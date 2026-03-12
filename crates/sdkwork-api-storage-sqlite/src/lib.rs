@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sdkwork_api_domain_catalog::{Channel, ProxyProvider};
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
@@ -52,6 +52,15 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS catalog_models (
+            external_name TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            PRIMARY KEY (external_name, provider_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
     Ok(pool)
 }
 
@@ -78,10 +87,11 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_channels(&self) -> Result<Vec<Channel>> {
-        let rows =
-            sqlx::query_as::<_, (String, String)>("SELECT id, name FROM catalog_channels ORDER BY id")
-                .fetch_all(&self.pool)
-                .await?;
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT id, name FROM catalog_channels ORDER BY id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows
             .into_iter()
             .map(|(id, name)| Channel { id, name })
@@ -141,10 +151,39 @@ impl SqliteAdminStore {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(tenant_id, provider_id, key_reference)| UpstreamCredential {
-                tenant_id,
+            .map(
+                |(tenant_id, provider_id, key_reference)| UpstreamCredential {
+                    tenant_id,
+                    provider_id,
+                    key_reference,
+                },
+            )
+            .collect())
+    }
+
+    pub async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {
+        sqlx::query(
+            "INSERT INTO catalog_models (external_name, provider_id) VALUES (?, ?)
+             ON CONFLICT(external_name, provider_id) DO NOTHING",
+        )
+        .bind(&model.external_name)
+        .bind(&model.provider_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(model.clone())
+    }
+
+    pub async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>> {
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT external_name, provider_id FROM catalog_models ORDER BY external_name, provider_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(external_name, provider_id)| ModelCatalogEntry {
+                external_name,
                 provider_id,
-                key_reference,
             })
             .collect())
     }

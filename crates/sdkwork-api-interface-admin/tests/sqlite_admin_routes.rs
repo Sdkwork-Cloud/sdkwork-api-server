@@ -154,5 +154,45 @@ async fn create_and_list_providers_and_credentials() {
         .unwrap();
 
     let credentials_json = read_json(credentials).await;
-    assert_eq!(credentials_json[0]["provider_id"], "provider-openai-official");
+    assert_eq!(
+        credentials_json[0]["provider_id"],
+        "provider-openai-official"
+    );
+}
+
+#[tokio::test]
+async fn create_and_list_models() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+
+    let create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openai-official\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+
+    let list = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/models")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let models_json = read_json(list).await;
+    assert_eq!(models_json[0]["external_name"], "gpt-4.1");
 }

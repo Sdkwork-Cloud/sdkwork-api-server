@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sdkwork_api_domain_catalog::{Channel, ProxyProvider};
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 
 pub fn service_name() -> &'static str {
@@ -35,4 +35,21 @@ pub async fn persist_provider(
 
 pub async fn list_providers(store: &SqliteAdminStore) -> Result<Vec<ProxyProvider>> {
     store.list_providers().await
+}
+
+pub fn create_model(external_name: &str, provider_id: &str) -> Result<ModelCatalogEntry> {
+    Ok(ModelCatalogEntry::new(external_name, provider_id))
+}
+
+pub async fn persist_model(
+    store: &SqliteAdminStore,
+    external_name: &str,
+    provider_id: &str,
+) -> Result<ModelCatalogEntry> {
+    let model = create_model(external_name, provider_id)?;
+    store.insert_model(&model).await
+}
+
+pub async fn list_model_entries(store: &SqliteAdminStore) -> Result<Vec<ModelCatalogEntry>> {
+    store.list_models().await
 }

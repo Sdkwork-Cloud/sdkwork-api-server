@@ -364,6 +364,7 @@ dependencies = [
  "axum",
  "sdkwork-api-config",
  "sdkwork-api-interface-http",
+ "sdkwork-api-storage-sqlite",
  "tokio",
 ]
 
@@ -888,6 +889,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "sdkwork-api-contract-openai",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-storage-sqlite",
+ "tokio",
 ]
 
 [[package]]
@@ -993,7 +997,11 @@ dependencies = [
  "axum",
  "sdkwork-api-app-gateway",
  "sdkwork-api-contract-openai",
+ "sdkwork-api-interface-admin",
+ "sdkwork-api-storage-sqlite",
  "serde",
+ "serde_json",
+ "sqlx",
  "tokio",
  "tower",
 ]

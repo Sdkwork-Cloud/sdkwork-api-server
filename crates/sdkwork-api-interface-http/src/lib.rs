@@ -1,5 +1,6 @@
 use axum::{
     extract::Json as ExtractJson,
+    extract::State,
     http::header,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -7,9 +8,24 @@ use axum::{
 };
 use sdkwork_api_app_gateway::create_chat_completion;
 use sdkwork_api_app_gateway::list_models;
-use sdkwork_api_app_gateway::{create_embedding, create_response};
+use sdkwork_api_app_gateway::{create_embedding, create_response, list_models_from_store};
 use sdkwork_api_contract_openai::streaming::SseFrame;
+use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::Deserialize;
+use sqlx::SqlitePool;
+
+#[derive(Debug, Clone)]
+pub struct GatewayApiState {
+    store: SqliteAdminStore,
+}
+
+impl GatewayApiState {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self {
+            store: SqliteAdminStore::new(pool),
+        }
+    }
+}
 
 pub fn gateway_router() -> Router {
     Router::new()
@@ -20,8 +36,33 @@ pub fn gateway_router() -> Router {
         .route("/v1/embeddings", post(embeddings_handler))
 }
 
+pub fn gateway_router_with_pool(pool: SqlitePool) -> Router {
+    Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .route("/v1/models", get(list_models_from_store_handler))
+        .route("/v1/chat/completions", post(chat_completions_handler))
+        .route("/v1/responses", post(responses_handler))
+        .route("/v1/embeddings", post(embeddings_handler))
+        .with_state(GatewayApiState::new(pool))
+}
+
 async fn list_models_handler() -> Json<sdkwork_api_contract_openai::models::ListModelsResponse> {
     Json(list_models("tenant-1", "project-1").expect("models response"))
+}
+
+async fn list_models_from_store_handler(
+    State(state): State<GatewayApiState>,
+) -> Result<Json<sdkwork_api_contract_openai::models::ListModelsResponse>, Response> {
+    list_models_from_store(&state.store, "tenant-1", "project-1")
+        .await
+        .map(Json)
+        .map_err(|_| {
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load models",
+            )
+                .into_response()
+        })
 }
 
 #[derive(Debug, Deserialize)]

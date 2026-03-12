@@ -9,8 +9,13 @@ axum.workspace = true
 serde.workspace = true
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+sqlx.workspace = true
 
 [dev-dependencies]
+sdkwork-api-interface-admin = { path = "../sdkwork-api-interface-admin" }
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+serde_json.workspace = true
 tokio.workspace = true
 tower.workspace = true
 

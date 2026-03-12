@@ -4,10 +4,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use sdkwork_api_app_catalog::{list_channels, list_providers, persist_channel, persist_provider};
+use sdkwork_api_app_catalog::{
+    list_channels, list_model_entries, list_providers, persist_channel, persist_model,
+    persist_provider,
+};
 use sdkwork_api_app_credential::{list_credentials, persist_credential};
 use sdkwork_api_app_identity::{issue_jwt, verify_jwt, Claims};
-use sdkwork_api_domain_catalog::{Channel, ProxyProvider};
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
@@ -57,6 +60,12 @@ struct CreateCredentialRequest {
     key_reference: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct CreateModelRequest {
+    external_name: String,
+    provider_id: String,
+}
+
 pub fn admin_router() -> Router {
     Router::new()
         .route("/admin/health", get(|| async { "ok" }))
@@ -96,7 +105,10 @@ pub fn admin_router_with_pool(pool: SqlitePool) -> Router {
             "/admin/credentials",
             get(list_credentials_handler).post(create_credential_handler),
         )
-        .route("/admin/models", get(|| async { "models" }))
+        .route(
+            "/admin/models",
+            get(list_models_handler).post(create_model_handler),
+        )
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route(
             "/admin/routing/simulations",
@@ -178,4 +190,23 @@ async fn create_credential_handler(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(credential)))
+}
+
+async fn list_models_handler(
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ModelCatalogEntry>>, StatusCode> {
+    list_model_entries(&state.store)
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_model_handler(
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateModelRequest>,
+) -> Result<(StatusCode, Json<ModelCatalogEntry>), StatusCode> {
+    let model = persist_model(&state.store, &request.external_name, &request.provider_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(model)))
 }
