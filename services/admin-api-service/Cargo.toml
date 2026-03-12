@@ -5,5 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+axum.workspace = true
+sdkwork-api-config = { path = "../../crates/sdkwork-api-config" }
 sdkwork-api-interface-admin = { path = "../../crates/sdkwork-api-interface-admin" }
-
+sdkwork-api-storage-sqlite = { path = "../../crates/sdkwork-api-storage-sqlite" }
+tokio.workspace = true

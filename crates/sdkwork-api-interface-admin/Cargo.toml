@@ -5,9 +5,22 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
+sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
+sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
+sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
+sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+sqlx.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+sqlx.workspace = true
 tokio.workspace = true
 tower.workspace = true
 

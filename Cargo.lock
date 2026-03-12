@@ -6,7 +6,12 @@ version = 4
 name = "admin-api-service"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "axum",
+ "sdkwork-api-config",
  "sdkwork-api-interface-admin",
+ "sdkwork-api-storage-sqlite",
+ "tokio",
 ]
 
 [[package]]
@@ -355,7 +360,11 @@ dependencies = [
 name = "gateway-service"
 version = "0.1.0"
 dependencies = [
- "sdkwork-api-kernel",
+ "anyhow",
+ "axum",
+ "sdkwork-api-config",
+ "sdkwork-api-interface-http",
+ "tokio",
 ]
 
 [[package]]
@@ -861,6 +870,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "sdkwork-api-domain-catalog",
+ "sdkwork-api-storage-sqlite",
 ]
 
 [[package]]
@@ -869,6 +879,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "sdkwork-api-domain-credential",
+ "sdkwork-api-storage-sqlite",
 ]
 
 [[package]]
@@ -929,10 +940,16 @@ version = "0.1.0"
 [[package]]
 name = "sdkwork-api-domain-catalog"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "sdkwork-api-domain-credential"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "sdkwork-api-domain-identity"
@@ -954,7 +971,17 @@ version = "0.1.0"
 name = "sdkwork-api-interface-admin"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "axum",
+ "sdkwork-api-app-catalog",
+ "sdkwork-api-app-credential",
+ "sdkwork-api-app-identity",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-domain-credential",
+ "sdkwork-api-storage-sqlite",
+ "serde",
+ "serde_json",
+ "sqlx",
  "tokio",
  "tower",
 ]
@@ -1043,6 +1070,8 @@ name = "sdkwork-api-storage-sqlite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-domain-credential",
  "sqlx",
  "tokio",
 ]

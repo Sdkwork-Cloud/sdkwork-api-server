@@ -1,4 +1,13 @@
-fn main() {
-    let _ = sdkwork_api_interface_admin::admin_router();
-    println!("admin-api-service");
+use sdkwork_api_config::StandaloneConfig;
+use sdkwork_api_interface_admin::admin_router_with_pool;
+use sdkwork_api_storage_sqlite::run_migrations;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let config = StandaloneConfig::default();
+    let pool = run_migrations(&config.database_url).await?;
+    let listener = TcpListener::bind(&config.admin_bind).await?;
+    axum::serve(listener, admin_router_with_pool(pool)).await?;
+    Ok(())
 }

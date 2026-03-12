@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 
 [lib]
 path = "src/lib.rs"

@@ -19,8 +19,10 @@ The current implementation includes the first project skeleton and the first wor
 - OpenAI contract crates
 - canonical gateway contract crate
 - domain and storage abstractions
+- SQLite-backed admin persistence for channels, providers, and credentials
 - secret and identity primitives
-- admin and gateway HTTP interface skeleton
+- admin and gateway HTTP interfaces
+- standalone `gateway-service` and `admin-api-service` HTTP startup wiring
 - `/v1/models`
 - `/v1/chat/completions`
 - `/v1/responses`
