@@ -1,0 +1,9 @@
+[package]
+name = "admin-api-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sdkwork-api-interface-admin = { path = "../../crates/sdkwork-api-interface-admin" }
+

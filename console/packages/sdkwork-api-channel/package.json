@@ -1,0 +1,22 @@
+{
+  "name": "sdkwork-api-channel",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.tsx",
+  "module": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": {
+      "import": "./src/index.tsx",
+      "types": "./src/index.tsx"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0"
+  }
+}
+

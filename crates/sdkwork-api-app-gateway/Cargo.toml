@@ -1,0 +1,12 @@
+[package]
+name = "sdkwork-api-app-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS tenant_projects (
+    id TEXT PRIMARY KEY NOT NULL,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL
+);
+

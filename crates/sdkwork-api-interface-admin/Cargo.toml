@@ -1,0 +1,15 @@
+[package]
+name = "sdkwork-api-interface-admin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true
+
+[lib]
+path = "src/lib.rs"

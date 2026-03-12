@@ -1,10 +1,40 @@
 [workspace]
 members = [
+    "crates/sdkwork-api-app-billing",
+    "crates/sdkwork-api-app-catalog",
+    "crates/sdkwork-api-app-credential",
+    "crates/sdkwork-api-app-gateway",
+    "crates/sdkwork-api-app-routing",
+    "crates/sdkwork-api-app-usage",
+    "crates/sdkwork-api-app-identity",
     "crates/sdkwork-api-config",
     "crates/sdkwork-api-contract-gateway",
     "crates/sdkwork-api-contract-openai",
+    "crates/sdkwork-api-domain-billing",
+    "crates/sdkwork-api-domain-catalog",
+    "crates/sdkwork-api-domain-credential",
+    "crates/sdkwork-api-domain-identity",
+    "crates/sdkwork-api-domain-routing",
+    "crates/sdkwork-api-domain-tenant",
+    "crates/sdkwork-api-domain-usage",
     "crates/sdkwork-api-kernel",
     "crates/sdkwork-api-observability",
+    "crates/sdkwork-api-provider-core",
+    "crates/sdkwork-api-provider-ollama",
+    "crates/sdkwork-api-provider-openai",
+    "crates/sdkwork-api-provider-openrouter",
+    "crates/sdkwork-api-runtime-host",
+    "crates/sdkwork-api-secret-core",
+    "crates/sdkwork-api-secret-keyring",
+    "crates/sdkwork-api-secret-local",
+    "crates/sdkwork-api-storage-core",
+    "crates/sdkwork-api-storage-libsql",
+    "crates/sdkwork-api-storage-mysql",
+    "crates/sdkwork-api-storage-postgres",
+    "crates/sdkwork-api-storage-sqlite",
+    "crates/sdkwork-api-interface-admin",
+    "crates/sdkwork-api-interface-http",
+    "services/admin-api-service",
     "services/gateway-service",
 ]
 resolver = "2"
@@ -15,5 +45,12 @@ version = "0.1.0"
 license = "MIT"
 
 [workspace.dependencies]
+anyhow = "1.0"
+axum = "0.8"
+base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite"] }
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util"] }

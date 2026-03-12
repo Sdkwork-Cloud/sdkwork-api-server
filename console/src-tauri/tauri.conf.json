@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SDKWork API Console",
+  "version": "0.1.0",
+  "identifier": "com.sdkwork.api.console",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "SDKWork API Console",
+        "width": 1280,
+        "height": 900
+      }
+    ]
+  }
+}

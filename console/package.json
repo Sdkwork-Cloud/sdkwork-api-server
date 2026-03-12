@@ -10,14 +10,20 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sdkwork-api-channel": "workspace:*",
+    "sdkwork-api-core": "workspace:*",
+    "sdkwork-api-routing": "workspace:*",
+    "sdkwork-api-runtime": "workspace:*",
+    "sdkwork-api-usage": "workspace:*",
+    "sdkwork-api-workspace": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^5.0.0",
+    "turbo": "^2.5.8",
     "typescript": "^5.8.2",
     "vite": "^7.0.0"
   }
 }
-

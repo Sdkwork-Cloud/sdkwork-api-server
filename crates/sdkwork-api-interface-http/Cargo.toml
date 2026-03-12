@@ -1,0 +1,18 @@
+[package]
+name = "sdkwork-api-interface-http"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+serde.workspace = true
+sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
+sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true
+
+[lib]
+path = "src/lib.rs"
