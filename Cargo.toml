@@ -1,6 +1,8 @@
 [workspace]
 members = [
+    "crates/sdkwork-api-config",
     "crates/sdkwork-api-kernel",
+    "crates/sdkwork-api-observability",
     "services/gateway-service",
 ]
 resolver = "2"
