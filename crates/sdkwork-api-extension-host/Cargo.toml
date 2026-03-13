@@ -1,0 +1,9 @@
+[package]
+name = "sdkwork-api-extension-host"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
+

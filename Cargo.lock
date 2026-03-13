@@ -1465,6 +1465,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sdkwork-api-extension-host"
+version = "0.1.0"
+dependencies = [
+ "sdkwork-api-extension-core",
+]
+
+[[package]]
 name = "sdkwork-api-interface-admin"
 version = "0.1.0"
 dependencies = [
