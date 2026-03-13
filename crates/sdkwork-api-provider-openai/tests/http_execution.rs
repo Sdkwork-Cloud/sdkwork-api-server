@@ -98,6 +98,121 @@ async fn adapter_posts_legacy_completions_to_openai_compatible_upstream() {
 }
 
 #[tokio::test]
+async fn adapter_posts_responses_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/responses", post(capture_responses_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::responses::CreateResponseRequest {
+        model: "gpt-4.1".to_owned(),
+        input: Value::String("hello".to_owned()),
+        stream: Some(false),
+    };
+
+    let response = adapter
+        .responses("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "resp_upstream");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_retrieves_response_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/resp_1",
+            get(capture_response_retrieve_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .retrieve_response("sk-upstream-openai", "resp_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "resp_1");
+}
+
+#[tokio::test]
+async fn adapter_lists_response_input_items_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/resp_1/input_items",
+            get(capture_response_input_items_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .list_response_input_items("sk-upstream-openai", "resp_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["data"][0]["id"], "item_1");
+}
+
+#[tokio::test]
+async fn adapter_deletes_response_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/resp_1",
+            delete(capture_response_delete_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .delete_response("sk-upstream-openai", "resp_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["deleted"], true);
+}
+
+#[tokio::test]
 async fn adapter_posts_moderations_to_openai_compatible_upstream() {
     let state = CaptureState::default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -2203,6 +2318,89 @@ async fn capture_fine_tuning_cancel_request(
             "object":"fine_tuning.job",
             "model":"gpt-4.1-mini",
             "status":"cancelled"
+        })),
+    )
+}
+
+async fn capture_responses_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"resp_upstream",
+            "object":"response",
+            "model":"gpt-4.1",
+            "output":[]
+        })),
+    )
+}
+
+async fn capture_response_retrieve_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"resp_1",
+            "object":"response",
+            "model":"gpt-4.1",
+            "output":[]
+        })),
+    )
+}
+
+async fn capture_response_input_items_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "id":"item_1",
+                "object":"response.input_item",
+                "type":"message"
+            }]
+        })),
+    )
+}
+
+async fn capture_response_delete_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"resp_1",
+            "object":"response.deleted",
+            "deleted":true
         })),
     )
 }

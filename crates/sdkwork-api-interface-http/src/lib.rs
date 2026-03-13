@@ -41,6 +41,7 @@ use sdkwork_api_app_gateway::create_video;
 use sdkwork_api_app_gateway::create_webhook;
 use sdkwork_api_app_gateway::delete_assistant;
 use sdkwork_api_app_gateway::delete_file;
+use sdkwork_api_app_gateway::delete_response;
 use sdkwork_api_app_gateway::delete_vector_store;
 use sdkwork_api_app_gateway::delete_vector_store_file;
 use sdkwork_api_app_gateway::delete_video;
@@ -52,6 +53,7 @@ use sdkwork_api_app_gateway::get_file;
 use sdkwork_api_app_gateway::get_fine_tuning_job;
 use sdkwork_api_app_gateway::get_model;
 use sdkwork_api_app_gateway::get_model_from_store;
+use sdkwork_api_app_gateway::get_response;
 use sdkwork_api_app_gateway::get_vector_store;
 use sdkwork_api_app_gateway::get_vector_store_file;
 use sdkwork_api_app_gateway::get_vector_store_file_batch;
@@ -62,6 +64,7 @@ use sdkwork_api_app_gateway::list_batches;
 use sdkwork_api_app_gateway::list_files;
 use sdkwork_api_app_gateway::list_fine_tuning_jobs;
 use sdkwork_api_app_gateway::list_models;
+use sdkwork_api_app_gateway::list_response_input_items;
 use sdkwork_api_app_gateway::list_vector_store_file_batch_files;
 use sdkwork_api_app_gateway::list_vector_store_files;
 use sdkwork_api_app_gateway::list_vector_stores;
@@ -80,25 +83,27 @@ use sdkwork_api_app_gateway::{
     relay_chat_completion_from_store, relay_chat_completion_stream_from_store,
     relay_complete_upload_from_store, relay_completion_from_store,
     relay_delete_assistant_from_store, relay_delete_file_from_store,
-    relay_delete_vector_store_file_from_store, relay_delete_vector_store_from_store,
-    relay_delete_video_from_store, relay_delete_webhook_from_store, relay_embedding_from_store,
-    relay_eval_from_store, relay_file_content_from_store, relay_file_from_store,
-    relay_fine_tuning_job_from_store, relay_get_assistant_from_store, relay_get_batch_from_store,
-    relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
+    relay_delete_response_from_store, relay_delete_vector_store_file_from_store,
+    relay_delete_vector_store_from_store, relay_delete_video_from_store,
+    relay_delete_webhook_from_store, relay_embedding_from_store, relay_eval_from_store,
+    relay_file_content_from_store, relay_file_from_store, relay_fine_tuning_job_from_store,
+    relay_get_assistant_from_store, relay_get_batch_from_store, relay_get_file_from_store,
+    relay_get_fine_tuning_job_from_store, relay_get_response_from_store,
     relay_get_vector_store_file_batch_from_store, relay_get_vector_store_file_from_store,
     relay_get_vector_store_from_store, relay_get_video_from_store, relay_get_webhook_from_store,
     relay_image_generation_from_store, relay_list_assistants_from_store,
     relay_list_batches_from_store, relay_list_files_from_store,
-    relay_list_fine_tuning_jobs_from_store, relay_list_vector_store_file_batch_files_from_store,
-    relay_list_vector_store_files_from_store, relay_list_vector_stores_from_store,
-    relay_list_videos_from_store, relay_list_webhooks_from_store, relay_moderation_from_store,
-    relay_realtime_session_from_store, relay_remix_video_from_store, relay_response_from_store,
-    relay_search_vector_store_from_store, relay_speech_from_store, relay_transcription_from_store,
-    relay_translation_from_store, relay_update_assistant_from_store,
-    relay_update_vector_store_from_store, relay_update_webhook_from_store, relay_upload_from_store,
-    relay_upload_part_from_store, relay_vector_store_file_batch_from_store,
-    relay_vector_store_file_from_store, relay_vector_store_from_store,
-    relay_video_content_from_store, relay_video_from_store, relay_webhook_from_store,
+    relay_list_fine_tuning_jobs_from_store, relay_list_response_input_items_from_store,
+    relay_list_vector_store_file_batch_files_from_store, relay_list_vector_store_files_from_store,
+    relay_list_vector_stores_from_store, relay_list_videos_from_store,
+    relay_list_webhooks_from_store, relay_moderation_from_store, relay_realtime_session_from_store,
+    relay_remix_video_from_store, relay_response_from_store, relay_search_vector_store_from_store,
+    relay_speech_from_store, relay_transcription_from_store, relay_translation_from_store,
+    relay_update_assistant_from_store, relay_update_vector_store_from_store,
+    relay_update_webhook_from_store, relay_upload_from_store, relay_upload_part_from_store,
+    relay_vector_store_file_batch_from_store, relay_vector_store_file_from_store,
+    relay_vector_store_from_store, relay_video_content_from_store, relay_video_from_store,
+    relay_webhook_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
@@ -116,7 +121,9 @@ use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
-use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::responses::{
+    CreateResponseRequest, DeleteResponseResponse, ListResponseInputItemsResponse, ResponseObject,
+};
 use sdkwork_api_contract_openai::streaming::SseFrame;
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
@@ -175,6 +182,14 @@ pub fn gateway_router() -> Router {
         .route("/v1/chat/completions", post(chat_completions_handler))
         .route("/v1/completions", post(completions_handler))
         .route("/v1/responses", post(responses_handler))
+        .route(
+            "/v1/responses/{response_id}",
+            get(response_retrieve_handler).delete(response_delete_handler),
+        )
+        .route(
+            "/v1/responses/{response_id}/input_items",
+            get(response_input_items_list_handler),
+        )
         .route("/v1/embeddings", post(embeddings_handler))
         .route("/v1/moderations", post(moderations_handler))
         .route("/v1/images/generations", post(image_generations_handler))
@@ -332,6 +347,14 @@ pub fn gateway_router_with_store_and_secret_manager(
         )
         .route("/v1/completions", post(completions_with_state_handler))
         .route("/v1/responses", post(responses_with_state_handler))
+        .route(
+            "/v1/responses/{response_id}",
+            get(response_retrieve_with_state_handler).delete(response_delete_with_state_handler),
+        )
+        .route(
+            "/v1/responses/{response_id}/input_items",
+            get(response_input_items_list_with_state_handler),
+        )
         .route("/v1/embeddings", post(embeddings_with_state_handler))
         .route("/v1/moderations", post(moderations_with_state_handler))
         .route(
@@ -546,8 +569,25 @@ async fn chat_completions_handler(
 
 async fn responses_handler(
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
-) -> Json<sdkwork_api_contract_openai::responses::ResponseObject> {
+) -> Json<ResponseObject> {
     Json(create_response("tenant-1", "project-1", &request.model).expect("response"))
+}
+
+async fn response_retrieve_handler(Path(response_id): Path<String>) -> Json<ResponseObject> {
+    Json(get_response("tenant-1", "project-1", &response_id).expect("response retrieve"))
+}
+
+async fn response_input_items_list_handler(
+    Path(response_id): Path<String>,
+) -> Json<ListResponseInputItemsResponse> {
+    Json(
+        list_response_input_items("tenant-1", "project-1", &response_id)
+            .expect("response input items"),
+    )
+}
+
+async fn response_delete_handler(Path(response_id): Path<String>) -> Json<DeleteResponseResponse> {
+    Json(delete_response("tenant-1", "project-1", &response_id).expect("response delete"))
 }
 
 async fn completions_handler(
@@ -1167,6 +1207,165 @@ async fn responses_with_state_handler(
     }
 
     Json(create_response("tenant-1", "project-1", &request.model).expect("response"))
+        .into_response()
+}
+
+async fn response_retrieve_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_get_response_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &response_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(get_response("tenant-1", "project-1", &response_id).expect("response retrieve"))
+        .into_response()
+}
+
+async fn response_input_items_list_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_list_response_input_items_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &response_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response input items",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        list_response_input_items("tenant-1", "project-1", &response_id)
+            .expect("response input items"),
+    )
+    .into_response()
+}
+
+async fn response_delete_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_delete_response_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &response_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "responses", &response_id, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(delete_response("tenant-1", "project-1", &response_id).expect("response delete"))
         .into_response()
 }
 

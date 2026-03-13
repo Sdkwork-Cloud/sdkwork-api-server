@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::Value;
 use sqlx::SqlitePool;
@@ -18,6 +18,59 @@ async fn responses_route_returns_ok() {
                 .uri("/v1/responses")
                 .header("content-type", "application/json")
                 .body(Body::from("{\"model\":\"gpt-4.1\",\"input\":\"hi\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response_retrieve_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/responses/resp_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response_input_items_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/responses/resp_1/input_items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response_delete_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/responses/resp_1")
+                .body(Body::empty())
                 .unwrap(),
         )
         .await
@@ -51,6 +104,14 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
         .route("/v1/responses", post(upstream_responses_handler))
+        .route(
+            "/v1/responses/resp_1",
+            get(upstream_response_retrieve_handler).delete(upstream_response_delete_handler),
+        )
+        .route(
+            "/v1/responses/resp_1/input_items",
+            get(upstream_response_input_items_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
@@ -126,6 +187,7 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     assert_eq!(model.status(), StatusCode::CREATED);
 
     let response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -144,6 +206,53 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
+
+    let retrieve_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/responses/resp_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(retrieve_response.status(), StatusCode::OK);
+    let retrieve_json = read_json(retrieve_response).await;
+    assert_eq!(retrieve_json["id"], "resp_1");
+
+    let input_items_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/responses/resp_1/input_items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(input_items_response.status(), StatusCode::OK);
+    let input_items_json = read_json(input_items_response).await;
+    assert_eq!(input_items_json["data"][0]["id"], "item_1");
+
+    let delete_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/responses/resp_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(delete_response.status(), StatusCode::OK);
+    let delete_json = read_json(delete_response).await;
+    assert_eq!(delete_json["deleted"], true);
 }
 
 async fn upstream_responses_handler(
@@ -162,6 +271,67 @@ async fn upstream_responses_handler(
             "object":"response",
             "model":"gpt-4.1",
             "output":[]
+        })),
+    )
+}
+
+async fn upstream_response_retrieve_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"resp_1",
+            "object":"response",
+            "model":"gpt-4.1",
+            "output":[]
+        })),
+    )
+}
+
+async fn upstream_response_input_items_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"list",
+            "data":[{
+                "id":"item_1",
+                "object":"response.input_item",
+                "type":"message"
+            }]
+        })),
+    )
+}
+
+async fn upstream_response_delete_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"resp_1",
+            "object":"response.deleted",
+            "deleted":true
         })),
     )
 }

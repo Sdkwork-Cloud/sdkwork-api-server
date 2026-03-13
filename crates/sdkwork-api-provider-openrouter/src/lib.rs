@@ -73,6 +73,24 @@ impl OpenRouterProviderAdapter {
         self.delegate.responses(api_key, request).await
     }
 
+    pub async fn retrieve_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
+        self.delegate.retrieve_response(api_key, response_id).await
+    }
+
+    pub async fn delete_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
+        self.delegate.delete_response(api_key, response_id).await
+    }
+
+    pub async fn list_response_input_items(
+        &self,
+        api_key: &str,
+        response_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .list_response_input_items(api_key, response_id)
+            .await
+    }
+
     pub async fn completions(
         &self,
         api_key: &str,
@@ -471,6 +489,15 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             )),
             ProviderRequest::Responses(request) => Ok(ProviderOutput::Json(
                 self.responses(api_key, request).await?,
+            )),
+            ProviderRequest::ResponsesRetrieve(response_id) => Ok(ProviderOutput::Json(
+                self.retrieve_response(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesDelete(response_id) => Ok(ProviderOutput::Json(
+                self.delete_response(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesInputItemsList(response_id) => Ok(ProviderOutput::Json(
+                self.list_response_input_items(api_key, response_id).await?,
             )),
             ProviderRequest::Embeddings(request) => Ok(ProviderOutput::Json(
                 self.embeddings(api_key, request).await?,

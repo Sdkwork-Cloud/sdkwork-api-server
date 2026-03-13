@@ -29,8 +29,10 @@ use sdkwork_api_contract_openai::moderations::{
     CreateModerationRequest, ModerationCategoryScores, ModerationResponse, ModerationResult,
 };
 use sdkwork_api_contract_openai::realtime::{CreateRealtimeSessionRequest, RealtimeSessionObject};
-use sdkwork_api_contract_openai::responses::CreateResponseRequest;
-use sdkwork_api_contract_openai::responses::ResponseObject;
+use sdkwork_api_contract_openai::responses::{
+    CreateResponseRequest, DeleteResponseResponse, ListResponseInputItemsResponse,
+    ResponseInputItemObject, ResponseObject,
+};
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest, UploadObject,
     UploadPartObject,
@@ -172,6 +174,87 @@ pub async fn relay_response_from_store(
         provider.base_url,
         &api_key,
         ProviderRequest::Responses(request),
+    )
+    .await
+}
+
+pub async fn relay_get_response_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", response_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesRetrieve(response_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_response_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", response_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesDelete(response_id),
+    )
+    .await
+}
+
+pub async fn relay_list_response_input_items_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", response_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesInputItemsList(response_id),
     )
     .await
 }
@@ -1707,6 +1790,32 @@ pub fn create_chat_completion(
 
 pub fn create_response(_tenant_id: &str, _project_id: &str, model: &str) -> Result<ResponseObject> {
     Ok(ResponseObject::empty("resp_1", model))
+}
+
+pub fn get_response(
+    _tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<ResponseObject> {
+    Ok(ResponseObject::empty(response_id, "gpt-4.1"))
+}
+
+pub fn list_response_input_items(
+    _tenant_id: &str,
+    _project_id: &str,
+    _response_id: &str,
+) -> Result<ListResponseInputItemsResponse> {
+    Ok(ListResponseInputItemsResponse::new(vec![
+        ResponseInputItemObject::message("item_1"),
+    ]))
+}
+
+pub fn delete_response(
+    _tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<DeleteResponseResponse> {
+    Ok(DeleteResponseResponse::deleted(response_id))
 }
 
 pub fn create_completion(
