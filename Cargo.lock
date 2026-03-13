@@ -1458,6 +1458,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sdkwork-api-extension-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "sdkwork-api-interface-admin"
 version = "0.1.0"
 dependencies = [
