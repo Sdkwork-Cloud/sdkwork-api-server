@@ -44,11 +44,12 @@ The current repository includes:
   - `os_keyring`
 - per-credential backend tracking so previously stored secrets can still be resolved after a default backend switch
 - environment-driven standalone config loading for bind addresses, database URL, secret backend, credential master key, local secret file path, and keyring service name
-- signed admin JWT authentication for the control plane
+- signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
 - a built-in extension host with manifest registration for OpenAI, OpenRouter, and Ollama provider extensions
 - persisted extension installation and instance records for configuration-driven mounting
 - provider runtime dispatch keyed by `ProxyProvider.extension_id`, with `adapter_kind` kept as a compatibility alias for older records and protocol classification
+- real provider dispatch now consumes persisted extension load state so instance-level `base_url` overrides are honored and disabled installations or instances short-circuit to local fallback
 
 ## Extension Runtime Status
 

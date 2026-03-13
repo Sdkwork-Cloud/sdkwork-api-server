@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_config::StandaloneConfig;
-use sdkwork_api_interface_admin::admin_router_with_store_and_secret_manager;
+use sdkwork_api_interface_admin::admin_router_with_store_and_secret_manager_and_jwt_secret;
 use sdkwork_api_storage_core::{AdminStore, StorageDialect};
 use sdkwork_api_storage_postgres::{run_migrations as run_postgres_migrations, PostgresAdminStore};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
@@ -37,7 +37,11 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(&config.admin_bind).await?;
     axum::serve(
         listener,
-        admin_router_with_store_and_secret_manager(store, secret_manager),
+        admin_router_with_store_and_secret_manager_and_jwt_secret(
+            store,
+            secret_manager,
+            config.admin_jwt_signing_secret,
+        ),
     )
     .await?;
     Ok(())

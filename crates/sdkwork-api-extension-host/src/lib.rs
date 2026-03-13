@@ -55,6 +55,7 @@ pub struct ExtensionLoadPlan {
     pub instance_id: String,
     pub installation_id: String,
     pub extension_id: String,
+    pub enabled: bool,
     pub runtime: sdkwork_api_extension_core::ExtensionRuntime,
     pub display_name: String,
     pub entrypoint: Option<String>,
@@ -181,6 +182,7 @@ impl ExtensionHost {
             instance_id: instance.instance_id.clone(),
             installation_id: installation.installation_id.clone(),
             extension_id: manifest.id.clone(),
+            enabled: installation.enabled && instance.enabled,
             runtime: installation.runtime.clone(),
             display_name: manifest.display_name.clone(),
             entrypoint: installation

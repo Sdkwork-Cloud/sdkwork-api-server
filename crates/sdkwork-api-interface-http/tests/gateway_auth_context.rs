@@ -83,3 +83,49 @@ async fn stateful_gateway_requires_api_key_and_uses_request_context() {
     let ledger_json = read_json(ledger).await;
     assert_eq!(ledger_json[0]["project_id"], "project-live");
 }
+
+#[tokio::test]
+async fn stateful_moderations_route_requires_gateway_api_key() {
+    let pool = memory_pool().await;
+    let _api_key = support::issue_gateway_api_key(&pool, "tenant-live", "project-live").await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let unauthorized = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/moderations")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"omni-moderation-latest\",\"input\":\"hi\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn stateful_images_generation_route_requires_gateway_api_key() {
+    let pool = memory_pool().await;
+    let _api_key = support::issue_gateway_api_key(&pool, "tenant-live", "project-live").await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let unauthorized = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/images/generations")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-image-1\",\"prompt\":\"draw a lighthouse\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+}

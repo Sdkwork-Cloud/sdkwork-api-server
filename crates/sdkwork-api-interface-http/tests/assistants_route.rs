@@ -143,6 +143,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let _ = admin_app
@@ -219,6 +220,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("POST")
                 .uri("/v1/assistants")
+                .header("authorization", format!("Bearer {api_key}"))
                 .header("content-type", "application/json")
                 .body(Body::from("{\"name\":\"Support\",\"model\":\"gpt-4.1\"}"))
                 .unwrap(),
@@ -240,6 +242,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("GET")
                 .uri("/v1/assistants")
+                .header("authorization", format!("Bearer {api_key}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -257,6 +260,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("GET")
                 .uri("/v1/assistants/asst_1")
+                .header("authorization", format!("Bearer {api_key}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -273,6 +277,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("POST")
                 .uri("/v1/assistants/asst_1")
+                .header("authorization", format!("Bearer {api_key}"))
                 .header("content-type", "application/json")
                 .body(Body::from("{\"name\":\"Support v2\"}"))
                 .unwrap(),
@@ -289,6 +294,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("DELETE")
                 .uri("/v1/assistants/asst_1")
+                .header("authorization", format!("Bearer {api_key}"))
                 .body(Body::empty())
                 .unwrap(),
         )

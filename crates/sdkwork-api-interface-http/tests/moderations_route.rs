@@ -62,6 +62,7 @@ async fn stateful_moderations_route_relays_to_openai_compatible_provider() {
     });
 
     let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
@@ -139,6 +140,7 @@ async fn stateful_moderations_route_relays_to_openai_compatible_provider() {
             Request::builder()
                 .method("POST")
                 .uri("/v1/moderations")
+                .header("authorization", format!("Bearer {api_key}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"model\":\"omni-moderation-latest\",\"input\":\"relay me\"}",
@@ -155,6 +157,66 @@ async fn stateful_moderations_route_relays_to_openai_compatible_provider() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
+}
+
+#[tokio::test]
+async fn stateful_moderations_route_records_usage_and_billing_for_authenticated_project() {
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-live", "project-live").await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/moderations")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"omni-moderation-latest\",\"input\":\"hi\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json[0]["project_id"], "project-live");
+    assert_eq!(usage_json[0]["model"], "omni-moderation-latest");
+
+    let ledger = admin_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/billing/ledger")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(ledger.status(), StatusCode::OK);
+    let ledger_json = read_json(ledger).await;
+    assert_eq!(ledger_json[0]["project_id"], "project-live");
 }
 
 async fn upstream_moderations_handler(

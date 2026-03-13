@@ -15,6 +15,10 @@ fn standalone_defaults_are_local_friendly() {
     assert_eq!(config.admin_bind, "127.0.0.1:8081");
     assert_eq!(config.database_url, "sqlite://sdkwork-api-server.db");
     assert_eq!(config.secret_backend, SecretBackendKind::DatabaseEncrypted);
+    assert_eq!(
+        config.admin_jwt_signing_secret,
+        "local-dev-admin-jwt-secret"
+    );
     assert_eq!(config.storage_dialect().unwrap(), StorageDialect::Sqlite);
 }
 
@@ -68,6 +72,7 @@ fn builds_config_from_pairs() {
         ),
         ("SDKWORK_SECRET_BACKEND", "os_keyring"),
         ("SDKWORK_CREDENTIAL_MASTER_KEY", "prod-master-key"),
+        ("SDKWORK_ADMIN_JWT_SIGNING_SECRET", "prod-admin-jwt-secret"),
     ])
     .unwrap();
 
@@ -75,6 +80,7 @@ fn builds_config_from_pairs() {
     assert_eq!(config.admin_bind, "0.0.0.0:9001");
     assert_eq!(config.secret_backend, SecretBackendKind::OsKeyring);
     assert_eq!(config.credential_master_key, "prod-master-key");
+    assert_eq!(config.admin_jwt_signing_secret, "prod-admin-jwt-secret");
     assert_eq!(config.storage_dialect().unwrap(), StorageDialect::Postgres);
 }
 

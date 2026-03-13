@@ -119,12 +119,13 @@ use sdkwork_api_app_gateway::update_webhook;
 use sdkwork_api_app_gateway::video_content;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, delete_model_from_store, list_models_from_store,
-    relay_assistant_from_store, relay_batch_from_store, relay_cancel_batch_from_store,
-    relay_cancel_fine_tuning_job_from_store, relay_cancel_response_from_store,
-    relay_cancel_thread_run_from_store, relay_cancel_upload_from_store,
-    relay_cancel_vector_store_file_batch_from_store, relay_chat_completion_from_store,
-    relay_chat_completion_stream_from_store, relay_compact_response_from_store,
-    relay_complete_upload_from_store, relay_completion_from_store, relay_conversation_from_store,
+    planned_execution_provider_id_for_route, relay_assistant_from_store, relay_batch_from_store,
+    relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
+    relay_cancel_response_from_store, relay_cancel_thread_run_from_store,
+    relay_cancel_upload_from_store, relay_cancel_vector_store_file_batch_from_store,
+    relay_chat_completion_from_store, relay_chat_completion_stream_from_store,
+    relay_compact_response_from_store, relay_complete_upload_from_store,
+    relay_completion_from_store, relay_conversation_from_store,
     relay_conversation_items_from_store, relay_count_response_input_tokens_from_store,
     relay_delete_assistant_from_store, relay_delete_chat_completion_from_store,
     relay_delete_conversation_from_store, relay_delete_conversation_item_from_store,
@@ -167,7 +168,6 @@ use sdkwork_api_app_gateway::{
 use sdkwork_api_app_identity::{
     resolve_gateway_request_context, GatewayRequestContext as IdentityGatewayRequestContext,
 };
-use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
 use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
@@ -1286,7 +1286,7 @@ async fn translations_handler(
 }
 
 async fn audio_speech_handler(ExtractJson(request): ExtractJson<CreateSpeechRequest>) -> Response {
-    local_speech_response(&request)
+    local_speech_response("tenant-1", "project-1", &request)
 }
 
 async fn files_handler(multipart: Multipart) -> Response {
@@ -1315,7 +1315,7 @@ async fn file_delete_handler(
 }
 
 async fn file_content_handler(Path(file_id): Path<String>) -> Response {
-    local_file_content_response(&file_id)
+    local_file_content_response("tenant-1", "project-1", &file_id)
 }
 
 async fn videos_handler(
@@ -1341,7 +1341,7 @@ async fn video_delete_handler(
 }
 
 async fn video_content_handler(Path(video_id): Path<String>) -> Response {
-    local_video_content_response(&video_id)
+    local_video_content_response("tenant-1", "project-1", &video_id)
 }
 
 async fn video_remix_handler(
@@ -1686,6 +1686,7 @@ async fn chat_completions_with_state_handler(
             Ok(Some(response)) => {
                 let usage_result = record_gateway_usage_for_project(
                     state.store.as_ref(),
+                    request_context.tenant_id(),
                     request_context.project_id(),
                     "chat_completion",
                     &request.model,
@@ -1725,6 +1726,7 @@ async fn chat_completions_with_state_handler(
             Ok(Some(response)) => {
                 let usage_result = record_gateway_usage_for_project(
                     state.store.as_ref(),
+                    request_context.tenant_id(),
                     request_context.project_id(),
                     "chat_completion",
                     &request.model,
@@ -1755,6 +1757,7 @@ async fn chat_completions_with_state_handler(
 
     let usage_result = record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         &request.model,
@@ -1805,6 +1808,7 @@ async fn chat_completions_list_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "chat_completion",
                 "chat_completions",
@@ -1835,6 +1839,7 @@ async fn chat_completions_list_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         "chat_completions",
@@ -1875,6 +1880,7 @@ async fn chat_completion_retrieve_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "chat_completion",
                 &completion_id,
@@ -1905,6 +1911,7 @@ async fn chat_completion_retrieve_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         &completion_id,
@@ -1951,6 +1958,7 @@ async fn chat_completion_update_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "chat_completion",
                 &completion_id,
@@ -1981,6 +1989,7 @@ async fn chat_completion_update_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         &completion_id,
@@ -2026,6 +2035,7 @@ async fn chat_completion_delete_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "chat_completion",
                 &completion_id,
@@ -2056,6 +2066,7 @@ async fn chat_completion_delete_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         &completion_id,
@@ -2100,6 +2111,7 @@ async fn chat_completion_messages_list_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "chat_completion",
                 &completion_id,
@@ -2130,6 +2142,7 @@ async fn chat_completion_messages_list_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "chat_completion",
         &completion_id,
@@ -2158,22 +2171,31 @@ async fn chat_completion_messages_list_with_state_handler(
 }
 
 async fn conversations_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateConversationRequest>,
 ) -> Response {
     match relay_conversation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "responses", "conversations", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "responses",
+                "conversations",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2194,9 +2216,17 @@ async fn conversations_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "responses", "conversations", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "responses",
+        "conversations",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2205,22 +2235,37 @@ async fn conversations_with_state_handler(
             .into_response();
     }
 
-    Json(create_conversation("tenant-1", "project-1").expect("conversation")).into_response()
+    Json(
+        create_conversation(request_context.tenant_id(), request_context.project_id())
+            .expect("conversation"),
+    )
+    .into_response()
 }
 
-async fn conversations_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn conversations_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_conversations_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "responses", "conversations", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "responses",
+                "conversations",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2241,9 +2286,17 @@ async fn conversations_list_with_state_handler(State(state): State<GatewayApiSta
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "responses", "conversations", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "responses",
+        "conversations",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2252,25 +2305,32 @@ async fn conversations_list_with_state_handler(State(state): State<GatewayApiSta
             .into_response();
     }
 
-    Json(list_conversations("tenant-1", "project-1").expect("conversation list")).into_response()
+    Json(
+        list_conversations(request_context.tenant_id(), request_context.project_id())
+            .expect("conversation list"),
+    )
+    .into_response()
 }
 
 async fn conversation_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(conversation_id): Path<String>,
 ) -> Response {
     match relay_get_conversation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "responses",
                 &conversation_id,
                 20,
@@ -2298,8 +2358,10 @@ async fn conversation_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "responses",
         &conversation_id,
         20,
@@ -2315,11 +2377,19 @@ async fn conversation_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_conversation("tenant-1", "project-1", &conversation_id).expect("conversation"))
-        .into_response()
+    Json(
+        get_conversation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation"),
+    )
+    .into_response()
 }
 
 async fn conversation_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(conversation_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateConversationRequest>,
@@ -2327,16 +2397,18 @@ async fn conversation_update_with_state_handler(
     match relay_update_conversation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "responses",
                 &conversation_id,
                 20,
@@ -2364,8 +2436,10 @@ async fn conversation_update_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "responses",
         &conversation_id,
         20,
@@ -2383,8 +2457,8 @@ async fn conversation_update_with_state_handler(
 
     Json(
         update_conversation(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &conversation_id,
             request.metadata.unwrap_or(serde_json::json!({})),
         )
@@ -2394,21 +2468,24 @@ async fn conversation_update_with_state_handler(
 }
 
 async fn conversation_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(conversation_id): Path<String>,
 ) -> Response {
     match relay_delete_conversation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "responses",
                 &conversation_id,
                 20,
@@ -2436,8 +2513,10 @@ async fn conversation_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "responses",
         &conversation_id,
         20,
@@ -2454,13 +2533,18 @@ async fn conversation_delete_with_state_handler(
     }
 
     Json(
-        delete_conversation("tenant-1", "project-1", &conversation_id)
-            .expect("conversation delete"),
+        delete_conversation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation delete"),
     )
     .into_response()
 }
 
 async fn conversation_items_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(conversation_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateConversationItemsRequest>,
@@ -2468,16 +2552,18 @@ async fn conversation_items_with_state_handler(
     match relay_conversation_items_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "responses",
                 &conversation_id,
                 20,
@@ -2505,8 +2591,10 @@ async fn conversation_items_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "responses",
         &conversation_id,
         20,
@@ -2523,28 +2611,35 @@ async fn conversation_items_with_state_handler(
     }
 
     Json(
-        create_conversation_items("tenant-1", "project-1", &conversation_id)
-            .expect("conversation items"),
+        create_conversation_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation items"),
     )
     .into_response()
 }
 
 async fn conversation_items_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(conversation_id): Path<String>,
 ) -> Response {
     match relay_list_conversation_items_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "responses",
                 &conversation_id,
                 20,
@@ -2572,8 +2667,10 @@ async fn conversation_items_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "responses",
         &conversation_id,
         20,
@@ -2590,30 +2687,43 @@ async fn conversation_items_list_with_state_handler(
     }
 
     Json(
-        list_conversation_items("tenant-1", "project-1", &conversation_id)
-            .expect("conversation items list"),
+        list_conversation_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation items list"),
     )
     .into_response()
 }
 
 async fn conversation_item_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Response {
     match relay_get_conversation_item_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
         &item_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "responses", &item_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "responses",
+                &item_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2634,9 +2744,17 @@ async fn conversation_item_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "responses", &item_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "responses",
+        &item_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2646,30 +2764,44 @@ async fn conversation_item_retrieve_with_state_handler(
     }
 
     Json(
-        get_conversation_item("tenant-1", "project-1", &conversation_id, &item_id)
-            .expect("conversation item"),
+        get_conversation_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+            &item_id,
+        )
+        .expect("conversation item"),
     )
     .into_response()
 }
 
 async fn conversation_item_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Response {
     match relay_delete_conversation_item_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &conversation_id,
         &item_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "responses", &item_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "responses",
+                &item_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2690,9 +2822,17 @@ async fn conversation_item_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "responses", &item_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "responses",
+        &item_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2702,29 +2842,43 @@ async fn conversation_item_delete_with_state_handler(
     }
 
     Json(
-        delete_conversation_item("tenant-1", "project-1", &conversation_id, &item_id)
-            .expect("conversation item delete"),
+        delete_conversation_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+            &item_id,
+        )
+        .expect("conversation item delete"),
     )
     .into_response()
 }
 
 async fn threads_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateThreadRequest>,
 ) -> Response {
     match relay_thread_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", "threads", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                "threads",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2745,9 +2899,17 @@ async fn threads_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", "threads", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        "threads",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2756,26 +2918,36 @@ async fn threads_with_state_handler(
             .into_response();
     }
 
-    Json(create_thread("tenant-1", "project-1").expect("thread")).into_response()
+    Json(create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread"))
+        .into_response()
 }
 
 async fn thread_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
 ) -> Response {
     match relay_get_thread_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2796,9 +2968,17 @@ async fn thread_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2807,10 +2987,19 @@ async fn thread_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_thread("tenant-1", "project-1", &thread_id).expect("thread retrieve")).into_response()
+    Json(
+        get_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread retrieve"),
+    )
+    .into_response()
 }
 
 async fn thread_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateThreadRequest>,
@@ -2818,17 +3007,25 @@ async fn thread_update_with_state_handler(
     match relay_update_thread_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2849,9 +3046,17 @@ async fn thread_update_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2860,26 +3065,43 @@ async fn thread_update_with_state_handler(
             .into_response();
     }
 
-    Json(update_thread("tenant-1", "project-1", &thread_id).expect("thread update")).into_response()
+    Json(
+        update_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread update"),
+    )
+    .into_response()
 }
 
 async fn thread_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
 ) -> Response {
     match relay_delete_thread_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2900,9 +3122,17 @@ async fn thread_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2911,10 +3141,19 @@ async fn thread_delete_with_state_handler(
             .into_response();
     }
 
-    Json(delete_thread("tenant-1", "project-1", &thread_id).expect("thread delete")).into_response()
+    Json(
+        delete_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread delete"),
+    )
+    .into_response()
 }
 
 async fn thread_messages_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateThreadMessageRequest>,
@@ -2922,17 +3161,25 @@ async fn thread_messages_with_state_handler(
     match relay_thread_messages_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2953,9 +3200,17 @@ async fn thread_messages_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -2966,29 +3221,44 @@ async fn thread_messages_with_state_handler(
 
     let text = request.content.as_str().unwrap_or("hello");
     Json(
-        create_thread_message("tenant-1", "project-1", &thread_id, &request.role, text)
-            .expect("thread message create"),
+        create_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &request.role,
+            text,
+        )
+        .expect("thread message create"),
     )
     .into_response()
 }
 
 async fn thread_messages_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
 ) -> Response {
     match relay_list_thread_messages_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3009,9 +3279,17 @@ async fn thread_messages_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3020,28 +3298,44 @@ async fn thread_messages_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_thread_messages("tenant-1", "project-1", &thread_id).expect("thread messages list"))
-        .into_response()
+    Json(
+        list_thread_messages(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread messages list"),
+    )
+    .into_response()
 }
 
 async fn thread_message_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Response {
     match relay_get_thread_message_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &message_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &message_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3062,9 +3356,17 @@ async fn thread_message_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &message_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3074,13 +3376,19 @@ async fn thread_message_retrieve_with_state_handler(
     }
 
     Json(
-        get_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message retrieve"),
+        get_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message retrieve"),
     )
     .into_response()
 }
 
 async fn thread_message_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, message_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<UpdateThreadMessageRequest>,
@@ -3088,8 +3396,8 @@ async fn thread_message_update_with_state_handler(
     match relay_update_thread_message_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &message_id,
         &request,
@@ -3097,9 +3405,17 @@ async fn thread_message_update_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &message_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3120,9 +3436,17 @@ async fn thread_message_update_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &message_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3132,30 +3456,44 @@ async fn thread_message_update_with_state_handler(
     }
 
     Json(
-        update_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message update"),
+        update_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message update"),
     )
     .into_response()
 }
 
 async fn thread_message_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Response {
     match relay_delete_thread_message_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &message_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &message_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3176,9 +3514,17 @@ async fn thread_message_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &message_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &message_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3188,28 +3534,36 @@ async fn thread_message_delete_with_state_handler(
     }
 
     Json(
-        delete_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message delete"),
+        delete_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message delete"),
     )
     .into_response()
 }
 
 async fn thread_and_run_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateThreadAndRunRequest>,
 ) -> Response {
     match relay_thread_and_run_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "assistants",
                 "threads/runs",
                 25,
@@ -3237,8 +3591,10 @@ async fn thread_and_run_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "assistants",
         "threads/runs",
         25,
@@ -3255,13 +3611,18 @@ async fn thread_and_run_with_state_handler(
     }
 
     Json(
-        create_thread_and_run("tenant-1", "project-1", &request.assistant_id)
-            .expect("thread and run create"),
+        create_thread_and_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.assistant_id,
+        )
+        .expect("thread and run create"),
     )
     .into_response()
 }
 
 async fn thread_runs_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateRunRequest>,
@@ -3269,17 +3630,25 @@ async fn thread_runs_with_state_handler(
     match relay_thread_run_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 25, 0.025)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                25,
+                0.025,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3300,9 +3669,17 @@ async fn thread_runs_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 25, 0.025)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        25,
+        0.025,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3313,8 +3690,8 @@ async fn thread_runs_with_state_handler(
 
     Json(
         create_thread_run(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &thread_id,
             &request.assistant_id,
             request.model.as_deref(),
@@ -3325,22 +3702,31 @@ async fn thread_runs_with_state_handler(
 }
 
 async fn thread_runs_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
 ) -> Response {
     match relay_list_thread_runs_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 15, 0.015)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &thread_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3361,9 +3747,17 @@ async fn thread_runs_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &thread_id, 15, 0.015)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &thread_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3372,28 +3766,44 @@ async fn thread_runs_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_thread_runs("tenant-1", "project-1", &thread_id).expect("thread runs list"))
-        .into_response()
+    Json(
+        list_thread_runs(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread runs list"),
+    )
+    .into_response()
 }
 
 async fn thread_run_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
     match relay_get_thread_run_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 15, 0.015)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &run_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3414,9 +3824,17 @@ async fn thread_run_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 15, 0.015)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &run_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3425,11 +3843,20 @@ async fn thread_run_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run"))
-        .into_response()
+    Json(
+        get_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run"),
+    )
+    .into_response()
 }
 
 async fn thread_run_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<UpdateRunRequest>,
@@ -3437,8 +3864,8 @@ async fn thread_run_update_with_state_handler(
     match relay_update_thread_run_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
         &request,
@@ -3446,9 +3873,17 @@ async fn thread_run_update_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &run_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3469,9 +3904,17 @@ async fn thread_run_update_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &run_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3481,29 +3924,44 @@ async fn thread_run_update_with_state_handler(
     }
 
     Json(
-        update_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run update"),
+        update_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run update"),
     )
     .into_response()
 }
 
 async fn thread_run_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
     match relay_cancel_thread_run_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &run_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3524,9 +3982,17 @@ async fn thread_run_cancel_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &run_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3536,12 +4002,19 @@ async fn thread_run_cancel_with_state_handler(
     }
 
     Json(
-        cancel_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run cancel"),
+        cancel_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run cancel"),
     )
     .into_response()
 }
 
 async fn thread_run_submit_tool_outputs_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<SubmitToolOutputsRunRequest>,
@@ -3549,8 +4022,8 @@ async fn thread_run_submit_tool_outputs_with_state_handler(
     match relay_submit_thread_run_tool_outputs_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
         &request,
@@ -3558,9 +4031,17 @@ async fn thread_run_submit_tool_outputs_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &run_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3581,9 +4062,17 @@ async fn thread_run_submit_tool_outputs_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &run_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3598,30 +4087,45 @@ async fn thread_run_submit_tool_outputs_with_state_handler(
         .map(|output| (output.tool_call_id.as_str(), output.output.as_str()))
         .collect();
     Json(
-        submit_thread_run_tool_outputs("tenant-1", "project-1", &thread_id, &run_id, tool_outputs)
-            .expect("thread run tool outputs"),
+        submit_thread_run_tool_outputs(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+            tool_outputs,
+        )
+        .expect("thread run tool outputs"),
     )
     .into_response()
 }
 
 async fn thread_run_steps_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
     match relay_list_thread_run_steps_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 15, 0.015)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &run_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3642,9 +4146,17 @@ async fn thread_run_steps_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &run_id, 15, 0.015)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &run_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3654,21 +4166,27 @@ async fn thread_run_steps_list_with_state_handler(
     }
 
     Json(
-        list_thread_run_steps("tenant-1", "project-1", &thread_id, &run_id)
-            .expect("thread run steps"),
+        list_thread_run_steps(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run steps"),
     )
     .into_response()
 }
 
 async fn thread_run_step_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id, step_id)): Path<(String, String, String)>,
 ) -> Response {
     match relay_get_thread_run_step_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &thread_id,
         &run_id,
         &step_id,
@@ -3676,9 +4194,17 @@ async fn thread_run_step_retrieve_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &step_id, 15, 0.015)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &step_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3699,9 +4225,17 @@ async fn thread_run_step_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &step_id, 15, 0.015)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &step_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -3711,8 +4245,14 @@ async fn thread_run_step_retrieve_with_state_handler(
     }
 
     Json(
-        get_thread_run_step("tenant-1", "project-1", &thread_id, &run_id, &step_id)
-            .expect("thread run step"),
+        get_thread_run_step(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+            &step_id,
+        )
+        .expect("thread run step"),
     )
     .into_response()
 }
@@ -3732,8 +4272,8 @@ fn upstream_passthrough_response(response: reqwest::Response) -> Response {
         .expect("valid upstream stream response")
 }
 
-fn local_file_content_response(file_id: &str) -> Response {
-    let bytes = file_content("tenant-1", "project-1", file_id).expect("file content");
+fn local_file_content_response(tenant_id: &str, project_id: &str, file_id: &str) -> Response {
+    let bytes = file_content(tenant_id, project_id, file_id).expect("file content");
     Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/jsonl")
@@ -3741,8 +4281,8 @@ fn local_file_content_response(file_id: &str) -> Response {
         .expect("valid local file content response")
 }
 
-fn local_video_content_response(video_id: &str) -> Response {
-    let bytes = video_content("tenant-1", "project-1", video_id).expect("video content");
+fn local_video_content_response(tenant_id: &str, project_id: &str, video_id: &str) -> Response {
+    let bytes = video_content(tenant_id, project_id, video_id).expect("video content");
     Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, "video/mp4")
@@ -3767,6 +4307,7 @@ async fn responses_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &request.model,
@@ -3797,6 +4338,7 @@ async fn responses_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &request.model,
@@ -3841,6 +4383,7 @@ async fn response_input_tokens_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &request.model,
@@ -3871,6 +4414,7 @@ async fn response_input_tokens_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &request.model,
@@ -3915,6 +4459,7 @@ async fn response_retrieve_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &response_id,
@@ -3945,6 +4490,7 @@ async fn response_retrieve_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &response_id,
@@ -3989,6 +4535,7 @@ async fn response_input_items_list_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &response_id,
@@ -4019,6 +4566,7 @@ async fn response_input_items_list_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &response_id,
@@ -4063,6 +4611,7 @@ async fn response_delete_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &response_id,
@@ -4093,6 +4642,7 @@ async fn response_delete_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &response_id,
@@ -4137,6 +4687,7 @@ async fn response_cancel_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &response_id,
@@ -4167,6 +4718,7 @@ async fn response_cancel_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &response_id,
@@ -4211,6 +4763,7 @@ async fn response_compact_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "responses",
                 &request.model,
@@ -4241,6 +4794,7 @@ async fn response_compact_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "responses",
         &request.model,
@@ -4285,6 +4839,7 @@ async fn completions_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "completions",
                 &request.model,
@@ -4315,6 +4870,7 @@ async fn completions_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "completions",
         &request.model,
@@ -4359,6 +4915,7 @@ async fn embeddings_with_state_handler(
         Ok(Some(response)) => {
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
                 request_context.project_id(),
                 "embeddings",
                 &request.model,
@@ -4389,6 +4946,7 @@ async fn embeddings_with_state_handler(
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
         request_context.project_id(),
         "embeddings",
         &request.model,
@@ -4417,21 +4975,24 @@ async fn embeddings_with_state_handler(
 }
 
 async fn moderations_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateModerationRequest>,
 ) -> Response {
     match relay_moderation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "moderations",
                 &request.model,
                 1,
@@ -4459,8 +5020,10 @@ async fn moderations_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "moderations",
         &request.model,
         1,
@@ -4476,27 +5039,43 @@ async fn moderations_with_state_handler(
             .into_response();
     }
 
-    Json(create_moderation("tenant-1", "project-1", &request.model).expect("moderation"))
-        .into_response()
+    Json(
+        create_moderation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("moderation"),
+    )
+    .into_response()
 }
 
 async fn image_generations_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateImageRequest>,
 ) -> Response {
     match relay_image_generation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "images", &request.model, 50, 0.05)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "images",
+                &request.model,
+                50,
+                0.05,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4517,9 +5096,17 @@ async fn image_generations_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "images", &request.model, 50, 0.05)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "images",
+        &request.model,
+        50,
+        0.05,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4528,11 +5115,19 @@ async fn image_generations_with_state_handler(
             .into_response();
     }
 
-    Json(create_image_generation("tenant-1", "project-1", &request.model).expect("image"))
-        .into_response()
+    Json(
+        create_image_generation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("image"),
+    )
+    .into_response()
 }
 
 async fn image_edits_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     multipart: Multipart,
 ) -> Response {
@@ -4545,16 +5140,24 @@ async fn image_edits_with_state_handler(
     match relay_image_edit_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "images",
+                &route_model,
+                50,
+                0.05,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4575,9 +5178,17 @@ async fn image_edits_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "images",
+        &route_model,
+        50,
+        0.05,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4586,10 +5197,19 @@ async fn image_edits_with_state_handler(
             .into_response();
     }
 
-    Json(create_image_edit("tenant-1", "project-1", &request).expect("image edit")).into_response()
+    Json(
+        create_image_edit(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("image edit"),
+    )
+    .into_response()
 }
 
 async fn image_variations_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     multipart: Multipart,
 ) -> Response {
@@ -4602,16 +5222,24 @@ async fn image_variations_with_state_handler(
     match relay_image_variation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "images",
+                &route_model,
+                50,
+                0.05,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4632,9 +5260,17 @@ async fn image_variations_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "images",
+        &route_model,
+        50,
+        0.05,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4643,26 +5279,36 @@ async fn image_variations_with_state_handler(
             .into_response();
     }
 
-    Json(create_image_variation("tenant-1", "project-1", &request).expect("image variation"))
-        .into_response()
+    Json(
+        create_image_variation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("image variation"),
+    )
+    .into_response()
 }
 
 async fn transcriptions_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateTranscriptionRequest>,
 ) -> Response {
     match relay_transcription_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "audio_transcriptions",
                 &request.model,
                 25,
@@ -4690,8 +5336,10 @@ async fn transcriptions_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "audio_transcriptions",
         &request.model,
         25,
@@ -4707,26 +5355,36 @@ async fn transcriptions_with_state_handler(
             .into_response();
     }
 
-    Json(create_transcription("tenant-1", "project-1", &request.model).expect("transcription"))
-        .into_response()
+    Json(
+        create_transcription(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("transcription"),
+    )
+    .into_response()
 }
 
 async fn translations_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateTranslationRequest>,
 ) -> Response {
     match relay_translation_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "audio_translations",
                 &request.model,
                 25,
@@ -4754,8 +5412,10 @@ async fn translations_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "audio_translations",
         &request.model,
         25,
@@ -4771,26 +5431,36 @@ async fn translations_with_state_handler(
             .into_response();
     }
 
-    Json(create_translation("tenant-1", "project-1", &request.model).expect("translation"))
-        .into_response()
+    Json(
+        create_translation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("translation"),
+    )
+    .into_response()
 }
 
 async fn audio_speech_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateSpeechRequest>,
 ) -> Response {
     match relay_speech_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "audio_speech",
                 &request.model,
                 25,
@@ -4818,8 +5488,10 @@ async fn audio_speech_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "audio_speech",
         &request.model,
         25,
@@ -4835,10 +5507,15 @@ async fn audio_speech_with_state_handler(
             .into_response();
     }
 
-    local_speech_response(&request)
+    local_speech_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
 }
 
 async fn files_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     multipart: Multipart,
 ) -> Response {
@@ -4850,16 +5527,24 @@ async fn files_with_state_handler(
     match relay_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "files", &request.purpose, 5, 0.005)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "files",
+                &request.purpose,
+                5,
+                0.005,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4880,9 +5565,17 @@ async fn files_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "files", &request.purpose, 5, 0.005)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "files",
+        &request.purpose,
+        5,
+        0.005,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4891,22 +5584,41 @@ async fn files_with_state_handler(
             .into_response();
     }
 
-    Json(create_file("tenant-1", "project-1", &request).expect("file")).into_response()
+    Json(
+        create_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("file"),
+    )
+    .into_response()
 }
 
-async fn files_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn files_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_files_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "files", "list", 1, 0.001)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "files",
+                "list",
+                1,
+                0.001,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4927,9 +5639,17 @@ async fn files_list_with_state_handler(State(state): State<GatewayApiState>) -> 
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "files", "list", 1, 0.001)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "files",
+        "list",
+        1,
+        0.001,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4938,26 +5658,36 @@ async fn files_list_with_state_handler(State(state): State<GatewayApiState>) -> 
             .into_response();
     }
 
-    Json(list_files("tenant-1", "project-1").expect("files list")).into_response()
+    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
+        .into_response()
 }
 
 async fn file_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(file_id): Path<String>,
 ) -> Response {
     match relay_get_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &file_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "files",
+                &file_id,
+                1,
+                0.001,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4978,9 +5708,17 @@ async fn file_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "files",
+        &file_id,
+        1,
+        0.001,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -4989,26 +5727,43 @@ async fn file_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_file("tenant-1", "project-1", &file_id).expect("file retrieve")).into_response()
+    Json(
+        get_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &file_id,
+        )
+        .expect("file retrieve"),
+    )
+    .into_response()
 }
 
 async fn file_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(file_id): Path<String>,
 ) -> Response {
     match relay_delete_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &file_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "files",
+                &file_id,
+                1,
+                0.001,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5029,9 +5784,17 @@ async fn file_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "files",
+        &file_id,
+        1,
+        0.001,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5040,26 +5803,43 @@ async fn file_delete_with_state_handler(
             .into_response();
     }
 
-    Json(delete_file("tenant-1", "project-1", &file_id).expect("file delete")).into_response()
+    Json(
+        delete_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &file_id,
+        )
+        .expect("file delete"),
+    )
+    .into_response()
 }
 
 async fn file_content_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(file_id): Path<String>,
 ) -> Response {
     match relay_file_content_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &file_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "files",
+                &file_id,
+                1,
+                0.001,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5080,9 +5860,17 @@ async fn file_content_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "files", &file_id, 1, 0.001)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "files",
+        &file_id,
+        1,
+        0.001,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5091,26 +5879,39 @@ async fn file_content_with_state_handler(
             .into_response();
     }
 
-    local_file_content_response(&file_id)
+    local_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    )
 }
 
 async fn videos_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateVideoRequest>,
 ) -> Response {
     match relay_video_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", &request.model, 90, 0.09)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &request.model,
+                90,
+                0.09,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5131,9 +5932,17 @@ async fn videos_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", &request.model, 90, 0.09)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &request.model,
+        90,
+        0.09,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5142,23 +5951,42 @@ async fn videos_with_state_handler(
             .into_response();
     }
 
-    Json(create_video("tenant-1", "project-1", &request.model, &request.prompt).expect("video"))
-        .into_response()
+    Json(
+        create_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+            &request.prompt,
+        )
+        .expect("video"),
+    )
+    .into_response()
 }
 
-async fn videos_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn videos_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_videos_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", "videos", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                "videos",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5179,9 +6007,17 @@ async fn videos_list_with_state_handler(State(state): State<GatewayApiState>) ->
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", "videos", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        "videos",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5190,26 +6026,39 @@ async fn videos_list_with_state_handler(State(state): State<GatewayApiState>) ->
             .into_response();
     }
 
-    Json(list_videos("tenant-1", "project-1").expect("videos list")).into_response()
+    Json(
+        list_videos(request_context.tenant_id(), request_context.project_id())
+            .expect("videos list"),
+    )
+    .into_response()
 }
 
 async fn video_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(video_id): Path<String>,
 ) -> Response {
     match relay_get_video_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &video_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &video_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5230,9 +6079,17 @@ async fn video_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &video_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5241,26 +6098,43 @@ async fn video_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_video("tenant-1", "project-1", &video_id).expect("video retrieve")).into_response()
+    Json(
+        get_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+        )
+        .expect("video retrieve"),
+    )
+    .into_response()
 }
 
 async fn video_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(video_id): Path<String>,
 ) -> Response {
     match relay_delete_video_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &video_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &video_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5281,9 +6155,17 @@ async fn video_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &video_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5292,26 +6174,43 @@ async fn video_delete_with_state_handler(
             .into_response();
     }
 
-    Json(delete_video("tenant-1", "project-1", &video_id).expect("video delete")).into_response()
+    Json(
+        delete_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+        )
+        .expect("video delete"),
+    )
+    .into_response()
 }
 
 async fn video_content_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(video_id): Path<String>,
 ) -> Response {
     match relay_video_content_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &video_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &video_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5332,9 +6231,17 @@ async fn video_content_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &video_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5343,10 +6250,15 @@ async fn video_content_with_state_handler(
             .into_response();
     }
 
-    local_video_content_response(&video_id)
+    local_video_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+    )
 }
 
 async fn video_remix_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(video_id): Path<String>,
     ExtractJson(request): ExtractJson<RemixVideoRequest>,
@@ -5354,17 +6266,25 @@ async fn video_remix_with_state_handler(
     match relay_remix_video_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &video_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 60, 0.06)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &video_id,
+                60,
+                0.06,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5385,9 +6305,17 @@ async fn video_remix_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "videos", &video_id, 60, 0.06)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &video_id,
+        60,
+        0.06,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5396,27 +6324,44 @@ async fn video_remix_with_state_handler(
             .into_response();
     }
 
-    Json(remix_video("tenant-1", "project-1", &video_id, &request.prompt).expect("video remix"))
-        .into_response()
+    Json(
+        remix_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+            &request.prompt,
+        )
+        .expect("video remix"),
+    )
+    .into_response()
 }
 
 async fn uploads_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateUploadRequest>,
 ) -> Response {
     match relay_upload_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "uploads", &request.purpose, 8, 0.008)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "uploads",
+                &request.purpose,
+                8,
+                0.008,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5437,9 +6382,17 @@ async fn uploads_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "uploads", &request.purpose, 8, 0.008)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "uploads",
+        &request.purpose,
+        8,
+        0.008,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5448,10 +6401,19 @@ async fn uploads_with_state_handler(
             .into_response();
     }
 
-    Json(create_upload("tenant-1", "project-1", &request).expect("upload")).into_response()
+    Json(
+        create_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("upload"),
+    )
+    .into_response()
 }
 
 async fn upload_parts_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
     multipart: Multipart,
@@ -5464,15 +6426,17 @@ async fn upload_parts_with_state_handler(
     match relay_upload_part_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "uploads",
                 &request.upload_id,
                 4,
@@ -5500,8 +6464,10 @@ async fn upload_parts_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "uploads",
         &request.upload_id,
         4,
@@ -5517,11 +6483,19 @@ async fn upload_parts_with_state_handler(
             .into_response();
     }
 
-    Json(create_upload_part("tenant-1", "project-1", &request).expect("upload part"))
-        .into_response()
+    Json(
+        create_upload_part(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("upload part"),
+    )
+    .into_response()
 }
 
 async fn upload_complete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
     ExtractJson(mut request): ExtractJson<CompleteUploadRequest>,
@@ -5531,15 +6505,17 @@ async fn upload_complete_with_state_handler(
     match relay_complete_upload_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "uploads",
                 &request.upload_id,
                 4,
@@ -5567,8 +6543,10 @@ async fn upload_complete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "uploads",
         &request.upload_id,
         4,
@@ -5584,27 +6562,43 @@ async fn upload_complete_with_state_handler(
             .into_response();
     }
 
-    Json(complete_upload("tenant-1", "project-1", &request).expect("upload complete"))
-        .into_response()
+    Json(
+        complete_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("upload complete"),
+    )
+    .into_response()
 }
 
 async fn upload_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
 ) -> Response {
     match relay_cancel_upload_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &upload_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "uploads", &upload_id, 4, 0.004)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "uploads",
+                &upload_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5625,9 +6619,17 @@ async fn upload_cancel_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "uploads", &upload_id, 4, 0.004)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "uploads",
+        &upload_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5636,25 +6638,36 @@ async fn upload_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(cancel_upload("tenant-1", "project-1", &upload_id).expect("upload cancel")).into_response()
+    Json(
+        cancel_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &upload_id,
+        )
+        .expect("upload cancel"),
+    )
+    .into_response()
 }
 
 async fn fine_tuning_jobs_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
 ) -> Response {
     match relay_fine_tuning_job_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "fine_tuning",
                 &request.model,
                 200,
@@ -5682,8 +6695,10 @@ async fn fine_tuning_jobs_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "fine_tuning",
         &request.model,
         200,
@@ -5699,25 +6714,41 @@ async fn fine_tuning_jobs_with_state_handler(
             .into_response();
     }
 
-    Json(create_fine_tuning_job("tenant-1", "project-1", &request.model).expect("fine tuning"))
-        .into_response()
+    Json(
+        create_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("fine tuning"),
+    )
+    .into_response()
 }
 
 async fn fine_tuning_jobs_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
     match relay_list_fine_tuning_jobs_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "fine_tuning", "jobs", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                "jobs",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5738,9 +6769,17 @@ async fn fine_tuning_jobs_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "fine_tuning", "jobs", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        "jobs",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5749,25 +6788,32 @@ async fn fine_tuning_jobs_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_fine_tuning_jobs("tenant-1", "project-1").expect("fine tuning list")).into_response()
+    Json(
+        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
+            .expect("fine tuning list"),
+    )
+    .into_response()
 }
 
 async fn fine_tuning_job_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
     match relay_get_fine_tuning_job_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &fine_tuning_job_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "fine_tuning",
                 &fine_tuning_job_id,
                 20,
@@ -5795,8 +6841,10 @@ async fn fine_tuning_job_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "fine_tuning",
         &fine_tuning_job_id,
         20,
@@ -5813,28 +6861,35 @@ async fn fine_tuning_job_retrieve_with_state_handler(
     }
 
     Json(
-        get_fine_tuning_job("tenant-1", "project-1", &fine_tuning_job_id)
-            .expect("fine tuning retrieve"),
+        get_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning retrieve"),
     )
     .into_response()
 }
 
 async fn fine_tuning_job_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
     match relay_cancel_fine_tuning_job_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &fine_tuning_job_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "fine_tuning",
                 &fine_tuning_job_id,
                 20,
@@ -5862,8 +6917,10 @@ async fn fine_tuning_job_cancel_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "fine_tuning",
         &fine_tuning_job_id,
         20,
@@ -5880,29 +6937,42 @@ async fn fine_tuning_job_cancel_with_state_handler(
     }
 
     Json(
-        cancel_fine_tuning_job("tenant-1", "project-1", &fine_tuning_job_id)
-            .expect("fine tuning cancel"),
+        cancel_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning cancel"),
     )
     .into_response()
 }
 
 async fn assistants_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateAssistantRequest>,
 ) -> Response {
     match relay_assistant_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &request.model, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &request.model,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5923,9 +6993,17 @@ async fn assistants_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &request.model, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &request.model,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5935,25 +7013,41 @@ async fn assistants_with_state_handler(
     }
 
     Json(
-        create_assistant("tenant-1", "project-1", &request.name, &request.model)
-            .expect("assistant"),
+        create_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+            &request.model,
+        )
+        .expect("assistant"),
     )
     .into_response()
 }
 
-async fn assistants_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn assistants_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_assistants_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", "assistants", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                "assistants",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5974,9 +7068,17 @@ async fn assistants_list_with_state_handler(State(state): State<GatewayApiState>
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", "assistants", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        "assistants",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -5985,26 +7087,39 @@ async fn assistants_list_with_state_handler(State(state): State<GatewayApiState>
             .into_response();
     }
 
-    Json(list_assistants("tenant-1", "project-1").expect("assistants list")).into_response()
+    Json(
+        list_assistants(request_context.tenant_id(), request_context.project_id())
+            .expect("assistants list"),
+    )
+    .into_response()
 }
 
 async fn assistant_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(assistant_id): Path<String>,
 ) -> Response {
     match relay_get_assistant_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &assistant_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &assistant_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6025,9 +7140,17 @@ async fn assistant_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &assistant_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6036,11 +7159,19 @@ async fn assistant_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_assistant("tenant-1", "project-1", &assistant_id).expect("assistant retrieve"))
-        .into_response()
+    Json(
+        get_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &assistant_id,
+        )
+        .expect("assistant retrieve"),
+    )
+    .into_response()
 }
 
 async fn assistant_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(assistant_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateAssistantRequest>,
@@ -6048,8 +7179,8 @@ async fn assistant_update_with_state_handler(
     match relay_update_assistant_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &assistant_id,
         &request,
     )
@@ -6057,9 +7188,17 @@ async fn assistant_update_with_state_handler(
     {
         Ok(Some(response)) => {
             let usage_target = request.model.as_deref().unwrap_or(assistant_id.as_str());
-            if record_gateway_usage(state.store.as_ref(), "assistants", usage_target, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                usage_target,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6081,9 +7220,17 @@ async fn assistant_update_with_state_handler(
     }
 
     let usage_target = request.model.as_deref().unwrap_or(assistant_id.as_str());
-    if record_gateway_usage(state.store.as_ref(), "assistants", usage_target, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        usage_target,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6094,8 +7241,8 @@ async fn assistant_update_with_state_handler(
 
     Json(
         update_assistant(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &assistant_id,
             request.name.as_deref().unwrap_or("assistant"),
         )
@@ -6105,22 +7252,31 @@ async fn assistant_update_with_state_handler(
 }
 
 async fn assistant_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(assistant_id): Path<String>,
 ) -> Response {
     match relay_delete_assistant_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &assistant_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "assistants",
+                &assistant_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6141,9 +7297,17 @@ async fn assistant_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "assistants",
+        &assistant_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6152,27 +7316,43 @@ async fn assistant_delete_with_state_handler(
             .into_response();
     }
 
-    Json(delete_assistant("tenant-1", "project-1", &assistant_id).expect("assistant delete"))
-        .into_response()
+    Json(
+        delete_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &assistant_id,
+        )
+        .expect("assistant delete"),
+    )
+    .into_response()
 }
 
 async fn webhooks_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateWebhookRequest>,
 ) -> Response {
     match relay_webhook_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "webhooks", &request.url, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "webhooks",
+                &request.url,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6193,9 +7373,17 @@ async fn webhooks_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "webhooks", &request.url, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "webhooks",
+        &request.url,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6204,23 +7392,42 @@ async fn webhooks_with_state_handler(
             .into_response();
     }
 
-    Json(create_webhook("tenant-1", "project-1", &request.url, &request.events).expect("webhook"))
-        .into_response()
+    Json(
+        create_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.url,
+            &request.events,
+        )
+        .expect("webhook"),
+    )
+    .into_response()
 }
 
-async fn webhooks_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn webhooks_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_webhooks_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "webhooks", "webhooks", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "webhooks",
+                "webhooks",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6241,9 +7448,17 @@ async fn webhooks_list_with_state_handler(State(state): State<GatewayApiState>) 
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "webhooks", "webhooks", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "webhooks",
+        "webhooks",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6252,26 +7467,39 @@ async fn webhooks_list_with_state_handler(State(state): State<GatewayApiState>) 
             .into_response();
     }
 
-    Json(list_webhooks("tenant-1", "project-1").expect("webhooks list")).into_response()
+    Json(
+        list_webhooks(request_context.tenant_id(), request_context.project_id())
+            .expect("webhooks list"),
+    )
+    .into_response()
 }
 
 async fn webhook_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(webhook_id): Path<String>,
 ) -> Response {
     match relay_get_webhook_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &webhook_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "webhooks", &webhook_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "webhooks",
+                &webhook_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6292,9 +7520,17 @@ async fn webhook_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "webhooks", &webhook_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "webhooks",
+        &webhook_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6303,11 +7539,19 @@ async fn webhook_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_webhook("tenant-1", "project-1", &webhook_id).expect("webhook retrieve"))
-        .into_response()
+    Json(
+        get_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &webhook_id,
+        )
+        .expect("webhook retrieve"),
+    )
+    .into_response()
 }
 
 async fn webhook_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(webhook_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateWebhookRequest>,
@@ -6315,8 +7559,8 @@ async fn webhook_update_with_state_handler(
     match relay_update_webhook_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &webhook_id,
         &request,
     )
@@ -6324,9 +7568,17 @@ async fn webhook_update_with_state_handler(
     {
         Ok(Some(response)) => {
             let usage_target = request.url.as_deref().unwrap_or(webhook_id.as_str());
-            if record_gateway_usage(state.store.as_ref(), "webhooks", usage_target, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "webhooks",
+                usage_target,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6348,9 +7600,17 @@ async fn webhook_update_with_state_handler(
     }
 
     let usage_target = request.url.as_deref().unwrap_or(webhook_id.as_str());
-    if record_gateway_usage(state.store.as_ref(), "webhooks", usage_target, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "webhooks",
+        usage_target,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6361,8 +7621,8 @@ async fn webhook_update_with_state_handler(
 
     Json(
         update_webhook(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &webhook_id,
             request
                 .url
@@ -6375,22 +7635,31 @@ async fn webhook_update_with_state_handler(
 }
 
 async fn webhook_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(webhook_id): Path<String>,
 ) -> Response {
     match relay_delete_webhook_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &webhook_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "webhooks", &webhook_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "webhooks",
+                &webhook_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6411,9 +7680,17 @@ async fn webhook_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "webhooks", &webhook_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "webhooks",
+        &webhook_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6422,26 +7699,36 @@ async fn webhook_delete_with_state_handler(
             .into_response();
     }
 
-    Json(delete_webhook("tenant-1", "project-1", &webhook_id).expect("webhook delete"))
-        .into_response()
+    Json(
+        delete_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &webhook_id,
+        )
+        .expect("webhook delete"),
+    )
+    .into_response()
 }
 
 async fn realtime_sessions_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateRealtimeSessionRequest>,
 ) -> Response {
     match relay_realtime_session_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "realtime_sessions",
                 &request.model,
                 30,
@@ -6469,8 +7756,10 @@ async fn realtime_sessions_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "realtime_sessions",
         &request.model,
         30,
@@ -6486,27 +7775,43 @@ async fn realtime_sessions_with_state_handler(
             .into_response();
     }
 
-    Json(create_realtime_session("tenant-1", "project-1", &request.model).expect("realtime"))
-        .into_response()
+    Json(
+        create_realtime_session(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("realtime"),
+    )
+    .into_response()
 }
 
 async fn evals_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateEvalRequest>,
 ) -> Response {
     match relay_eval_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "evals", &request.name, 40, 0.04)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "evals",
+                &request.name,
+                40,
+                0.04,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6527,9 +7832,17 @@ async fn evals_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "evals", &request.name, 40, 0.04)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "evals",
+        &request.name,
+        40,
+        0.04,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6538,26 +7851,43 @@ async fn evals_with_state_handler(
             .into_response();
     }
 
-    Json(create_eval("tenant-1", "project-1", &request.name).expect("eval")).into_response()
+    Json(
+        create_eval(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+        )
+        .expect("eval"),
+    )
+    .into_response()
 }
 
 async fn batches_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateBatchRequest>,
 ) -> Response {
     match relay_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "batches", &request.endpoint, 60, 0.06)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "batches",
+                &request.endpoint,
+                60,
+                0.06,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6578,9 +7908,17 @@ async fn batches_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "batches", &request.endpoint, 60, 0.06)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "batches",
+        &request.endpoint,
+        60,
+        0.06,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6591,8 +7929,8 @@ async fn batches_with_state_handler(
 
     Json(
         create_batch(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &request.endpoint,
             &request.input_file_id,
         )
@@ -6601,19 +7939,30 @@ async fn batches_with_state_handler(
     .into_response()
 }
 
-async fn batches_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn batches_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_batches_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "batches", "batches", 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "batches",
+                "batches",
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6634,9 +7983,17 @@ async fn batches_list_with_state_handler(State(state): State<GatewayApiState>) -
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "batches", "batches", 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "batches",
+        "batches",
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6645,26 +8002,39 @@ async fn batches_list_with_state_handler(State(state): State<GatewayApiState>) -
             .into_response();
     }
 
-    Json(list_batches("tenant-1", "project-1").expect("batches list")).into_response()
+    Json(
+        list_batches(request_context.tenant_id(), request_context.project_id())
+            .expect("batches list"),
+    )
+    .into_response()
 }
 
 async fn batch_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(batch_id): Path<String>,
 ) -> Response {
     match relay_get_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &batch_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "batches", &batch_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "batches",
+                &batch_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6685,9 +8055,17 @@ async fn batch_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "batches", &batch_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "batches",
+        &batch_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6696,26 +8074,43 @@ async fn batch_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(get_batch("tenant-1", "project-1", &batch_id).expect("batch retrieve")).into_response()
+    Json(
+        get_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &batch_id,
+        )
+        .expect("batch retrieve"),
+    )
+    .into_response()
 }
 
 async fn batch_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(batch_id): Path<String>,
 ) -> Response {
     match relay_cancel_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &batch_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(state.store.as_ref(), "batches", &batch_id, 20, 0.02)
-                .await
-                .is_err()
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "batches",
+                &batch_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
             {
                 return (
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6736,9 +8131,17 @@ async fn batch_cancel_with_state_handler(
         }
     }
 
-    if record_gateway_usage(state.store.as_ref(), "batches", &batch_id, 20, 0.02)
-        .await
-        .is_err()
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "batches",
+        &batch_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
     {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -6747,25 +8150,36 @@ async fn batch_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(cancel_batch("tenant-1", "project-1", &batch_id).expect("batch cancel")).into_response()
+    Json(
+        cancel_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &batch_id,
+        )
+        .expect("batch cancel"),
+    )
+    .into_response()
 }
 
 async fn vector_stores_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateVectorStoreRequest>,
 ) -> Response {
     match relay_vector_store_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_stores",
                 &request.name,
                 35,
@@ -6793,8 +8207,10 @@ async fn vector_stores_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_stores",
         &request.name,
         35,
@@ -6810,22 +8226,34 @@ async fn vector_stores_with_state_handler(
             .into_response();
     }
 
-    Json(create_vector_store("tenant-1", "project-1", &request.name).expect("vector store"))
-        .into_response()
+    Json(
+        create_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+        )
+        .expect("vector store"),
+    )
+    .into_response()
 }
 
-async fn vector_stores_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+async fn vector_stores_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
     match relay_list_vector_stores_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_stores",
                 "vector_stores",
                 20,
@@ -6853,8 +8281,10 @@ async fn vector_stores_list_with_state_handler(State(state): State<GatewayApiSta
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_stores",
         "vector_stores",
         20,
@@ -6870,25 +8300,32 @@ async fn vector_stores_list_with_state_handler(State(state): State<GatewayApiSta
             .into_response();
     }
 
-    Json(list_vector_stores("tenant-1", "project-1").expect("vector stores list")).into_response()
+    Json(
+        list_vector_stores(request_context.tenant_id(), request_context.project_id())
+            .expect("vector stores list"),
+    )
+    .into_response()
 }
 
 async fn vector_store_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
 ) -> Response {
     match relay_get_vector_store_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_stores",
                 &vector_store_id,
                 20,
@@ -6916,8 +8353,10 @@ async fn vector_store_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_stores",
         &vector_store_id,
         20,
@@ -6934,12 +8373,18 @@ async fn vector_store_retrieve_with_state_handler(
     }
 
     Json(
-        get_vector_store("tenant-1", "project-1", &vector_store_id).expect("vector store retrieve"),
+        get_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store retrieve"),
     )
     .into_response()
 }
 
 async fn vector_store_update_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateVectorStoreRequest>,
@@ -6947,16 +8392,18 @@ async fn vector_store_update_with_state_handler(
     match relay_update_vector_store_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_stores",
                 &vector_store_id,
                 35,
@@ -6984,8 +8431,10 @@ async fn vector_store_update_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_stores",
         &vector_store_id,
         35,
@@ -7003,8 +8452,8 @@ async fn vector_store_update_with_state_handler(
 
     Json(
         update_vector_store(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &vector_store_id,
             request.name.as_deref().unwrap_or("vector-store"),
         )
@@ -7014,21 +8463,24 @@ async fn vector_store_update_with_state_handler(
 }
 
 async fn vector_store_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
 ) -> Response {
     match relay_delete_vector_store_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_stores",
                 &vector_store_id,
                 20,
@@ -7056,8 +8508,10 @@ async fn vector_store_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_stores",
         &vector_store_id,
         20,
@@ -7074,13 +8528,18 @@ async fn vector_store_delete_with_state_handler(
     }
 
     Json(
-        delete_vector_store("tenant-1", "project-1", &vector_store_id)
-            .expect("vector store delete"),
+        delete_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store delete"),
     )
     .into_response()
 }
 
 async fn vector_store_search_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<SearchVectorStoreRequest>,
@@ -7088,16 +8547,18 @@ async fn vector_store_search_with_state_handler(
     match relay_search_vector_store_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_search",
                 &vector_store_id,
                 20,
@@ -7125,8 +8586,10 @@ async fn vector_store_search_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_search",
         &vector_store_id,
         20,
@@ -7143,13 +8606,19 @@ async fn vector_store_search_with_state_handler(
     }
 
     Json(
-        search_vector_store("tenant-1", "project-1", &vector_store_id, &request.query)
-            .expect("vector store search"),
+        search_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &request.query,
+        )
+        .expect("vector store search"),
     )
     .into_response()
 }
 
 async fn vector_store_files_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileRequest>,
@@ -7157,16 +8626,18 @@ async fn vector_store_files_with_state_handler(
     match relay_vector_store_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_files",
                 &vector_store_id,
                 25,
@@ -7194,8 +8665,10 @@ async fn vector_store_files_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_files",
         &vector_store_id,
         25,
@@ -7212,28 +8685,36 @@ async fn vector_store_files_with_state_handler(
     }
 
     Json(
-        create_vector_store_file("tenant-1", "project-1", &vector_store_id, &request.file_id)
-            .expect("vector store file"),
+        create_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &request.file_id,
+        )
+        .expect("vector store file"),
     )
     .into_response()
 }
 
 async fn vector_store_files_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
 ) -> Response {
     match relay_list_vector_store_files_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_files",
                 &vector_store_id,
                 15,
@@ -7261,8 +8742,10 @@ async fn vector_store_files_list_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_files",
         &vector_store_id,
         15,
@@ -7279,29 +8762,36 @@ async fn vector_store_files_list_with_state_handler(
     }
 
     Json(
-        list_vector_store_files("tenant-1", "project-1", &vector_store_id)
-            .expect("vector store files list"),
+        list_vector_store_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store files list"),
     )
     .into_response()
 }
 
 async fn vector_store_file_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, file_id)): Path<(String, String)>,
 ) -> Response {
     match relay_get_vector_store_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &file_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_files",
                 &vector_store_id,
                 15,
@@ -7329,8 +8819,10 @@ async fn vector_store_file_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_files",
         &vector_store_id,
         15,
@@ -7347,29 +8839,37 @@ async fn vector_store_file_retrieve_with_state_handler(
     }
 
     Json(
-        get_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
-            .expect("vector store file retrieve"),
+        get_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &file_id,
+        )
+        .expect("vector store file retrieve"),
     )
     .into_response()
 }
 
 async fn vector_store_file_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, file_id)): Path<(String, String)>,
 ) -> Response {
     match relay_delete_vector_store_file_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &file_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_files",
                 &vector_store_id,
                 15,
@@ -7397,8 +8897,10 @@ async fn vector_store_file_delete_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_files",
         &vector_store_id,
         15,
@@ -7415,13 +8917,19 @@ async fn vector_store_file_delete_with_state_handler(
     }
 
     Json(
-        delete_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
-            .expect("vector store file delete"),
+        delete_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &file_id,
+        )
+        .expect("vector store file delete"),
     )
     .into_response()
 }
 
 async fn vector_store_file_batches_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileBatchRequest>,
@@ -7429,16 +8937,18 @@ async fn vector_store_file_batches_with_state_handler(
     match relay_vector_store_file_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &request,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_file_batches",
                 &vector_store_id,
                 25,
@@ -7466,8 +8976,10 @@ async fn vector_store_file_batches_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_file_batches",
         &vector_store_id,
         25,
@@ -7485,8 +8997,8 @@ async fn vector_store_file_batches_with_state_handler(
 
     Json(
         create_vector_store_file_batch(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &vector_store_id,
             &request.file_ids,
         )
@@ -7496,22 +9008,25 @@ async fn vector_store_file_batches_with_state_handler(
 }
 
 async fn vector_store_file_batch_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Response {
     match relay_get_vector_store_file_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &batch_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_file_batches",
                 &vector_store_id,
                 15,
@@ -7539,8 +9054,10 @@ async fn vector_store_file_batch_retrieve_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_file_batches",
         &vector_store_id,
         15,
@@ -7557,29 +9074,37 @@ async fn vector_store_file_batch_retrieve_with_state_handler(
     }
 
     Json(
-        get_vector_store_file_batch("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch retrieve"),
+        get_vector_store_file_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch retrieve"),
     )
     .into_response()
 }
 
 async fn vector_store_file_batch_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Response {
     match relay_cancel_vector_store_file_batch_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &batch_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_file_batches",
                 &vector_store_id,
                 15,
@@ -7607,8 +9132,10 @@ async fn vector_store_file_batch_cancel_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_file_batches",
         &vector_store_id,
         15,
@@ -7625,29 +9152,37 @@ async fn vector_store_file_batch_cancel_with_state_handler(
     }
 
     Json(
-        cancel_vector_store_file_batch("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch cancel"),
+        cancel_vector_store_file_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch cancel"),
     )
     .into_response()
 }
 
 async fn vector_store_file_batch_files_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Response {
     match relay_list_vector_store_file_batch_files_from_store(
         state.store.as_ref(),
         &state.secret_manager,
-        "tenant-1",
-        "project-1",
+        request_context.tenant_id(),
+        request_context.project_id(),
         &vector_store_id,
         &batch_id,
     )
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(
+            if record_gateway_usage_for_project(
                 state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
                 "vector_store_file_batches",
                 &vector_store_id,
                 15,
@@ -7675,8 +9210,10 @@ async fn vector_store_file_batch_files_with_state_handler(
         }
     }
 
-    if record_gateway_usage(
+    if record_gateway_usage_for_project(
         state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
         "vector_store_file_batches",
         &vector_store_id,
         15,
@@ -7693,38 +9230,39 @@ async fn vector_store_file_batch_files_with_state_handler(
     }
 
     Json(
-        list_vector_store_file_batch_files("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch files"),
+        list_vector_store_file_batch_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch files"),
     )
     .into_response()
 }
 
-async fn record_gateway_usage(
-    store: &dyn AdminStore,
-    capability: &str,
-    model: &str,
-    units: u64,
-    amount: f64,
-) -> anyhow::Result<()> {
-    record_gateway_usage_for_project(store, "project-1", capability, model, units, amount).await
-}
-
 async fn record_gateway_usage_for_project(
     store: &dyn AdminStore,
+    tenant_id: &str,
     project_id: &str,
     capability: &str,
     model: &str,
     units: u64,
     amount: f64,
 ) -> anyhow::Result<()> {
-    let decision = simulate_route_with_store(store, capability, model).await?;
-    persist_usage_record(store, project_id, model, &decision.selected_provider_id).await?;
+    let provider_id =
+        planned_execution_provider_id_for_route(store, tenant_id, capability, model).await?;
+    persist_usage_record(store, project_id, model, &provider_id).await?;
     persist_ledger_entry(store, project_id, units, amount).await?;
     Ok(())
 }
 
-fn local_speech_response(request: &CreateSpeechRequest) -> Response {
-    let speech = create_speech_response("tenant-1", "project-1", request).expect("speech");
+fn local_speech_response(
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateSpeechRequest,
+) -> Response {
+    let speech = create_speech_response(tenant_id, project_id, request).expect("speech");
     if request.stream_format.as_deref() == Some("sse") {
         let delta = serde_json::json!({
             "type":"response.output_audio.delta",

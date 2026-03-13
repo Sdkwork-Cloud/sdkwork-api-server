@@ -39,6 +39,7 @@ async fn images_edit_route_accepts_multipart() {
         .oneshot(multipart_request(
             "/v1/images/edits",
             boundary,
+            None,
             multipart_body(
                 boundary,
                 &[("model", "gpt-image-1"), ("prompt", "make it sunset")],
@@ -62,6 +63,7 @@ async fn images_variation_route_accepts_multipart() {
         .oneshot(multipart_request(
             "/v1/images/variations",
             boundary,
+            None,
             multipart_body(
                 boundary,
                 &[("model", "gpt-image-1")],
@@ -110,12 +112,13 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
         axum::serve(listener, upstream).await.unwrap();
     });
 
-    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let (gateway_app, api_key) = configure_gateway_with_image_provider(address).await;
     let response = gateway_app
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/v1/images/generations")
+                .header("authorization", format!("Bearer {api_key}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"model\":\"gpt-image-1\",\"prompt\":\"relay me\"}",
@@ -135,6 +138,29 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
 }
 
 #[tokio::test]
+async fn stateful_images_generation_route_requires_gateway_api_key() {
+    let pool = memory_pool().await;
+    let _api_key = support::issue_gateway_api_key(&pool, "tenant-live", "project-live").await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/images/generations")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-image-1\",\"prompt\":\"draw a lighthouse\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn stateful_images_edit_route_relays_multipart_to_openai_compatible_provider() {
     let upstream_state = UpstreamCaptureState::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -147,12 +173,13 @@ async fn stateful_images_edit_route_relays_multipart_to_openai_compatible_provid
         axum::serve(listener, upstream).await.unwrap();
     });
 
-    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let (gateway_app, api_key) = configure_gateway_with_image_provider(address).await;
     let boundary = "sdkwork-upstream-edit";
     let response = gateway_app
         .oneshot(multipart_request(
             "/v1/images/edits",
             boundary,
+            Some(&api_key),
             multipart_body(
                 boundary,
                 &[("model", "gpt-image-1"), ("prompt", "relay edit")],
@@ -202,12 +229,13 @@ async fn stateful_images_variation_route_relays_multipart_to_openai_compatible_p
         axum::serve(listener, upstream).await.unwrap();
     });
 
-    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let (gateway_app, api_key) = configure_gateway_with_image_provider(address).await;
     let boundary = "sdkwork-upstream-variation";
     let response = gateway_app
         .oneshot(multipart_request(
             "/v1/images/variations",
             boundary,
+            Some(&api_key),
             multipart_body(
                 boundary,
                 &[("model", "gpt-image-1")],
@@ -236,8 +264,9 @@ async fn stateful_images_variation_route_relays_multipart_to_openai_compatible_p
     assert!(body.contains("source.png"));
 }
 
-async fn configure_gateway_with_image_provider(address: SocketAddr) -> Router {
+async fn configure_gateway_with_image_provider(address: SocketAddr) -> (Router, String) {
     let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
@@ -307,19 +336,25 @@ async fn configure_gateway_with_image_provider(address: SocketAddr) -> Router {
         .unwrap();
     assert_eq!(model.status(), StatusCode::CREATED);
 
-    gateway_app
+    (gateway_app, api_key)
 }
 
-fn multipart_request(uri: &str, boundary: &str, body: Vec<u8>) -> Request<Body> {
-    Request::builder()
-        .method("POST")
-        .uri(uri)
-        .header(
-            "content-type",
-            format!("multipart/form-data; boundary={boundary}"),
-        )
-        .body(Body::from(body))
-        .unwrap()
+fn multipart_request(
+    uri: &str,
+    boundary: &str,
+    api_key: Option<&str>,
+    body: Vec<u8>,
+) -> Request<Body> {
+    let mut builder = Request::builder().method("POST").uri(uri).header(
+        "content-type",
+        format!("multipart/form-data; boundary={boundary}"),
+    );
+
+    if let Some(api_key) = api_key {
+        builder = builder.header("authorization", format!("Bearer {api_key}"));
+    }
+
+    builder.body(Body::from(body)).unwrap()
 }
 
 fn multipart_body(

@@ -62,6 +62,9 @@ Backend:
   - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
   - Rust crate name: `sdkwork-api-ext-provider-*` / `sdkwork-api-ext-channel-*`
 - Configuration-driven extension load planning that merges manifest defaults, installation config, and instance overrides into one runtime plan
+- Provider execution now consumes persisted extension installation and instance state during real dispatch:
+  - `enabled = false` on an installation or instance forces local fallback
+  - instance `base_url` overrides the provider catalog `base_url`
 - Runtime-selectable upstream credential persistence with three local strategies:
   - `database_encrypted`
   - `local_encrypted_file`
@@ -149,6 +152,7 @@ The credential binding itself remains in SQLite so routing and provider resoluti
 - inferred storage dialect via `storage_dialect()`
 - `secret_backend`
 - `credential_master_key`
+- `admin_jwt_signing_secret`
 - `secret_local_file`
 - `secret_keyring_service`
 
@@ -159,6 +163,7 @@ It can now be loaded from environment variables:
 - `SDKWORK_DATABASE_URL`
 - `SDKWORK_SECRET_BACKEND`
 - `SDKWORK_CREDENTIAL_MASTER_KEY`
+- `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
 - `SDKWORK_SECRET_LOCAL_FILE`
 - `SDKWORK_SECRET_KEYRING_SERVICE`
 

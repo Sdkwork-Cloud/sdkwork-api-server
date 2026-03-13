@@ -16,6 +16,7 @@ pub struct StandaloneConfig {
     pub gateway_bind: String,
     pub admin_bind: String,
     pub database_url: String,
+    pub admin_jwt_signing_secret: String,
     pub secret_backend: SecretBackendKind,
     pub credential_master_key: String,
     pub secret_local_file: String,
@@ -28,6 +29,7 @@ impl Default for StandaloneConfig {
             gateway_bind: "127.0.0.1:8080".to_owned(),
             admin_bind: "127.0.0.1:8081".to_owned(),
             database_url: "sqlite://sdkwork-api-server.db".to_owned(),
+            admin_jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
             secret_backend: SecretBackendKind::DatabaseEncrypted,
             credential_master_key: "local-dev-master-key".to_owned(),
             secret_local_file: "sdkwork-api-secrets.json".to_owned(),
@@ -72,6 +74,10 @@ impl StandaloneConfig {
                 .get("SDKWORK_DATABASE_URL")
                 .cloned()
                 .unwrap_or(default.database_url),
+            admin_jwt_signing_secret: values
+                .get("SDKWORK_ADMIN_JWT_SIGNING_SECRET")
+                .cloned()
+                .unwrap_or(default.admin_jwt_signing_secret),
             secret_backend,
             credential_master_key: values
                 .get("SDKWORK_CREDENTIAL_MASTER_KEY")

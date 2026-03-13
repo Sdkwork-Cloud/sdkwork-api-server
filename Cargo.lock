@@ -1400,6 +1400,7 @@ name = "sdkwork-api-app-gateway"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "base64",
  "reqwest",
  "sdkwork-api-app-credential",

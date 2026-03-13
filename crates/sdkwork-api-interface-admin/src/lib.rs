@@ -41,6 +41,8 @@ use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
+const DEFAULT_ADMIN_JWT_SIGNING_SECRET: &str = "local-dev-admin-jwt-secret";
+
 #[derive(Clone)]
 pub struct AdminApiState {
     store: Arc<dyn AdminStore>,
@@ -61,10 +63,22 @@ impl AdminApiState {
     }
 
     pub fn with_secret_manager(pool: SqlitePool, secret_manager: CredentialSecretManager) -> Self {
+        Self::with_secret_manager_and_jwt_secret(
+            pool,
+            secret_manager,
+            DEFAULT_ADMIN_JWT_SIGNING_SECRET,
+        )
+    }
+
+    pub fn with_secret_manager_and_jwt_secret(
+        pool: SqlitePool,
+        secret_manager: CredentialSecretManager,
+        jwt_signing_secret: impl Into<String>,
+    ) -> Self {
         Self {
             store: Arc::new(SqliteAdminStore::new(pool)),
             secret_manager,
-            jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
+            jwt_signing_secret: jwt_signing_secret.into(),
         }
     }
 
@@ -72,10 +86,22 @@ impl AdminApiState {
         store: Arc<dyn AdminStore>,
         secret_manager: CredentialSecretManager,
     ) -> Self {
+        Self::with_store_and_secret_manager_and_jwt_secret(
+            store,
+            secret_manager,
+            DEFAULT_ADMIN_JWT_SIGNING_SECRET,
+        )
+    }
+
+    pub fn with_store_and_secret_manager_and_jwt_secret(
+        store: Arc<dyn AdminStore>,
+        secret_manager: CredentialSecretManager,
+        jwt_signing_secret: impl Into<String>,
+    ) -> Self {
         Self {
             store,
             secret_manager,
-            jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
+            jwt_signing_secret: jwt_signing_secret.into(),
         }
     }
 }
@@ -290,7 +316,23 @@ pub fn admin_router_with_store_and_secret_manager(
     store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 ) -> Router {
-    let state = AdminApiState::with_store_and_secret_manager(store, secret_manager);
+    admin_router_with_store_and_secret_manager_and_jwt_secret(
+        store,
+        secret_manager,
+        DEFAULT_ADMIN_JWT_SIGNING_SECRET,
+    )
+}
+
+pub fn admin_router_with_store_and_secret_manager_and_jwt_secret(
+    store: Arc<dyn AdminStore>,
+    secret_manager: CredentialSecretManager,
+    jwt_signing_secret: impl Into<String>,
+) -> Router {
+    let state = AdminApiState::with_store_and_secret_manager_and_jwt_secret(
+        store,
+        secret_manager,
+        jwt_signing_secret,
+    );
     Router::new()
         .route("/admin/health", get(|| async { "ok" }))
         .route("/admin/auth/login", post(login_handler))
