@@ -4,7 +4,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
-use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::audio::{
+    CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
+};
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
@@ -38,6 +40,7 @@ pub enum ProviderRequest<'a> {
     ImagesGenerations(&'a CreateImageRequest),
     AudioTranscriptions(&'a CreateTranscriptionRequest),
     AudioTranslations(&'a CreateTranslationRequest),
+    AudioSpeech(&'a CreateSpeechRequest),
     FineTuningJobs(&'a CreateFineTuningJobRequest),
     Assistants(&'a CreateAssistantRequest),
     RealtimeSessions(&'a CreateRealtimeSessionRequest),

@@ -13,6 +13,7 @@
 | `/v1/images/generations` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local base64 image fallback |
 | `/v1/audio/transcriptions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local transcription fallback |
 | `/v1/audio/translations` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local translation fallback |
+| `/v1/audio/speech` | Implemented | Stateful mode supports OpenAI-compatible upstream binary or event-stream relay; otherwise emits local audio fallback |
 | `/v1/fine_tuning/jobs` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local fine-tuning job fallback |
 | `/v1/assistants` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local assistant fallback |
 | `/v1/realtime/sessions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local realtime session fallback |
@@ -50,7 +51,7 @@
 | Streaming | Defined | Implemented |
 | Files | Defined | Contract only |
 | Uploads | Defined | Contract only |
-| Audio | Defined | Partially implemented (`/v1/audio/transcriptions`, `/v1/audio/translations`); speech remains contract only |
+| Audio | Defined | Partially implemented (`/v1/audio/transcriptions`, `/v1/audio/translations`, `/v1/audio/speech`) |
 | Fine Tuning | Defined | Implemented |
 | Realtime | Defined | Implemented |
 | Assistants | Defined | Implemented |
@@ -64,7 +65,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, audio translations, fine-tuning jobs, assistants, realtime sessions, evals, batches, and vector stores when provider and credential records are configured |
+| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs, assistants, realtime sessions, evals, batches, and vector stores when provider and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |

@@ -57,6 +57,14 @@ pub struct CreateSpeechRequest {
     pub model: String,
     pub voice: String,
     pub input: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_format: Option<String>,
 }
 
 impl CreateSpeechRequest {
@@ -69,6 +77,10 @@ impl CreateSpeechRequest {
             model: model.into(),
             voice: voice.into(),
             input: input.into(),
+            instructions: None,
+            response_format: None,
+            speed: None,
+            stream_format: None,
         }
     }
 }

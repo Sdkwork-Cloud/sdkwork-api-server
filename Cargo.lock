@@ -1287,6 +1287,7 @@ name = "sdkwork-api-app-gateway"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "reqwest",
  "sdkwork-api-app-credential",
  "sdkwork-api-app-routing",
@@ -1452,6 +1453,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64",
  "reqwest",
  "sdkwork-api-app-billing",
  "sdkwork-api-app-credential",

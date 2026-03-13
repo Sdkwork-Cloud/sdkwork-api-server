@@ -9,6 +9,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sdkwork_api_app_billing::persist_ledger_entry;
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::create_assistant;
@@ -20,6 +21,7 @@ use sdkwork_api_app_gateway::create_fine_tuning_job;
 use sdkwork_api_app_gateway::create_image_generation;
 use sdkwork_api_app_gateway::create_moderation;
 use sdkwork_api_app_gateway::create_realtime_session;
+use sdkwork_api_app_gateway::create_speech_response;
 use sdkwork_api_app_gateway::create_transcription;
 use sdkwork_api_app_gateway::create_translation;
 use sdkwork_api_app_gateway::create_vector_store;
@@ -30,13 +32,15 @@ use sdkwork_api_app_gateway::{
     relay_chat_completion_stream_from_store, relay_completion_from_store,
     relay_embedding_from_store, relay_eval_from_store, relay_fine_tuning_job_from_store,
     relay_image_generation_from_store, relay_moderation_from_store,
-    relay_realtime_session_from_store, relay_response_from_store, relay_transcription_from_store,
-    relay_translation_from_store, relay_vector_store_from_store,
+    relay_realtime_session_from_store, relay_response_from_store, relay_speech_from_store,
+    relay_transcription_from_store, relay_translation_from_store, relay_vector_store_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
-use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::audio::{
+    CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
+};
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
@@ -101,6 +105,7 @@ pub fn gateway_router() -> Router {
         .route("/v1/images/generations", post(image_generations_handler))
         .route("/v1/audio/transcriptions", post(transcriptions_handler))
         .route("/v1/audio/translations", post(translations_handler))
+        .route("/v1/audio/speech", post(audio_speech_handler))
         .route("/v1/fine_tuning/jobs", post(fine_tuning_jobs_handler))
         .route("/v1/assistants", post(assistants_handler))
         .route("/v1/realtime/sessions", post(realtime_sessions_handler))
@@ -167,6 +172,7 @@ pub fn gateway_router_with_store_and_secret_manager(
             "/v1/audio/translations",
             post(translations_with_state_handler),
         )
+        .route("/v1/audio/speech", post(audio_speech_with_state_handler))
         .route(
             "/v1/fine_tuning/jobs",
             post(fine_tuning_jobs_with_state_handler),
@@ -267,6 +273,10 @@ async fn translations_handler(
     Json(create_translation("tenant-1", "project-1", &request.model).expect("translation"))
 }
 
+async fn audio_speech_handler(ExtractJson(request): ExtractJson<CreateSpeechRequest>) -> Response {
+    local_speech_response(&request)
+}
+
 async fn fine_tuning_jobs_handler(
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
 ) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
@@ -347,7 +357,7 @@ async fn chat_completions_with_state_handler(
                         .into_response();
                 }
 
-                return upstream_stream_response(response);
+                return upstream_passthrough_response(response);
             }
             Ok(None) => {}
             Err(_) => {
@@ -430,7 +440,7 @@ async fn chat_completions_with_state_handler(
     }
 }
 
-fn upstream_stream_response(response: reqwest::Response) -> Response {
+fn upstream_passthrough_response(response: reqwest::Response) -> Response {
     let content_type = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -857,6 +867,69 @@ async fn translations_with_state_handler(
         .into_response()
 }
 
+async fn audio_speech_with_state_handler(
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<CreateSpeechRequest>,
+) -> Response {
+    match relay_speech_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "audio_speech",
+                &request.model,
+                25,
+                0.025,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return upstream_passthrough_response(response);
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream speech",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "audio_speech",
+        &request.model,
+        25,
+        0.025,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    local_speech_response(&request)
+}
+
 async fn fine_tuning_jobs_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
@@ -1226,4 +1299,43 @@ async fn record_gateway_usage(
     persist_usage_record(store, "project-1", model, &decision.selected_provider_id).await?;
     persist_ledger_entry(store, "project-1", units, amount).await?;
     Ok(())
+}
+
+fn local_speech_response(request: &CreateSpeechRequest) -> Response {
+    let speech = create_speech_response("tenant-1", "project-1", request).expect("speech");
+    if request.stream_format.as_deref() == Some("sse") {
+        let delta = serde_json::json!({
+            "type":"response.output_audio.delta",
+            "delta": speech.audio_base64,
+            "format": speech.format,
+        })
+        .to_string();
+        let done = serde_json::json!({
+            "type":"response.completed"
+        })
+        .to_string();
+        let body = format!("{}{}", SseFrame::data(&delta), SseFrame::data(&done));
+        return ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response();
+    }
+
+    let bytes = STANDARD
+        .decode(speech.audio_base64.as_bytes())
+        .unwrap_or_default();
+
+    Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(header::CONTENT_TYPE, speech_content_type(&speech.format))
+        .body(Body::from(bytes))
+        .expect("valid speech response")
+}
+
+fn speech_content_type(format: &str) -> &'static str {
+    match format {
+        "mp3" => "audio/mpeg",
+        "opus" => "audio/opus",
+        "aac" => "audio/aac",
+        "flac" => "audio/flac",
+        "pcm" => "audio/pcm",
+        _ => "audio/wav",
+    }
 }

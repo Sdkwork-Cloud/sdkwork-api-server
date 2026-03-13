@@ -2,7 +2,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
-use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::audio::{
+    CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
+};
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
@@ -109,6 +111,14 @@ impl OpenAiProviderAdapter {
     ) -> Result<Value> {
         self.post_json("/v1/audio/translations", api_key, request)
             .await
+    }
+
+    pub async fn audio_speech(
+        &self,
+        api_key: &str,
+        request: &CreateSpeechRequest,
+    ) -> Result<reqwest::Response> {
+        self.post_stream("/v1/audio/speech", api_key, request).await
     }
 
     pub async fn fine_tuning_jobs(
@@ -226,6 +236,9 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::AudioTranslations(request) => Ok(ProviderOutput::Json(
                 self.audio_translations(api_key, request).await?,
+            )),
+            ProviderRequest::AudioSpeech(request) => Ok(ProviderOutput::Stream(
+                self.audio_speech(api_key, request).await?,
             )),
             ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
                 self.fine_tuning_jobs(api_key, request).await?,

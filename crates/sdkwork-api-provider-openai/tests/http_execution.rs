@@ -460,6 +460,51 @@ async fn adapter_posts_vector_stores_to_openai_compatible_upstream() {
     );
 }
 
+#[tokio::test]
+async fn adapter_posts_audio_speech_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/audio/speech", post(capture_speech_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::audio::CreateSpeechRequest::new(
+        "gpt-4o-mini-tts",
+        "nova",
+        "Hello",
+    );
+
+    let response = adapter
+        .audio_speech("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("audio/mpeg")
+    );
+    assert_eq!(response.bytes().await.unwrap().as_ref(), b"AUDIO");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["voice"],
+        "nova"
+    );
+}
+
 async fn capture_chat_request(
     State(state): State<CaptureState>,
     headers: HeaderMap,
@@ -711,4 +756,21 @@ async fn capture_vector_store_request(
             "status":"completed"
         })),
     )
+}
+
+async fn capture_speech_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (
+    [(axum::http::header::HeaderName, &'static str); 1],
+    &'static [u8],
+) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    ([(axum::http::header::CONTENT_TYPE, "audio/mpeg")], b"AUDIO")
 }

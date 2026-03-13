@@ -1,9 +1,11 @@
 use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sdkwork_api_app_credential::{resolve_provider_secret_with_manager, CredentialSecretManager};
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_contract_openai::assistants::{AssistantObject, CreateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
-    CreateTranscriptionRequest, CreateTranslationRequest, TranscriptionObject, TranslationObject,
+    CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest, SpeechResponse,
+    TranscriptionObject, TranslationObject,
 };
 use sdkwork_api_contract_openai::batches::{BatchObject, CreateBatchRequest};
 use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
@@ -296,6 +298,33 @@ pub async fn relay_translation_from_store(
     .await
 }
 
+pub async fn relay_speech_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateSpeechRequest,
+) -> Result<Option<reqwest::Response>> {
+    let decision = simulate_route_with_store(store, "audio_speech", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_stream_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::AudioSpeech(request),
+    )
+    .await
+}
+
 pub async fn relay_fine_tuning_job_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -527,6 +556,19 @@ pub fn create_translation(
     Ok(TranslationObject::new("sdkwork translation"))
 }
 
+pub fn create_speech_response(
+    _tenant_id: &str,
+    _project_id: &str,
+    request: &CreateSpeechRequest,
+) -> Result<SpeechResponse> {
+    let format = request
+        .response_format
+        .clone()
+        .unwrap_or_else(|| "wav".to_owned());
+    let bytes = fallback_speech_bytes(&format);
+    Ok(SpeechResponse::new(format, STANDARD.encode(bytes)))
+}
+
 pub fn create_fine_tuning_job(
     _tenant_id: &str,
     _project_id: &str,
@@ -615,4 +657,17 @@ async fn execute_stream_provider_request(
 
     let response = adapter.execute(api_key, request).await?;
     Ok(response.into_stream())
+}
+
+fn fallback_speech_bytes(format: &str) -> Vec<u8> {
+    match format {
+        "wav" => vec![
+            0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d,
+            0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00,
+            0x80, 0x3e, 0x00, 0x00, 0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00,
+            0x00, 0x00,
+        ],
+        "pcm" => vec![0x00, 0x00],
+        _ => Vec::new(),
+    }
 }

@@ -1,7 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
-use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::audio::{
+    CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
+};
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
@@ -110,6 +112,14 @@ impl OpenRouterProviderAdapter {
         self.delegate.audio_translations(api_key, request).await
     }
 
+    pub async fn audio_speech(
+        &self,
+        api_key: &str,
+        request: &CreateSpeechRequest,
+    ) -> Result<reqwest::Response> {
+        self.delegate.audio_speech(api_key, request).await
+    }
+
     pub async fn fine_tuning_jobs(
         &self,
         api_key: &str,
@@ -187,6 +197,9 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             )),
             ProviderRequest::AudioTranslations(request) => Ok(ProviderOutput::Json(
                 self.audio_translations(api_key, request).await?,
+            )),
+            ProviderRequest::AudioSpeech(request) => Ok(ProviderOutput::Stream(
+                self.audio_speech(api_key, request).await?,
             )),
             ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
                 self.fine_tuning_jobs(api_key, request).await?,
