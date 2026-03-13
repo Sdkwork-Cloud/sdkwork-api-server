@@ -47,6 +47,7 @@ The current repository includes:
 - environment-driven extension discovery config for manifest search paths plus connector and native-dynamic runtime toggles
 - signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
+- persisted routing policies shared by admin simulations and real gateway provider dispatch
 - a built-in extension host with manifest registration for OpenAI, OpenRouter, and Ollama provider extensions
 - filesystem extension discovery through `sdkwork-extension.toml` package manifests loaded from configured search paths
 - persisted extension installation and instance records for configuration-driven mounting
@@ -111,5 +112,12 @@ Discovered provider manifests become executable only when:
 1. the runtime policy enables their declared runtime
 2. the manifest declares a supported protocol
 3. persisted installation and instance state resolves to an enabled runtime load plan
+
+Routing remains intentionally conservative in this batch:
+
+- policy precedence is deterministic by `priority DESC` then `policy_id ASC`
+- model matching supports exact and glob-style `*` patterns
+- provider selection supports ordered preference plus optional default provider
+- weighted traffic shaping, health probes, and regional policy dimensions remain future work
 
 The runtime host is still intentionally lightweight, but the core gateway, admin, routing, credential, and provider relay slices now run against the same Rust workspace and can be assembled in-process for embedded mode.

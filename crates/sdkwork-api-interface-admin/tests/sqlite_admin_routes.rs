@@ -334,6 +334,139 @@ async fn routing_simulation_uses_catalog_models() {
 }
 
 #[tokio::test]
+async fn create_and_list_routing_policies() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/routing/policies")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create.status(), StatusCode::CREATED);
+    let created_json = read_json(create).await;
+    assert_eq!(created_json["policy_id"], "policy-gpt-4-1");
+    assert_eq!(created_json["priority"], 100);
+
+    let list = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/policies")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(list.status(), StatusCode::OK);
+    let list_json = read_json(list).await;
+    assert_eq!(list_json[0]["policy_id"], "policy-gpt-4-1");
+    assert_eq!(
+        list_json[0]["ordered_provider_ids"][0],
+        "provider-openrouter"
+    );
+    assert_eq!(
+        list_json[0]["default_provider_id"],
+        "provider-openai-official"
+    );
+}
+
+#[tokio::test]
+async fn routing_simulation_reports_policy_selected_provider() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let create_openrouter = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openrouter\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_openrouter.status(), StatusCode::CREATED);
+
+    let create_openai = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openai-official\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_openai.status(), StatusCode::CREATED);
+
+    let create_policy = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/routing/policies")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_policy.status(), StatusCode::CREATED);
+
+    let simulate = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/routing/simulations")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"capability\":\"chat_completion\",\"model\":\"gpt-4.1\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(simulate.status(), StatusCode::OK);
+    let simulation_json = read_json(simulate).await;
+    assert_eq!(
+        simulation_json["selected_provider_id"],
+        "provider-openrouter"
+    );
+    assert_eq!(simulation_json["matched_policy_id"], "policy-gpt-4-1");
+}
+
+#[tokio::test]
 async fn create_and_list_extension_installations_and_instances() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);

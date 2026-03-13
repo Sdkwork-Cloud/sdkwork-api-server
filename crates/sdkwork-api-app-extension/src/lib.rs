@@ -3,6 +3,16 @@ use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, Exten
 use sdkwork_api_storage_core::AdminStore;
 use serde_json::Value;
 
+pub struct PersistExtensionInstanceInput<'a> {
+    pub instance_id: &'a str,
+    pub installation_id: &'a str,
+    pub extension_id: &'a str,
+    pub enabled: bool,
+    pub base_url: Option<&'a str>,
+    pub credential_ref: Option<&'a str>,
+    pub config: Value,
+}
+
 pub async fn list_extension_installations(
     store: &dyn AdminStore,
 ) -> Result<Vec<ExtensionInstallation>> {
@@ -33,22 +43,17 @@ pub async fn list_extension_instances(store: &dyn AdminStore) -> Result<Vec<Exte
 
 pub async fn persist_extension_instance(
     store: &dyn AdminStore,
-    instance_id: &str,
-    installation_id: &str,
-    extension_id: &str,
-    enabled: bool,
-    base_url: Option<&str>,
-    credential_ref: Option<&str>,
-    config: Value,
+    input: PersistExtensionInstanceInput<'_>,
 ) -> Result<ExtensionInstance> {
     let mut instance =
-        ExtensionInstance::new(instance_id, installation_id, extension_id).with_enabled(enabled);
-    if let Some(base_url) = base_url {
+        ExtensionInstance::new(input.instance_id, input.installation_id, input.extension_id)
+            .with_enabled(input.enabled);
+    if let Some(base_url) = input.base_url {
         instance = instance.with_base_url(base_url);
     }
-    if let Some(credential_ref) = credential_ref {
+    if let Some(credential_ref) = input.credential_ref {
         instance = instance.with_credential_ref(credential_ref);
     }
-    instance = instance.with_config(config);
+    instance = instance.with_config(input.config);
     store.insert_extension_instance(&instance).await
 }

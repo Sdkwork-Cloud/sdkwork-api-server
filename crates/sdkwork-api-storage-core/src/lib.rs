@@ -4,6 +4,7 @@ use sdkwork_api_domain_billing::LedgerEntry;
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
+use sdkwork_api_domain_routing::RoutingPolicy;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
@@ -71,6 +72,9 @@ pub trait AdminStore: Send + Sync {
     async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>>;
     async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>>;
     async fn delete_model(&self, external_name: &str) -> Result<bool>;
+
+    async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy>;
+    async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>>;
 
     async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord>;
     async fn list_usage_records(&self) -> Result<Vec<UsageRecord>>;

@@ -18,13 +18,15 @@ use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_credential::{list_credentials, persist_credential_with_secret_and_manager};
 use sdkwork_api_app_extension::{
     list_extension_installations, list_extension_instances, persist_extension_installation,
-    persist_extension_instance,
+    persist_extension_instance, PersistExtensionInstanceInput,
 };
 use sdkwork_api_app_identity::{
     issue_jwt, list_gateway_api_keys, persist_gateway_api_key, verify_jwt, Claims,
     CreatedGatewayApiKey,
 };
-use sdkwork_api_app_routing::simulate_route_with_store;
+use sdkwork_api_app_routing::{
+    create_routing_policy, list_routing_policies, persist_routing_policy, simulate_route_with_store,
+};
 use sdkwork_api_app_tenant::{list_projects, list_tenants, persist_project, persist_tenant};
 use sdkwork_api_app_usage::list_usage_records;
 use sdkwork_api_domain_billing::LedgerEntry;
@@ -33,6 +35,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
+use sdkwork_api_domain_routing::RoutingPolicy;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -241,6 +244,21 @@ struct CreateExtensionInstanceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct CreateRoutingPolicyRequest {
+    policy_id: String,
+    capability: String,
+    model_pattern: String,
+    #[serde(default = "default_true")]
+    enabled: bool,
+    #[serde(default)]
+    priority: i32,
+    #[serde(default)]
+    ordered_provider_ids: Vec<String>,
+    #[serde(default)]
+    default_provider_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct RoutingSimulationRequest {
     capability: String,
     model: String,
@@ -250,6 +268,8 @@ struct RoutingSimulationRequest {
 struct RoutingSimulationResponse {
     selected_provider_id: String,
     candidate_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matched_policy_id: Option<String>,
 }
 
 pub fn admin_router() -> Router {
@@ -375,7 +395,10 @@ pub fn admin_router_with_store_and_secret_manager_and_jwt_secret(
         )
         .route("/admin/usage/records", get(list_usage_records_handler))
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
-        .route("/admin/routing/policies", get(|| async { "policies" }))
+        .route(
+            "/admin/routing/policies",
+            get(list_routing_policies_handler).post(create_routing_policy_handler),
+        )
         .route("/admin/routing/simulations", post(simulate_routing_handler))
         .with_state(state)
 }
@@ -628,13 +651,15 @@ async fn create_extension_instance_handler(
 ) -> Result<(StatusCode, Json<ExtensionInstance>), StatusCode> {
     let instance = persist_extension_instance(
         state.store.as_ref(),
-        &request.instance_id,
-        &request.installation_id,
-        &request.extension_id,
-        request.enabled,
-        request.base_url.as_deref(),
-        request.credential_ref.as_deref(),
-        request.config,
+        PersistExtensionInstanceInput {
+            instance_id: &request.instance_id,
+            installation_id: &request.installation_id,
+            extension_id: &request.extension_id,
+            enabled: request.enabled,
+            base_url: request.base_url.as_deref(),
+            credential_ref: request.credential_ref.as_deref(),
+            config: request.config,
+        },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -653,7 +678,39 @@ async fn simulate_routing_handler(
     Ok(Json(RoutingSimulationResponse {
         selected_provider_id: decision.selected_provider_id,
         candidate_ids: decision.candidate_ids,
+        matched_policy_id: decision.matched_policy_id,
     }))
+}
+
+async fn list_routing_policies_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<RoutingPolicy>>, StatusCode> {
+    list_routing_policies(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_routing_policy_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateRoutingPolicyRequest>,
+) -> Result<(StatusCode, Json<RoutingPolicy>), StatusCode> {
+    let policy = create_routing_policy(
+        &request.policy_id,
+        &request.capability,
+        &request.model_pattern,
+        request.enabled,
+        request.priority,
+        &request.ordered_provider_ids,
+        request.default_provider_id.as_deref(),
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let policy = persist_routing_policy(state.store.as_ref(), &policy)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(policy)))
 }
 
 async fn list_usage_records_handler(
@@ -708,4 +765,8 @@ fn provider_bindings_from_request(request: &CreateProviderRequest) -> Vec<Provid
     }
 
     bindings
+}
+
+fn default_true() -> bool {
+    true
 }

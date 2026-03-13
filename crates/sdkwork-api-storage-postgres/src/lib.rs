@@ -6,6 +6,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
+use sdkwork_api_domain_routing::RoutingPolicy;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -28,6 +29,20 @@ fn provider_channel_bindings(provider: &ProxyProvider) -> Vec<ProviderChannelBin
     } else {
         provider.channel_bindings.clone()
     }
+}
+
+async fn load_routing_policy_provider_ids(pool: &PgPool, policy_id: &str) -> Result<Vec<String>> {
+    let rows = sqlx::query_as::<_, (String,)>(
+        "SELECT provider_id
+         FROM routing_policy_providers
+         WHERE policy_id = $1
+         ORDER BY position, provider_id",
+    )
+    .bind(policy_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|(provider_id,)| provider_id).collect())
 }
 
 async fn load_provider_channel_bindings(
@@ -198,6 +213,28 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     sqlx::query("ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS context_window BIGINT")
         .execute(&pool)
         .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS routing_policies (
+            policy_id TEXT PRIMARY KEY NOT NULL,
+            capability TEXT NOT NULL,
+            model_pattern TEXT NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            priority INTEGER NOT NULL DEFAULT 0,
+            default_provider_id TEXT
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS routing_policy_providers (
+            policy_id TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            PRIMARY KEY (policy_id, provider_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS usage_records (
             project_id TEXT NOT NULL,
@@ -568,6 +605,64 @@ impl PostgresAdminStore {
         Ok(result.rows_affected() > 0)
     }
 
+    pub async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {
+        sqlx::query(
+            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, default_provider_id) VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, default_provider_id = excluded.default_provider_id",
+        )
+        .bind(&policy.policy_id)
+        .bind(&policy.capability)
+        .bind(&policy.model_pattern)
+        .bind(policy.enabled)
+        .bind(policy.priority)
+        .bind(&policy.default_provider_id)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query("DELETE FROM routing_policy_providers WHERE policy_id = $1")
+            .bind(&policy.policy_id)
+            .execute(&self.pool)
+            .await?;
+
+        for (position, provider_id) in policy.ordered_provider_ids.iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO routing_policy_providers (policy_id, provider_id, position) VALUES ($1, $2, $3)
+                 ON CONFLICT(policy_id, provider_id) DO UPDATE SET position = excluded.position",
+            )
+            .bind(&policy.policy_id)
+            .bind(provider_id)
+            .bind(i32::try_from(position)?)
+            .execute(&self.pool)
+            .await?;
+        }
+
+        Ok(policy.clone())
+    }
+
+    pub async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
+        let rows = sqlx::query_as::<_, (String, String, String, bool, i32, Option<String>)>(
+            "SELECT policy_id, capability, model_pattern, enabled, priority, default_provider_id
+             FROM routing_policies
+             ORDER BY priority DESC, policy_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut policies = Vec::with_capacity(rows.len());
+        for (policy_id, capability, model_pattern, enabled, priority, default_provider_id) in rows {
+            policies.push(
+                RoutingPolicy::new(policy_id.clone(), capability, model_pattern)
+                    .with_enabled(enabled)
+                    .with_priority(priority)
+                    .with_ordered_provider_ids(
+                        load_routing_policy_provider_ids(&self.pool, &policy_id).await?,
+                    )
+                    .with_default_provider_id_option(default_provider_id),
+            );
+        }
+        Ok(policies)
+    }
+
     pub async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
         sqlx::query(
             "INSERT INTO usage_records (project_id, model, provider_id) VALUES ($1, $2, $3)",
@@ -935,6 +1030,14 @@ impl AdminStore for PostgresAdminStore {
 
     async fn delete_model(&self, external_name: &str) -> Result<bool> {
         PostgresAdminStore::delete_model(self, external_name).await
+    }
+
+    async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {
+        PostgresAdminStore::insert_routing_policy(self, policy).await
+    }
+
+    async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
+        PostgresAdminStore::list_routing_policies(self).await
     }
 
     async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
