@@ -244,6 +244,43 @@ async fn adapter_posts_audio_translations_to_openai_compatible_upstream() {
     );
 }
 
+#[tokio::test]
+async fn adapter_posts_fine_tuning_jobs_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/fine_tuning/jobs", post(capture_fine_tuning_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest::new(
+        "file_1",
+        "gpt-4.1-mini",
+    );
+
+    let response = adapter
+        .fine_tuning_jobs("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "ftjob_upstream");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["training_file"],
+        "file_1"
+    );
+}
+
 async fn capture_chat_request(
     State(state): State<CaptureState>,
     headers: HeaderMap,
@@ -361,6 +398,28 @@ async fn capture_translation_request(
         StatusCode::OK,
         Json(json!({
             "text":"upstream translation"
+        })),
+    )
+}
+
+async fn capture_fine_tuning_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"ftjob_upstream",
+            "object":"fine_tuning.job",
+            "model":"gpt-4.1-mini",
+            "status":"queued"
         })),
     )
 }

@@ -13,6 +13,7 @@ use sdkwork_api_app_billing::persist_ledger_entry;
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::create_chat_completion;
 use sdkwork_api_app_gateway::create_completion;
+use sdkwork_api_app_gateway::create_fine_tuning_job;
 use sdkwork_api_app_gateway::create_image_generation;
 use sdkwork_api_app_gateway::create_moderation;
 use sdkwork_api_app_gateway::create_transcription;
@@ -21,8 +22,9 @@ use sdkwork_api_app_gateway::list_models;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, list_models_from_store, relay_chat_completion_from_store,
     relay_chat_completion_stream_from_store, relay_completion_from_store,
-    relay_embedding_from_store, relay_image_generation_from_store, relay_moderation_from_store,
-    relay_response_from_store, relay_transcription_from_store, relay_translation_from_store,
+    relay_embedding_from_store, relay_fine_tuning_job_from_store,
+    relay_image_generation_from_store, relay_moderation_from_store, relay_response_from_store,
+    relay_transcription_from_store, relay_translation_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
@@ -30,6 +32,7 @@ use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTrans
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
@@ -86,6 +89,7 @@ pub fn gateway_router() -> Router {
         .route("/v1/images/generations", post(image_generations_handler))
         .route("/v1/audio/transcriptions", post(transcriptions_handler))
         .route("/v1/audio/translations", post(translations_handler))
+        .route("/v1/fine_tuning/jobs", post(fine_tuning_jobs_handler))
 }
 
 pub fn gateway_router_with_pool(pool: SqlitePool) -> Router {
@@ -145,6 +149,10 @@ pub fn gateway_router_with_store_and_secret_manager(
         .route(
             "/v1/audio/translations",
             post(translations_with_state_handler),
+        )
+        .route(
+            "/v1/fine_tuning/jobs",
+            post(fine_tuning_jobs_with_state_handler),
         )
         .with_state(GatewayApiState::with_store_and_secret_manager(
             store,
@@ -232,6 +240,12 @@ async fn translations_handler(
     ExtractJson(request): ExtractJson<CreateTranslationRequest>,
 ) -> Json<sdkwork_api_contract_openai::audio::TranslationObject> {
     Json(create_translation("tenant-1", "project-1", &request.model).expect("translation"))
+}
+
+async fn fine_tuning_jobs_handler(
+    ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
+) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
+    Json(create_fine_tuning_job("tenant-1", "project-1", &request.model).expect("fine tuning"))
 }
 
 async fn chat_completions_with_state_handler(
@@ -772,6 +786,70 @@ async fn translations_with_state_handler(
     }
 
     Json(create_translation("tenant-1", "project-1", &request.model).expect("translation"))
+        .into_response()
+}
+
+async fn fine_tuning_jobs_with_state_handler(
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
+) -> Response {
+    match relay_fine_tuning_job_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "fine_tuning",
+                &request.model,
+                200,
+                0.2,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "fine_tuning",
+        &request.model,
+        200,
+        0.2,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(create_fine_tuning_job("tenant-1", "project-1", &request.model).expect("fine tuning"))
         .into_response()
 }
 

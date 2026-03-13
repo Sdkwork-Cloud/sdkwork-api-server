@@ -13,6 +13,7 @@
 | `/v1/images/generations` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local base64 image fallback |
 | `/v1/audio/transcriptions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local transcription fallback |
 | `/v1/audio/translations` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local translation fallback |
+| `/v1/fine_tuning/jobs` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local fine-tuning job fallback |
 
 ## Current Implemented Admin APIs
 
@@ -45,7 +46,7 @@
 | Files | Defined | Contract only |
 | Uploads | Defined | Contract only |
 | Audio | Defined | Partially implemented (`/v1/audio/transcriptions`, `/v1/audio/translations`); speech remains contract only |
-| Fine Tuning | Defined | Contract only |
+| Fine Tuning | Defined | Implemented |
 | Realtime | Defined | Contract only |
 | Assistants | Defined | Contract only |
 | Vector Stores | Defined | Contract only |
@@ -58,7 +59,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, and audio translations when provider, model, and credential records are configured |
+| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, audio translations, and fine-tuning jobs when provider, model, and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |

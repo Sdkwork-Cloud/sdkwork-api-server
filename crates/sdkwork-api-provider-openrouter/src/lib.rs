@@ -4,6 +4,7 @@ use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTrans
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
@@ -103,6 +104,14 @@ impl OpenRouterProviderAdapter {
     ) -> Result<Value> {
         self.delegate.audio_translations(api_key, request).await
     }
+
+    pub async fn fine_tuning_jobs(
+        &self,
+        api_key: &str,
+        request: &CreateFineTuningJobRequest,
+    ) -> Result<Value> {
+        self.delegate.fine_tuning_jobs(api_key, request).await
+    }
 }
 
 impl ProviderAdapter for OpenRouterProviderAdapter {
@@ -141,6 +150,9 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             )),
             ProviderRequest::AudioTranslations(request) => Ok(ProviderOutput::Json(
                 self.audio_translations(api_key, request).await?,
+            )),
+            ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
+                self.fine_tuning_jobs(api_key, request).await?,
             )),
         }
     }

@@ -7,6 +7,7 @@ use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTrans
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
@@ -32,6 +33,7 @@ pub enum ProviderRequest<'a> {
     ImagesGenerations(&'a CreateImageRequest),
     AudioTranscriptions(&'a CreateTranscriptionRequest),
     AudioTranslations(&'a CreateTranslationRequest),
+    FineTuningJobs(&'a CreateFineTuningJobRequest),
 }
 
 pub enum ProviderOutput {

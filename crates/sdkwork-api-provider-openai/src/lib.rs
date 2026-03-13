@@ -5,6 +5,7 @@ use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTrans
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
@@ -105,6 +106,15 @@ impl OpenAiProviderAdapter {
             .await
     }
 
+    pub async fn fine_tuning_jobs(
+        &self,
+        api_key: &str,
+        request: &CreateFineTuningJobRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/fine_tuning/jobs", api_key, request)
+            .await
+    }
+
     async fn post_json<T: serde::Serialize>(
         &self,
         path: &str,
@@ -178,6 +188,9 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::AudioTranslations(request) => Ok(ProviderOutput::Json(
                 self.audio_translations(api_key, request).await?,
+            )),
+            ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
+                self.fine_tuning_jobs(api_key, request).await?,
             )),
         }
     }

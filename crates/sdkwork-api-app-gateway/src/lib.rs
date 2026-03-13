@@ -9,6 +9,7 @@ use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::{CompletionObject, CreateCompletionRequest};
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse;
+use sdkwork_api_contract_openai::fine_tuning::{CreateFineTuningJobRequest, FineTuningJobObject};
 use sdkwork_api_contract_openai::images::{CreateImageRequest, ImageObject, ImagesResponse};
 use sdkwork_api_contract_openai::models::{ListModelsResponse, ModelObject};
 use sdkwork_api_contract_openai::moderations::{
@@ -290,6 +291,33 @@ pub async fn relay_translation_from_store(
     .await
 }
 
+pub async fn relay_fine_tuning_job_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateFineTuningJobRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "fine_tuning", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::FineTuningJobs(request),
+    )
+    .await
+}
+
 pub fn create_chat_completion(
     _tenant_id: &str,
     _project_id: &str,
@@ -357,6 +385,14 @@ pub fn create_translation(
     _model: &str,
 ) -> Result<TranslationObject> {
     Ok(TranslationObject::new("sdkwork translation"))
+}
+
+pub fn create_fine_tuning_job(
+    _tenant_id: &str,
+    _project_id: &str,
+    model: &str,
+) -> Result<FineTuningJobObject> {
+    Ok(FineTuningJobObject::new("ftjob_1", model))
 }
 
 fn default_provider_registry() -> ProviderRegistry {
