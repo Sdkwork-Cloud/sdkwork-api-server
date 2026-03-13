@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
+use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
@@ -62,6 +62,10 @@ pub enum ProviderRequest<'a> {
     FineTuningJobsRetrieve(&'a str),
     FineTuningJobsCancel(&'a str),
     Assistants(&'a CreateAssistantRequest),
+    AssistantsList,
+    AssistantsRetrieve(&'a str),
+    AssistantsUpdate(&'a str, &'a UpdateAssistantRequest),
+    AssistantsDelete(&'a str),
     RealtimeSessions(&'a CreateRealtimeSessionRequest),
     Evals(&'a CreateEvalRequest),
     Batches(&'a CreateBatchRequest),

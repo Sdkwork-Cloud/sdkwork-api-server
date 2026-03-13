@@ -414,6 +414,133 @@ async fn adapter_posts_assistants_to_openai_compatible_upstream() {
 }
 
 #[tokio::test]
+async fn adapter_lists_assistants_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/assistants", get(capture_assistants_list_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter.list_assistants("sk-upstream-openai").await.unwrap();
+
+    assert_eq!(response["object"], "list");
+    assert_eq!(response["data"][0]["id"], "asst_1");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_retrieves_assistant_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/assistants/asst_1",
+            get(capture_assistant_retrieve_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .retrieve_assistant("sk-upstream-openai", "asst_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "asst_1");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_updates_assistant_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/assistants/asst_1",
+            post(capture_assistant_update_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request =
+        sdkwork_api_contract_openai::assistants::UpdateAssistantRequest::new("Support v2");
+
+    let response = adapter
+        .update_assistant("sk-upstream-openai", "asst_1", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "asst_1");
+    assert_eq!(response["name"], "Support v2");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["name"],
+        "Support v2"
+    );
+}
+
+#[tokio::test]
+async fn adapter_deletes_assistant_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/assistants/asst_1",
+            delete(capture_assistant_delete_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .delete_assistant("sk-upstream-openai", "asst_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["deleted"], true);
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
 async fn adapter_posts_realtime_sessions_to_openai_compatible_upstream() {
     let state = CaptureState::default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1679,6 +1806,93 @@ async fn capture_assistant_request(
             "object":"assistant",
             "name":"Support",
             "model":"gpt-4.1"
+        })),
+    )
+}
+
+async fn capture_assistants_list_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "id":"asst_1",
+                "object":"assistant",
+                "name":"Support",
+                "model":"gpt-4.1"
+            }],
+            "first_id":"asst_1",
+            "last_id":"asst_1",
+            "has_more":false
+        })),
+    )
+}
+
+async fn capture_assistant_retrieve_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"asst_1",
+            "object":"assistant",
+            "name":"Support",
+            "model":"gpt-4.1"
+        })),
+    )
+}
+
+async fn capture_assistant_update_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"asst_1",
+            "object":"assistant",
+            "name":"Support v2",
+            "model":"gpt-4.1"
+        })),
+    )
+}
+
+async fn capture_assistant_delete_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"asst_1",
+            "object":"assistant.deleted",
+            "deleted":true
         })),
     )
 }

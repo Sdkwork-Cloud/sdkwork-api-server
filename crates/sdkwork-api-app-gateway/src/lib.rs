@@ -2,7 +2,10 @@ use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sdkwork_api_app_credential::{resolve_provider_secret_with_manager, CredentialSecretManager};
 use sdkwork_api_app_routing::simulate_route_with_store;
-use sdkwork_api_contract_openai::assistants::{AssistantObject, CreateAssistantRequest};
+use sdkwork_api_contract_openai::assistants::{
+    AssistantObject, CreateAssistantRequest, DeleteAssistantResponse, ListAssistantsResponse,
+    UpdateAssistantRequest,
+};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest, SpeechResponse,
     TranscriptionObject, TranslationObject,
@@ -711,6 +714,114 @@ pub async fn relay_assistant_from_store(
         provider.base_url,
         &api_key,
         ProviderRequest::Assistants(request),
+    )
+    .await
+}
+
+pub async fn relay_list_assistants_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "assistants", "assistants").await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::AssistantsList,
+    )
+    .await
+}
+
+pub async fn relay_get_assistant_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "assistants", assistant_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::AssistantsRetrieve(assistant_id),
+    )
+    .await
+}
+
+pub async fn relay_update_assistant_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+    request: &UpdateAssistantRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "assistants", assistant_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::AssistantsUpdate(assistant_id, request),
+    )
+    .await
+}
+
+pub async fn relay_delete_assistant_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "assistants", assistant_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::AssistantsDelete(assistant_id),
     )
     .await
 }
@@ -1480,6 +1591,37 @@ pub fn create_assistant(
     model: &str,
 ) -> Result<AssistantObject> {
     Ok(AssistantObject::new("asst_1", name, model))
+}
+
+pub fn list_assistants(_tenant_id: &str, _project_id: &str) -> Result<ListAssistantsResponse> {
+    Ok(ListAssistantsResponse::new(vec![AssistantObject::new(
+        "asst_1", "Support", "gpt-4.1",
+    )]))
+}
+
+pub fn get_assistant(
+    _tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+) -> Result<AssistantObject> {
+    Ok(AssistantObject::new(assistant_id, "Support", "gpt-4.1"))
+}
+
+pub fn update_assistant(
+    _tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+    name: &str,
+) -> Result<AssistantObject> {
+    Ok(AssistantObject::new(assistant_id, name, "gpt-4.1"))
+}
+
+pub fn delete_assistant(
+    _tenant_id: &str,
+    _project_id: &str,
+    assistant_id: &str,
+) -> Result<DeleteAssistantResponse> {
+    Ok(DeleteAssistantResponse::deleted(assistant_id))
 }
 
 pub fn create_realtime_session(

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
-use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
+use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
@@ -246,6 +246,30 @@ impl OpenAiProviderAdapter {
         request: &CreateAssistantRequest,
     ) -> Result<Value> {
         self.post_json("/v1/assistants", api_key, request).await
+    }
+
+    pub async fn list_assistants(&self, api_key: &str) -> Result<Value> {
+        self.get_json("/v1/assistants", api_key).await
+    }
+
+    pub async fn retrieve_assistant(&self, api_key: &str, assistant_id: &str) -> Result<Value> {
+        self.get_json(&format!("/v1/assistants/{assistant_id}"), api_key)
+            .await
+    }
+
+    pub async fn update_assistant(
+        &self,
+        api_key: &str,
+        assistant_id: &str,
+        request: &UpdateAssistantRequest,
+    ) -> Result<Value> {
+        self.post_json(&format!("/v1/assistants/{assistant_id}"), api_key, request)
+            .await
+    }
+
+    pub async fn delete_assistant(&self, api_key: &str, assistant_id: &str) -> Result<Value> {
+        self.delete_json(&format!("/v1/assistants/{assistant_id}"), api_key)
+            .await
     }
 
     pub async fn realtime_sessions(
@@ -622,6 +646,19 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::Assistants(request) => Ok(ProviderOutput::Json(
                 self.assistants(api_key, request).await?,
+            )),
+            ProviderRequest::AssistantsList => {
+                Ok(ProviderOutput::Json(self.list_assistants(api_key).await?))
+            }
+            ProviderRequest::AssistantsRetrieve(assistant_id) => Ok(ProviderOutput::Json(
+                self.retrieve_assistant(api_key, assistant_id).await?,
+            )),
+            ProviderRequest::AssistantsUpdate(assistant_id, request) => Ok(ProviderOutput::Json(
+                self.update_assistant(api_key, assistant_id, request)
+                    .await?,
+            )),
+            ProviderRequest::AssistantsDelete(assistant_id) => Ok(ProviderOutput::Json(
+                self.delete_assistant(api_key, assistant_id).await?,
             )),
             ProviderRequest::RealtimeSessions(request) => Ok(ProviderOutput::Json(
                 self.realtime_sessions(api_key, request).await?,

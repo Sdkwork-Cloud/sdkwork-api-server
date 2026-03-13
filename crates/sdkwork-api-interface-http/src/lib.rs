@@ -37,16 +37,19 @@ use sdkwork_api_app_gateway::create_upload_part;
 use sdkwork_api_app_gateway::create_vector_store;
 use sdkwork_api_app_gateway::create_vector_store_file;
 use sdkwork_api_app_gateway::create_vector_store_file_batch;
+use sdkwork_api_app_gateway::delete_assistant;
 use sdkwork_api_app_gateway::delete_file;
 use sdkwork_api_app_gateway::delete_vector_store;
 use sdkwork_api_app_gateway::delete_vector_store_file;
 use sdkwork_api_app_gateway::file_content;
+use sdkwork_api_app_gateway::get_assistant;
 use sdkwork_api_app_gateway::get_batch;
 use sdkwork_api_app_gateway::get_file;
 use sdkwork_api_app_gateway::get_fine_tuning_job;
 use sdkwork_api_app_gateway::get_vector_store;
 use sdkwork_api_app_gateway::get_vector_store_file;
 use sdkwork_api_app_gateway::get_vector_store_file_batch;
+use sdkwork_api_app_gateway::list_assistants;
 use sdkwork_api_app_gateway::list_batches;
 use sdkwork_api_app_gateway::list_files;
 use sdkwork_api_app_gateway::list_fine_tuning_jobs;
@@ -55,31 +58,34 @@ use sdkwork_api_app_gateway::list_vector_store_file_batch_files;
 use sdkwork_api_app_gateway::list_vector_store_files;
 use sdkwork_api_app_gateway::list_vector_stores;
 use sdkwork_api_app_gateway::search_vector_store;
+use sdkwork_api_app_gateway::update_assistant;
 use sdkwork_api_app_gateway::update_vector_store;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, list_models_from_store, relay_assistant_from_store,
     relay_batch_from_store, relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
     relay_cancel_upload_from_store, relay_cancel_vector_store_file_batch_from_store,
     relay_chat_completion_from_store, relay_chat_completion_stream_from_store,
-    relay_complete_upload_from_store, relay_completion_from_store, relay_delete_file_from_store,
+    relay_complete_upload_from_store, relay_completion_from_store,
+    relay_delete_assistant_from_store, relay_delete_file_from_store,
     relay_delete_vector_store_file_from_store, relay_delete_vector_store_from_store,
     relay_embedding_from_store, relay_eval_from_store, relay_file_content_from_store,
-    relay_file_from_store, relay_fine_tuning_job_from_store, relay_get_batch_from_store,
-    relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
+    relay_file_from_store, relay_fine_tuning_job_from_store, relay_get_assistant_from_store,
+    relay_get_batch_from_store, relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
     relay_get_vector_store_file_batch_from_store, relay_get_vector_store_file_from_store,
     relay_get_vector_store_from_store, relay_image_generation_from_store,
-    relay_list_batches_from_store, relay_list_files_from_store,
+    relay_list_assistants_from_store, relay_list_batches_from_store, relay_list_files_from_store,
     relay_list_fine_tuning_jobs_from_store, relay_list_vector_store_file_batch_files_from_store,
     relay_list_vector_store_files_from_store, relay_list_vector_stores_from_store,
     relay_moderation_from_store, relay_realtime_session_from_store, relay_response_from_store,
     relay_search_vector_store_from_store, relay_speech_from_store, relay_transcription_from_store,
-    relay_translation_from_store, relay_update_vector_store_from_store, relay_upload_from_store,
-    relay_upload_part_from_store, relay_vector_store_file_batch_from_store,
-    relay_vector_store_file_from_store, relay_vector_store_from_store,
+    relay_translation_from_store, relay_update_assistant_from_store,
+    relay_update_vector_store_from_store, relay_upload_from_store, relay_upload_part_from_store,
+    relay_vector_store_file_batch_from_store, relay_vector_store_file_from_store,
+    relay_vector_store_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
-use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
+use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
@@ -183,7 +189,16 @@ pub fn gateway_router() -> Router {
             "/v1/fine_tuning/jobs/{fine_tuning_job_id}/cancel",
             post(fine_tuning_job_cancel_handler),
         )
-        .route("/v1/assistants", post(assistants_handler))
+        .route(
+            "/v1/assistants",
+            get(assistants_list_handler).post(assistants_handler),
+        )
+        .route(
+            "/v1/assistants/{assistant_id}",
+            get(assistant_retrieve_handler)
+                .post(assistant_update_handler)
+                .delete(assistant_delete_handler),
+        )
         .route("/v1/realtime/sessions", post(realtime_sessions_handler))
         .route("/v1/evals", post(evals_handler))
         .route(
@@ -328,7 +343,16 @@ pub fn gateway_router_with_store_and_secret_manager(
             "/v1/fine_tuning/jobs/{fine_tuning_job_id}/cancel",
             post(fine_tuning_job_cancel_with_state_handler),
         )
-        .route("/v1/assistants", post(assistants_with_state_handler))
+        .route(
+            "/v1/assistants",
+            get(assistants_list_with_state_handler).post(assistants_with_state_handler),
+        )
+        .route(
+            "/v1/assistants/{assistant_id}",
+            get(assistant_retrieve_with_state_handler)
+                .post(assistant_update_with_state_handler)
+                .delete(assistant_delete_with_state_handler),
+        )
         .route(
             "/v1/realtime/sessions",
             post(realtime_sessions_with_state_handler),
@@ -573,6 +597,38 @@ async fn assistants_handler(
         create_assistant("tenant-1", "project-1", &request.name, &request.model)
             .expect("assistant"),
     )
+}
+
+async fn assistants_list_handler(
+) -> Json<sdkwork_api_contract_openai::assistants::ListAssistantsResponse> {
+    Json(list_assistants("tenant-1", "project-1").expect("assistants list"))
+}
+
+async fn assistant_retrieve_handler(
+    Path(assistant_id): Path<String>,
+) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
+    Json(get_assistant("tenant-1", "project-1", &assistant_id).expect("assistant retrieve"))
+}
+
+async fn assistant_update_handler(
+    Path(assistant_id): Path<String>,
+    ExtractJson(request): ExtractJson<UpdateAssistantRequest>,
+) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
+    Json(
+        update_assistant(
+            "tenant-1",
+            "project-1",
+            &assistant_id,
+            request.name.as_deref().unwrap_or("assistant"),
+        )
+        .expect("assistant update"),
+    )
+}
+
+async fn assistant_delete_handler(
+    Path(assistant_id): Path<String>,
+) -> Json<sdkwork_api_contract_openai::assistants::DeleteAssistantResponse> {
+    Json(delete_assistant("tenant-1", "project-1", &assistant_id).expect("assistant delete"))
 }
 
 async fn realtime_sessions_handler(
@@ -2159,6 +2215,221 @@ async fn assistants_with_state_handler(
             .expect("assistant"),
     )
     .into_response()
+}
+
+async fn assistants_list_with_state_handler(State(state): State<GatewayApiState>) -> Response {
+    match relay_list_assistants_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "assistants", "assistants", 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistants list",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "assistants", "assistants", 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(list_assistants("tenant-1", "project-1").expect("assistants list")).into_response()
+}
+
+async fn assistant_retrieve_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(assistant_id): Path<String>,
+) -> Response {
+    match relay_get_assistant_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &assistant_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(get_assistant("tenant-1", "project-1", &assistant_id).expect("assistant retrieve"))
+        .into_response()
+}
+
+async fn assistant_update_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(assistant_id): Path<String>,
+    ExtractJson(request): ExtractJson<UpdateAssistantRequest>,
+) -> Response {
+    match relay_update_assistant_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &assistant_id,
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            let usage_target = request.model.as_deref().unwrap_or(assistant_id.as_str());
+            if record_gateway_usage(state.store.as_ref(), "assistants", usage_target, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant update",
+            )
+                .into_response();
+        }
+    }
+
+    let usage_target = request.model.as_deref().unwrap_or(assistant_id.as_str());
+    if record_gateway_usage(state.store.as_ref(), "assistants", usage_target, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        update_assistant(
+            "tenant-1",
+            "project-1",
+            &assistant_id,
+            request.name.as_deref().unwrap_or("assistant"),
+        )
+        .expect("assistant update"),
+    )
+    .into_response()
+}
+
+async fn assistant_delete_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(assistant_id): Path<String>,
+) -> Response {
+    match relay_delete_assistant_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &assistant_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "assistants", &assistant_id, 20, 0.02)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(delete_assistant("tenant-1", "project-1", &assistant_id).expect("assistant delete"))
+        .into_response()
 }
 
 async fn realtime_sessions_with_state_handler(
