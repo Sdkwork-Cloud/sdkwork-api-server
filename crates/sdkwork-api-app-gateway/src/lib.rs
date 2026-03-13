@@ -71,7 +71,9 @@ use sdkwork_api_contract_openai::webhooks::{
     CreateWebhookRequest, DeleteWebhookResponse, ListWebhooksResponse, UpdateWebhookRequest,
     WebhookObject,
 };
-use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
+use sdkwork_api_extension_core::{ExtensionKind, ExtensionManifest, ExtensionRuntime};
+use sdkwork_api_extension_host::{BuiltinProviderExtensionFactory, ExtensionHost};
+use sdkwork_api_provider_core::ProviderRequest;
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
@@ -3716,18 +3718,39 @@ pub fn list_vector_store_file_batch_files(
     ]))
 }
 
-fn default_provider_registry() -> ProviderRegistry {
-    let mut registry = ProviderRegistry::new();
-    registry.register_factory("openai", |base_url| {
-        Box::new(OpenAiProviderAdapter::new(base_url))
-    });
-    registry.register_factory("openrouter", |base_url| {
-        Box::new(OpenRouterProviderAdapter::new(base_url))
-    });
-    registry.register_factory("ollama", |base_url| {
-        Box::new(OllamaProviderAdapter::new(base_url))
-    });
-    registry
+pub fn builtin_extension_host() -> ExtensionHost {
+    let mut host = ExtensionHost::new();
+    host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+        ExtensionManifest::new(
+            "sdkwork.provider.openai.official",
+            ExtensionKind::Provider,
+            "0.1.0",
+            ExtensionRuntime::Builtin,
+        ),
+        "openai",
+        |base_url| Box::new(OpenAiProviderAdapter::new(base_url)),
+    ));
+    host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+        ExtensionManifest::new(
+            "sdkwork.provider.openrouter",
+            ExtensionKind::Provider,
+            "0.1.0",
+            ExtensionRuntime::Builtin,
+        ),
+        "openrouter",
+        |base_url| Box::new(OpenRouterProviderAdapter::new(base_url)),
+    ));
+    host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+        ExtensionManifest::new(
+            "sdkwork.provider.ollama",
+            ExtensionKind::Provider,
+            "0.1.0",
+            ExtensionRuntime::Builtin,
+        ),
+        "ollama",
+        |base_url| Box::new(OllamaProviderAdapter::new(base_url)),
+    ));
+    host
 }
 
 async fn execute_json_provider_request(
@@ -3736,8 +3759,8 @@ async fn execute_json_provider_request(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<Value>> {
-    let registry = default_provider_registry();
-    let Some(adapter) = registry.resolve(adapter_kind, base_url) else {
+    let host = builtin_extension_host();
+    let Some(adapter) = host.resolve_provider(adapter_kind, base_url) else {
         return Ok(None);
     };
 
@@ -3751,8 +3774,8 @@ async fn execute_stream_provider_request(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<reqwest::Response>> {
-    let registry = default_provider_registry();
-    let Some(adapter) = registry.resolve(adapter_kind, base_url) else {
+    let host = builtin_extension_host();
+    let Some(adapter) = host.resolve_provider(adapter_kind, base_url) else {
         return Ok(None);
     };
 

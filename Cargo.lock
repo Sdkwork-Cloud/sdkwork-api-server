@@ -1331,6 +1331,8 @@ dependencies = [
  "sdkwork-api-app-routing",
  "sdkwork-api-contract-openai",
  "sdkwork-api-domain-catalog",
+ "sdkwork-api-extension-core",
+ "sdkwork-api-extension-host",
  "sdkwork-api-provider-core",
  "sdkwork-api-provider-ollama",
  "sdkwork-api-provider-openai",
@@ -1469,6 +1471,7 @@ name = "sdkwork-api-extension-host"
 version = "0.1.0"
 dependencies = [
  "sdkwork-api-extension-core",
+ "sdkwork-api-provider-core",
 ]
 
 [[package]]
