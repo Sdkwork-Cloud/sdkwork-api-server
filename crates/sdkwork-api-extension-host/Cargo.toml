@@ -8,6 +8,7 @@ license.workspace = true
 serde_json.workspace = true
 sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
 sdkwork-api-provider-core = { path = "../sdkwork-api-provider-core" }
+toml.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

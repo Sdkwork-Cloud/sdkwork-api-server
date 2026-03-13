@@ -62,6 +62,11 @@ Backend:
   - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
   - Rust crate name: `sdkwork-api-ext-provider-*` / `sdkwork-api-ext-channel-*`
 - Configuration-driven extension load planning that merges manifest defaults, installation config, and instance overrides into one runtime plan
+- Filesystem discovery for external extension packages through `sdkwork-extension.toml` manifests loaded from configured extension search paths
+- Protocol-aware relay for discovered provider extensions when the manifest declares a supported protocol:
+  - `openai`
+  - `openrouter`
+  - `ollama`
 - Provider execution now consumes persisted extension installation and instance state during real dispatch:
   - `enabled = false` on an installation or instance forces local fallback
   - instance `base_url` overrides the provider catalog `base_url`
@@ -94,7 +99,9 @@ Known gaps:
   - `openrouter`
   - `ollama`
 - provider execution is now `extension_id`-driven with `adapter_kind` retained as compatibility metadata and protocol hint
-- dynamic runtime loading for `native_dynamic` and `connector` extensions is designed but not yet implemented
+- extension manifest discovery and configuration-driven loading are now active for both `connector` and `native_dynamic` package metadata
+- discovered provider extensions can relay through existing protocol adapters when the manifest declares a supported protocol
+- native dynamic ABI loading and connector process supervision are still not implemented
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
 - routing policies are still placeholder-only; current routing uses catalog candidates plus deterministic fallback
@@ -150,6 +157,9 @@ The credential binding itself remains in SQLite so routing and provider resoluti
 
 - `database_url`
 - inferred storage dialect via `storage_dialect()`
+- `extension_paths`
+- `enable_connector_extensions`
+- `enable_native_dynamic_extensions`
 - `secret_backend`
 - `credential_master_key`
 - `admin_jwt_signing_secret`
@@ -161,6 +171,9 @@ It can now be loaded from environment variables:
 - `SDKWORK_GATEWAY_BIND`
 - `SDKWORK_ADMIN_BIND`
 - `SDKWORK_DATABASE_URL`
+- `SDKWORK_EXTENSION_PATHS`
+- `SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS`
+- `SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS`
 - `SDKWORK_SECRET_BACKEND`
 - `SDKWORK_CREDENTIAL_MASTER_KEY`
 - `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
@@ -210,6 +223,10 @@ pnpm --dir console exec vite build
   - manifest metadata defines package identity and default entrypoint/schema references
   - installation state selects runtime and package-level config
   - instance state supplies environment-specific overrides such as `base_url`, `credential_ref`, and traffic weighting
+- Extension discovery now has a second manifest source in addition to built-ins:
+  - built-in extensions compiled into the gateway
+  - external manifests discovered from `SDKWORK_EXTENSION_PATHS`
+- Discovered provider extensions can participate in real relay execution when their manifest declares a supported protocol and their persisted installation or instance is enabled.
 - `openrouter` and `ollama` are registered as built-in OpenAI-compatible provider extensions in addition to the direct `openai` adapter.
 
 ## Design Docs

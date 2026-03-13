@@ -62,3 +62,4 @@ sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "postgres"] }
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5", features = ["util"] }
+toml = "0.8"

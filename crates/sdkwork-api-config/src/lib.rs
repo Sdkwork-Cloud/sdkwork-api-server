@@ -16,6 +16,9 @@ pub struct StandaloneConfig {
     pub gateway_bind: String,
     pub admin_bind: String,
     pub database_url: String,
+    pub extension_paths: Vec<String>,
+    pub enable_connector_extensions: bool,
+    pub enable_native_dynamic_extensions: bool,
     pub admin_jwt_signing_secret: String,
     pub secret_backend: SecretBackendKind,
     pub credential_master_key: String,
@@ -29,6 +32,9 @@ impl Default for StandaloneConfig {
             gateway_bind: "127.0.0.1:8080".to_owned(),
             admin_bind: "127.0.0.1:8081".to_owned(),
             database_url: "sqlite://sdkwork-api-server.db".to_owned(),
+            extension_paths: Vec::new(),
+            enable_connector_extensions: true,
+            enable_native_dynamic_extensions: false,
             admin_jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
             secret_backend: SecretBackendKind::DatabaseEncrypted,
             credential_master_key: "local-dev-master-key".to_owned(),
@@ -74,6 +80,24 @@ impl StandaloneConfig {
                 .get("SDKWORK_DATABASE_URL")
                 .cloned()
                 .unwrap_or(default.database_url),
+            extension_paths: values
+                .get("SDKWORK_EXTENSION_PATHS")
+                .map(|value| {
+                    std::env::split_paths(value)
+                        .map(|path| path.to_string_lossy().into_owned())
+                        .collect()
+                })
+                .unwrap_or(default.extension_paths),
+            enable_connector_extensions: parse_bool_env(
+                &values,
+                "SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS",
+                default.enable_connector_extensions,
+            )?,
+            enable_native_dynamic_extensions: parse_bool_env(
+                &values,
+                "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
+                default.enable_native_dynamic_extensions,
+            )?,
             admin_jwt_signing_secret: values
                 .get("SDKWORK_ADMIN_JWT_SIGNING_SECRET")
                 .cloned()
@@ -110,5 +134,14 @@ impl StandaloneConfig {
         } else {
             None
         }
+    }
+}
+
+fn parse_bool_env(values: &HashMap<String, String>, key: &str, default: bool) -> Result<bool> {
+    match values.get(key) {
+        Some(value) => value
+            .parse::<bool>()
+            .map_err(|error| anyhow::anyhow!("invalid boolean for {key}: {error}")),
+        None => Ok(default),
     }
 }

@@ -19,6 +19,16 @@ pub enum ExtensionRuntime {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExtensionProtocol {
+    #[serde(rename = "openai")]
+    OpenAi,
+    #[serde(rename = "openrouter")]
+    OpenRouter,
+    #[serde(rename = "ollama")]
+    Ollama,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CompatibilityLevel {
     Native,
@@ -53,6 +63,16 @@ impl ExtensionRuntime {
     }
 }
 
+impl ExtensionProtocol {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OpenAi => "openai",
+            Self::OpenRouter => "openrouter",
+            Self::Ollama => "ollama",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseExtensionRuntimeError(String);
 
@@ -63,6 +83,17 @@ impl std::fmt::Display for ParseExtensionRuntimeError {
 }
 
 impl std::error::Error for ParseExtensionRuntimeError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseExtensionProtocolError(String);
+
+impl std::fmt::Display for ParseExtensionProtocolError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ParseExtensionProtocolError {}
 
 impl FromStr for ExtensionRuntime {
     type Err = ParseExtensionRuntimeError;
@@ -79,6 +110,21 @@ impl FromStr for ExtensionRuntime {
     }
 }
 
+impl FromStr for ExtensionProtocol {
+    type Err = ParseExtensionProtocolError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "openai" => Ok(Self::OpenAi),
+            "openrouter" => Ok(Self::OpenRouter),
+            "ollama" => Ok(Self::Ollama),
+            other => Err(ParseExtensionProtocolError(format!(
+                "unknown extension protocol: {other}"
+            ))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtensionManifest {
     pub api_version: String,
@@ -87,6 +133,8 @@ pub struct ExtensionManifest {
     pub version: String,
     pub display_name: String,
     pub runtime: ExtensionRuntime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<ExtensionProtocol>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrypoint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -112,6 +160,7 @@ impl ExtensionManifest {
             kind,
             version: version.into(),
             runtime,
+            protocol: None,
             entrypoint: None,
             config_schema: None,
             credential_schema: None,
@@ -136,6 +185,11 @@ impl ExtensionManifest {
 
     pub fn with_entrypoint(mut self, entrypoint: impl Into<String>) -> Self {
         self.entrypoint = Some(entrypoint.into());
+        self
+    }
+
+    pub fn with_protocol(mut self, protocol: ExtensionProtocol) -> Self {
+        self.protocol = Some(protocol);
         self
     }
 

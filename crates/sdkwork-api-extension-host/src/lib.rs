@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionManifest};
@@ -64,6 +66,63 @@ pub struct ExtensionLoadPlan {
     pub config_schema: Option<String>,
     pub credential_schema: Option<String>,
     pub config: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionDiscoveryPolicy {
+    pub search_paths: Vec<PathBuf>,
+    pub enable_connector_extensions: bool,
+    pub enable_native_dynamic_extensions: bool,
+}
+
+impl ExtensionDiscoveryPolicy {
+    pub fn new(search_paths: Vec<PathBuf>) -> Self {
+        Self {
+            search_paths,
+            enable_connector_extensions: true,
+            enable_native_dynamic_extensions: false,
+        }
+    }
+
+    pub fn with_connector_extensions(mut self, enabled: bool) -> Self {
+        self.enable_connector_extensions = enabled;
+        self
+    }
+
+    pub fn with_native_dynamic_extensions(mut self, enabled: bool) -> Self {
+        self.enable_native_dynamic_extensions = enabled;
+        self
+    }
+
+    fn allows_runtime(&self, runtime: &sdkwork_api_extension_core::ExtensionRuntime) -> bool {
+        match runtime {
+            sdkwork_api_extension_core::ExtensionRuntime::Builtin => true,
+            sdkwork_api_extension_core::ExtensionRuntime::Connector => {
+                self.enable_connector_extensions
+            }
+            sdkwork_api_extension_core::ExtensionRuntime::NativeDynamic => {
+                self.enable_native_dynamic_extensions
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiscoveredExtensionPackage {
+    pub root_dir: PathBuf,
+    pub manifest_path: PathBuf,
+    pub manifest: ExtensionManifest,
+}
+
+pub fn discover_extension_packages(
+    policy: &ExtensionDiscoveryPolicy,
+) -> Result<Vec<DiscoveredExtensionPackage>, ExtensionHostError> {
+    let mut packages = Vec::new();
+    for search_path in &policy.search_paths {
+        discover_in_path(search_path, policy, &mut packages)?;
+    }
+    packages.sort_by(|left, right| left.manifest_path.cmp(&right.manifest_path));
+    Ok(packages)
 }
 
 impl ExtensionHost {
@@ -236,6 +295,14 @@ pub enum ExtensionHostError {
         manifest_runtime: sdkwork_api_extension_core::ExtensionRuntime,
         installation_runtime: sdkwork_api_extension_core::ExtensionRuntime,
     },
+    ManifestReadFailed {
+        path: String,
+        message: String,
+    },
+    ManifestParseFailed {
+        path: String,
+        message: String,
+    },
 }
 
 impl fmt::Display for ExtensionHostError {
@@ -268,6 +335,16 @@ impl fmt::Display for ExtensionHostError {
                 "extension {} manifest runtime {:?} does not match installation runtime {:?}",
                 extension_id, manifest_runtime, installation_runtime
             ),
+            Self::ManifestReadFailed { path, message } => {
+                write!(f, "failed to read extension manifest {}: {}", path, message)
+            }
+            Self::ManifestParseFailed { path, message } => {
+                write!(
+                    f,
+                    "failed to parse extension manifest {}: {}",
+                    path, message
+                )
+            }
         }
     }
 }
@@ -289,4 +366,57 @@ fn merge_config(base: &Value, overlay: &Value) -> Value {
         }
         (_, overlay) => overlay.clone(),
     }
+}
+
+fn discover_in_path(
+    path: &Path,
+    policy: &ExtensionDiscoveryPolicy,
+    packages: &mut Vec<DiscoveredExtensionPackage>,
+) -> Result<(), ExtensionHostError> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    if path.is_file() {
+        if path.file_name().and_then(|name| name.to_str()) == Some("sdkwork-extension.toml") {
+            let manifest = parse_manifest(path)?;
+            if policy.allows_runtime(&manifest.runtime) {
+                let root_dir = path.parent().unwrap_or(path).to_path_buf();
+                packages.push(DiscoveredExtensionPackage {
+                    root_dir,
+                    manifest_path: path.to_path_buf(),
+                    manifest,
+                });
+            }
+        }
+        return Ok(());
+    }
+
+    let entries = fs::read_dir(path).map_err(|error| ExtensionHostError::ManifestReadFailed {
+        path: path.display().to_string(),
+        message: error.to_string(),
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| ExtensionHostError::ManifestReadFailed {
+            path: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        discover_in_path(&entry.path(), policy, packages)?;
+    }
+
+    Ok(())
+}
+
+fn parse_manifest(path: &Path) -> Result<ExtensionManifest, ExtensionHostError> {
+    let manifest_text =
+        fs::read_to_string(path).map_err(|error| ExtensionHostError::ManifestReadFailed {
+            path: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+
+    toml::from_str(&manifest_text).map_err(|error| ExtensionHostError::ManifestParseFailed {
+        path: path.display().to_string(),
+        message: error.to_string(),
+    })
 }

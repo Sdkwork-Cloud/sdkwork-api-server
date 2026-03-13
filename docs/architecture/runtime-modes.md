@@ -44,12 +44,15 @@ The current repository includes:
   - `os_keyring`
 - per-credential backend tracking so previously stored secrets can still be resolved after a default backend switch
 - environment-driven standalone config loading for bind addresses, database URL, secret backend, credential master key, local secret file path, and keyring service name
+- environment-driven extension discovery config for manifest search paths plus connector and native-dynamic runtime toggles
 - signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
 - a built-in extension host with manifest registration for OpenAI, OpenRouter, and Ollama provider extensions
+- filesystem extension discovery through `sdkwork-extension.toml` package manifests loaded from configured search paths
 - persisted extension installation and instance records for configuration-driven mounting
 - provider runtime dispatch keyed by `ProxyProvider.extension_id`, with `adapter_kind` kept as a compatibility alias for older records and protocol classification
 - real provider dispatch now consumes persisted extension load state so instance-level `base_url` overrides are honored and disabled installations or instances short-circuit to local fallback
+- discovered provider manifests can now bind to the current protocol adapters so connector-style extensions participate in real relay execution when they declare a supported protocol
 
 ## Extension Runtime Status
 
@@ -58,8 +61,8 @@ The extension architecture is intentionally layered.
 | Runtime | Current Status | Notes |
 |---|---|---|
 | `builtin` | Active | First-party provider extensions are registered in-process through `sdkwork-api-extension-host` |
-| `native_dynamic` | Planned | ABI boundary is still design-only; no loader is active yet |
-| `connector` | Planned | Configuration model exists, but connector process lifecycle is not wired yet |
+| `native_dynamic` | Discovery-only | Manifest discovery and policy filtering are active, but ABI loading and execution are still design-only |
+| `connector` | Active with protocol mapping | Manifest discovery and config-driven loading are active; supported protocols can relay through the current adapter set, but connector process lifecycle is still not supervised by the host |
 
 ## Configuration Layers
 
@@ -97,5 +100,16 @@ Configuration-driven loading now uses a stable merge order:
 3. instance-level overrides such as `base_url`, `credential_ref`, and rollout weights
 
 This means `connector` and `native_dynamic` extensions can already be represented, validated, and mounted through config even before the actual executable loader lifecycle is fully wired.
+
+The runtime now also supports two manifest sources:
+
+1. built-in manifests registered in process
+2. external package manifests discovered from configured extension search paths
+
+Discovered provider manifests become executable only when:
+
+1. the runtime policy enables their declared runtime
+2. the manifest declares a supported protocol
+3. persisted installation and instance state resolves to an enabled runtime load plan
 
 The runtime host is still intentionally lightweight, but the core gateway, admin, routing, credential, and provider relay slices now run against the same Rust workspace and can be assembled in-process for embedded mode.

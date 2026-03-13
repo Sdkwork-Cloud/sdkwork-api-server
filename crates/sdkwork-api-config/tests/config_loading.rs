@@ -14,6 +14,9 @@ fn standalone_defaults_are_local_friendly() {
     assert_eq!(config.gateway_bind, "127.0.0.1:8080");
     assert_eq!(config.admin_bind, "127.0.0.1:8081");
     assert_eq!(config.database_url, "sqlite://sdkwork-api-server.db");
+    assert!(config.extension_paths.is_empty());
+    assert!(config.enable_connector_extensions);
+    assert!(!config.enable_native_dynamic_extensions);
     assert_eq!(config.secret_backend, SecretBackendKind::DatabaseEncrypted);
     assert_eq!(
         config.admin_jwt_signing_secret,
@@ -94,4 +97,30 @@ fn builds_secret_runtime_locations_from_pairs() {
 
     assert_eq!(config.secret_local_file, "D:/sdkwork/secrets.json");
     assert_eq!(config.secret_keyring_service, "sdkwork-api-server");
+}
+
+#[test]
+fn parses_extension_discovery_settings_from_pairs() {
+    let extension_paths =
+        std::env::join_paths(["D:/sdkwork/extensions", "D:/sdkwork/extensions-trusted"]).unwrap();
+
+    let config = StandaloneConfig::from_pairs([
+        (
+            "SDKWORK_EXTENSION_PATHS",
+            extension_paths.to_string_lossy().as_ref(),
+        ),
+        ("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS", "false"),
+        ("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS", "true"),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        config.extension_paths,
+        vec![
+            "D:/sdkwork/extensions".to_owned(),
+            "D:/sdkwork/extensions-trusted".to_owned()
+        ]
+    );
+    assert!(!config.enable_connector_extensions);
+    assert!(config.enable_native_dynamic_extensions);
 }

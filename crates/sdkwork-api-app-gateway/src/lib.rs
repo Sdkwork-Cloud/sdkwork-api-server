@@ -72,8 +72,13 @@ use sdkwork_api_contract_openai::webhooks::{
     WebhookObject,
 };
 use sdkwork_api_domain_catalog::ProxyProvider;
-use sdkwork_api_extension_core::{ExtensionKind, ExtensionManifest, ExtensionRuntime};
-use sdkwork_api_extension_host::{BuiltinProviderExtensionFactory, ExtensionHost};
+use sdkwork_api_extension_core::{
+    ExtensionKind, ExtensionManifest, ExtensionProtocol, ExtensionRuntime,
+};
+use sdkwork_api_extension_host::{
+    discover_extension_packages, BuiltinExtensionFactory, BuiltinProviderExtensionFactory,
+    ExtensionDiscoveryPolicy, ExtensionHost,
+};
 use sdkwork_api_provider_core::ProviderRequest;
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
@@ -209,7 +214,7 @@ struct ProviderExecutionDescriptor {
 }
 
 async fn build_extension_host_from_store(store: &dyn AdminStore) -> Result<ExtensionHost> {
-    let mut host = builtin_extension_host();
+    let mut host = configured_extension_host()?;
 
     let mut installations = store.list_extension_installations().await?;
     installations.sort_by(|left, right| left.installation_id.cmp(&right.installation_id));
@@ -3889,6 +3894,71 @@ fn provider_runtime_key(provider: &ProxyProvider) -> &str {
     &provider.extension_id
 }
 
+fn configured_extension_host() -> Result<ExtensionHost> {
+    let mut host = builtin_extension_host();
+    let policy = configured_extension_discovery_policy();
+
+    for package in discover_extension_packages(&policy)? {
+        register_discovered_extension(&mut host, package.manifest);
+    }
+
+    Ok(host)
+}
+
+fn configured_extension_discovery_policy() -> ExtensionDiscoveryPolicy {
+    let search_paths = std::env::var_os("SDKWORK_EXTENSION_PATHS")
+        .map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    ExtensionDiscoveryPolicy::new(search_paths)
+        .with_connector_extensions(env_flag(
+            "SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS",
+            true,
+        ))
+        .with_native_dynamic_extensions(env_flag(
+            "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
+            false,
+        ))
+}
+
+fn env_flag(key: &str, default: bool) -> bool {
+    std::env::var(key)
+        .ok()
+        .and_then(|value| value.parse::<bool>().ok())
+        .unwrap_or(default)
+}
+
+fn register_discovered_extension(host: &mut ExtensionHost, manifest: ExtensionManifest) {
+    if host.manifest(&manifest.id).is_some() {
+        return;
+    }
+
+    match (manifest.kind.clone(), manifest.protocol.clone()) {
+        (ExtensionKind::Provider, Some(ExtensionProtocol::OpenAi)) => {
+            host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+                manifest,
+                "openai",
+                |base_url| Box::new(OpenAiProviderAdapter::new(base_url)),
+            ));
+        }
+        (ExtensionKind::Provider, Some(ExtensionProtocol::OpenRouter)) => {
+            host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+                manifest,
+                "openrouter",
+                |base_url| Box::new(OpenRouterProviderAdapter::new(base_url)),
+            ));
+        }
+        (ExtensionKind::Provider, Some(ExtensionProtocol::Ollama)) => {
+            host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+                manifest,
+                "ollama",
+                |base_url| Box::new(OllamaProviderAdapter::new(base_url)),
+            ));
+        }
+        _ => host.register_builtin(BuiltinExtensionFactory::new(manifest)),
+    }
+}
+
 async fn execute_json_provider_request_for_provider(
     store: &dyn AdminStore,
     provider: &ProxyProvider,
@@ -3939,7 +4009,7 @@ async fn execute_json_provider_request(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<Value>> {
-    let host = builtin_extension_host();
+    let host = configured_extension_host()?;
     let Some(adapter) = host.resolve_provider(runtime_key, base_url) else {
         return Ok(None);
     };
@@ -3954,7 +4024,7 @@ async fn execute_stream_provider_request(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<reqwest::Response>> {
-    let host = builtin_extension_host();
+    let host = configured_extension_host()?;
     let Some(adapter) = host.resolve_provider(runtime_key, base_url) else {
         return Ok(None);
     };
