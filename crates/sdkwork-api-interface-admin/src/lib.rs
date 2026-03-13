@@ -16,6 +16,10 @@ use sdkwork_api_app_catalog::{
 };
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_credential::{list_credentials, persist_credential_with_secret_and_manager};
+use sdkwork_api_app_extension::{
+    list_extension_installations, list_extension_instances, persist_extension_installation,
+    persist_extension_instance,
+};
 use sdkwork_api_app_identity::{
     issue_jwt, list_gateway_api_keys, persist_gateway_api_key, verify_jwt, Claims,
     CreatedGatewayApiKey,
@@ -31,6 +35,7 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
@@ -185,6 +190,29 @@ struct CreateApiKeyRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct CreateExtensionInstallationRequest {
+    installation_id: String,
+    extension_id: String,
+    runtime: ExtensionRuntime,
+    enabled: bool,
+    entrypoint: Option<String>,
+    #[serde(default)]
+    config: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateExtensionInstanceRequest {
+    instance_id: String,
+    installation_id: String,
+    extension_id: String,
+    enabled: bool,
+    base_url: Option<String>,
+    credential_ref: Option<String>,
+    #[serde(default)]
+    config: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
 struct RoutingSimulationRequest {
     capability: String,
     model: String,
@@ -208,6 +236,14 @@ pub fn admin_router() -> Router {
         .route("/admin/providers", get(|| async { "providers" }))
         .route("/admin/credentials", get(|| async { "credentials" }))
         .route("/admin/models", get(|| async { "models" }))
+        .route(
+            "/admin/extensions/installations",
+            get(|| async { "extension-installations" }),
+        )
+        .route(
+            "/admin/extensions/instances",
+            get(|| async { "extension-instances" }),
+        )
         .route("/admin/usage/records", get(|| async { "usage-records" }))
         .route("/admin/billing/ledger", get(|| async { "billing-ledger" }))
         .route("/admin/routing/policies", get(|| async { "policies" }))
@@ -284,6 +320,14 @@ pub fn admin_router_with_store_and_secret_manager(
         .route(
             "/admin/models",
             get(list_models_handler).post(create_model_handler),
+        )
+        .route(
+            "/admin/extensions/installations",
+            get(list_extension_installations_handler).post(create_extension_installation_handler),
+        )
+        .route(
+            "/admin/extensions/instances",
+            get(list_extension_instances_handler).post(create_extension_instance_handler),
         )
         .route("/admin/usage/records", get(list_usage_records_handler))
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
@@ -491,6 +535,65 @@ async fn create_api_key_handler(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(created)))
+}
+
+async fn list_extension_installations_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ExtensionInstallation>>, StatusCode> {
+    list_extension_installations(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_extension_installation_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateExtensionInstallationRequest>,
+) -> Result<(StatusCode, Json<ExtensionInstallation>), StatusCode> {
+    let installation = persist_extension_installation(
+        state.store.as_ref(),
+        &request.installation_id,
+        &request.extension_id,
+        request.runtime,
+        request.enabled,
+        request.entrypoint.as_deref(),
+        request.config,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(installation)))
+}
+
+async fn list_extension_instances_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ExtensionInstance>>, StatusCode> {
+    list_extension_instances(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_extension_instance_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateExtensionInstanceRequest>,
+) -> Result<(StatusCode, Json<ExtensionInstance>), StatusCode> {
+    let instance = persist_extension_instance(
+        state.store.as_ref(),
+        &request.instance_id,
+        &request.installation_id,
+        &request.extension_id,
+        request.enabled,
+        request.base_url.as_deref(),
+        request.credential_ref.as_deref(),
+        request.config,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(instance)))
 }
 
 async fn simulate_routing_handler(

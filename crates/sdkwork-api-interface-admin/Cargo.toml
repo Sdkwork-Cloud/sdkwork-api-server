@@ -12,6 +12,7 @@ serde_json.workspace = true
 sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
+sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-tenant = { path = "../sdkwork-api-app-tenant" }
@@ -22,6 +23,7 @@ sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
+sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 sqlx.workspace = true

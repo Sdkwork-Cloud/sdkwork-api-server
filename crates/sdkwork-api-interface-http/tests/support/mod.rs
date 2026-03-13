@@ -7,11 +7,7 @@ use sqlx::SqlitePool;
 use tower::ServiceExt;
 
 #[allow(dead_code)]
-pub async fn issue_gateway_api_key(
-    pool: &SqlitePool,
-    tenant_id: &str,
-    project_id: &str,
-) -> String {
+pub async fn issue_gateway_api_key(pool: &SqlitePool, tenant_id: &str, project_id: &str) -> String {
     let store = SqliteAdminStore::new(pool.clone());
     persist_gateway_api_key(&store, tenant_id, project_id, "live")
         .await

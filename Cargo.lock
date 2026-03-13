@@ -1386,6 +1386,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sdkwork-api-app-extension"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sdkwork-api-extension-core",
+ "sdkwork-api-storage-core",
+ "serde_json",
+]
+
+[[package]]
 name = "sdkwork-api-app-gateway"
 version = "0.1.0"
 dependencies = [
@@ -1529,6 +1539,7 @@ name = "sdkwork-api-extension-core"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1537,6 +1548,7 @@ version = "0.1.0"
 dependencies = [
  "sdkwork-api-extension-core",
  "sdkwork-api-provider-core",
+ "serde_json",
 ]
 
 [[package]]
@@ -1548,6 +1560,7 @@ dependencies = [
  "sdkwork-api-app-billing",
  "sdkwork-api-app-catalog",
  "sdkwork-api-app-credential",
+ "sdkwork-api-app-extension",
  "sdkwork-api-app-identity",
  "sdkwork-api-app-routing",
  "sdkwork-api-app-tenant",
@@ -1558,6 +1571,7 @@ dependencies = [
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-extension-core",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
  "serde",
@@ -1709,6 +1723,7 @@ dependencies = [
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-extension-core",
  "sdkwork-api-secret-core",
 ]
 
@@ -1732,6 +1747,7 @@ dependencies = [
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-extension-core",
  "sdkwork-api-secret-core",
  "sdkwork-api-storage-core",
  "serde_json",
@@ -1751,6 +1767,7 @@ dependencies = [
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-extension-core",
  "sdkwork-api-secret-core",
  "sdkwork-api-storage-core",
  "serde_json",

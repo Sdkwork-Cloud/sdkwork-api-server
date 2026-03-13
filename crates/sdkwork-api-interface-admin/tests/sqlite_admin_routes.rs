@@ -328,3 +328,88 @@ async fn routing_simulation_uses_catalog_models() {
         2
     );
 }
+
+#[tokio::test]
+async fn create_and_list_extension_installations_and_instances() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let installation = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/installations")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"installation_id\":\"openrouter-builtin\",\"extension_id\":\"sdkwork.provider.openrouter\",\"runtime\":\"builtin\",\"enabled\":true,\"entrypoint\":null,\"config\":{\"trust_mode\":\"builtin\"}}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(installation.status(), StatusCode::CREATED);
+
+    let instance = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/instances")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"instance_id\":\"provider-openrouter-main\",\"installation_id\":\"openrouter-builtin\",\"extension_id\":\"sdkwork.provider.openrouter\",\"enabled\":true,\"base_url\":\"https://openrouter.ai/api/v1\",\"credential_ref\":\"cred-openrouter\",\"config\":{\"region\":\"global\",\"weight\":100}}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(instance.status(), StatusCode::CREATED);
+
+    let installations = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/extensions/installations")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(installations.status(), StatusCode::OK);
+    let installations_json = read_json(installations).await;
+    assert_eq!(
+        installations_json[0]["extension_id"],
+        "sdkwork.provider.openrouter"
+    );
+    assert_eq!(installations_json[0]["runtime"], "builtin");
+
+    let instances = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/extensions/instances")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(instances.status(), StatusCode::OK);
+    let instances_json = read_json(instances).await;
+    assert_eq!(instances_json[0]["instance_id"], "provider-openrouter-main");
+    assert_eq!(
+        instances_json[0]["base_url"],
+        "https://openrouter.ai/api/v1"
+    );
+    assert_eq!(instances_json[0]["config"]["region"], "global");
+}

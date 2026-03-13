@@ -6,6 +6,7 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
 use sdkwork_api_secret_core::SecretEnvelope;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,4 +90,16 @@ pub trait AdminStore: Send + Sync {
     ) -> Result<GatewayApiKeyRecord>;
     async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>>;
     async fn find_gateway_api_key(&self, hashed_key: &str) -> Result<Option<GatewayApiKeyRecord>>;
+
+    async fn insert_extension_installation(
+        &self,
+        installation: &ExtensionInstallation,
+    ) -> Result<ExtensionInstallation>;
+    async fn list_extension_installations(&self) -> Result<Vec<ExtensionInstallation>>;
+
+    async fn insert_extension_instance(
+        &self,
+        instance: &ExtensionInstance,
+    ) -> Result<ExtensionInstance>;
+    async fn list_extension_instances(&self) -> Result<Vec<ExtensionInstance>>;
 }

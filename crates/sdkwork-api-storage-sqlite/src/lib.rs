@@ -1,4 +1,6 @@
 use anyhow::Result;
+use std::str::FromStr;
+
 use sdkwork_api_domain_billing::LedgerEntry;
 use sdkwork_api_domain_catalog::{
     Channel, ModelCapability, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
@@ -7,8 +9,10 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_secret_core::SecretEnvelope;
 use sdkwork_api_storage_core::{AdminStore, StorageDialect};
+use serde_json::Value;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
@@ -177,6 +181,31 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS extension_installations (
+            installation_id TEXT PRIMARY KEY NOT NULL,
+            extension_id TEXT NOT NULL,
+            runtime TEXT NOT NULL,
+            enabled INTEGER NOT NULL,
+            entrypoint TEXT,
+            config_json TEXT NOT NULL DEFAULT '{}'
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS extension_instances (
+            instance_id TEXT PRIMARY KEY NOT NULL,
+            installation_id TEXT NOT NULL,
+            extension_id TEXT NOT NULL,
+            enabled INTEGER NOT NULL,
+            base_url TEXT,
+            credential_ref TEXT,
+            config_json TEXT NOT NULL DEFAULT '{}'
+        )",
+    )
+    .execute(&pool)
+    .await?;
     Ok(pool)
 }
 
@@ -249,6 +278,14 @@ fn encode_model_capabilities(capabilities: &[ModelCapability]) -> Result<String>
 
 fn decode_model_capabilities(capabilities: &str) -> Result<Vec<ModelCapability>> {
     Ok(serde_json::from_str(capabilities)?)
+}
+
+fn encode_extension_config(config: &Value) -> Result<String> {
+    Ok(serde_json::to_string(config)?)
+}
+
+fn decode_extension_config(config_json: &str) -> Result<Value> {
+    Ok(serde_json::from_str(config_json)?)
 }
 
 #[derive(Debug, Clone)]
@@ -748,6 +785,101 @@ impl SqliteAdminStore {
             }),
         )
     }
+
+    pub async fn insert_extension_installation(
+        &self,
+        installation: &ExtensionInstallation,
+    ) -> Result<ExtensionInstallation> {
+        sqlx::query(
+            "INSERT INTO extension_installations (installation_id, extension_id, runtime, enabled, entrypoint, config_json) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(installation_id) DO UPDATE SET extension_id = excluded.extension_id, runtime = excluded.runtime, enabled = excluded.enabled, entrypoint = excluded.entrypoint, config_json = excluded.config_json",
+        )
+        .bind(&installation.installation_id)
+        .bind(&installation.extension_id)
+        .bind(installation.runtime.as_str())
+        .bind(if installation.enabled { 1_i64 } else { 0_i64 })
+        .bind(&installation.entrypoint)
+        .bind(encode_extension_config(&installation.config)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(installation.clone())
+    }
+
+    pub async fn list_extension_installations(&self) -> Result<Vec<ExtensionInstallation>> {
+        let rows = sqlx::query_as::<_, (String, String, String, i64, Option<String>, String)>(
+            "SELECT installation_id, extension_id, runtime, enabled, entrypoint, config_json
+             FROM extension_installations
+             ORDER BY installation_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut installations = Vec::with_capacity(rows.len());
+        for (installation_id, extension_id, runtime, enabled, entrypoint, config_json) in rows {
+            installations.push(ExtensionInstallation {
+                installation_id,
+                extension_id,
+                runtime: ExtensionRuntime::from_str(&runtime)?,
+                enabled: enabled != 0,
+                entrypoint,
+                config: decode_extension_config(&config_json)?,
+            });
+        }
+        Ok(installations)
+    }
+
+    pub async fn insert_extension_instance(
+        &self,
+        instance: &ExtensionInstance,
+    ) -> Result<ExtensionInstance> {
+        sqlx::query(
+            "INSERT INTO extension_instances (instance_id, installation_id, extension_id, enabled, base_url, credential_ref, config_json) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(instance_id) DO UPDATE SET installation_id = excluded.installation_id, extension_id = excluded.extension_id, enabled = excluded.enabled, base_url = excluded.base_url, credential_ref = excluded.credential_ref, config_json = excluded.config_json",
+        )
+        .bind(&instance.instance_id)
+        .bind(&instance.installation_id)
+        .bind(&instance.extension_id)
+        .bind(if instance.enabled { 1_i64 } else { 0_i64 })
+        .bind(&instance.base_url)
+        .bind(&instance.credential_ref)
+        .bind(encode_extension_config(&instance.config)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(instance.clone())
+    }
+
+    pub async fn list_extension_instances(&self) -> Result<Vec<ExtensionInstance>> {
+        let rows = sqlx::query_as::<_, (String, String, String, i64, Option<String>, Option<String>, String)>(
+            "SELECT instance_id, installation_id, extension_id, enabled, base_url, credential_ref, config_json
+             FROM extension_instances
+             ORDER BY instance_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut instances = Vec::with_capacity(rows.len());
+        for (
+            instance_id,
+            installation_id,
+            extension_id,
+            enabled,
+            base_url,
+            credential_ref,
+            config_json,
+        ) in rows
+        {
+            instances.push(ExtensionInstance {
+                instance_id,
+                installation_id,
+                extension_id,
+                enabled: enabled != 0,
+                base_url,
+                credential_ref,
+                config: decode_extension_config(&config_json)?,
+            });
+        }
+        Ok(instances)
+    }
 }
 
 #[async_trait::async_trait]
@@ -883,5 +1015,27 @@ impl AdminStore for SqliteAdminStore {
 
     async fn find_gateway_api_key(&self, hashed_key: &str) -> Result<Option<GatewayApiKeyRecord>> {
         SqliteAdminStore::find_gateway_api_key(self, hashed_key).await
+    }
+
+    async fn insert_extension_installation(
+        &self,
+        installation: &ExtensionInstallation,
+    ) -> Result<ExtensionInstallation> {
+        SqliteAdminStore::insert_extension_installation(self, installation).await
+    }
+
+    async fn list_extension_installations(&self) -> Result<Vec<ExtensionInstallation>> {
+        SqliteAdminStore::list_extension_installations(self).await
+    }
+
+    async fn insert_extension_instance(
+        &self,
+        instance: &ExtensionInstance,
+    ) -> Result<ExtensionInstance> {
+        SqliteAdminStore::insert_extension_instance(self, instance).await
+    }
+
+    async fn list_extension_instances(&self) -> Result<Vec<ExtensionInstance>> {
+        SqliteAdminStore::list_extension_instances(self).await
     }
 }

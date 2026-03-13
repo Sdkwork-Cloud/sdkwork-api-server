@@ -3,6 +3,7 @@ members = [
     "crates/sdkwork-api-app-billing",
     "crates/sdkwork-api-app-catalog",
     "crates/sdkwork-api-app-credential",
+    "crates/sdkwork-api-app-extension",
     "crates/sdkwork-api-extension-core",
     "crates/sdkwork-api-extension-host",
     "crates/sdkwork-api-app-gateway",
