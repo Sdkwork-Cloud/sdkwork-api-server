@@ -16,7 +16,9 @@ use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
 use sdkwork_api_contract_openai::files::CreateFileRequest;
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
-use sdkwork_api_contract_openai::images::CreateImageRequest;
+use sdkwork_api_contract_openai::images::{
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest,
+};
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::{
@@ -277,6 +279,22 @@ impl OllamaProviderAdapter {
         request: &CreateImageRequest,
     ) -> Result<Value> {
         self.delegate.images_generations(api_key, request).await
+    }
+
+    pub async fn images_edits(
+        &self,
+        api_key: &str,
+        request: &CreateImageEditRequest,
+    ) -> Result<Value> {
+        self.delegate.images_edits(api_key, request).await
+    }
+
+    pub async fn images_variations(
+        &self,
+        api_key: &str,
+        request: &CreateImageVariationRequest,
+    ) -> Result<Value> {
+        self.delegate.images_variations(api_key, request).await
     }
 
     pub async fn audio_transcriptions(
@@ -734,6 +752,12 @@ impl ProviderExecutionAdapter for OllamaProviderAdapter {
             )),
             ProviderRequest::ImagesGenerations(request) => Ok(ProviderOutput::Json(
                 self.images_generations(api_key, request).await?,
+            )),
+            ProviderRequest::ImagesEdits(request) => Ok(ProviderOutput::Json(
+                self.images_edits(api_key, request).await?,
+            )),
+            ProviderRequest::ImagesVariations(request) => Ok(ProviderOutput::Json(
+                self.images_variations(api_key, request).await?,
             )),
             ProviderRequest::AudioTranscriptions(request) => Ok(ProviderOutput::Json(
                 self.audio_transcriptions(api_key, request).await?,

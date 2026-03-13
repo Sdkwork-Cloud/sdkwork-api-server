@@ -31,7 +31,9 @@ use sdkwork_api_app_gateway::create_conversation_items;
 use sdkwork_api_app_gateway::create_eval;
 use sdkwork_api_app_gateway::create_file;
 use sdkwork_api_app_gateway::create_fine_tuning_job;
+use sdkwork_api_app_gateway::create_image_edit;
 use sdkwork_api_app_gateway::create_image_generation;
+use sdkwork_api_app_gateway::create_image_variation;
 use sdkwork_api_app_gateway::create_moderation;
 use sdkwork_api_app_gateway::create_realtime_session;
 use sdkwork_api_app_gateway::create_speech_response;
@@ -113,7 +115,8 @@ use sdkwork_api_app_gateway::{
     relay_get_fine_tuning_job_from_store, relay_get_response_from_store,
     relay_get_vector_store_file_batch_from_store, relay_get_vector_store_file_from_store,
     relay_get_vector_store_from_store, relay_get_video_from_store, relay_get_webhook_from_store,
-    relay_image_generation_from_store, relay_list_assistants_from_store,
+    relay_image_edit_from_store, relay_image_generation_from_store,
+    relay_image_variation_from_store, relay_list_assistants_from_store,
     relay_list_batches_from_store, relay_list_chat_completion_messages_from_store,
     relay_list_chat_completions_from_store, relay_list_conversation_items_from_store,
     relay_list_conversations_from_store, relay_list_files_from_store,
@@ -151,7 +154,9 @@ use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
 use sdkwork_api_contract_openai::files::CreateFileRequest;
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
-use sdkwork_api_contract_openai::images::CreateImageRequest;
+use sdkwork_api_contract_openai::images::{
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageUpload,
+};
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::{
@@ -268,6 +273,8 @@ pub fn gateway_router() -> Router {
         .route("/v1/embeddings", post(embeddings_handler))
         .route("/v1/moderations", post(moderations_handler))
         .route("/v1/images/generations", post(image_generations_handler))
+        .route("/v1/images/edits", post(image_edits_handler))
+        .route("/v1/images/variations", post(image_variations_handler))
         .route("/v1/audio/transcriptions", post(transcriptions_handler))
         .route("/v1/audio/translations", post(translations_handler))
         .route("/v1/audio/speech", post(audio_speech_handler))
@@ -477,6 +484,11 @@ pub fn gateway_router_with_store_and_secret_manager(
         .route(
             "/v1/images/generations",
             post(image_generations_with_state_handler),
+        )
+        .route("/v1/images/edits", post(image_edits_with_state_handler))
+        .route(
+            "/v1/images/variations",
+            post(image_variations_with_state_handler),
         )
         .route(
             "/v1/audio/transcriptions",
@@ -870,6 +882,26 @@ async fn image_generations_handler(
     Json(
         create_image_generation("tenant-1", "project-1", &request.model).expect("image generation"),
     )
+}
+
+async fn image_edits_handler(multipart: Multipart) -> Response {
+    match parse_image_edit_request(multipart).await {
+        Ok(request) => {
+            Json(create_image_edit("tenant-1", "project-1", &request).expect("image edit"))
+                .into_response()
+        }
+        Err(response) => response,
+    }
+}
+
+async fn image_variations_handler(multipart: Multipart) -> Response {
+    match parse_image_variation_request(multipart).await {
+        Ok(request) => Json(
+            create_image_variation("tenant-1", "project-1", &request).expect("image variation"),
+        )
+        .into_response(),
+        Err(response) => response,
+    }
 }
 
 async fn transcriptions_handler(
@@ -2897,6 +2929,121 @@ async fn image_generations_with_state_handler(
     }
 
     Json(create_image_generation("tenant-1", "project-1", &request.model).expect("image"))
+        .into_response()
+}
+
+async fn image_edits_with_state_handler(
+    State(state): State<GatewayApiState>,
+    multipart: Multipart,
+) -> Response {
+    let request = match parse_image_edit_request(multipart).await {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
+    let route_model = request.model_or_default().to_owned();
+
+    match relay_image_edit_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream image edit",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(create_image_edit("tenant-1", "project-1", &request).expect("image edit")).into_response()
+}
+
+async fn image_variations_with_state_handler(
+    State(state): State<GatewayApiState>,
+    multipart: Multipart,
+) -> Response {
+    let request = match parse_image_variation_request(multipart).await {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
+    let route_model = request.model_or_default().to_owned();
+
+    match relay_image_variation_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream image variation",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "images", &route_model, 50, 0.05)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(create_image_variation("tenant-1", "project-1", &request).expect("image variation"))
         .into_response()
 }
 
@@ -6033,6 +6180,125 @@ async fn parse_file_request(mut multipart: Multipart) -> Result<CreateFileReques
         request = request.with_content_type(content_type);
     }
     Ok(request)
+}
+
+async fn parse_image_edit_request(
+    mut multipart: Multipart,
+) -> Result<CreateImageEditRequest, Response> {
+    let mut model = None;
+    let mut prompt = None;
+    let mut image = None;
+    let mut mask = None;
+    let mut n = None;
+    let mut quality = None;
+    let mut response_format = None;
+    let mut size = None;
+    let mut user = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(bad_multipart)? {
+        match field.name() {
+            Some("model") => model = Some(field.text().await.map_err(bad_multipart)?),
+            Some("prompt") => prompt = Some(field.text().await.map_err(bad_multipart)?),
+            Some("image") => image = Some(parse_image_upload_field(field).await?),
+            Some("mask") => mask = Some(parse_image_upload_field(field).await?),
+            Some("n") => {
+                n = Some(
+                    parse_u32_field(field.text().await.map_err(bad_multipart)?).map_err(
+                        |message| (axum::http::StatusCode::BAD_REQUEST, message).into_response(),
+                    )?,
+                )
+            }
+            Some("quality") => quality = Some(field.text().await.map_err(bad_multipart)?),
+            Some("response_format") => {
+                response_format = Some(field.text().await.map_err(bad_multipart)?)
+            }
+            Some("size") => size = Some(field.text().await.map_err(bad_multipart)?),
+            Some("user") => user = Some(field.text().await.map_err(bad_multipart)?),
+            _ => {}
+        }
+    }
+
+    let mut request = CreateImageEditRequest::new(
+        prompt.ok_or_else(missing_multipart_field)?,
+        image.ok_or_else(missing_multipart_field)?,
+    );
+    if let Some(model) = model {
+        request = request.with_model(model);
+    }
+    if let Some(mask) = mask {
+        request = request.with_mask(mask);
+    }
+    request.n = n;
+    request.quality = quality;
+    request.response_format = response_format;
+    request.size = size;
+    request.user = user;
+
+    Ok(request)
+}
+
+async fn parse_image_variation_request(
+    mut multipart: Multipart,
+) -> Result<CreateImageVariationRequest, Response> {
+    let mut model = None;
+    let mut image = None;
+    let mut n = None;
+    let mut response_format = None;
+    let mut size = None;
+    let mut user = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(bad_multipart)? {
+        match field.name() {
+            Some("model") => model = Some(field.text().await.map_err(bad_multipart)?),
+            Some("image") => image = Some(parse_image_upload_field(field).await?),
+            Some("n") => {
+                n = Some(
+                    parse_u32_field(field.text().await.map_err(bad_multipart)?).map_err(
+                        |message| (axum::http::StatusCode::BAD_REQUEST, message).into_response(),
+                    )?,
+                )
+            }
+            Some("response_format") => {
+                response_format = Some(field.text().await.map_err(bad_multipart)?)
+            }
+            Some("size") => size = Some(field.text().await.map_err(bad_multipart)?),
+            Some("user") => user = Some(field.text().await.map_err(bad_multipart)?),
+            _ => {}
+        }
+    }
+
+    let mut request = CreateImageVariationRequest::new(image.ok_or_else(missing_multipart_field)?);
+    if let Some(model) = model {
+        request = request.with_model(model);
+    }
+    request.n = n;
+    request.response_format = response_format;
+    request.size = size;
+    request.user = user;
+
+    Ok(request)
+}
+
+async fn parse_image_upload_field(
+    field: axum::extract::multipart::Field<'_>,
+) -> Result<ImageUpload, Response> {
+    let filename = field
+        .file_name()
+        .map(ToOwned::to_owned)
+        .ok_or_else(missing_multipart_field)?;
+    let content_type = field.content_type().map(ToOwned::to_owned);
+    let bytes = field.bytes().await.map_err(bad_multipart)?.to_vec();
+    let mut upload = ImageUpload::new(filename, bytes);
+    if let Some(content_type) = content_type {
+        upload = upload.with_content_type(content_type);
+    }
+    Ok(upload)
+}
+
+fn parse_u32_field(value: String) -> Result<u32, &'static str> {
+    value
+        .parse::<u32>()
+        .map_err(|_| "invalid numeric multipart field")
 }
 
 async fn parse_upload_part_request(

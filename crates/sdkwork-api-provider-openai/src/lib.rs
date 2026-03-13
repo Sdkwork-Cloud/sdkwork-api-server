@@ -17,7 +17,9 @@ use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
 use sdkwork_api_contract_openai::files::CreateFileRequest;
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
-use sdkwork_api_contract_openai::images::CreateImageRequest;
+use sdkwork_api_contract_openai::images::{
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest,
+};
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::{
@@ -300,6 +302,63 @@ impl OpenAiProviderAdapter {
         request: &CreateImageRequest,
     ) -> Result<Value> {
         self.post_json("/v1/images/generations", api_key, request)
+            .await
+    }
+
+    pub async fn images_edits(
+        &self,
+        api_key: &str,
+        request: &CreateImageEditRequest,
+    ) -> Result<Value> {
+        let mut form = reqwest::multipart::Form::new()
+            .text("prompt", request.prompt.clone())
+            .part(
+                "image",
+                multipart_file_part(
+                    request.image.bytes.clone(),
+                    &request.image.filename,
+                    request.image.content_type.as_deref(),
+                ),
+            );
+        form = add_optional_text_field(form, "model", request.model.as_deref());
+        form = add_optional_number_field(form, "n", request.n);
+        form = add_optional_text_field(form, "quality", request.quality.as_deref());
+        form = add_optional_text_field(form, "response_format", request.response_format.as_deref());
+        form = add_optional_text_field(form, "size", request.size.as_deref());
+        form = add_optional_text_field(form, "user", request.user.as_deref());
+        if let Some(mask) = &request.mask {
+            form = form.part(
+                "mask",
+                multipart_file_part(
+                    mask.bytes.clone(),
+                    &mask.filename,
+                    mask.content_type.as_deref(),
+                ),
+            );
+        }
+        self.post_multipart_json("/v1/images/edits", api_key, form)
+            .await
+    }
+
+    pub async fn images_variations(
+        &self,
+        api_key: &str,
+        request: &CreateImageVariationRequest,
+    ) -> Result<Value> {
+        let mut form = reqwest::multipart::Form::new().part(
+            "image",
+            multipart_file_part(
+                request.image.bytes.clone(),
+                &request.image.filename,
+                request.image.content_type.as_deref(),
+            ),
+        );
+        form = add_optional_text_field(form, "model", request.model.as_deref());
+        form = add_optional_number_field(form, "n", request.n);
+        form = add_optional_text_field(form, "response_format", request.response_format.as_deref());
+        form = add_optional_text_field(form, "size", request.size.as_deref());
+        form = add_optional_text_field(form, "user", request.user.as_deref());
+        self.post_multipart_json("/v1/images/variations", api_key, form)
             .await
     }
 
@@ -940,6 +999,12 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::ImagesGenerations(request) => Ok(ProviderOutput::Json(
                 self.images_generations(api_key, request).await?,
             )),
+            ProviderRequest::ImagesEdits(request) => Ok(ProviderOutput::Json(
+                self.images_edits(api_key, request).await?,
+            )),
+            ProviderRequest::ImagesVariations(request) => Ok(ProviderOutput::Json(
+                self.images_variations(api_key, request).await?,
+            )),
             ProviderRequest::AudioTranscriptions(request) => Ok(ProviderOutput::Json(
                 self.audio_transcriptions(api_key, request).await?,
             )),
@@ -1139,4 +1204,26 @@ fn multipart_file_part(
             .expect("valid multipart content type");
     }
     part
+}
+
+fn add_optional_text_field(
+    form: reqwest::multipart::Form,
+    name: &str,
+    value: Option<&str>,
+) -> reqwest::multipart::Form {
+    match value {
+        Some(value) => form.text(name.to_owned(), value.to_owned()),
+        None => form,
+    }
+}
+
+fn add_optional_number_field(
+    form: reqwest::multipart::Form,
+    name: &str,
+    value: Option<u32>,
+) -> reqwest::multipart::Form {
+    match value {
+        Some(value) => form.text(name.to_owned(), value.to_string()),
+        None => form,
+    }
 }

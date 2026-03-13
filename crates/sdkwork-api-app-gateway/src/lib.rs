@@ -31,7 +31,10 @@ use sdkwork_api_contract_openai::files::{
 use sdkwork_api_contract_openai::fine_tuning::{
     CreateFineTuningJobRequest, FineTuningJobObject, ListFineTuningJobsResponse,
 };
-use sdkwork_api_contract_openai::images::{CreateImageRequest, ImageObject, ImagesResponse};
+use sdkwork_api_contract_openai::images::{
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageObject,
+    ImagesResponse,
+};
 use sdkwork_api_contract_openai::models::{ListModelsResponse, ModelObject};
 use sdkwork_api_contract_openai::moderations::{
     CreateModerationRequest, ModerationCategoryScores, ModerationResponse, ModerationResult,
@@ -873,6 +876,60 @@ pub async fn relay_image_generation_from_store(
         provider.base_url,
         &api_key,
         ProviderRequest::ImagesGenerations(request),
+    )
+    .await
+}
+
+pub async fn relay_image_edit_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateImageEditRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "images", request.model_or_default()).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ImagesEdits(request),
+    )
+    .await
+}
+
+pub async fn relay_image_variation_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateImageVariationRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "images", request.model_or_default()).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ImagesVariations(request),
     )
     .await
 }
@@ -2515,6 +2572,26 @@ pub fn create_image_generation(
     _tenant_id: &str,
     _project_id: &str,
     _model: &str,
+) -> Result<ImagesResponse> {
+    Ok(ImagesResponse::new(vec![ImageObject::base64(
+        "sdkwork-image",
+    )]))
+}
+
+pub fn create_image_edit(
+    _tenant_id: &str,
+    _project_id: &str,
+    _request: &CreateImageEditRequest,
+) -> Result<ImagesResponse> {
+    Ok(ImagesResponse::new(vec![ImageObject::base64(
+        "sdkwork-image",
+    )]))
+}
+
+pub fn create_image_variation(
+    _tenant_id: &str,
+    _project_id: &str,
+    _request: &CreateImageVariationRequest,
 ) -> Result<ImagesResponse> {
     Ok(ImagesResponse::new(vec![ImageObject::base64(
         "sdkwork-image",

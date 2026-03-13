@@ -19,7 +19,9 @@ use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
 use sdkwork_api_contract_openai::files::CreateFileRequest;
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
-use sdkwork_api_contract_openai::images::CreateImageRequest;
+use sdkwork_api_contract_openai::images::{
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest,
+};
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::{
@@ -74,6 +76,8 @@ pub enum ProviderRequest<'a> {
     Embeddings(&'a CreateEmbeddingRequest),
     Moderations(&'a CreateModerationRequest),
     ImagesGenerations(&'a CreateImageRequest),
+    ImagesEdits(&'a CreateImageEditRequest),
+    ImagesVariations(&'a CreateImageVariationRequest),
     AudioTranscriptions(&'a CreateTranscriptionRequest),
     AudioTranslations(&'a CreateTranslationRequest),
     AudioSpeech(&'a CreateSpeechRequest),

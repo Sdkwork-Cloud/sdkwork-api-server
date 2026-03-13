@@ -628,6 +628,105 @@ async fn adapter_posts_image_generations_to_openai_compatible_upstream() {
 }
 
 #[tokio::test]
+async fn adapter_posts_image_edits_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/images/edits", post(capture_image_multipart_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::images::CreateImageEditRequest::new(
+        "make it sunset",
+        sdkwork_api_contract_openai::images::ImageUpload::new("source.png", b"PNGDATA".to_vec())
+            .with_content_type("image/png"),
+    )
+    .with_model("gpt-image-1")
+    .with_mask(
+        sdkwork_api_contract_openai::images::ImageUpload::new("mask.png", b"MASKDATA".to_vec())
+            .with_content_type("image/png"),
+    );
+
+    let response = adapter
+        .images_edits("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["data"][0]["b64_json"], "upstream-image");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert!(state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
+    let raw_body = state.raw_body.lock().unwrap().clone().unwrap();
+    let body = String::from_utf8_lossy(&raw_body);
+    assert!(body.contains("make it sunset"));
+    assert!(body.contains("source.png"));
+    assert!(body.contains("mask.png"));
+}
+
+#[tokio::test]
+async fn adapter_posts_image_variations_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/images/variations",
+            post(capture_image_multipart_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::images::CreateImageVariationRequest::new(
+        sdkwork_api_contract_openai::images::ImageUpload::new("source.png", b"PNGDATA".to_vec())
+            .with_content_type("image/png"),
+    )
+    .with_model("gpt-image-1");
+
+    let response = adapter
+        .images_variations("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["data"][0]["b64_json"], "upstream-image");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert!(state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
+    let raw_body = state.raw_body.lock().unwrap().clone().unwrap();
+    let body = String::from_utf8_lossy(&raw_body);
+    assert!(body.contains("source.png"));
+    assert!(body.contains("gpt-image-1"));
+}
+
+#[tokio::test]
 async fn adapter_posts_videos_to_openai_compatible_upstream() {
     let state = CaptureState::default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -2707,6 +2806,29 @@ async fn capture_image_request(
         .and_then(|value| value.to_str().ok())
         .map(ToOwned::to_owned);
     *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "data":[{"b64_json":"upstream-image"}]
+        })),
+    )
+}
+
+async fn capture_image_multipart_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.content_type.lock().unwrap() = headers
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.raw_body.lock().unwrap() = Some(body.to_vec());
 
     (
         StatusCode::OK,

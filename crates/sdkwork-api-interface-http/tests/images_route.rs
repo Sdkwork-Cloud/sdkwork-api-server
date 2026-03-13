@@ -5,6 +5,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::Value;
 use sqlx::SqlitePool;
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 
@@ -28,6 +29,49 @@ async fn images_generation_route_returns_ok() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+#[tokio::test]
+async fn images_edit_route_accepts_multipart() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let boundary = "sdkwork-boundary-edit";
+    let response = app
+        .oneshot(multipart_request(
+            "/v1/images/edits",
+            boundary,
+            multipart_body(
+                boundary,
+                &[("model", "gpt-image-1"), ("prompt", "make it sunset")],
+                &[
+                    ("image", "source.png", "image/png", b"PNGDATA"),
+                    ("mask", "mask.png", "image/png", b"MASKDATA"),
+                ],
+            ),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn images_variation_route_accepts_multipart() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let boundary = "sdkwork-boundary-variation";
+    let response = app
+        .oneshot(multipart_request(
+            "/v1/images/variations",
+            boundary,
+            multipart_body(
+                boundary,
+                &[("model", "gpt-image-1")],
+                &[("image", "source.png", "image/png", b"PNGDATA")],
+            ),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -44,6 +88,8 @@ async fn memory_pool() -> SqlitePool {
 #[derive(Clone, Default)]
 struct UpstreamCaptureState {
     authorization: Arc<Mutex<Option<String>>>,
+    content_type: Arc<Mutex<Option<String>>>,
+    raw_body: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 #[tokio::test]
@@ -52,13 +98,143 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/images/generations", post(upstream_images_handler))
+        .route(
+            "/v1/images/generations",
+            post(upstream_images_generation_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
         axum::serve(listener, upstream).await.unwrap();
     });
 
+    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/images/generations")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-image-1\",\"prompt\":\"relay me\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["data"][0]["b64_json"], "upstream-image");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn stateful_images_edit_route_relays_multipart_to_openai_compatible_provider() {
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/v1/images/edits", post(upstream_images_multipart_handler))
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
+    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let boundary = "sdkwork-upstream-edit";
+    let response = gateway_app
+        .oneshot(multipart_request(
+            "/v1/images/edits",
+            boundary,
+            multipart_body(
+                boundary,
+                &[("model", "gpt-image-1"), ("prompt", "relay edit")],
+                &[
+                    ("image", "source.png", "image/png", b"PNGDATA"),
+                    ("mask", "mask.png", "image/png", b"MASKDATA"),
+                ],
+            ),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["data"][0]["b64_json"], "upstream-image");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert!(upstream_state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
+    let raw_body = upstream_state.raw_body.lock().unwrap().clone().unwrap();
+    let body = String::from_utf8_lossy(&raw_body);
+    assert!(body.contains("relay edit"));
+    assert!(body.contains("source.png"));
+    assert!(body.contains("mask.png"));
+}
+
+#[tokio::test]
+async fn stateful_images_variation_route_relays_multipart_to_openai_compatible_provider() {
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route(
+            "/v1/images/variations",
+            post(upstream_images_multipart_handler),
+        )
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
+    let gateway_app = configure_gateway_with_image_provider(address).await;
+    let boundary = "sdkwork-upstream-variation";
+    let response = gateway_app
+        .oneshot(multipart_request(
+            "/v1/images/variations",
+            boundary,
+            multipart_body(
+                boundary,
+                &[("model", "gpt-image-1")],
+                &[("image", "source.png", "image/png", b"PNGDATA")],
+            ),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["data"][0]["b64_json"], "upstream-image");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert!(upstream_state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
+    let raw_body = upstream_state.raw_body.lock().unwrap().clone().unwrap();
+    let body = String::from_utf8_lossy(&raw_body);
+    assert!(body.contains("source.png"));
+}
+
+async fn configure_gateway_with_image_provider(address: SocketAddr) -> Router {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
@@ -90,7 +266,6 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
         )
         .await
         .unwrap();
-
     assert_eq!(provider.status(), StatusCode::CREATED);
 
     let credential = admin_app
@@ -107,7 +282,6 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
         )
         .await
         .unwrap();
-
     assert_eq!(credential.status(), StatusCode::CREATED);
 
     let model = admin_app
@@ -124,33 +298,55 @@ async fn stateful_images_generation_route_relays_to_openai_compatible_provider()
         )
         .await
         .unwrap();
-
     assert_eq!(model.status(), StatusCode::CREATED);
 
-    let response = gateway_app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/images/generations")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    "{\"model\":\"gpt-image-1\",\"prompt\":\"relay me\"}",
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let json = read_json(response).await;
-    assert_eq!(json["data"][0]["b64_json"], "upstream-image");
-    assert_eq!(
-        upstream_state.authorization.lock().unwrap().as_deref(),
-        Some("Bearer sk-upstream-openai")
-    );
+    gateway_app
 }
 
-async fn upstream_images_handler(
+fn multipart_request(uri: &str, boundary: &str, body: Vec<u8>) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(Body::from(body))
+        .unwrap()
+}
+
+fn multipart_body(
+    boundary: &str,
+    text_fields: &[(&str, &str)],
+    file_fields: &[(&str, &str, &str, &[u8])],
+) -> Vec<u8> {
+    let mut body = Vec::new();
+
+    for (name, value) in text_fields {
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(
+            format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+        );
+        body.extend_from_slice(value.as_bytes());
+        body.extend_from_slice(b"\r\n");
+    }
+
+    for (name, filename, content_type, bytes) in file_fields {
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        body.extend_from_slice(
+            format!("Content-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n")
+                .as_bytes(),
+        );
+        body.extend_from_slice(format!("Content-Type: {content_type}\r\n\r\n").as_bytes());
+        body.extend_from_slice(bytes);
+        body.extend_from_slice(b"\r\n");
+    }
+
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    body
+}
+
+async fn upstream_images_generation_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -158,6 +354,29 @@ async fn upstream_images_handler(
         .get("authorization")
         .and_then(|value| value.to_str().ok())
         .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "data":[{"b64_json":"upstream-image"}]
+        })),
+    )
+}
+
+async fn upstream_images_multipart_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.content_type.lock().unwrap() = headers
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.raw_body.lock().unwrap() = Some(body.to_vec());
 
     (
         StatusCode::OK,
