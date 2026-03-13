@@ -2,6 +2,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use axum::Router;
 use serde_json::Value;
+use serial_test::serial;
 use sqlx::SqlitePool;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,6 +49,7 @@ async fn login_token(app: Router) -> String {
         .to_owned()
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn login_returns_a_gateway_jwt_like_token() {
     let pool = memory_pool().await;
@@ -71,6 +73,7 @@ async fn login_returns_a_gateway_jwt_like_token() {
     assert_eq!(json["token"].as_str().unwrap().split('.').count(), 3);
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn create_and_list_channels() {
     let pool = memory_pool().await;
@@ -111,6 +114,7 @@ async fn create_and_list_channels() {
     assert_eq!(json[0]["id"], "openai");
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn create_and_list_providers_and_credentials() {
     let pool = memory_pool().await;
@@ -233,6 +237,7 @@ async fn create_and_list_providers_and_credentials() {
     assert_eq!(secret, "sk-upstream-openai");
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn create_and_list_models() {
     let pool = memory_pool().await;
@@ -276,6 +281,7 @@ async fn create_and_list_models() {
     assert_eq!(models_json[0]["context_window"], 128000);
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn routing_simulation_uses_catalog_models() {
     let pool = memory_pool().await;
@@ -345,6 +351,7 @@ async fn routing_simulation_uses_catalog_models() {
     );
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn create_and_list_routing_policies() {
     let pool = memory_pool().await;
@@ -397,6 +404,7 @@ async fn create_and_list_routing_policies() {
     );
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn routing_simulation_reports_policy_selected_provider() {
     let pool = memory_pool().await;
@@ -478,6 +486,7 @@ async fn routing_simulation_reports_policy_selected_provider() {
     assert_eq!(simulation_json["matched_policy_id"], "policy-gpt-4-1");
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn create_and_list_extension_installations_and_instances() {
     let pool = memory_pool().await;
@@ -563,6 +572,7 @@ async fn create_and_list_extension_installations_and_instances() {
     assert_eq!(instances_json[0]["config"]["region"], "global");
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn list_discovered_extension_packages_from_admin_api() {
     let root = temp_extension_root("admin-extension-packages");
@@ -628,11 +638,15 @@ compatibility = "relay"
     );
     assert_eq!(json[0]["validation"]["valid"], true);
     assert_eq!(json[0]["validation"]["issues"].as_array().unwrap().len(), 0);
+    assert_eq!(json[0]["trust"]["state"], "unsigned");
+    assert_eq!(json[0]["trust"]["signature_present"], false);
+    assert_eq!(json[0]["trust"]["load_allowed"], true);
 
     cleanup_dir(&root);
 }
 
 #[cfg(windows)]
+#[serial(extension_env)]
 #[tokio::test]
 async fn list_active_connector_runtime_statuses_from_admin_api() {
     let root = temp_extension_root("admin-runtime-statuses");

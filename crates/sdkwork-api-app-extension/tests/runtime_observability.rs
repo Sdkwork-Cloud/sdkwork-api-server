@@ -29,6 +29,9 @@ fn lists_discovered_extension_packages_from_policy() {
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].manifest.id, "sdkwork.provider.custom-openai");
     assert_eq!(packages[0].root_dir, package_dir);
+    assert_eq!(packages[0].trust.state.as_str(), "unsigned");
+    assert!(!packages[0].trust.signature_present);
+    assert!(packages[0].trust.load_allowed);
     cleanup_dir(&root);
 }
 
@@ -93,6 +96,11 @@ runtime = "connector"
 protocol = "openai"
 entrypoint = "powershell.exe"
 channel_bindings = ["sdkwork.channel.openai"]
+permissions = ["network_outbound", "spawn_process"]
+
+[health]
+path = "/health"
+interval_secs = 30
 
 [[capabilities]]
 operation = "chat.completions.create"

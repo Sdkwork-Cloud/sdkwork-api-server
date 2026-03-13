@@ -64,9 +64,14 @@ Backend:
   - Rust crate name: `sdkwork-api-ext-provider-*` / `sdkwork-api-ext-channel-*`
   - explicit manifest permissions such as `network_outbound` and `spawn_process`
   - connector health contracts such as `/health` plus polling interval metadata
+  - trust declarations with publisher identity plus ed25519 signature material
 - Configuration-driven extension load planning that merges manifest defaults, installation config, and instance overrides into one runtime plan
 - Filesystem discovery for external extension packages through `sdkwork-extension.toml` manifests loaded from configured extension search paths
 - Discovery-time validation of extension manifest standards is now surfaced through the admin package listing
+- Discovery-time trust verification is now surfaced through the admin package listing:
+  - `verified` packages are signed by a trusted publisher and may load
+  - `unsigned` packages remain discoverable and may be loadable when the runtime policy allows them
+  - `untrusted_signer` and `invalid_signature` packages are visible but blocked from runtime loading
 - Protocol-aware relay for discovered provider extensions when the manifest declares a supported protocol:
   - `openai`
   - `openrouter`
@@ -109,6 +114,10 @@ Known gaps:
 - extension manifest discovery and configuration-driven loading are now active for both `connector` and `native_dynamic` package metadata
 - discovered provider extensions can relay through existing protocol adapters when the manifest declares a supported protocol
 - connector runtimes are now executable through host supervision or healthy external endpoint reuse, but they currently require HTTP health probes and the existing protocol-mapped adapter set
+- external extension trust policy is now real for discovered packages:
+  - trusted-signer verification is enforced for signed packages
+  - unsigned connector packages can be allowed or blocked by policy
+  - native dynamic packages are intended to run only when explicitly enabled and signed by a trusted publisher
 - native dynamic ABI loading is still not implemented
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
@@ -169,6 +178,9 @@ The credential binding itself remains in SQLite so routing and provider resoluti
 - `extension_paths`
 - `enable_connector_extensions`
 - `enable_native_dynamic_extensions`
+- `extension_trusted_signers`
+- `require_signed_connector_extensions`
+- `require_signed_native_dynamic_extensions`
 - `secret_backend`
 - `credential_master_key`
 - `admin_jwt_signing_secret`
@@ -183,11 +195,20 @@ It can now be loaded from environment variables:
 - `SDKWORK_EXTENSION_PATHS`
 - `SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS`
 - `SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS`
+- `SDKWORK_EXTENSION_TRUSTED_SIGNERS`
+- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS`
+- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS`
 - `SDKWORK_SECRET_BACKEND`
 - `SDKWORK_CREDENTIAL_MASTER_KEY`
 - `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
 - `SDKWORK_SECRET_LOCAL_FILE`
 - `SDKWORK_SECRET_KEYRING_SERVICE`
+
+Trusted signer entries are currently configured as a semicolon-delimited list:
+
+```text
+SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-public-key>
+```
 
 Supported secret backend strategy identifiers are:
 
@@ -229,6 +250,11 @@ pnpm --dir console exec vite build
 - Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.
 - Provider dispatch is now routed through `sdkwork-api-extension-host`, which resolves factories by `extension_id` first and keeps legacy `adapter_kind` aliases as a fallback.
 - Extension runtime configuration is split into package metadata, installation state, and mounted instances so one extension can back multiple provider instances.
+- External extension trust is also explicit:
+  - discovery always reports packages for admin visibility
+  - runtime loading only admits packages whose trust report is `load_allowed = true`
+  - signed packages must match a trusted publisher key
+  - unsigned package admission is runtime-policy controlled
 - Extension load planning now follows a deterministic merge order:
   - manifest metadata defines package identity and default entrypoint/schema references
   - installation state selects runtime and package-level config

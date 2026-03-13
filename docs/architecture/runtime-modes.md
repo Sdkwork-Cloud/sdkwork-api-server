@@ -53,10 +53,12 @@ The current repository includes:
 - persisted extension installation and instance records for configuration-driven mounting
 - authenticated admin visibility for discovered extension packages and active connector runtime statuses
 - discovery-time validation of manifest permissions, bindings, capabilities, entrypoints, and connector health contracts
+- discovery-time trust verification for external extension packages, including publisher identity, ed25519 signature checks, and trusted-signer policy evaluation
 - provider runtime dispatch keyed by `ProxyProvider.extension_id`, with `adapter_kind` kept as a compatibility alias for older records and protocol classification
 - real provider dispatch now consumes persisted extension load state so instance-level `base_url` overrides are honored and disabled installations or instances short-circuit to local fallback
 - discovered provider manifests can now bind to the current protocol adapters so connector-style extensions participate in real relay execution when they declare a supported protocol
 - connector runtime supervision is now active for discovered packages, including host-managed process startup, HTTP health probing, and reuse of already healthy external endpoints
+- gateway runtime loading now skips external packages whose trust policy does not allow execution, so blocked connector or native-dynamic packages fall back cleanly instead of entering the execution host
 
 ## Extension Runtime Status
 
@@ -114,12 +116,14 @@ Discovered package observability now includes:
 
 1. normalized distribution and crate naming
 2. manifest validation results for explicit permissions, channel bindings, capabilities, and runtime contract completeness
+3. trust verification results for signature presence, publisher trust, signature validity, and load eligibility
 
 Discovered provider manifests become executable only when:
 
 1. the runtime policy enables their declared runtime
 2. the manifest declares a supported protocol
-3. persisted installation and instance state resolves to an enabled runtime load plan
+3. the trust policy marks the package as loadable
+4. persisted installation and instance state resolves to an enabled runtime load plan
 
 Routing remains intentionally conservative in this batch:
 

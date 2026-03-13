@@ -12,11 +12,13 @@ use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, Exten
 use sdkwork_api_extension_host::shutdown_connector_runtime;
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 use serde_json::{json, Value};
+use serial_test::serial;
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn relay_can_boot_supervised_connector_runtime_for_discovered_extension() {
     let extension_root = temp_extension_root("connector-dispatch");

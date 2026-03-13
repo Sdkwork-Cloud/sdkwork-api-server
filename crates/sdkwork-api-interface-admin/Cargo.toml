@@ -30,6 +30,7 @@ sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 sqlx.workspace = true
 
 [dev-dependencies]
+serial_test.workspace = true
 serde_json.workspace = true
 sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }

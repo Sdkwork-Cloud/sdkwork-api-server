@@ -76,7 +76,8 @@ use sdkwork_api_extension_core::{
     ExtensionKind, ExtensionManifest, ExtensionProtocol, ExtensionRuntime,
 };
 use sdkwork_api_extension_host::{
-    discover_extension_packages, ensure_connector_runtime_started, BuiltinProviderExtensionFactory,
+    discover_extension_packages, ensure_connector_runtime_started,
+    verify_discovered_extension_package_trust, BuiltinProviderExtensionFactory,
     DiscoveredExtensionPackage, ExtensionDiscoveryPolicy, ExtensionHost,
 };
 use sdkwork_api_provider_core::ProviderRequest;
@@ -219,13 +220,23 @@ async fn build_extension_host_from_store(store: &dyn AdminStore) -> Result<Exten
     let mut installations = store.list_extension_installations().await?;
     installations.sort_by(|left, right| left.installation_id.cmp(&right.installation_id));
     for installation in installations {
-        host.install(installation).map_err(anyhow::Error::new)?;
+        match host.install(installation) {
+            Ok(()) => {}
+            Err(sdkwork_api_extension_host::ExtensionHostError::ManifestNotFound { .. }) => {}
+            Err(error) => return Err(error.into()),
+        }
     }
 
     let mut instances = store.list_extension_instances().await?;
     instances.sort_by(|left, right| left.instance_id.cmp(&right.instance_id));
     for instance in instances {
-        host.mount_instance(instance).map_err(anyhow::Error::new)?;
+        match host.mount_instance(instance) {
+            Ok(()) => {}
+            Err(sdkwork_api_extension_host::ExtensionHostError::InstallationNotFound {
+                ..
+            }) => {}
+            Err(error) => return Err(error.into()),
+        }
     }
 
     Ok(host)
@@ -3906,6 +3917,10 @@ fn configured_extension_host() -> Result<ExtensionHost> {
     let policy = configured_extension_discovery_policy();
 
     for package in discover_extension_packages(&policy)? {
+        let trust = verify_discovered_extension_package_trust(&package, &policy);
+        if !trust.load_allowed {
+            continue;
+        }
         register_discovered_extension(&mut host, package);
     }
 
@@ -3917,7 +3932,7 @@ fn configured_extension_discovery_policy() -> ExtensionDiscoveryPolicy {
         .map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
         .unwrap_or_default();
 
-    ExtensionDiscoveryPolicy::new(search_paths)
+    let mut policy = ExtensionDiscoveryPolicy::new(search_paths)
         .with_connector_extensions(env_flag(
             "SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS",
             true,
@@ -3926,6 +3941,18 @@ fn configured_extension_discovery_policy() -> ExtensionDiscoveryPolicy {
             "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
             false,
         ))
+        .with_required_signatures_for_connector_extensions(env_flag(
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+            false,
+        ))
+        .with_required_signatures_for_native_dynamic_extensions(env_flag(
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS",
+            true,
+        ));
+    for (publisher, public_key) in env_trusted_signers("SDKWORK_EXTENSION_TRUSTED_SIGNERS") {
+        policy = policy.with_trusted_signer(publisher, public_key);
+    }
+    policy
 }
 
 fn env_flag(key: &str, default: bool) -> bool {
@@ -3933,6 +3960,32 @@ fn env_flag(key: &str, default: bool) -> bool {
         .ok()
         .and_then(|value| value.parse::<bool>().ok())
         .unwrap_or(default)
+}
+
+fn env_trusted_signers(key: &str) -> Vec<(String, String)> {
+    std::env::var(key)
+        .ok()
+        .map(|value| parse_trusted_signers(&value))
+        .unwrap_or_default()
+}
+
+fn parse_trusted_signers(value: &str) -> Vec<(String, String)> {
+    value
+        .split(';')
+        .filter_map(|entry| {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return None;
+            }
+            let (publisher, public_key) = entry.split_once('=')?;
+            let publisher = publisher.trim();
+            let public_key = public_key.trim();
+            if publisher.is_empty() || public_key.is_empty() {
+                return None;
+            }
+            Some((publisher.to_owned(), public_key.to_owned()))
+        })
+        .collect()
 }
 
 fn register_discovered_extension(host: &mut ExtensionHost, package: DiscoveredExtensionPackage) {

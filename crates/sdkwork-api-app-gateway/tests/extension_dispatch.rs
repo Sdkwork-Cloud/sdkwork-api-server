@@ -12,6 +12,7 @@ use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 use serde_json::{json, Value};
+use serial_test::serial;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -20,6 +21,7 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep, Duration};
 
+#[serial(extension_env)]
 #[test]
 fn builtin_host_registers_current_provider_extensions() {
     let host = builtin_extension_host();
@@ -39,6 +41,7 @@ fn builtin_host_registers_current_provider_extensions() {
         .is_some());
 }
 
+#[serial(extension_env)]
 #[test]
 fn builtin_host_resolves_provider_by_extension_id() {
     let host = builtin_extension_host();
@@ -59,6 +62,7 @@ struct UpstreamCaptureState {
     authorization: Arc<Mutex<Option<String>>>,
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn relay_uses_persisted_extension_instance_base_url_override() {
     let upstream_state = UpstreamCaptureState::default();
@@ -156,6 +160,7 @@ async fn relay_uses_persisted_extension_instance_base_url_override() {
     );
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn disabled_extension_instance_prevents_upstream_relay() {
     let upstream_state = UpstreamCaptureState::default();
@@ -249,6 +254,7 @@ async fn disabled_extension_instance_prevents_upstream_relay() {
     assert!(upstream_state.authorization.lock().unwrap().is_none());
 }
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn discovered_connector_extension_can_relay_through_supported_protocol() {
     let extension_root = temp_extension_root("discovered-connector");
@@ -355,6 +361,108 @@ async fn discovered_connector_extension_can_relay_through_supported_protocol() {
     cleanup_dir(&extension_root);
 }
 
+#[serial(extension_env)]
+#[tokio::test]
+async fn unsigned_discovered_connector_extension_is_blocked_when_signature_is_required() {
+    let extension_root = temp_extension_root("unsigned-connector-blocked");
+    let package_dir = extension_root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        discovered_connector_manifest(),
+    )
+    .unwrap();
+    let _guard = extension_env_guard_with_signature_requirement(&extension_root, true);
+
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let _upstream_thread = thread::spawn({
+        let upstream_state = upstream_state.clone();
+        move || serve_connector_compatible_upstream(listener, upstream_state, 1)
+    });
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let secret_manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-custom-openai",
+                "openai",
+                "custom-openai",
+                format!("http://{address}"),
+                "Custom OpenAI",
+            )
+            .with_extension_id("sdkwork.provider.custom-openai"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(
+            &ModelCatalogEntry::new("gpt-4.1", "provider-custom-openai").with_streaming(true),
+        )
+        .await
+        .unwrap();
+    persist_credential_with_secret_and_manager(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "provider-custom-openai",
+        "cred-custom-openai",
+        "sk-upstream-openai",
+    )
+    .await
+    .unwrap();
+    store
+        .insert_extension_installation(
+            &ExtensionInstallation::new(
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+                ExtensionRuntime::Connector,
+            )
+            .with_enabled(true)
+            .with_entrypoint("bin/sdkwork-provider-custom-openai")
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-custom-openai",
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+            )
+            .with_enabled(true)
+            .with_base_url(format!("http://{address}"))
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+
+    let request = chat_request("gpt-4.1");
+    let response = relay_chat_completion_from_store(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    .unwrap();
+
+    assert!(response.is_none());
+    assert!(upstream_state.authorization.lock().unwrap().is_none());
+
+    cleanup_dir(&extension_root);
+}
+
 fn chat_request(model: &str) -> CreateChatCompletionRequest {
     CreateChatCompletionRequest {
         model: model.to_owned(),
@@ -445,6 +553,11 @@ runtime = "connector"
 protocol = "openai"
 entrypoint = "bin/sdkwork-provider-custom-openai"
 channel_bindings = ["sdkwork.channel.openai"]
+permissions = ["network_outbound", "spawn_process"]
+
+[health]
+path = "/health"
+interval_secs = 30
 
 [[capabilities]]
 operation = "chat.completions.create"
@@ -481,9 +594,18 @@ async fn wait_for_health(base_url: &str) {
 }
 
 fn extension_env_guard(path: &Path) -> ExtensionEnvGuard {
+    extension_env_guard_with_signature_requirement(path, false)
+}
+
+fn extension_env_guard_with_signature_requirement(
+    path: &Path,
+    require_connector_signature: bool,
+) -> ExtensionEnvGuard {
     let previous_paths = std::env::var("SDKWORK_EXTENSION_PATHS").ok();
     let previous_connector = std::env::var("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS").ok();
     let previous_native = std::env::var("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS").ok();
+    let previous_connector_signature =
+        std::env::var("SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS").ok();
 
     let joined_paths = std::env::join_paths([path]).unwrap();
     std::env::set_var("SDKWORK_EXTENSION_PATHS", joined_paths);
@@ -492,11 +614,20 @@ fn extension_env_guard(path: &Path) -> ExtensionEnvGuard {
         "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
         "false",
     );
+    std::env::set_var(
+        "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+        if require_connector_signature {
+            "true"
+        } else {
+            "false"
+        },
+    );
 
     ExtensionEnvGuard {
         previous_paths,
         previous_connector,
         previous_native,
+        previous_connector_signature,
     }
 }
 
@@ -504,6 +635,7 @@ struct ExtensionEnvGuard {
     previous_paths: Option<String>,
     previous_connector: Option<String>,
     previous_native: Option<String>,
+    previous_connector_signature: Option<String>,
 }
 
 impl Drop for ExtensionEnvGuard {
@@ -516,6 +648,10 @@ impl Drop for ExtensionEnvGuard {
         restore_env_var(
             "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
             self.previous_native.as_deref(),
+        );
+        restore_env_var(
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+            self.previous_connector_signature.as_deref(),
         );
     }
 }

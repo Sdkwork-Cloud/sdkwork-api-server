@@ -3,7 +3,8 @@ use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, Exten
 use sdkwork_api_extension_host::{
     discover_extension_packages,
     list_connector_runtime_statuses as host_connector_runtime_statuses,
-    validate_discovered_extension_package, ConnectorRuntimeStatus, DiscoveredExtensionPackage,
+    validate_discovered_extension_package, verify_discovered_extension_package_trust,
+    ConnectorRuntimeStatus, DiscoveredExtensionPackage, ExtensionTrustReport,
     ManifestValidationReport,
 };
 use sdkwork_api_storage_core::AdminStore;
@@ -30,6 +31,7 @@ pub struct DiscoveredExtensionPackageRecord {
     pub crate_name: String,
     pub manifest: sdkwork_api_extension_core::ExtensionManifest,
     pub validation: ManifestValidationReport,
+    pub trust: ExtensionTrustReport,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -75,7 +77,7 @@ pub fn list_discovered_extension_packages(
 ) -> Result<Vec<DiscoveredExtensionPackageRecord>> {
     Ok(discover_extension_packages(policy)?
         .into_iter()
-        .map(DiscoveredExtensionPackageRecord::from)
+        .map(|package| DiscoveredExtensionPackageRecord::from_package(package, policy))
         .collect())
 }
 
@@ -108,7 +110,7 @@ pub fn configured_extension_discovery_policy_from_env() -> ExtensionDiscoveryPol
         .map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
         .unwrap_or_default();
 
-    ExtensionDiscoveryPolicy::new(search_paths)
+    let mut policy = ExtensionDiscoveryPolicy::new(search_paths)
         .with_connector_extensions(env_flag(
             "SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS",
             true,
@@ -117,11 +119,24 @@ pub fn configured_extension_discovery_policy_from_env() -> ExtensionDiscoveryPol
             "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
             false,
         ))
+        .with_required_signatures_for_connector_extensions(env_flag(
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+            false,
+        ))
+        .with_required_signatures_for_native_dynamic_extensions(env_flag(
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS",
+            true,
+        ));
+    for (publisher, public_key) in env_trusted_signers("SDKWORK_EXTENSION_TRUSTED_SIGNERS") {
+        policy = policy.with_trusted_signer(publisher, public_key);
+    }
+    policy
 }
 
-impl From<DiscoveredExtensionPackage> for DiscoveredExtensionPackageRecord {
-    fn from(value: DiscoveredExtensionPackage) -> Self {
+impl DiscoveredExtensionPackageRecord {
+    fn from_package(value: DiscoveredExtensionPackage, policy: &ExtensionDiscoveryPolicy) -> Self {
         let validation = validate_discovered_extension_package(&value);
+        let trust = verify_discovered_extension_package_trust(&value, policy);
         Self {
             root_dir: value.root_dir,
             manifest_path: value.manifest_path,
@@ -129,6 +144,7 @@ impl From<DiscoveredExtensionPackage> for DiscoveredExtensionPackageRecord {
             crate_name: value.manifest.crate_name(),
             manifest: value.manifest,
             validation,
+            trust,
         }
     }
 }
@@ -151,4 +167,30 @@ fn env_flag(key: &str, default: bool) -> bool {
         .ok()
         .and_then(|value| value.parse::<bool>().ok())
         .unwrap_or(default)
+}
+
+fn env_trusted_signers(key: &str) -> Vec<(String, String)> {
+    std::env::var(key)
+        .ok()
+        .map(|value| parse_trusted_signers(&value))
+        .unwrap_or_default()
+}
+
+fn parse_trusted_signers(value: &str) -> Vec<(String, String)> {
+    value
+        .split(';')
+        .filter_map(|entry| {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return None;
+            }
+            let (publisher, public_key) = entry.split_once('=')?;
+            let publisher = publisher.trim();
+            let public_key = public_key.trim();
+            if publisher.is_empty() || public_key.is_empty() {
+                return None;
+            }
+            Some((publisher.to_owned(), public_key.to_owned()))
+        })
+        .collect()
 }

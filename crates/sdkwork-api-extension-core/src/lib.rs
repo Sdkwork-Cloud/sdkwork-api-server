@@ -49,6 +49,48 @@ pub enum ExtensionPermission {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionSignatureAlgorithm {
+    Ed25519,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtensionSignature {
+    pub algorithm: ExtensionSignatureAlgorithm,
+    pub public_key: String,
+    pub signature: String,
+}
+
+impl ExtensionSignature {
+    pub fn new(
+        algorithm: ExtensionSignatureAlgorithm,
+        public_key: impl Into<String>,
+        signature: impl Into<String>,
+    ) -> Self {
+        Self {
+            algorithm,
+            public_key: public_key.into(),
+            signature: signature.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtensionTrustDeclaration {
+    pub publisher: String,
+    pub signature: ExtensionSignature,
+}
+
+impl ExtensionTrustDeclaration {
+    pub fn signed(publisher: impl Into<String>, signature: ExtensionSignature) -> Self {
+        Self {
+            publisher: publisher.into(),
+            signature,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityDescriptor {
     pub operation: String,
     pub compatibility: CompatibilityLevel,
@@ -170,6 +212,8 @@ pub struct ExtensionManifest {
     pub permissions: Vec<ExtensionPermission>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<ExtensionHealthContract>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust: Option<ExtensionTrustDeclaration>,
     pub channel_bindings: Vec<String>,
     pub capabilities: Vec<CapabilityDescriptor>,
 }
@@ -195,6 +239,7 @@ impl ExtensionManifest {
             credential_schema: None,
             permissions: Vec::new(),
             health: None,
+            trust: None,
             channel_bindings: Vec::new(),
             capabilities: Vec::new(),
         }
@@ -241,6 +286,11 @@ impl ExtensionManifest {
 
     pub fn with_health_contract(mut self, health: ExtensionHealthContract) -> Self {
         self.health = Some(health);
+        self
+    }
+
+    pub fn with_trust(mut self, trust: ExtensionTrustDeclaration) -> Self {
+        self.trust = Some(trust);
         self
     }
 

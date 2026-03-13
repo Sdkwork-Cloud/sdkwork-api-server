@@ -17,6 +17,9 @@ fn standalone_defaults_are_local_friendly() {
     assert!(config.extension_paths.is_empty());
     assert!(config.enable_connector_extensions);
     assert!(!config.enable_native_dynamic_extensions);
+    assert!(!config.require_signed_connector_extensions);
+    assert!(config.require_signed_native_dynamic_extensions);
+    assert!(config.extension_trusted_signers.is_empty());
     assert_eq!(config.secret_backend, SecretBackendKind::DatabaseEncrypted);
     assert_eq!(
         config.admin_jwt_signing_secret,
@@ -111,6 +114,18 @@ fn parses_extension_discovery_settings_from_pairs() {
         ),
         ("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS", "false"),
         ("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS", "true"),
+        (
+            "SDKWORK_EXTENSION_TRUSTED_SIGNERS",
+            "sdkwork=ZXhwaWNpdC1wdWJsaWMta2V5;partner=c2Vjb25kLXB1YmxpYy1rZXk=",
+        ),
+        (
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+            "true",
+        ),
+        (
+            "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS",
+            "false",
+        ),
     ])
     .unwrap();
 
@@ -123,4 +138,14 @@ fn parses_extension_discovery_settings_from_pairs() {
     );
     assert!(!config.enable_connector_extensions);
     assert!(config.enable_native_dynamic_extensions);
+    assert!(config.require_signed_connector_extensions);
+    assert!(!config.require_signed_native_dynamic_extensions);
+    assert_eq!(
+        config.extension_trusted_signers["sdkwork"],
+        "ZXhwaWNpdC1wdWJsaWMta2V5"
+    );
+    assert_eq!(
+        config.extension_trusted_signers["partner"],
+        "c2Vjb25kLXB1YmxpYy1rZXk="
+    );
 }

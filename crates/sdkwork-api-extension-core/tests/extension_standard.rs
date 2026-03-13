@@ -1,6 +1,6 @@
 use sdkwork_api_extension_core::{
     ExtensionHealthContract, ExtensionKind, ExtensionManifest, ExtensionPermission,
-    ExtensionRuntime,
+    ExtensionRuntime, ExtensionSignature, ExtensionSignatureAlgorithm, ExtensionTrustDeclaration,
 };
 
 #[test]
@@ -44,4 +44,31 @@ fn manifest_derives_distribution_and_crate_names_from_runtime_id() {
         manifest.health.as_ref(),
         Some(&ExtensionHealthContract::new("/health", 30))
     );
+}
+
+#[test]
+fn manifest_carries_extension_trust_metadata() {
+    let manifest = ExtensionManifest::new(
+        "sdkwork.provider.openrouter",
+        ExtensionKind::Provider,
+        "0.1.0",
+        ExtensionRuntime::Connector,
+    )
+    .with_trust(ExtensionTrustDeclaration::signed(
+        "sdkwork",
+        ExtensionSignature::new(
+            ExtensionSignatureAlgorithm::Ed25519,
+            "cHVibGljLWtleS1iYXNlNjQ=",
+            "c2lnbmF0dXJlLWJhc2U2NA==",
+        ),
+    ));
+
+    let trust = manifest.trust.as_ref().expect("trust metadata");
+    assert_eq!(trust.publisher, "sdkwork");
+    assert_eq!(
+        trust.signature.algorithm,
+        ExtensionSignatureAlgorithm::Ed25519
+    );
+    assert_eq!(trust.signature.public_key, "cHVibGljLWtleS1iYXNlNjQ=");
+    assert_eq!(trust.signature.signature, "c2lnbmF0dXJlLWJhc2U2NA==");
 }
