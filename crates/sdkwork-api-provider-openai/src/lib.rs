@@ -21,7 +21,7 @@ use sdkwork_api_contract_openai::uploads::{
 };
 use sdkwork_api_contract_openai::vector_stores::{
     CreateVectorStoreFileBatchRequest, CreateVectorStoreFileRequest, CreateVectorStoreRequest,
-    UpdateVectorStoreRequest,
+    SearchVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
@@ -324,6 +324,20 @@ impl OpenAiProviderAdapter {
     pub async fn delete_vector_store(&self, api_key: &str, vector_store_id: &str) -> Result<Value> {
         self.delete_json(&format!("/v1/vector_stores/{vector_store_id}"), api_key)
             .await
+    }
+
+    pub async fn search_vector_store(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+        request: &SearchVectorStoreRequest,
+    ) -> Result<Value> {
+        self.post_json(
+            &format!("/v1/vector_stores/{vector_store_id}/search"),
+            api_key,
+            request,
+        )
+        .await
     }
 
     pub async fn create_vector_store_file(
@@ -645,6 +659,12 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::VectorStoresDelete(vector_store_id) => Ok(ProviderOutput::Json(
                 self.delete_vector_store(api_key, vector_store_id).await?,
             )),
+            ProviderRequest::VectorStoresSearch(vector_store_id, request) => {
+                Ok(ProviderOutput::Json(
+                    self.search_vector_store(api_key, vector_store_id, request)
+                        .await?,
+                ))
+            }
             ProviderRequest::VectorStoreFiles(vector_store_id, request) => {
                 Ok(ProviderOutput::Json(
                     self.create_vector_store_file(api_key, vector_store_id, request)

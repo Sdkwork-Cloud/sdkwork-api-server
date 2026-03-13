@@ -1039,6 +1039,44 @@ async fn adapter_lists_vector_store_file_batch_files_from_openai_compatible_upst
 }
 
 #[tokio::test]
+async fn adapter_searches_vector_store_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/vector_stores/vs_1/search",
+            post(capture_vector_store_search_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request =
+        sdkwork_api_contract_openai::vector_stores::SearchVectorStoreRequest::new("reset password");
+
+    let response = adapter
+        .search_vector_store("sk-upstream-openai", "vs_1", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["object"], "list");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["query"],
+        "reset password"
+    );
+}
+
+#[tokio::test]
 async fn adapter_posts_audio_speech_to_openai_compatible_upstream() {
     let state = CaptureState::default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -2043,6 +2081,38 @@ async fn capture_vector_store_file_batch_files_request(
                 "object":"vector_store.file",
                 "status":"completed"
             }]
+        })),
+    )
+}
+
+async fn capture_vector_store_search_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "file_id":"file_1",
+                "filename":"kb.txt",
+                "score":0.98,
+                "attributes":{},
+                "content":[{
+                    "type":"text",
+                    "text":"reset password"
+                }]
+            }],
+            "has_more":false,
+            "next_page":null,
+            "search_query":"reset password"
         })),
     )
 }

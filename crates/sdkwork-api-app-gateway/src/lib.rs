@@ -35,8 +35,8 @@ use sdkwork_api_contract_openai::uploads::{
 use sdkwork_api_contract_openai::vector_stores::{
     CreateVectorStoreFileBatchRequest, CreateVectorStoreFileRequest, CreateVectorStoreRequest,
     DeleteVectorStoreFileResponse, DeleteVectorStoreResponse, ListVectorStoreFilesResponse,
-    ListVectorStoresResponse, UpdateVectorStoreRequest, VectorStoreFileBatchObject,
-    VectorStoreFileObject, VectorStoreObject,
+    ListVectorStoresResponse, SearchVectorStoreRequest, SearchVectorStoreResponse,
+    UpdateVectorStoreRequest, VectorStoreFileBatchObject, VectorStoreFileObject, VectorStoreObject,
 };
 use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
@@ -1011,6 +1011,34 @@ pub async fn relay_delete_vector_store_from_store(
     .await
 }
 
+pub async fn relay_search_vector_store_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    request: &SearchVectorStoreRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_store_search", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoresSearch(vector_store_id, request),
+    )
+    .await
+}
+
 pub async fn relay_vector_store_file_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -1528,6 +1556,15 @@ pub fn delete_vector_store(
     vector_store_id: &str,
 ) -> Result<DeleteVectorStoreResponse> {
     Ok(DeleteVectorStoreResponse::deleted(vector_store_id))
+}
+
+pub fn search_vector_store(
+    _tenant_id: &str,
+    _project_id: &str,
+    _vector_store_id: &str,
+    query: &str,
+) -> Result<SearchVectorStoreResponse> {
+    Ok(SearchVectorStoreResponse::sample(query))
 }
 
 pub fn create_vector_store_file(

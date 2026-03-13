@@ -18,8 +18,8 @@ use sdkwork_api_contract_openai::uploads::{
 use sdkwork_api_contract_openai::vector_stores::{
     CreateVectorStoreFileBatchRequest, CreateVectorStoreFileRequest, CreateVectorStoreRequest,
     DeleteVectorStoreFileResponse, DeleteVectorStoreResponse, ListVectorStoreFilesResponse,
-    ListVectorStoresResponse, UpdateVectorStoreRequest, VectorStoreFileBatchObject,
-    VectorStoreFileObject, VectorStoreObject,
+    ListVectorStoresResponse, SearchVectorStoreRequest, SearchVectorStoreResponse,
+    UpdateVectorStoreRequest, VectorStoreFileBatchObject, VectorStoreFileObject, VectorStoreObject,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, WebhookObject};
 
@@ -221,6 +221,18 @@ fn serializes_vector_store_contracts() {
     let cancelled_file_batch = VectorStoreFileBatchObject::cancelled("vsfb_1");
     let cancelled_file_batch_json = serde_json::to_value(cancelled_file_batch).unwrap();
     assert_eq!(cancelled_file_batch_json["status"], "cancelled");
+
+    let search = SearchVectorStoreRequest::new("how do I reset my password?");
+    let search_json = serde_json::to_value(search).unwrap();
+    assert_eq!(search_json["query"], "how do I reset my password?");
+
+    let search_response = SearchVectorStoreResponse::sample("how do I reset my password?");
+    let search_response_json = serde_json::to_value(search_response).unwrap();
+    assert_eq!(search_response_json["object"], "list");
+    assert_eq!(
+        search_response_json["data"][0]["content"][0]["type"],
+        "text"
+    );
 }
 
 #[test]
