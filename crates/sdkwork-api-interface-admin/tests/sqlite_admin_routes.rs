@@ -78,6 +78,7 @@ async fn create_and_list_channels() {
 #[tokio::test]
 async fn create_and_list_providers_and_credentials() {
     let pool = memory_pool().await;
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
 
     let _ = app
@@ -118,7 +119,7 @@ async fn create_and_list_providers_and_credentials() {
                 .uri("/admin/credentials")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"tenant_id\":\"tenant-1\",\"provider_id\":\"provider-openai-official\",\"key_reference\":\"cred-openai\"}",
+                    "{\"tenant_id\":\"tenant-1\",\"provider_id\":\"provider-openai-official\",\"key_reference\":\"cred-openai\",\"secret_value\":\"sk-upstream-openai\"}",
                 ))
                 .unwrap(),
         )
@@ -158,6 +159,18 @@ async fn create_and_list_providers_and_credentials() {
         credentials_json[0]["provider_id"],
         "provider-openai-official"
     );
+    assert!(credentials_json[0]["secret_value"].is_null());
+
+    let secret = sdkwork_api_app_credential::resolve_credential_secret(
+        &store,
+        "local-dev-master-key",
+        "tenant-1",
+        "provider-openai-official",
+        "cred-openai",
+    )
+    .await
+    .unwrap();
+    assert_eq!(secret, "sk-upstream-openai");
 }
 
 #[tokio::test]

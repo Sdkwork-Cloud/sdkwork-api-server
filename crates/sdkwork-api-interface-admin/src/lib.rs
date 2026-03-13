@@ -9,7 +9,7 @@ use sdkwork_api_app_catalog::{
     list_channels, list_model_entries, list_providers, persist_channel, persist_model,
     persist_provider,
 };
-use sdkwork_api_app_credential::{list_credentials, persist_credential};
+use sdkwork_api_app_credential::{list_credentials, persist_credential_with_secret};
 use sdkwork_api_app_identity::{
     issue_jwt, list_gateway_api_keys, persist_gateway_api_key, verify_jwt, Claims,
     CreatedGatewayApiKey,
@@ -30,12 +30,18 @@ use sqlx::SqlitePool;
 #[derive(Debug, Clone)]
 pub struct AdminApiState {
     store: SqliteAdminStore,
+    credential_master_key: String,
 }
 
 impl AdminApiState {
     pub fn new(pool: SqlitePool) -> Self {
+        Self::with_master_key(pool, "local-dev-master-key")
+    }
+
+    pub fn with_master_key(pool: SqlitePool, credential_master_key: impl Into<String>) -> Self {
         Self {
             store: SqliteAdminStore::new(pool),
+            credential_master_key: credential_master_key.into(),
         }
     }
 }
@@ -69,6 +75,7 @@ struct CreateCredentialRequest {
     tenant_id: String,
     provider_id: String,
     key_reference: String,
+    secret_value: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +138,13 @@ pub fn admin_router() -> Router {
 }
 
 pub fn admin_router_with_pool(pool: SqlitePool) -> Router {
+    admin_router_with_pool_and_master_key(pool, "local-dev-master-key")
+}
+
+pub fn admin_router_with_pool_and_master_key(
+    pool: SqlitePool,
+    credential_master_key: impl Into<String>,
+) -> Router {
     Router::new()
         .route("/admin/health", get(|| async { "ok" }))
         .route("/admin/auth/login", post(login_handler))
@@ -167,7 +181,7 @@ pub fn admin_router_with_pool(pool: SqlitePool) -> Router {
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route("/admin/routing/simulations", post(simulate_routing_handler))
-        .with_state(AdminApiState::new(pool))
+        .with_state(AdminApiState::with_master_key(pool, credential_master_key))
 }
 
 async fn login_handler(
@@ -234,11 +248,13 @@ async fn create_credential_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateCredentialRequest>,
 ) -> Result<(StatusCode, Json<UpstreamCredential>), StatusCode> {
-    let credential = persist_credential(
+    let credential = persist_credential_with_secret(
         &state.store,
+        &state.credential_master_key,
         &request.tenant_id,
         &request.provider_id,
         &request.key_reference,
+        &request.secret_value,
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

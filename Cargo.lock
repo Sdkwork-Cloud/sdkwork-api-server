@@ -882,7 +882,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "sdkwork-api-domain-credential",
+ "sdkwork-api-secret-core",
  "sdkwork-api-storage-sqlite",
+ "tokio",
 ]
 
 [[package]]
@@ -1128,6 +1130,7 @@ dependencies = [
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-secret-core",
  "sqlx",
  "tokio",
 ]

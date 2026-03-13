@@ -5,6 +5,7 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_secret_core::SecretEnvelope;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
@@ -59,10 +60,26 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             tenant_id TEXT NOT NULL,
             provider_id TEXT NOT NULL,
             key_reference TEXT NOT NULL,
+            secret_ciphertext TEXT,
+            secret_key_version INTEGER,
             PRIMARY KEY (tenant_id, provider_id, key_reference)
         )",
     )
     .execute(&pool)
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "credential_records",
+        "secret_ciphertext",
+        "secret_ciphertext TEXT",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "credential_records",
+        "secret_key_version",
+        "secret_key_version INTEGER",
+    )
     .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS catalog_models (
@@ -103,6 +120,26 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     Ok(pool)
+}
+
+async fn ensure_sqlite_column(
+    pool: &SqlitePool,
+    table_name: &str,
+    column_name: &str,
+    column_definition: &str,
+) -> Result<()> {
+    let query = format!("PRAGMA table_info({table_name})");
+    let rows = sqlx::query_as::<_, (i64, String, String, i64, Option<String>, i64)>(&query)
+        .fetch_all(pool)
+        .await?;
+
+    if rows.iter().any(|(_, name, _, _, _, _)| name == column_name) {
+        return Ok(());
+    }
+
+    let alter = format!("ALTER TABLE {table_name} ADD COLUMN {column_definition}");
+    sqlx::query(&alter).execute(pool).await?;
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +221,25 @@ impl SqliteAdminStore {
         Ok(credential.clone())
     }
 
+    pub async fn insert_encrypted_credential(
+        &self,
+        credential: &UpstreamCredential,
+        envelope: &SecretEnvelope,
+    ) -> Result<UpstreamCredential> {
+        sqlx::query(
+            "INSERT INTO credential_records (tenant_id, provider_id, key_reference, secret_ciphertext, secret_key_version) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(tenant_id, provider_id, key_reference) DO UPDATE SET secret_ciphertext = excluded.secret_ciphertext, secret_key_version = excluded.secret_key_version",
+        )
+        .bind(&credential.tenant_id)
+        .bind(&credential.provider_id)
+        .bind(&credential.key_reference)
+        .bind(&envelope.ciphertext)
+        .bind(i64::from(envelope.key_version))
+        .execute(&self.pool)
+        .await?;
+        Ok(credential.clone())
+    }
+
     pub async fn list_credentials(&self) -> Result<Vec<UpstreamCredential>> {
         let rows = sqlx::query_as::<_, (String, String, String)>(
             "SELECT tenant_id, provider_id, key_reference FROM credential_records ORDER BY provider_id, tenant_id",
@@ -200,6 +256,31 @@ impl SqliteAdminStore {
                 },
             )
             .collect())
+    }
+
+    pub async fn find_credential_envelope(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        key_reference: &str,
+    ) -> Result<Option<SecretEnvelope>> {
+        let row = sqlx::query_as::<_, (Option<String>, Option<i64>)>(
+            "SELECT secret_ciphertext, secret_key_version FROM credential_records WHERE tenant_id = ? AND provider_id = ? AND key_reference = ?",
+        )
+        .bind(tenant_id)
+        .bind(provider_id)
+        .bind(key_reference)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some((Some(ciphertext), Some(key_version))) = row else {
+            return Ok(None);
+        };
+
+        Ok(Some(SecretEnvelope {
+            ciphertext,
+            key_version: u32::try_from(key_version)?,
+        }))
     }
 
     pub async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {

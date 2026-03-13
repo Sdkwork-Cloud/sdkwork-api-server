@@ -12,6 +12,7 @@ sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
+sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }
 sqlx.workspace = true
 
 [dev-dependencies]
