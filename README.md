@@ -15,7 +15,23 @@ It is organized as a composable backend plus a pnpm-based console:
 Backend:
 
 - Axum-based gateway and admin HTTP services
-- OpenAI-compatible contracts for models, chat completions, responses, embeddings, and SSE streaming
+- OpenAI-compatible contracts for:
+  - models
+  - chat completions
+  - responses
+  - embeddings
+  - SSE streaming
+  - files
+  - uploads
+  - audio
+  - images
+  - moderations
+  - realtime sessions
+  - assistants
+  - vector stores
+  - batches
+  - webhooks
+  - evals
 - SQLite-backed control plane persistence for:
   - tenants
   - projects
@@ -54,8 +70,9 @@ The repository is now a working control-plane-first gateway skeleton, but it is 
 Known gaps:
 
 - upstream relay currently supports only the OpenAI-compatible adapter path (`adapter_kind = openai`)
-- provider execution still uses a minimal direct adapter switch instead of a fully generic multi-adapter dispatch kernel
+- provider execution is now registry-based, but only the OpenAI-compatible adapter is registered by default
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
+- the broader API families beyond models/chat/responses/embeddings/streaming are contract-defined but not yet wired to HTTP handlers or upstream adapters
 - routing policies are still placeholder-only; current routing uses catalog candidates plus deterministic fallback
 - only SQLite is fully implemented as an active persistence driver; PostgreSQL, MySQL, and libsql remain extension boundaries
 
@@ -119,6 +136,7 @@ pnpm --dir console exec vite build
 - The backend is split into domain, application, interface, storage, provider, secret, and runtime crates to preserve controller/service/repository layering without forcing separate deployable processes for every boundary.
 - Standalone and embedded runtime modes share the same Rust crates; Tauri integration consumes the same admin and gateway capabilities through the runtime host boundary.
 - Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.
+- Provider dispatch is now routed through `sdkwork-api-provider-core` registry abstractions so new adapter kinds can be added without reworking every gateway relay path.
 
 ## Design Docs
 

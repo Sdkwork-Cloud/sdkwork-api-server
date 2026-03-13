@@ -1,10 +1,13 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use reqwest::Client;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
-use sdkwork_api_provider_core::ProviderAdapter;
+use sdkwork_api_provider_core::{
+    ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
+};
 use serde_json::Value;
 
 pub fn map_model_object(model: &str) -> ModelCatalogEntry {
@@ -95,5 +98,25 @@ impl OpenAiProviderAdapter {
 impl ProviderAdapter for OpenAiProviderAdapter {
     fn id(&self) -> &'static str {
         "openai"
+    }
+}
+
+#[async_trait]
+impl ProviderExecutionAdapter for OpenAiProviderAdapter {
+    async fn execute(&self, api_key: &str, request: ProviderRequest<'_>) -> Result<ProviderOutput> {
+        match request {
+            ProviderRequest::ChatCompletions(request) => Ok(ProviderOutput::Json(
+                self.chat_completions(api_key, request).await?,
+            )),
+            ProviderRequest::ChatCompletionsStream(request) => Ok(ProviderOutput::Stream(
+                self.chat_completions_stream(api_key, request).await?,
+            )),
+            ProviderRequest::Responses(request) => Ok(ProviderOutput::Json(
+                self.responses(api_key, request).await?,
+            )),
+            ProviderRequest::Embeddings(request) => Ok(ProviderOutput::Json(
+                self.embeddings(api_key, request).await?,
+            )),
+        }
     }
 }

@@ -8,6 +8,7 @@ use sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse;
 use sdkwork_api_contract_openai::models::{ListModelsResponse, ModelObject};
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::responses::ResponseObject;
+use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -52,16 +53,13 @@ pub async fn relay_chat_completion_from_store(
         return Ok(None);
     };
 
-    let response = match provider.adapter_kind.as_str() {
-        "openai" => {
-            OpenAiProviderAdapter::new(provider.base_url)
-                .chat_completions(&api_key, request)
-                .await?
-        }
-        _ => return Ok(None),
-    };
-
-    Ok(Some(response))
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletions(request),
+    )
+    .await
 }
 
 pub async fn relay_chat_completion_stream_from_store(
@@ -80,16 +78,13 @@ pub async fn relay_chat_completion_stream_from_store(
         return Ok(None);
     };
 
-    let response = match provider.adapter_kind.as_str() {
-        "openai" => {
-            OpenAiProviderAdapter::new(provider.base_url)
-                .chat_completions_stream(&api_key, request)
-                .await?
-        }
-        _ => return Ok(None),
-    };
-
-    Ok(Some(response))
+    execute_stream_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsStream(request),
+    )
+    .await
 }
 
 pub async fn relay_response_from_store(
@@ -108,16 +103,13 @@ pub async fn relay_response_from_store(
         return Ok(None);
     };
 
-    let response = match provider.adapter_kind.as_str() {
-        "openai" => {
-            OpenAiProviderAdapter::new(provider.base_url)
-                .responses(&api_key, request)
-                .await?
-        }
-        _ => return Ok(None),
-    };
-
-    Ok(Some(response))
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::Responses(request),
+    )
+    .await
 }
 
 pub async fn relay_embedding_from_store(
@@ -136,16 +128,13 @@ pub async fn relay_embedding_from_store(
         return Ok(None);
     };
 
-    let response = match provider.adapter_kind.as_str() {
-        "openai" => {
-            OpenAiProviderAdapter::new(provider.base_url)
-                .embeddings(&api_key, request)
-                .await?
-        }
-        _ => return Ok(None),
-    };
-
-    Ok(Some(response))
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::Embeddings(request),
+    )
+    .await
 }
 
 pub fn create_chat_completion(
@@ -166,4 +155,42 @@ pub fn create_embedding(
     model: &str,
 ) -> Result<CreateEmbeddingResponse> {
     Ok(CreateEmbeddingResponse::empty(model))
+}
+
+fn default_provider_registry() -> ProviderRegistry {
+    let mut registry = ProviderRegistry::new();
+    registry.register_factory("openai", |base_url| {
+        Box::new(OpenAiProviderAdapter::new(base_url))
+    });
+    registry
+}
+
+async fn execute_json_provider_request(
+    adapter_kind: &str,
+    base_url: String,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+) -> Result<Option<Value>> {
+    let registry = default_provider_registry();
+    let Some(adapter) = registry.resolve(adapter_kind, base_url) else {
+        return Ok(None);
+    };
+
+    let response = adapter.execute(api_key, request).await?;
+    Ok(response.into_json())
+}
+
+async fn execute_stream_provider_request(
+    adapter_kind: &str,
+    base_url: String,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+) -> Result<Option<reqwest::Response>> {
+    let registry = default_provider_registry();
+    let Some(adapter) = registry.resolve(adapter_kind, base_url) else {
+        return Ok(None);
+    };
+
+    let response = adapter.execute(api_key, request).await?;
+    Ok(response.into_stream())
 }
