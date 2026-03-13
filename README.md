@@ -69,7 +69,10 @@ The repository is now a working control-plane-first gateway skeleton, but it is 
 
 Known gaps:
 
-- upstream relay currently supports only the OpenAI-compatible adapter path (`adapter_kind = openai`)
+- upstream relay currently supports OpenAI-compatible adapter kinds:
+  - `openai`
+  - `openrouter`
+  - `ollama`
 - provider execution is now registry-based, but only the OpenAI-compatible adapter is registered by default
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - the broader API families beyond models/chat/responses/embeddings/streaming are contract-defined but not yet wired to HTTP handlers or upstream adapters
@@ -152,6 +155,7 @@ pnpm --dir console exec vite build
 - Standalone and embedded runtime modes share the same Rust crates; Tauri integration consumes the same admin and gateway capabilities through the runtime host boundary.
 - Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.
 - Provider dispatch is now routed through `sdkwork-api-provider-core` registry abstractions so new adapter kinds can be added without reworking every gateway relay path.
+- `openrouter` and `ollama` are now registered as OpenAI-compatible provider adapters in addition to the direct `openai` adapter.
 
 ## Design Docs
 

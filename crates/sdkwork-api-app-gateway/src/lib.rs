@@ -9,7 +9,9 @@ use sdkwork_api_contract_openai::models::{ListModelsResponse, ModelObject};
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::responses::ResponseObject;
 use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
+use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
+use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
 
@@ -161,6 +163,12 @@ fn default_provider_registry() -> ProviderRegistry {
     let mut registry = ProviderRegistry::new();
     registry.register_factory("openai", |base_url| {
         Box::new(OpenAiProviderAdapter::new(base_url))
+    });
+    registry.register_factory("openrouter", |base_url| {
+        Box::new(OpenRouterProviderAdapter::new(base_url))
+    });
+    registry.register_factory("ollama", |base_url| {
+        Box::new(OllamaProviderAdapter::new(base_url))
     });
     registry
 }

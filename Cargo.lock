@@ -1160,7 +1160,9 @@ dependencies = [
  "sdkwork-api-contract-openai",
  "sdkwork-api-domain-catalog",
  "sdkwork-api-provider-core",
+ "sdkwork-api-provider-ollama",
  "sdkwork-api-provider-openai",
+ "sdkwork-api-provider-openrouter",
  "sdkwork-api-storage-sqlite",
  "serde_json",
  "tokio",
@@ -1347,6 +1349,18 @@ dependencies = [
 [[package]]
 name = "sdkwork-api-provider-ollama"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "reqwest",
+ "sdkwork-api-contract-openai",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-provider-core",
+ "sdkwork-api-provider-openai",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "sdkwork-api-provider-openai"
@@ -1367,6 +1381,18 @@ dependencies = [
 [[package]]
 name = "sdkwork-api-provider-openrouter"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "reqwest",
+ "sdkwork-api-contract-openai",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-provider-core",
+ "sdkwork-api-provider-openai",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "sdkwork-api-runtime-host"

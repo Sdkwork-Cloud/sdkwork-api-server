@@ -11,7 +11,9 @@ sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
 sdkwork-api-provider-core = { path = "../sdkwork-api-provider-core" }
+sdkwork-api-provider-ollama = { path = "../sdkwork-api-provider-ollama" }
 sdkwork-api-provider-openai = { path = "../sdkwork-api-provider-openai" }
+sdkwork-api-provider-openrouter = { path = "../sdkwork-api-provider-openrouter" }
 serde_json.workspace = true
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 
