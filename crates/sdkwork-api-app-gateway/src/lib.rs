@@ -5,6 +5,7 @@ use sdkwork_api_contract_openai::assistants::{AssistantObject, CreateAssistantRe
 use sdkwork_api_contract_openai::audio::{
     CreateTranscriptionRequest, CreateTranslationRequest, TranscriptionObject, TranslationObject,
 };
+use sdkwork_api_contract_openai::batches::{BatchObject, CreateBatchRequest};
 use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::{CompletionObject, CreateCompletionRequest};
@@ -20,6 +21,7 @@ use sdkwork_api_contract_openai::moderations::{
 use sdkwork_api_contract_openai::realtime::{CreateRealtimeSessionRequest, RealtimeSessionObject};
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::responses::ResponseObject;
+use sdkwork_api_contract_openai::vector_stores::{CreateVectorStoreRequest, VectorStoreObject};
 use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
@@ -402,6 +404,60 @@ pub async fn relay_eval_from_store(
     .await
 }
 
+pub async fn relay_batch_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateBatchRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "batches", &request.endpoint).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::Batches(request),
+    )
+    .await
+}
+
+pub async fn relay_vector_store_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateVectorStoreRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_stores", &request.name).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStores(request),
+    )
+    .await
+}
+
 pub fn create_chat_completion(
     _tenant_id: &str,
     _project_id: &str,
@@ -498,6 +554,23 @@ pub fn create_realtime_session(
 
 pub fn create_eval(_tenant_id: &str, _project_id: &str, name: &str) -> Result<EvalObject> {
     Ok(EvalObject::new("eval_1", name))
+}
+
+pub fn create_batch(
+    _tenant_id: &str,
+    _project_id: &str,
+    endpoint: &str,
+    input_file_id: &str,
+) -> Result<BatchObject> {
+    Ok(BatchObject::new("batch_1", endpoint, input_file_id))
+}
+
+pub fn create_vector_store(
+    _tenant_id: &str,
+    _project_id: &str,
+    name: &str,
+) -> Result<VectorStoreObject> {
+    Ok(VectorStoreObject::new("vs_1", name))
 }
 
 fn default_provider_registry() -> ProviderRegistry {

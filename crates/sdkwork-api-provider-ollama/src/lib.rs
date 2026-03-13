@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
 use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
@@ -11,6 +12,7 @@ use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::vector_stores::CreateVectorStoreRequest;
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
@@ -135,6 +137,18 @@ impl OllamaProviderAdapter {
     pub async fn evals(&self, api_key: &str, request: &CreateEvalRequest) -> Result<Value> {
         self.delegate.evals(api_key, request).await
     }
+
+    pub async fn batches(&self, api_key: &str, request: &CreateBatchRequest) -> Result<Value> {
+        self.delegate.batches(api_key, request).await
+    }
+
+    pub async fn vector_stores(
+        &self,
+        api_key: &str,
+        request: &CreateVectorStoreRequest,
+    ) -> Result<Value> {
+        self.delegate.vector_stores(api_key, request).await
+    }
 }
 
 impl ProviderAdapter for OllamaProviderAdapter {
@@ -186,6 +200,12 @@ impl ProviderExecutionAdapter for OllamaProviderAdapter {
             ProviderRequest::Evals(request) => {
                 Ok(ProviderOutput::Json(self.evals(api_key, request).await?))
             }
+            ProviderRequest::Batches(request) => {
+                Ok(ProviderOutput::Json(self.batches(api_key, request).await?))
+            }
+            ProviderRequest::VectorStores(request) => Ok(ProviderOutput::Json(
+                self.vector_stores(api_key, request).await?,
+            )),
         }
     }
 }

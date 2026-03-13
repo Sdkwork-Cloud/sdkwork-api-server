@@ -5,6 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sdkwork_api_contract_openai::assistants::CreateAssistantRequest;
 use sdkwork_api_contract_openai::audio::{CreateTranscriptionRequest, CreateTranslationRequest};
+use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
@@ -14,6 +15,7 @@ use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::vector_stores::CreateVectorStoreRequest;
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +42,8 @@ pub enum ProviderRequest<'a> {
     Assistants(&'a CreateAssistantRequest),
     RealtimeSessions(&'a CreateRealtimeSessionRequest),
     Evals(&'a CreateEvalRequest),
+    Batches(&'a CreateBatchRequest),
+    VectorStores(&'a CreateVectorStoreRequest),
 }
 
 pub enum ProviderOutput {

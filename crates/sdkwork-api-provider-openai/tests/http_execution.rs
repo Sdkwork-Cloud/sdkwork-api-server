@@ -387,6 +387,79 @@ async fn adapter_posts_evals_to_openai_compatible_upstream() {
     );
 }
 
+#[tokio::test]
+async fn adapter_posts_batches_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/batches", post(capture_batch_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::batches::CreateBatchRequest::new(
+        "file_1",
+        "/v1/responses",
+        "24h",
+    );
+
+    let response = adapter
+        .batches("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "batch_upstream");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["endpoint"],
+        "/v1/responses"
+    );
+}
+
+#[tokio::test]
+async fn adapter_posts_vector_stores_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/vector_stores", post(capture_vector_store_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request =
+        sdkwork_api_contract_openai::vector_stores::CreateVectorStoreRequest::new("kb-main");
+
+    let response = adapter
+        .vector_stores("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "vs_upstream");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["name"],
+        "kb-main"
+    );
+}
+
 async fn capture_chat_request(
     State(state): State<CaptureState>,
     headers: HeaderMap,
@@ -591,6 +664,51 @@ async fn capture_eval_request(
             "object":"eval",
             "name":"qa-benchmark",
             "status":"queued"
+        })),
+    )
+}
+
+async fn capture_batch_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"batch_upstream",
+            "object":"batch",
+            "endpoint":"/v1/responses",
+            "input_file_id":"file_1",
+            "status":"validating"
+        })),
+    )
+}
+
+async fn capture_vector_store_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"vs_upstream",
+            "object":"vector_store",
+            "name":"kb-main",
+            "status":"completed"
         })),
     )
 }

@@ -17,6 +17,8 @@
 | `/v1/assistants` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local assistant fallback |
 | `/v1/realtime/sessions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local realtime session fallback |
 | `/v1/evals` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local eval fallback |
+| `/v1/batches` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local batch fallback |
+| `/v1/vector_stores` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local vector store fallback |
 
 ## Current Implemented Admin APIs
 
@@ -52,8 +54,8 @@
 | Fine Tuning | Defined | Implemented |
 | Realtime | Defined | Implemented |
 | Assistants | Defined | Implemented |
-| Vector Stores | Defined | Contract only |
-| Batches | Defined | Contract only |
+| Vector Stores | Defined | Implemented |
+| Batches | Defined | Implemented |
 | Videos | Defined | Contract only |
 | Webhooks | Defined | Contract only |
 | Evals | Defined | Implemented |
@@ -62,7 +64,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, audio translations, fine-tuning jobs, assistants, realtime sessions, and evals when provider, model, and credential records are configured |
+| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, moderations, image generations, audio transcriptions, audio translations, fine-tuning jobs, assistants, realtime sessions, evals, batches, and vector stores when provider and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |
