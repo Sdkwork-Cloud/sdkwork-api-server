@@ -3,8 +3,10 @@ use sdkwork_api_app_credential::resolve_provider_secret;
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
 use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
+use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse;
 use sdkwork_api_contract_openai::models::{ListModelsResponse, ModelObject};
+use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::responses::ResponseObject;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -54,6 +56,62 @@ pub async fn relay_chat_completion_from_store(
         "openai" => {
             OpenAiProviderAdapter::new(provider.base_url)
                 .chat_completions(&api_key, request)
+                .await?
+        }
+        _ => return Ok(None),
+    };
+
+    Ok(Some(response))
+}
+
+pub async fn relay_response_from_store(
+    store: &SqliteAdminStore,
+    master_key: &str,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateResponseRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) = resolve_provider_secret(store, master_key, tenant_id, &provider.id).await?
+    else {
+        return Ok(None);
+    };
+
+    let response = match provider.adapter_kind.as_str() {
+        "openai" => {
+            OpenAiProviderAdapter::new(provider.base_url)
+                .responses(&api_key, request)
+                .await?
+        }
+        _ => return Ok(None),
+    };
+
+    Ok(Some(response))
+}
+
+pub async fn relay_embedding_from_store(
+    store: &SqliteAdminStore,
+    master_key: &str,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateEmbeddingRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "embeddings", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) = resolve_provider_secret(store, master_key, tenant_id, &provider.id).await?
+    else {
+        return Ok(None);
+    };
+
+    let response = match provider.adapter_kind.as_str() {
+        "openai" => {
+            OpenAiProviderAdapter::new(provider.base_url)
+                .embeddings(&api_key, request)
                 .await?
         }
         _ => return Ok(None),

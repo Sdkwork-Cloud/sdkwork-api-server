@@ -11,6 +11,7 @@ use sdkwork_api_app_gateway::create_chat_completion;
 use sdkwork_api_app_gateway::list_models;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, list_models_from_store, relay_chat_completion_from_store,
+    relay_embedding_from_store, relay_response_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
@@ -196,6 +197,39 @@ async fn responses_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
+    match relay_response_from_store(
+        &state.store,
+        &state.credential_master_key,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(&state.store, "responses", &request.model, 120, 0.12)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response",
+            )
+                .into_response();
+        }
+    }
+
     if record_gateway_usage(&state.store, "responses", &request.model, 120, 0.12)
         .await
         .is_err()
@@ -215,6 +249,39 @@ async fn embeddings_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateEmbeddingRequest>,
 ) -> Response {
+    match relay_embedding_from_store(
+        &state.store,
+        &state.credential_master_key,
+        "tenant-1",
+        "project-1",
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(&state.store, "embeddings", &request.model, 10, 0.01)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream embedding",
+            )
+                .into_response();
+        }
+    }
+
     if record_gateway_usage(&state.store, "embeddings", &request.model, 10, 0.01)
         .await
         .is_err()
