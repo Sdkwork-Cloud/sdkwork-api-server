@@ -1,14 +1,22 @@
 use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_storage_core::AdminStore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const ADMIN_JWT_ISSUER: &str = "sdkwork-admin";
+const ADMIN_JWT_AUDIENCE: &str = "sdkwork-admin-ui";
+const ADMIN_JWT_TTL_SECS: u64 = 60 * 60 * 12;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
+    pub iss: String,
+    pub aud: String,
+    pub exp: usize,
+    pub iat: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,20 +42,35 @@ pub fn hash_gateway_api_key(value: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub fn issue_jwt(subject: &str) -> Result<String> {
+pub fn issue_jwt(subject: &str, signing_secret: &str) -> Result<String> {
+    let issued_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| anyhow!("system clock error"))?
+        .as_secs();
     let claims = Claims {
         sub: subject.to_owned(),
+        iss: ADMIN_JWT_ISSUER.to_owned(),
+        aud: ADMIN_JWT_AUDIENCE.to_owned(),
+        exp: (issued_at + ADMIN_JWT_TTL_SECS) as usize,
+        iat: issued_at as usize,
     };
-    let payload = serde_json::to_vec(&claims)?;
-    Ok(format!("sdkwork.{}", URL_SAFE_NO_PAD.encode(payload)))
+    Ok(encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(signing_secret.as_bytes()),
+    )?)
 }
 
-pub fn verify_jwt(token: &str) -> Result<Claims> {
-    let payload = token
-        .strip_prefix("sdkwork.")
-        .ok_or_else(|| anyhow!("invalid token prefix"))?;
-    let decoded = URL_SAFE_NO_PAD.decode(payload)?;
-    Ok(serde_json::from_slice(&decoded)?)
+pub fn verify_jwt(token: &str, signing_secret: &str) -> Result<Claims> {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_audience(&[ADMIN_JWT_AUDIENCE]);
+    validation.set_issuer(&[ADMIN_JWT_ISSUER]);
+    Ok(decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(signing_secret.as_bytes()),
+        &validation,
+    )?
+    .claims)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

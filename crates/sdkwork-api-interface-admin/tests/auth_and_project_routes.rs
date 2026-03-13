@@ -1,6 +1,7 @@
 use axum::body::to_bytes;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use axum::Router;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -14,6 +15,26 @@ async fn memory_pool() -> SqlitePool {
     sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
         .unwrap()
+}
+
+async fn login_token(app: Router) -> String {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"subject\":\"admin-1\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    read_json(response).await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 
 #[tokio::test]
@@ -37,6 +58,7 @@ async fn login_route_exists() {
 async fn create_and_list_tenants_projects_and_api_keys() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
 
     let tenant = app
         .clone()
@@ -44,6 +66,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/tenants")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from("{\"id\":\"tenant-1\",\"name\":\"Tenant One\"}"))
                 .unwrap(),
@@ -59,6 +82,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/projects")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"tenant_id\":\"tenant-1\",\"id\":\"project-1\",\"name\":\"Project One\"}",
@@ -76,6 +100,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"tenant_id\":\"tenant-1\",\"project_id\":\"project-1\",\"environment\":\"live\"}",
@@ -98,6 +123,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/tenants")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -112,6 +138,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/projects")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -125,6 +152,7 @@ async fn create_and_list_tenants_projects_and_api_keys() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )

@@ -52,6 +52,7 @@ async-trait = "0.1"
 anyhow = "1.0"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
+jsonwebtoken = "9.3"
 keyring = "3.6.2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
 serde = { version = "1.0", features = ["derive"] }

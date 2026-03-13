@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use axum::{
+    extract::FromRequestParts,
     extract::State,
+    http::header,
+    http::request::Parts,
     http::StatusCode,
     routing::{get, post},
     Json, Router,
@@ -35,6 +38,7 @@ use sqlx::SqlitePool;
 pub struct AdminApiState {
     store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
+    jwt_signing_secret: String,
 }
 
 impl AdminApiState {
@@ -53,6 +57,7 @@ impl AdminApiState {
         Self {
             store: Arc::new(SqliteAdminStore::new(pool)),
             secret_manager,
+            jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
         }
     }
 
@@ -63,7 +68,43 @@ impl AdminApiState {
         Self {
             store,
             secret_manager,
+            jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct AuthenticatedAdminClaims(Claims);
+
+impl AuthenticatedAdminClaims {
+    fn claims(&self) -> &Claims {
+        &self.0
+    }
+}
+
+impl FromRequestParts<AdminApiState> for AuthenticatedAdminClaims {
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AdminApiState,
+    ) -> Result<Self, Self::Rejection> {
+        let Some(header_value) = parts.headers.get(header::AUTHORIZATION) else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+        let Ok(header_value) = header_value.to_str() else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+        let Some(token) = header_value
+            .strip_prefix("Bearer ")
+            .or_else(|| header_value.strip_prefix("bearer "))
+        else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+
+        verify_jwt(token, &state.jwt_signing_secret)
+            .map(Self)
+            .map_err(|_| StatusCode::UNAUTHORIZED)
     }
 }
 
@@ -142,7 +183,7 @@ struct RoutingSimulationResponse {
 pub fn admin_router() -> Router {
     Router::new()
         .route("/admin/health", get(|| async { "ok" }))
-        .route("/admin/auth/login", post(login_handler))
+        .route("/admin/auth/login", post(|| async { "login" }))
         .route("/admin/auth/me", get(|| async { "me" }))
         .route("/admin/tenants", get(|| async { "tenants" }))
         .route("/admin/projects", get(|| async { "projects" }))
@@ -195,10 +236,11 @@ pub fn admin_router_with_store_and_secret_manager(
     store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 ) -> Router {
+    let state = AdminApiState::with_store_and_secret_manager(store, secret_manager);
     Router::new()
         .route("/admin/health", get(|| async { "ok" }))
         .route("/admin/auth/login", post(login_handler))
-        .route("/admin/auth/me", get(|| async { "me" }))
+        .route("/admin/auth/me", get(me_handler))
         .route(
             "/admin/tenants",
             get(list_tenants_handler).post(create_tenant_handler),
@@ -231,21 +273,26 @@ pub fn admin_router_with_store_and_secret_manager(
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route("/admin/routing/simulations", post(simulate_routing_handler))
-        .with_state(AdminApiState::with_store_and_secret_manager(
-            store,
-            secret_manager,
-        ))
+        .with_state(state)
 }
 
 async fn login_handler(
+    State(state): State<AdminApiState>,
     Json(request): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    let token = issue_jwt(&request.subject).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let claims = verify_jwt(&token).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let token = issue_jwt(&request.subject, &state.jwt_signing_secret)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let claims = verify_jwt(&token, &state.jwt_signing_secret)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(LoginResponse { token, claims }))
 }
 
+async fn me_handler(claims: AuthenticatedAdminClaims) -> Json<Claims> {
+    Json(claims.claims().clone())
+}
+
 async fn list_channels_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Channel>>, StatusCode> {
     list_channels(state.store.as_ref())
@@ -255,6 +302,7 @@ async fn list_channels_handler(
 }
 
 async fn create_channel_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<Channel>), StatusCode> {
@@ -265,6 +313,7 @@ async fn create_channel_handler(
 }
 
 async fn list_providers_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<ProxyProvider>>, StatusCode> {
     list_providers(state.store.as_ref())
@@ -274,6 +323,7 @@ async fn list_providers_handler(
 }
 
 async fn create_provider_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateProviderRequest>,
 ) -> Result<(StatusCode, Json<ProxyProvider>), StatusCode> {
@@ -291,6 +341,7 @@ async fn create_provider_handler(
 }
 
 async fn list_credentials_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<UpstreamCredential>>, StatusCode> {
     list_credentials(state.store.as_ref())
@@ -300,6 +351,7 @@ async fn list_credentials_handler(
 }
 
 async fn create_credential_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateCredentialRequest>,
 ) -> Result<(StatusCode, Json<UpstreamCredential>), StatusCode> {
@@ -317,6 +369,7 @@ async fn create_credential_handler(
 }
 
 async fn list_models_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<ModelCatalogEntry>>, StatusCode> {
     list_model_entries(state.store.as_ref())
@@ -326,6 +379,7 @@ async fn list_models_handler(
 }
 
 async fn create_model_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateModelRequest>,
 ) -> Result<(StatusCode, Json<ModelCatalogEntry>), StatusCode> {
@@ -340,6 +394,7 @@ async fn create_model_handler(
 }
 
 async fn list_tenants_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Tenant>>, StatusCode> {
     list_tenants(state.store.as_ref())
@@ -349,6 +404,7 @@ async fn list_tenants_handler(
 }
 
 async fn create_tenant_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateTenantRequest>,
 ) -> Result<(StatusCode, Json<Tenant>), StatusCode> {
@@ -359,6 +415,7 @@ async fn create_tenant_handler(
 }
 
 async fn list_projects_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Project>>, StatusCode> {
     list_projects(state.store.as_ref())
@@ -368,6 +425,7 @@ async fn list_projects_handler(
 }
 
 async fn create_project_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>), StatusCode> {
@@ -383,6 +441,7 @@ async fn create_project_handler(
 }
 
 async fn list_api_keys_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<GatewayApiKeyRecord>>, StatusCode> {
     list_gateway_api_keys(state.store.as_ref())
@@ -392,6 +451,7 @@ async fn list_api_keys_handler(
 }
 
 async fn create_api_key_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateApiKeyRequest>,
 ) -> Result<(StatusCode, Json<CreatedGatewayApiKey>), StatusCode> {
@@ -407,6 +467,7 @@ async fn create_api_key_handler(
 }
 
 async fn simulate_routing_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<RoutingSimulationRequest>,
 ) -> Result<Json<RoutingSimulationResponse>, StatusCode> {
@@ -421,6 +482,7 @@ async fn simulate_routing_handler(
 }
 
 async fn list_usage_records_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<UsageRecord>>, StatusCode> {
     list_usage_records(state.store.as_ref())
@@ -430,6 +492,7 @@ async fn list_usage_records_handler(
 }
 
 async fn list_ledger_entries_handler(
+    _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<LedgerEntry>>, StatusCode> {
     list_ledger_entries(state.store.as_ref())

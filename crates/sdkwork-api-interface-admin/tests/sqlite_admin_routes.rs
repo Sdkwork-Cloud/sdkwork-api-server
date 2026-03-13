@@ -1,5 +1,6 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use axum::Router;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -13,6 +14,26 @@ async fn memory_pool() -> SqlitePool {
     sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
         .unwrap()
+}
+
+async fn login_token(app: Router) -> String {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"subject\":\"admin-user\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    read_json(response).await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 
 #[tokio::test]
@@ -35,13 +56,14 @@ async fn login_returns_a_gateway_jwt_like_token() {
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(json["claims"]["sub"], "admin-user");
-    assert!(json["token"].as_str().unwrap().starts_with("sdkwork."));
+    assert_eq!(json["token"].as_str().unwrap().split('.').count(), 3);
 }
 
 #[tokio::test]
 async fn create_and_list_channels() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
 
     let create = app
         .clone()
@@ -49,6 +71,7 @@ async fn create_and_list_channels() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/channels")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from("{\"id\":\"openai\",\"name\":\"OpenAI\"}"))
                 .unwrap(),
@@ -63,6 +86,7 @@ async fn create_and_list_channels() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/channels")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -80,6 +104,7 @@ async fn create_and_list_providers_and_credentials() {
     let pool = memory_pool().await;
     let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
 
     let _ = app
         .clone()
@@ -87,6 +112,7 @@ async fn create_and_list_providers_and_credentials() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/channels")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from("{\"id\":\"openai\",\"name\":\"OpenAI\"}"))
                 .unwrap(),
@@ -100,6 +126,7 @@ async fn create_and_list_providers_and_credentials() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/providers")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"id\":\"provider-openai-official\",\"channel_id\":\"openai\",\"adapter_kind\":\"openai\",\"base_url\":\"https://api.openai.com\",\"display_name\":\"OpenAI Official\"}",
@@ -117,6 +144,7 @@ async fn create_and_list_providers_and_credentials() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"tenant_id\":\"tenant-1\",\"provider_id\":\"provider-openai-official\",\"key_reference\":\"cred-openai\",\"secret_value\":\"sk-upstream-openai\"}",
@@ -134,6 +162,7 @@ async fn create_and_list_providers_and_credentials() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/providers")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -150,6 +179,7 @@ async fn create_and_list_providers_and_credentials() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -179,6 +209,7 @@ async fn create_and_list_providers_and_credentials() {
 async fn create_and_list_models() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
 
     let create = app
         .clone()
@@ -186,6 +217,7 @@ async fn create_and_list_models() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openai-official\"}",
@@ -202,6 +234,7 @@ async fn create_and_list_models() {
             Request::builder()
                 .method("GET")
                 .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -216,6 +249,7 @@ async fn create_and_list_models() {
 async fn routing_simulation_uses_catalog_models() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
 
     let create_openrouter = app
         .clone()
@@ -223,6 +257,7 @@ async fn routing_simulation_uses_catalog_models() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openrouter\"}",
@@ -240,6 +275,7 @@ async fn routing_simulation_uses_catalog_models() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openai-official\"}",
@@ -256,6 +292,7 @@ async fn routing_simulation_uses_catalog_models() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/routing/simulations")
+                .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"capability\":\"chat_completion\",\"model\":\"gpt-4.1\"}",
