@@ -77,4 +77,24 @@ Provider execution identity is now split deliberately:
 - `extension_id`: the canonical runtime key used by the gateway to resolve a provider extension implementation
 - `adapter_kind`: a compatibility alias and protocol hint that lets older records and OpenAI-compatible provider families continue to map cleanly during migration
 
+The extension package standard also distinguishes three names:
+
+- runtime ID:
+  - `sdkwork.provider.openrouter`
+  - `sdkwork.channel.openai`
+- distribution package name:
+  - `sdkwork-provider-openrouter`
+  - `sdkwork-channel-openai`
+- Rust crate name:
+  - `sdkwork-api-ext-provider-openrouter`
+  - `sdkwork-api-ext-channel-openai`
+
+Configuration-driven loading now uses a stable merge order:
+
+1. manifest metadata and default entrypoint references
+2. installation-level runtime choice and package config
+3. instance-level overrides such as `base_url`, `credential_ref`, and rollout weights
+
+This means `connector` and `native_dynamic` extensions can already be represented, validated, and mounted through config even before the actual executable loader lifecycle is fully wired.
+
 The runtime host is still intentionally lightweight, but the core gateway, admin, routing, credential, and provider relay slices now run against the same Rust workspace and can be assembled in-process for embedded mode.

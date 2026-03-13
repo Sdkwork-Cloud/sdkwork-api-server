@@ -57,6 +57,11 @@ Backend:
   - `sdkwork.provider.openrouter`
   - `sdkwork.provider.ollama`
 - Persisted extension installation and instance config through admin APIs
+- Standardized extension package metadata:
+  - runtime ID: `sdkwork.provider.*` / `sdkwork.channel.*`
+  - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
+  - Rust crate name: `sdkwork-api-ext-provider-*` / `sdkwork-api-ext-channel-*`
+- Configuration-driven extension load planning that merges manifest defaults, installation config, and instance overrides into one runtime plan
 - Runtime-selectable upstream credential persistence with three local strategies:
   - `database_encrypted`
   - `local_encrypted_file`
@@ -196,6 +201,10 @@ pnpm --dir console exec vite build
 - Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.
 - Provider dispatch is now routed through `sdkwork-api-extension-host`, which resolves factories by `extension_id` first and keeps legacy `adapter_kind` aliases as a fallback.
 - Extension runtime configuration is split into package metadata, installation state, and mounted instances so one extension can back multiple provider instances.
+- Extension load planning now follows a deterministic merge order:
+  - manifest metadata defines package identity and default entrypoint/schema references
+  - installation state selects runtime and package-level config
+  - instance state supplies environment-specific overrides such as `base_url`, `credential_ref`, and traffic weighting
 - `openrouter` and `ollama` are registered as built-in OpenAI-compatible provider extensions in addition to the direct `openai` adapter.
 
 ## Design Docs

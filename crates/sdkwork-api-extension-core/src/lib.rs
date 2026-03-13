@@ -85,7 +85,14 @@ pub struct ExtensionManifest {
     pub id: String,
     pub kind: ExtensionKind,
     pub version: String,
+    pub display_name: String,
     pub runtime: ExtensionRuntime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entrypoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_schema: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_schema: Option<String>,
     pub channel_bindings: Vec<String>,
     pub capabilities: Vec<CapabilityDescriptor>,
 }
@@ -97,15 +104,49 @@ impl ExtensionManifest {
         version: impl Into<String>,
         runtime: ExtensionRuntime,
     ) -> Self {
+        let id = id.into();
         Self {
             api_version: "sdkwork.extension/v1".to_owned(),
-            id: id.into(),
+            display_name: id.clone(),
+            id,
             kind,
             version: version.into(),
             runtime,
+            entrypoint: None,
+            config_schema: None,
+            credential_schema: None,
             channel_bindings: Vec::new(),
             capabilities: Vec::new(),
         }
+    }
+
+    pub fn distribution_name(&self) -> String {
+        self.id.replace('.', "-")
+    }
+
+    pub fn crate_name(&self) -> String {
+        let suffix = self.id.strip_prefix("sdkwork.").unwrap_or(&self.id);
+        format!("sdkwork-api-ext-{}", suffix.replace('.', "-"))
+    }
+
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
+        self.display_name = display_name.into();
+        self
+    }
+
+    pub fn with_entrypoint(mut self, entrypoint: impl Into<String>) -> Self {
+        self.entrypoint = Some(entrypoint.into());
+        self
+    }
+
+    pub fn with_config_schema(mut self, config_schema: impl Into<String>) -> Self {
+        self.config_schema = Some(config_schema.into());
+        self
+    }
+
+    pub fn with_credential_schema(mut self, credential_schema: impl Into<String>) -> Self {
+        self.credential_schema = Some(credential_schema.into());
+        self
     }
 
     pub fn with_capability(mut self, capability: CapabilityDescriptor) -> Self {
