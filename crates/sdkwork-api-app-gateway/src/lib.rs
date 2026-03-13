@@ -33,8 +33,9 @@ use sdkwork_api_contract_openai::uploads::{
     UploadPartObject,
 };
 use sdkwork_api_contract_openai::vector_stores::{
-    CreateVectorStoreRequest, DeleteVectorStoreResponse, ListVectorStoresResponse,
-    UpdateVectorStoreRequest, VectorStoreObject,
+    CreateVectorStoreFileRequest, CreateVectorStoreRequest, DeleteVectorStoreFileResponse,
+    DeleteVectorStoreResponse, ListVectorStoreFilesResponse, ListVectorStoresResponse,
+    UpdateVectorStoreRequest, VectorStoreFileObject, VectorStoreObject,
 };
 use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
@@ -1009,6 +1010,117 @@ pub async fn relay_delete_vector_store_from_store(
     .await
 }
 
+pub async fn relay_vector_store_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    request: &CreateVectorStoreFileRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_store_files", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoreFiles(vector_store_id, request),
+    )
+    .await
+}
+
+pub async fn relay_list_vector_store_files_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_store_files", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoreFilesList(vector_store_id),
+    )
+    .await
+}
+
+pub async fn relay_get_vector_store_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    file_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_store_files", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoreFilesRetrieve(vector_store_id, file_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_vector_store_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    file_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_store_files", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoreFilesDelete(vector_store_id, file_id),
+    )
+    .await
+}
+
 pub fn create_chat_completion(
     _tenant_id: &str,
     _project_id: &str,
@@ -1299,6 +1411,43 @@ pub fn delete_vector_store(
     vector_store_id: &str,
 ) -> Result<DeleteVectorStoreResponse> {
     Ok(DeleteVectorStoreResponse::deleted(vector_store_id))
+}
+
+pub fn create_vector_store_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    _vector_store_id: &str,
+    file_id: &str,
+) -> Result<VectorStoreFileObject> {
+    Ok(VectorStoreFileObject::new(file_id))
+}
+
+pub fn list_vector_store_files(
+    _tenant_id: &str,
+    _project_id: &str,
+    _vector_store_id: &str,
+) -> Result<ListVectorStoreFilesResponse> {
+    Ok(ListVectorStoreFilesResponse::new(vec![
+        VectorStoreFileObject::new("file_1"),
+    ]))
+}
+
+pub fn get_vector_store_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    _vector_store_id: &str,
+    file_id: &str,
+) -> Result<VectorStoreFileObject> {
+    Ok(VectorStoreFileObject::new(file_id))
+}
+
+pub fn delete_vector_store_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    _vector_store_id: &str,
+    file_id: &str,
+) -> Result<DeleteVectorStoreFileResponse> {
+    Ok(DeleteVectorStoreFileResponse::deleted(file_id))
 }
 
 fn default_provider_registry() -> ProviderRegistry {

@@ -32,6 +32,8 @@
 | `/v1/batches/{batch_id}/cancel` | Implemented | Stateful mode supports OpenAI-compatible upstream cancel relay; otherwise emits local cancelled batch fallback |
 | `/v1/vector_stores` | Implemented | Stateful mode supports OpenAI-compatible upstream create and list relay; otherwise emits local vector store fallback |
 | `/v1/vector_stores/{vector_store_id}` | Implemented | Stateful mode supports OpenAI-compatible upstream retrieve, update, and delete relay; otherwise emits local vector store metadata or deleted response fallback |
+| `/v1/vector_stores/{vector_store_id}/files` | Implemented | Stateful mode supports OpenAI-compatible upstream create and list relay; otherwise emits local vector store file fallback |
+| `/v1/vector_stores/{vector_store_id}/files/{file_id}` | Implemented | Stateful mode supports OpenAI-compatible upstream retrieve and delete relay; otherwise emits local vector store file metadata or deleted response fallback |
 
 ## Current Implemented Admin APIs
 
@@ -67,7 +69,7 @@
 | Fine Tuning | Defined | Partially implemented (`jobs.create`, `jobs.list`, `jobs.retrieve`, `jobs.cancel`) |
 | Realtime | Defined | Implemented |
 | Assistants | Defined | Implemented |
-| Vector Stores | Defined | Partially implemented (`create`, `list`, `retrieve`, `update`, `delete`) |
+| Vector Stores | Defined | Partially implemented (`create`, `list`, `retrieve`, `update`, `delete`, `files.create`, `files.list`, `files.retrieve`, `files.delete`) |
 | Batches | Defined | Partially implemented (`create`, `list`, `retrieve`, `cancel`) |
 | Videos | Defined | Contract only |
 | Webhooks | Defined | Contract only |
@@ -77,7 +79,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete when provider and credential records are configured |
+| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete plus vector store files create/list/retrieve/delete when provider and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |

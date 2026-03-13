@@ -25,6 +25,19 @@ impl UpdateVectorStoreRequest {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVectorStoreFileRequest {
+    pub file_id: String,
+}
+
+impl CreateVectorStoreFileRequest {
+    pub fn new(file_id: impl Into<String>) -> Self {
+        Self {
+            file_id: file_id.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct VectorStoreObject {
     pub id: String,
@@ -89,6 +102,38 @@ impl VectorStoreFileObject {
             id: id.into(),
             object: "vector_store.file",
             status: "completed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListVectorStoreFilesResponse {
+    pub object: &'static str,
+    pub data: Vec<VectorStoreFileObject>,
+}
+
+impl ListVectorStoreFilesResponse {
+    pub fn new(data: Vec<VectorStoreFileObject>) -> Self {
+        Self {
+            object: "list",
+            data,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteVectorStoreFileResponse {
+    pub id: String,
+    pub object: &'static str,
+    pub deleted: bool,
+}
+
+impl DeleteVectorStoreFileResponse {
+    pub fn deleted(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "vector_store.file.deleted",
+            deleted: true,
         }
     }
 }

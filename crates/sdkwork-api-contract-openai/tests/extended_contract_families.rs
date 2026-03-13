@@ -16,7 +16,8 @@ use sdkwork_api_contract_openai::uploads::{
     UploadPartObject,
 };
 use sdkwork_api_contract_openai::vector_stores::{
-    CreateVectorStoreRequest, DeleteVectorStoreResponse, ListVectorStoresResponse,
+    CreateVectorStoreFileRequest, CreateVectorStoreRequest, DeleteVectorStoreFileResponse,
+    DeleteVectorStoreResponse, ListVectorStoreFilesResponse, ListVectorStoresResponse,
     UpdateVectorStoreRequest, VectorStoreFileObject, VectorStoreObject,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, WebhookObject};
@@ -190,9 +191,23 @@ fn serializes_vector_store_contracts() {
     assert_eq!(deleted_json["object"], "vector_store.deleted");
     assert_eq!(deleted_json["deleted"], true);
 
+    let file_request = CreateVectorStoreFileRequest::new("file_1");
+    let file_request_json = serde_json::to_value(file_request).unwrap();
+    assert_eq!(file_request_json["file_id"], "file_1");
+
     let file = VectorStoreFileObject::new("file_1");
     let file_json = serde_json::to_value(file).unwrap();
     assert_eq!(file_json["object"], "vector_store.file");
+
+    let file_list = ListVectorStoreFilesResponse::new(vec![VectorStoreFileObject::new("file_1")]);
+    let file_list_json = serde_json::to_value(file_list).unwrap();
+    assert_eq!(file_list_json["object"], "list");
+    assert_eq!(file_list_json["data"][0]["id"], "file_1");
+
+    let deleted_file = DeleteVectorStoreFileResponse::deleted("file_1");
+    let deleted_file_json = serde_json::to_value(deleted_file).unwrap();
+    assert_eq!(deleted_file_json["object"], "vector_store.file.deleted");
+    assert_eq!(deleted_file_json["deleted"], true);
 }
 
 #[test]

@@ -19,7 +19,7 @@ use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
 use sdkwork_api_contract_openai::vector_stores::{
-    CreateVectorStoreRequest, UpdateVectorStoreRequest,
+    CreateVectorStoreFileRequest, CreateVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
@@ -266,6 +266,49 @@ impl OllamaProviderAdapter {
             .delete_vector_store(api_key, vector_store_id)
             .await
     }
+
+    pub async fn create_vector_store_file(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+        request: &CreateVectorStoreFileRequest,
+    ) -> Result<Value> {
+        self.delegate
+            .create_vector_store_file(api_key, vector_store_id, request)
+            .await
+    }
+
+    pub async fn list_vector_store_files(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .list_vector_store_files(api_key, vector_store_id)
+            .await
+    }
+
+    pub async fn retrieve_vector_store_file(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+        file_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .retrieve_vector_store_file(api_key, vector_store_id, file_id)
+            .await
+    }
+
+    pub async fn delete_vector_store_file(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+        file_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .delete_vector_store_file(api_key, vector_store_id, file_id)
+            .await
+    }
 }
 
 impl ProviderAdapter for OllamaProviderAdapter {
@@ -384,6 +427,28 @@ impl ProviderExecutionAdapter for OllamaProviderAdapter {
             ProviderRequest::VectorStoresDelete(vector_store_id) => Ok(ProviderOutput::Json(
                 self.delete_vector_store(api_key, vector_store_id).await?,
             )),
+            ProviderRequest::VectorStoreFiles(vector_store_id, request) => {
+                Ok(ProviderOutput::Json(
+                    self.create_vector_store_file(api_key, vector_store_id, request)
+                        .await?,
+                ))
+            }
+            ProviderRequest::VectorStoreFilesList(vector_store_id) => Ok(ProviderOutput::Json(
+                self.list_vector_store_files(api_key, vector_store_id)
+                    .await?,
+            )),
+            ProviderRequest::VectorStoreFilesRetrieve(vector_store_id, file_id) => {
+                Ok(ProviderOutput::Json(
+                    self.retrieve_vector_store_file(api_key, vector_store_id, file_id)
+                        .await?,
+                ))
+            }
+            ProviderRequest::VectorStoreFilesDelete(vector_store_id, file_id) => {
+                Ok(ProviderOutput::Json(
+                    self.delete_vector_store_file(api_key, vector_store_id, file_id)
+                        .await?,
+                ))
+            }
         }
     }
 }

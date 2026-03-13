@@ -34,17 +34,21 @@ use sdkwork_api_app_gateway::create_translation;
 use sdkwork_api_app_gateway::create_upload;
 use sdkwork_api_app_gateway::create_upload_part;
 use sdkwork_api_app_gateway::create_vector_store;
+use sdkwork_api_app_gateway::create_vector_store_file;
 use sdkwork_api_app_gateway::delete_file;
 use sdkwork_api_app_gateway::delete_vector_store;
+use sdkwork_api_app_gateway::delete_vector_store_file;
 use sdkwork_api_app_gateway::file_content;
 use sdkwork_api_app_gateway::get_batch;
 use sdkwork_api_app_gateway::get_file;
 use sdkwork_api_app_gateway::get_fine_tuning_job;
 use sdkwork_api_app_gateway::get_vector_store;
+use sdkwork_api_app_gateway::get_vector_store_file;
 use sdkwork_api_app_gateway::list_batches;
 use sdkwork_api_app_gateway::list_files;
 use sdkwork_api_app_gateway::list_fine_tuning_jobs;
 use sdkwork_api_app_gateway::list_models;
+use sdkwork_api_app_gateway::list_vector_store_files;
 use sdkwork_api_app_gateway::list_vector_stores;
 use sdkwork_api_app_gateway::update_vector_store;
 use sdkwork_api_app_gateway::{
@@ -53,16 +57,18 @@ use sdkwork_api_app_gateway::{
     relay_cancel_upload_from_store, relay_chat_completion_from_store,
     relay_chat_completion_stream_from_store, relay_complete_upload_from_store,
     relay_completion_from_store, relay_delete_file_from_store,
-    relay_delete_vector_store_from_store, relay_embedding_from_store, relay_eval_from_store,
-    relay_file_content_from_store, relay_file_from_store, relay_fine_tuning_job_from_store,
-    relay_get_batch_from_store, relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
-    relay_get_vector_store_from_store, relay_image_generation_from_store,
-    relay_list_batches_from_store, relay_list_files_from_store,
-    relay_list_fine_tuning_jobs_from_store, relay_list_vector_stores_from_store,
-    relay_moderation_from_store, relay_realtime_session_from_store, relay_response_from_store,
-    relay_speech_from_store, relay_transcription_from_store, relay_translation_from_store,
+    relay_delete_vector_store_file_from_store, relay_delete_vector_store_from_store,
+    relay_embedding_from_store, relay_eval_from_store, relay_file_content_from_store,
+    relay_file_from_store, relay_fine_tuning_job_from_store, relay_get_batch_from_store,
+    relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
+    relay_get_vector_store_file_from_store, relay_get_vector_store_from_store,
+    relay_image_generation_from_store, relay_list_batches_from_store, relay_list_files_from_store,
+    relay_list_fine_tuning_jobs_from_store, relay_list_vector_store_files_from_store,
+    relay_list_vector_stores_from_store, relay_moderation_from_store,
+    relay_realtime_session_from_store, relay_response_from_store, relay_speech_from_store,
+    relay_transcription_from_store, relay_translation_from_store,
     relay_update_vector_store_from_store, relay_upload_from_store, relay_upload_part_from_store,
-    relay_vector_store_from_store,
+    relay_vector_store_file_from_store, relay_vector_store_from_store,
 };
 use sdkwork_api_app_routing::simulate_route_with_store;
 use sdkwork_api_app_usage::persist_usage_record;
@@ -86,7 +92,7 @@ use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
 use sdkwork_api_contract_openai::vector_stores::{
-    CreateVectorStoreRequest, UpdateVectorStoreRequest,
+    CreateVectorStoreFileRequest, CreateVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -187,6 +193,14 @@ pub fn gateway_router() -> Router {
             get(vector_store_retrieve_handler)
                 .post(vector_store_update_handler)
                 .delete(vector_store_delete_handler),
+        )
+        .route(
+            "/v1/vector_stores/{vector_store_id}/files",
+            get(vector_store_files_list_handler).post(vector_store_files_handler),
+        )
+        .route(
+            "/v1/vector_stores/{vector_store_id}/files/{file_id}",
+            get(vector_store_file_retrieve_handler).delete(vector_store_file_delete_handler),
         )
 }
 
@@ -313,6 +327,16 @@ pub fn gateway_router_with_store_and_secret_manager(
             get(vector_store_retrieve_with_state_handler)
                 .post(vector_store_update_with_state_handler)
                 .delete(vector_store_delete_with_state_handler),
+        )
+        .route(
+            "/v1/vector_stores/{vector_store_id}/files",
+            get(vector_store_files_list_with_state_handler)
+                .post(vector_store_files_with_state_handler),
+        )
+        .route(
+            "/v1/vector_stores/{vector_store_id}/files/{file_id}",
+            get(vector_store_file_retrieve_with_state_handler)
+                .delete(vector_store_file_delete_with_state_handler),
         )
         .with_state(GatewayApiState::with_store_and_secret_manager(
             store,
@@ -587,6 +611,43 @@ async fn vector_store_delete_handler(
     Json(
         delete_vector_store("tenant-1", "project-1", &vector_store_id)
             .expect("vector store delete"),
+    )
+}
+
+async fn vector_store_files_handler(
+    Path(vector_store_id): Path<String>,
+    ExtractJson(request): ExtractJson<CreateVectorStoreFileRequest>,
+) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
+    Json(
+        create_vector_store_file("tenant-1", "project-1", &vector_store_id, &request.file_id)
+            .expect("vector store file"),
+    )
+}
+
+async fn vector_store_files_list_handler(
+    Path(vector_store_id): Path<String>,
+) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoreFilesResponse> {
+    Json(
+        list_vector_store_files("tenant-1", "project-1", &vector_store_id)
+            .expect("vector store files list"),
+    )
+}
+
+async fn vector_store_file_retrieve_handler(
+    Path((vector_store_id, file_id)): Path<(String, String)>,
+) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
+    Json(
+        get_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
+            .expect("vector store file retrieve"),
+    )
+}
+
+async fn vector_store_file_delete_handler(
+    Path((vector_store_id, file_id)): Path<(String, String)>,
+) -> Json<sdkwork_api_contract_openai::vector_stores::DeleteVectorStoreFileResponse> {
+    Json(
+        delete_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
+            .expect("vector store file delete"),
     )
 }
 
@@ -2650,6 +2711,278 @@ async fn vector_store_delete_with_state_handler(
     Json(
         delete_vector_store("tenant-1", "project-1", &vector_store_id)
             .expect("vector store delete"),
+    )
+    .into_response()
+}
+
+async fn vector_store_files_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(vector_store_id): Path<String>,
+    ExtractJson(request): ExtractJson<CreateVectorStoreFileRequest>,
+) -> Response {
+    match relay_vector_store_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &vector_store_id,
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "vector_store_files",
+                &vector_store_id,
+                25,
+                0.025,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "vector_store_files",
+        &vector_store_id,
+        25,
+        0.025,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        create_vector_store_file("tenant-1", "project-1", &vector_store_id, &request.file_id)
+            .expect("vector store file"),
+    )
+    .into_response()
+}
+
+async fn vector_store_files_list_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(vector_store_id): Path<String>,
+) -> Response {
+    match relay_list_vector_store_files_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &vector_store_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "vector_store_files",
+                &vector_store_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store files list",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "vector_store_files",
+        &vector_store_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        list_vector_store_files("tenant-1", "project-1", &vector_store_id)
+            .expect("vector store files list"),
+    )
+    .into_response()
+}
+
+async fn vector_store_file_retrieve_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path((vector_store_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match relay_get_vector_store_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &vector_store_id,
+        &file_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "vector_store_files",
+                &vector_store_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "vector_store_files",
+        &vector_store_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        get_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
+            .expect("vector store file retrieve"),
+    )
+    .into_response()
+}
+
+async fn vector_store_file_delete_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path((vector_store_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match relay_delete_vector_store_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &vector_store_id,
+        &file_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(
+                state.store.as_ref(),
+                "vector_store_files",
+                &vector_store_id,
+                15,
+                0.015,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(
+        state.store.as_ref(),
+        "vector_store_files",
+        &vector_store_id,
+        15,
+        0.015,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        delete_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
+            .expect("vector store file delete"),
     )
     .into_response()
 }
