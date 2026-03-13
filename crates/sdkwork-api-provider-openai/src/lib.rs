@@ -19,7 +19,9 @@ use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
-use sdkwork_api_contract_openai::vector_stores::CreateVectorStoreRequest;
+use sdkwork_api_contract_openai::vector_stores::{
+    CreateVectorStoreRequest, UpdateVectorStoreRequest,
+};
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
@@ -291,6 +293,38 @@ impl OpenAiProviderAdapter {
         self.post_json("/v1/vector_stores", api_key, request).await
     }
 
+    pub async fn list_vector_stores(&self, api_key: &str) -> Result<Value> {
+        self.get_json("/v1/vector_stores", api_key).await
+    }
+
+    pub async fn retrieve_vector_store(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+    ) -> Result<Value> {
+        self.get_json(&format!("/v1/vector_stores/{vector_store_id}"), api_key)
+            .await
+    }
+
+    pub async fn update_vector_store(
+        &self,
+        api_key: &str,
+        vector_store_id: &str,
+        request: &UpdateVectorStoreRequest,
+    ) -> Result<Value> {
+        self.post_json(
+            &format!("/v1/vector_stores/{vector_store_id}"),
+            api_key,
+            request,
+        )
+        .await
+    }
+
+    pub async fn delete_vector_store(&self, api_key: &str, vector_store_id: &str) -> Result<Value> {
+        self.delete_json(&format!("/v1/vector_stores/{vector_store_id}"), api_key)
+            .await
+    }
+
     async fn post_json<T: serde::Serialize>(
         &self,
         path: &str,
@@ -482,6 +516,21 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::VectorStores(request) => Ok(ProviderOutput::Json(
                 self.vector_stores(api_key, request).await?,
+            )),
+            ProviderRequest::VectorStoresList => Ok(ProviderOutput::Json(
+                self.list_vector_stores(api_key).await?,
+            )),
+            ProviderRequest::VectorStoresRetrieve(vector_store_id) => Ok(ProviderOutput::Json(
+                self.retrieve_vector_store(api_key, vector_store_id).await?,
+            )),
+            ProviderRequest::VectorStoresUpdate(vector_store_id, request) => {
+                Ok(ProviderOutput::Json(
+                    self.update_vector_store(api_key, vector_store_id, request)
+                        .await?,
+                ))
+            }
+            ProviderRequest::VectorStoresDelete(vector_store_id) => Ok(ProviderOutput::Json(
+                self.delete_vector_store(api_key, vector_store_id).await?,
             )),
         }
     }

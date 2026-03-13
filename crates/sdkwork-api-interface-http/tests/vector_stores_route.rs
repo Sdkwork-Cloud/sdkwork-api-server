@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
-use axum::routing::post;
+use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::Value;
 use sqlx::SqlitePool;
@@ -12,12 +12,85 @@ use tower::ServiceExt;
 async fn vector_stores_route_returns_ok() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/v1/vector_stores")
                 .header("content-type", "application/json")
                 .body(Body::from("{\"name\":\"kb-main\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn vector_stores_list_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn vector_store_retrieve_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores/vs_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn vector_store_update_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/vector_stores/vs_1")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"name\":\"kb-updated\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn vector_store_delete_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/vector_stores/vs_1")
+                .body(Body::empty())
                 .unwrap(),
         )
         .await
@@ -50,7 +123,16 @@ async fn stateful_vector_stores_route_relays_to_openai_compatible_provider() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/vector_stores", post(upstream_vector_stores_handler))
+        .route(
+            "/v1/vector_stores",
+            get(upstream_vector_stores_list_handler).post(upstream_vector_stores_handler),
+        )
+        .route(
+            "/v1/vector_stores/vs_1",
+            get(upstream_vector_store_retrieve_handler)
+                .post(upstream_vector_store_update_handler)
+                .delete(upstream_vector_store_delete_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
@@ -109,6 +191,7 @@ async fn stateful_vector_stores_route_relays_to_openai_compatible_provider() {
     assert_eq!(credential.status(), StatusCode::CREATED);
 
     let response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -127,6 +210,66 @@ async fn stateful_vector_stores_route_relays_to_openai_compatible_provider() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
+
+    let list_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(list_response.status(), StatusCode::OK);
+    let list_json = read_json(list_response).await;
+    assert_eq!(list_json["object"], "list");
+
+    let retrieve_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores/vs_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(retrieve_response.status(), StatusCode::OK);
+    let retrieve_json = read_json(retrieve_response).await;
+    assert_eq!(retrieve_json["id"], "vs_1");
+
+    let update_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/vector_stores/vs_1")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"name\":\"kb-updated\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(update_response.status(), StatusCode::OK);
+    let update_json = read_json(update_response).await;
+    assert_eq!(update_json["name"], "kb-updated");
+
+    let delete_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/vector_stores/vs_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(delete_response.status(), StatusCode::OK);
+    let delete_json = read_json(delete_response).await;
+    assert_eq!(delete_json["deleted"], true);
 }
 
 async fn upstream_vector_stores_handler(
@@ -145,6 +288,88 @@ async fn upstream_vector_stores_handler(
             "object":"vector_store",
             "name":"kb-main",
             "status":"completed"
+        })),
+    )
+}
+
+async fn upstream_vector_stores_list_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"list",
+            "data":[{
+                "id":"vs_1",
+                "object":"vector_store",
+                "name":"kb-main",
+                "status":"completed"
+            }]
+        })),
+    )
+}
+
+async fn upstream_vector_store_retrieve_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"vs_1",
+            "object":"vector_store",
+            "name":"kb-main",
+            "status":"completed"
+        })),
+    )
+}
+
+async fn upstream_vector_store_update_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"vs_1",
+            "object":"vector_store",
+            "name":"kb-updated",
+            "status":"completed"
+        })),
+    )
+}
+
+async fn upstream_vector_store_delete_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"vs_1",
+            "object":"vector_store.deleted",
+            "deleted":true
         })),
     )
 }

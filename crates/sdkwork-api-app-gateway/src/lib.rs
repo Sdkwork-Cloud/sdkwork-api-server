@@ -32,7 +32,10 @@ use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest, UploadObject,
     UploadPartObject,
 };
-use sdkwork_api_contract_openai::vector_stores::{CreateVectorStoreRequest, VectorStoreObject};
+use sdkwork_api_contract_openai::vector_stores::{
+    CreateVectorStoreRequest, DeleteVectorStoreResponse, ListVectorStoresResponse,
+    UpdateVectorStoreRequest, VectorStoreObject,
+};
 use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
@@ -898,6 +901,114 @@ pub async fn relay_vector_store_from_store(
     .await
 }
 
+pub async fn relay_list_vector_stores_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_stores", "vector_stores").await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoresList,
+    )
+    .await
+}
+
+pub async fn relay_get_vector_store_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_stores", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoresRetrieve(vector_store_id),
+    )
+    .await
+}
+
+pub async fn relay_update_vector_store_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    request: &UpdateVectorStoreRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_stores", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoresUpdate(vector_store_id, request),
+    )
+    .await
+}
+
+pub async fn relay_delete_vector_store_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "vector_stores", vector_store_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::VectorStoresDelete(vector_store_id),
+    )
+    .await
+}
+
 pub fn create_chat_completion(
     _tenant_id: &str,
     _project_id: &str,
@@ -1157,6 +1268,37 @@ pub fn create_vector_store(
     name: &str,
 ) -> Result<VectorStoreObject> {
     Ok(VectorStoreObject::new("vs_1", name))
+}
+
+pub fn list_vector_stores(_tenant_id: &str, _project_id: &str) -> Result<ListVectorStoresResponse> {
+    Ok(ListVectorStoresResponse::new(vec![VectorStoreObject::new(
+        "vs_1", "kb-main",
+    )]))
+}
+
+pub fn get_vector_store(
+    _tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+) -> Result<VectorStoreObject> {
+    Ok(VectorStoreObject::new(vector_store_id, "kb-main"))
+}
+
+pub fn update_vector_store(
+    _tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+    name: &str,
+) -> Result<VectorStoreObject> {
+    Ok(VectorStoreObject::new(vector_store_id, name))
+}
+
+pub fn delete_vector_store(
+    _tenant_id: &str,
+    _project_id: &str,
+    vector_store_id: &str,
+) -> Result<DeleteVectorStoreResponse> {
+    Ok(DeleteVectorStoreResponse::deleted(vector_store_id))
 }
 
 fn default_provider_registry() -> ProviderRegistry {

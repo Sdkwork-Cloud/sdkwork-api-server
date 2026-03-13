@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde_json::{json, Value};
@@ -640,6 +640,135 @@ async fn adapter_posts_vector_stores_to_openai_compatible_upstream() {
     assert_eq!(
         state.body.lock().unwrap().as_ref().unwrap()["name"],
         "kb-main"
+    );
+}
+
+#[tokio::test]
+async fn adapter_lists_vector_stores_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/vector_stores", get(capture_vector_stores_list_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .list_vector_stores("sk-upstream-openai")
+        .await
+        .unwrap();
+
+    assert_eq!(response["object"], "list");
+    assert_eq!(response["data"][0]["id"], "vs_1");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_retrieves_vector_store_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/vector_stores/vs_1",
+            get(capture_vector_store_retrieve_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .retrieve_vector_store("sk-upstream-openai", "vs_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "vs_1");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_modifies_vector_store_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/vector_stores/vs_1",
+            post(capture_vector_store_update_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request =
+        sdkwork_api_contract_openai::vector_stores::UpdateVectorStoreRequest::new("kb-updated");
+
+    let response = adapter
+        .update_vector_store("sk-upstream-openai", "vs_1", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["name"], "kb-updated");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(
+        state.body.lock().unwrap().as_ref().unwrap()["name"],
+        "kb-updated"
+    );
+}
+
+#[tokio::test]
+async fn adapter_deletes_vector_store_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/vector_stores/vs_1",
+            delete(capture_vector_store_delete_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .delete_vector_store("sk-upstream-openai", "vs_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["deleted"], true);
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
     );
 }
 
@@ -1402,6 +1531,90 @@ async fn capture_vector_store_request(
             "object":"vector_store",
             "name":"kb-main",
             "status":"completed"
+        })),
+    )
+}
+
+async fn capture_vector_stores_list_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "id":"vs_1",
+                "object":"vector_store",
+                "name":"kb-main",
+                "status":"completed"
+            }]
+        })),
+    )
+}
+
+async fn capture_vector_store_retrieve_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"vs_1",
+            "object":"vector_store",
+            "name":"kb-main",
+            "status":"completed"
+        })),
+    )
+}
+
+async fn capture_vector_store_update_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"vs_1",
+            "object":"vector_store",
+            "name":"kb-updated",
+            "status":"completed"
+        })),
+    )
+}
+
+async fn capture_vector_store_delete_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"vs_1",
+            "object":"vector_store.deleted",
+            "deleted":true
         })),
     )
 }

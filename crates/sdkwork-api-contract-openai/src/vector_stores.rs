@@ -11,6 +11,20 @@ impl CreateVectorStoreRequest {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateVectorStoreRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl UpdateVectorStoreRequest {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct VectorStoreObject {
     pub id: String,
@@ -26,6 +40,38 @@ impl VectorStoreObject {
             object: "vector_store",
             name: name.into(),
             status: "completed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListVectorStoresResponse {
+    pub object: &'static str,
+    pub data: Vec<VectorStoreObject>,
+}
+
+impl ListVectorStoresResponse {
+    pub fn new(data: Vec<VectorStoreObject>) -> Self {
+        Self {
+            object: "list",
+            data,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteVectorStoreResponse {
+    pub id: String,
+    pub object: &'static str,
+    pub deleted: bool,
+}
+
+impl DeleteVectorStoreResponse {
+    pub fn deleted(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "vector_store.deleted",
+            deleted: true,
         }
     }
 }
