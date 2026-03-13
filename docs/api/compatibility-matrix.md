@@ -78,12 +78,12 @@
 | Streaming | Defined | Implemented |
 | Files | Defined | Implemented (`create`, `list`, `retrieve`, `delete`, `content`) |
 | Uploads | Defined | Implemented |
-| Audio | Defined | Partially implemented (`/v1/audio/transcriptions`, `/v1/audio/translations`, `/v1/audio/speech`) |
-| Fine Tuning | Defined | Partially implemented (`jobs.create`, `jobs.list`, `jobs.retrieve`, `jobs.cancel`) |
+| Audio | Defined | Implemented |
+| Fine Tuning | Defined | Implemented |
 | Realtime | Defined | Implemented |
 | Assistants | Defined | Implemented (`create`, `list`, `retrieve`, `update`, `delete`) |
-| Vector Stores | Defined | Partially implemented (`create`, `list`, `retrieve`, `update`, `delete`, `search`, `files.create`, `files.list`, `files.retrieve`, `files.delete`, `file_batches.create`, `file_batches.retrieve`, `file_batches.cancel`, `file_batches.files.list`) |
-| Batches | Defined | Partially implemented (`create`, `list`, `retrieve`, `cancel`) |
+| Vector Stores | Defined | Implemented |
+| Batches | Defined | Implemented |
 | Videos | Defined | Implemented (`create`, `list`, `retrieve`, `delete`, `content`, `remix`) |
 | Webhooks | Defined | Implemented (`create`, `list`, `retrieve`, `update`, `delete`) |
 | Evals | Defined | Implemented |
@@ -92,7 +92,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Partially implemented; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, videos create/list/retrieve/delete/content/remix, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants create/list/retrieve/update/delete, webhooks create/list/retrieve/update/delete, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete/search plus vector store files create/list/retrieve/delete plus vector store file batches create/retrieve/cancel/list-files when provider and credential records are configured |
+| Upstream proxying | Implemented across all currently defined contract families; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, videos create/list/retrieve/delete/content/remix, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants create/list/retrieve/update/delete, webhooks create/list/retrieve/update/delete, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete/search plus vector store files create/list/retrieve/delete plus vector store file batches create/retrieve/cancel/list-files when provider and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |
