@@ -148,6 +148,10 @@ impl OpenRouterProviderAdapter {
         self.delegate.complete_upload(api_key, request).await
     }
 
+    pub async fn cancel_upload(&self, api_key: &str, upload_id: &str) -> Result<Value> {
+        self.delegate.cancel_upload(api_key, upload_id).await
+    }
+
     pub async fn fine_tuning_jobs(
         &self,
         api_key: &str,
@@ -240,6 +244,9 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             )),
             ProviderRequest::UploadComplete(request) => Ok(ProviderOutput::Json(
                 self.complete_upload(api_key, request).await?,
+            )),
+            ProviderRequest::UploadCancel(upload_id) => Ok(ProviderOutput::Json(
+                self.cancel_upload(api_key, upload_id).await?,
             )),
             ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
                 self.fine_tuning_jobs(api_key, request).await?,

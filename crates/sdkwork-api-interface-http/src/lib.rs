@@ -14,6 +14,7 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sdkwork_api_app_billing::persist_ledger_entry;
 use sdkwork_api_app_credential::CredentialSecretManager;
+use sdkwork_api_app_gateway::cancel_upload;
 use sdkwork_api_app_gateway::complete_upload;
 use sdkwork_api_app_gateway::create_assistant;
 use sdkwork_api_app_gateway::create_batch;
@@ -34,7 +35,7 @@ use sdkwork_api_app_gateway::create_vector_store;
 use sdkwork_api_app_gateway::list_models;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, list_models_from_store, relay_assistant_from_store,
-    relay_batch_from_store, relay_chat_completion_from_store,
+    relay_batch_from_store, relay_cancel_upload_from_store, relay_chat_completion_from_store,
     relay_chat_completion_stream_from_store, relay_complete_upload_from_store,
     relay_completion_from_store, relay_embedding_from_store, relay_eval_from_store,
     relay_file_from_store, relay_fine_tuning_job_from_store, relay_image_generation_from_store,
@@ -124,6 +125,10 @@ pub fn gateway_router() -> Router {
             "/v1/uploads/{upload_id}/complete",
             post(upload_complete_handler),
         )
+        .route(
+            "/v1/uploads/{upload_id}/cancel",
+            post(upload_cancel_handler),
+        )
         .route("/v1/fine_tuning/jobs", post(fine_tuning_jobs_handler))
         .route("/v1/assistants", post(assistants_handler))
         .route("/v1/realtime/sessions", post(realtime_sessions_handler))
@@ -200,6 +205,10 @@ pub fn gateway_router_with_store_and_secret_manager(
         .route(
             "/v1/uploads/{upload_id}/complete",
             post(upload_complete_with_state_handler),
+        )
+        .route(
+            "/v1/uploads/{upload_id}/cancel",
+            post(upload_cancel_with_state_handler),
         )
         .route(
             "/v1/fine_tuning/jobs",
@@ -336,6 +345,12 @@ async fn upload_complete_handler(
 ) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
     request.upload_id = upload_id;
     Json(complete_upload("tenant-1", "project-1", &request).expect("upload complete"))
+}
+
+async fn upload_cancel_handler(
+    Path(upload_id): Path<String>,
+) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
+    Json(cancel_upload("tenant-1", "project-1", &upload_id).expect("upload cancel"))
 }
 
 async fn fine_tuning_jobs_handler(
@@ -1233,6 +1248,57 @@ async fn upload_complete_with_state_handler(
 
     Json(complete_upload("tenant-1", "project-1", &request).expect("upload complete"))
         .into_response()
+}
+
+async fn upload_cancel_with_state_handler(
+    State(state): State<GatewayApiState>,
+    Path(upload_id): Path<String>,
+) -> Response {
+    match relay_cancel_upload_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        "tenant-1",
+        "project-1",
+        &upload_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage(state.store.as_ref(), "uploads", &upload_id, 4, 0.004)
+                .await
+                .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream upload cancellation",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage(state.store.as_ref(), "uploads", &upload_id, 4, 0.004)
+        .await
+        .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(cancel_upload("tenant-1", "project-1", &upload_id).expect("upload cancel")).into_response()
 }
 
 async fn fine_tuning_jobs_with_state_handler(

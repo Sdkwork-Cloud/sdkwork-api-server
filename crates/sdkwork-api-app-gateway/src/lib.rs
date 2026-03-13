@@ -438,6 +438,33 @@ pub async fn relay_complete_upload_from_store(
     .await
 }
 
+pub async fn relay_cancel_upload_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    upload_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "uploads", upload_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::UploadCancel(upload_id),
+    )
+    .await
+}
+
 pub async fn relay_fine_tuning_job_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -730,6 +757,17 @@ pub fn complete_upload(
         "application/jsonl",
         0,
         request.part_ids.clone(),
+    ))
+}
+
+pub fn cancel_upload(_tenant_id: &str, _project_id: &str, upload_id: &str) -> Result<UploadObject> {
+    Ok(UploadObject::cancelled(
+        upload_id,
+        "input.jsonl",
+        "batch",
+        "application/jsonl",
+        0,
+        vec![],
     ))
 }
 

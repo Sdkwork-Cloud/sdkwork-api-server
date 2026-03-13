@@ -49,6 +49,7 @@ pub enum ProviderRequest<'a> {
     Uploads(&'a CreateUploadRequest),
     UploadParts(&'a AddUploadPartRequest),
     UploadComplete(&'a CompleteUploadRequest),
+    UploadCancel(&'a str),
     FineTuningJobs(&'a CreateFineTuningJobRequest),
     Assistants(&'a CreateAssistantRequest),
     RealtimeSessions(&'a CreateRealtimeSessionRequest),

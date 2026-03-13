@@ -29,3 +29,12 @@ fn completes_upload_object() {
     assert_eq!(response.object, "upload");
     assert_eq!(response.part_ids.len(), 2);
 }
+
+#[test]
+fn cancels_upload_object() {
+    let response =
+        sdkwork_api_app_gateway::cancel_upload("tenant-1", "project-1", "upload_1").unwrap();
+    assert_eq!(response.object, "upload");
+    assert_eq!(response.id, "upload_1");
+    assert_eq!(response.status, "cancelled");
+}

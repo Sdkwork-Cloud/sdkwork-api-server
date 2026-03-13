@@ -71,6 +71,23 @@ async fn upload_complete_route_returns_ok() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+#[tokio::test]
+async fn upload_cancel_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads/upload_1/cancel")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -104,6 +121,10 @@ async fn stateful_upload_routes_relay_to_openai_compatible_provider() {
         .route(
             "/v1/uploads/upload_1/complete",
             post(upstream_upload_complete_handler),
+        )
+        .route(
+            "/v1/uploads/upload_1/cancel",
+            post(upstream_upload_cancel_handler),
         )
         .with_state(upstream_state.clone());
 
@@ -202,6 +223,7 @@ async fn stateful_upload_routes_relay_to_openai_compatible_provider() {
     assert_eq!(part_json["id"], "part_upstream");
 
     let complete_response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -226,6 +248,20 @@ async fn stateful_upload_routes_relay_to_openai_compatible_provider() {
         .as_deref()
         .unwrap_or_default()
         .starts_with("multipart/form-data"));
+
+    let cancel_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads/upload_1/cancel")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(cancel_response.status(), StatusCode::OK);
+    let cancel_json = read_json(cancel_response).await;
+    assert_eq!(cancel_json["status"], "cancelled");
 }
 
 fn build_upload_part_multipart_body(boundary: &str) -> Vec<u8> {
@@ -303,6 +339,30 @@ async fn upstream_upload_complete_handler(
             "bytes":1024,
             "part_ids":["part_1","part_2"],
             "status":"completed"
+        })),
+    )
+}
+
+async fn upstream_upload_cancel_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"upload_upstream",
+            "object":"upload",
+            "purpose":"batch",
+            "filename":"input.jsonl",
+            "mime_type":"application/jsonl",
+            "bytes":1024,
+            "part_ids":["part_1","part_2"],
+            "status":"cancelled"
         })),
     )
 }

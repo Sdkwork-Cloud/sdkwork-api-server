@@ -77,6 +77,19 @@ impl UploadObject {
         upload.status = "completed";
         upload
     }
+
+    pub fn cancelled(
+        id: impl Into<String>,
+        filename: impl Into<String>,
+        purpose: impl Into<String>,
+        mime_type: impl Into<String>,
+        bytes: u64,
+        part_ids: Vec<String>,
+    ) -> Self {
+        let mut upload = Self::with_details(id, filename, purpose, mime_type, bytes, part_ids);
+        upload.status = "cancelled";
+        upload
+    }
 }
 
 #[derive(Debug, Clone)]

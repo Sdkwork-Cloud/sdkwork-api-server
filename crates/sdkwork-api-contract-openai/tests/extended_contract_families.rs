@@ -53,6 +53,17 @@ fn serializes_upload_contracts() {
     let complete_request = CompleteUploadRequest::new("upload_1", vec!["part_1"]);
     let complete_json = serde_json::to_value(complete_request).unwrap();
     assert_eq!(complete_json["part_ids"][0], "part_1");
+
+    let cancelled_upload = UploadObject::cancelled(
+        "upload_1",
+        "input.jsonl",
+        "batch",
+        "application/jsonl",
+        1024,
+        vec!["part_1".to_owned()],
+    );
+    let cancelled_json = serde_json::to_value(cancelled_upload).unwrap();
+    assert_eq!(cancelled_json["status"], "cancelled");
 }
 
 #[test]

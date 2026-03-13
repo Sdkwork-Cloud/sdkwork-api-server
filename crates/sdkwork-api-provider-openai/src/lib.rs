@@ -173,6 +173,18 @@ impl OpenAiProviderAdapter {
         .await
     }
 
+    pub async fn cancel_upload(&self, api_key: &str, upload_id: &str) -> Result<Value> {
+        let response = self
+            .client
+            .post(format!("{}/v1/uploads/{upload_id}/cancel", self.base_url))
+            .bearer_auth(api_key)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(response.json::<Value>().await?)
+    }
+
     pub async fn fine_tuning_jobs(
         &self,
         api_key: &str,
@@ -321,6 +333,9 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::UploadComplete(request) => Ok(ProviderOutput::Json(
                 self.complete_upload(api_key, request).await?,
+            )),
+            ProviderRequest::UploadCancel(upload_id) => Ok(ProviderOutput::Json(
+                self.cancel_upload(api_key, upload_id).await?,
             )),
             ProviderRequest::FineTuningJobs(request) => Ok(ProviderOutput::Json(
                 self.fine_tuning_jobs(api_key, request).await?,

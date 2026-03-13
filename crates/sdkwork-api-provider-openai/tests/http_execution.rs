@@ -680,6 +680,40 @@ async fn adapter_posts_upload_complete_to_openai_compatible_upstream() {
     );
 }
 
+#[tokio::test]
+async fn adapter_posts_upload_cancel_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/uploads/upload_1/cancel",
+            post(capture_upload_cancel_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+
+    let response = adapter
+        .cancel_upload("sk-upstream-openai", "upload_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "upload_upstream");
+    assert_eq!(response["status"], "cancelled");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+    assert_eq!(state.raw_body.lock().unwrap().as_deref(), Some(&[][..]));
+}
+
 async fn capture_chat_request(
     State(state): State<CaptureState>,
     headers: HeaderMap,
@@ -1052,6 +1086,32 @@ async fn capture_upload_complete_request(
             "bytes":1024,
             "part_ids":["part_1","part_2"],
             "status":"completed"
+        })),
+    )
+}
+
+async fn capture_upload_cancel_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.raw_body.lock().unwrap() = Some(body.to_vec());
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"upload_upstream",
+            "object":"upload",
+            "purpose":"batch",
+            "filename":"input.jsonl",
+            "mime_type":"application/jsonl",
+            "bytes":1024,
+            "part_ids":["part_1","part_2"],
+            "status":"cancelled"
         })),
     )
 }
