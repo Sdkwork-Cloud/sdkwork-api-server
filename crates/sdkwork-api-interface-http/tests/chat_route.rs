@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::Value;
 use sqlx::SqlitePool;
@@ -19,6 +19,97 @@ async fn chat_route_returns_ok() {
                 .body(Body::from(
                     "{\"model\":\"gpt-4.1\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}",
                 ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn chat_list_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn chat_retrieve_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn chat_update_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"metadata\":{\"tier\":\"gold\"}}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn chat_delete_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn chat_messages_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions/chatcmpl_1/messages")
+                .body(Body::empty())
                 .unwrap(),
         )
         .await
@@ -47,6 +138,7 @@ async fn stateful_chat_route_records_usage_and_billing() {
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
 
     let response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -105,7 +197,20 @@ async fn stateful_chat_route_relays_to_openai_compatible_provider() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/chat/completions", post(upstream_chat_handler))
+        .route(
+            "/v1/chat/completions",
+            get(upstream_chat_list_handler).post(upstream_chat_handler),
+        )
+        .route(
+            "/v1/chat/completions/chatcmpl_1",
+            get(upstream_chat_retrieve_handler)
+                .post(upstream_chat_update_handler)
+                .delete(upstream_chat_delete_handler),
+        )
+        .route(
+            "/v1/chat/completions/chatcmpl_1/messages",
+            get(upstream_chat_messages_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
@@ -181,6 +286,7 @@ async fn stateful_chat_route_relays_to_openai_compatible_provider() {
     assert_eq!(model.status(), StatusCode::CREATED);
 
     let response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -201,6 +307,86 @@ async fn stateful_chat_route_relays_to_openai_compatible_provider() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
+
+    let list_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(list_response.status(), StatusCode::OK);
+    let list_json = read_json(list_response).await;
+    assert_eq!(list_json["object"], "list");
+
+    let retrieve_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(retrieve_response.status(), StatusCode::OK);
+    let retrieve_json = read_json(retrieve_response).await;
+    assert_eq!(retrieve_json["id"], "chatcmpl_1");
+
+    let update_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"metadata\":{\"tier\":\"gold\"}}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(update_response.status(), StatusCode::OK);
+    let update_json = read_json(update_response).await;
+    assert_eq!(update_json["metadata"]["tier"], "gold");
+
+    let delete_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/chat/completions/chatcmpl_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(delete_response.status(), StatusCode::OK);
+    let delete_json = read_json(delete_response).await;
+    assert_eq!(delete_json["deleted"], true);
+
+    let messages_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/completions/chatcmpl_1/messages")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(messages_response.status(), StatusCode::OK);
+    let messages_json = read_json(messages_response).await;
+    assert_eq!(messages_json["data"][0]["id"], "msg_1");
 }
 
 #[tokio::test]
@@ -429,6 +615,112 @@ async fn upstream_chat_handler(
             "object":"chat.completion",
             "model":"gpt-4.1",
             "choices":[]
+        })),
+    )
+}
+
+async fn upstream_chat_list_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"list",
+            "data":[{
+                "id":"chatcmpl_1",
+                "object":"chat.completion",
+                "model":"gpt-4.1",
+                "choices":[]
+            }]
+        })),
+    )
+}
+
+async fn upstream_chat_retrieve_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion",
+            "model":"gpt-4.1",
+            "choices":[]
+        })),
+    )
+}
+
+async fn upstream_chat_update_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion",
+            "model":"gpt-4.1",
+            "metadata":{"tier":"gold"},
+            "choices":[]
+        })),
+    )
+}
+
+async fn upstream_chat_delete_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion.deleted",
+            "deleted":true
+        })),
+    )
+}
+
+async fn upstream_chat_messages_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"list",
+            "data":[{
+                "id":"msg_1",
+                "object":"chat.completion.message",
+                "role":"assistant",
+                "content":"hello"
+            }]
         })),
     )
 }

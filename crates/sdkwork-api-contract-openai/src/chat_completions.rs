@@ -14,6 +14,20 @@ pub struct CreateChatCompletionRequest {
     pub stream: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateChatCompletionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+impl UpdateChatCompletionRequest {
+    pub fn new(metadata: Value) -> Self {
+        Self {
+            metadata: Some(metadata),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ChunkChoice {
     pub index: u32,
@@ -67,6 +81,8 @@ pub struct ChatCompletionResponse {
     pub id: String,
     pub object: &'static str,
     pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
     pub choices: Vec<ChatCompletionChoice>,
 }
 
@@ -76,6 +92,7 @@ impl ChatCompletionResponse {
             id: id.into(),
             object: "chat.completion",
             model: model.into(),
+            metadata: None,
             choices: vec![ChatCompletionChoice {
                 index: 0,
                 message: ChatCompletionMessage {
@@ -84,6 +101,78 @@ impl ChatCompletionResponse {
                 },
                 finish_reason: "stop",
             }],
+        }
+    }
+
+    pub fn with_metadata(id: impl Into<String>, model: impl Into<String>, metadata: Value) -> Self {
+        let mut response = Self::empty(id, model);
+        response.metadata = Some(metadata);
+        response
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListChatCompletionsResponse {
+    pub object: &'static str,
+    pub data: Vec<ChatCompletionResponse>,
+}
+
+impl ListChatCompletionsResponse {
+    pub fn new(data: Vec<ChatCompletionResponse>) -> Self {
+        Self {
+            object: "list",
+            data,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteChatCompletionResponse {
+    pub id: String,
+    pub object: &'static str,
+    pub deleted: bool,
+}
+
+impl DeleteChatCompletionResponse {
+    pub fn deleted(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "chat.completion.deleted",
+            deleted: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ChatCompletionMessageObject {
+    pub id: String,
+    pub object: &'static str,
+    pub role: &'static str,
+    pub content: Value,
+}
+
+impl ChatCompletionMessageObject {
+    pub fn assistant(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "chat.completion.message",
+            role: "assistant",
+            content: Value::String(content.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListChatCompletionMessagesResponse {
+    pub object: &'static str,
+    pub data: Vec<ChatCompletionMessageObject>,
+}
+
+impl ListChatCompletionMessagesResponse {
+    pub fn new(data: Vec<ChatCompletionMessageObject>) -> Self {
+        Self {
+            object: "list",
+            data,
         }
     }
 }

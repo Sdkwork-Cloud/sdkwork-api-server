@@ -6,11 +6,16 @@
 |---|---|---|
 | `/v1/models` | Implemented | Catalog-backed through SQLite when the stateful gateway is used |
 | `/v1/models/{model}` | Implemented | Catalog-backed model retrieval through SQLite when the stateful gateway is used |
-| `/v1/chat/completions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay for non-stream and `text/event-stream`; falls back to stub output when provider execution is unavailable |
+| `/v1/chat/completions` | Implemented | Stateful mode supports OpenAI-compatible upstream create, list, and `text/event-stream` relay; falls back to local chat completion or list output when provider execution is unavailable |
+| `/v1/chat/completions/{completion_id}` | Implemented | Stateful mode supports OpenAI-compatible upstream retrieve, update, and delete relay; otherwise emits local chat completion metadata or deleted fallback |
+| `/v1/chat/completions/{completion_id}/messages` | Implemented | Stateful mode supports OpenAI-compatible upstream message listing relay; otherwise emits local chat completion message fallback |
 | `/v1/completions` | Implemented | Stateful mode supports OpenAI-compatible upstream relay for legacy text completions; otherwise emits local completion fallback |
 | `/v1/responses` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local response object fallback |
+| `/v1/responses/input_tokens` | Implemented | Stateful mode supports OpenAI-compatible upstream input token counting; otherwise emits local input-token count fallback |
+| `/v1/responses/compact` | Implemented | Stateful mode supports OpenAI-compatible upstream compaction relay; otherwise emits local response compaction fallback |
 | `/v1/responses/{response_id}` | Implemented | Stateful mode supports OpenAI-compatible upstream retrieve and delete relay; otherwise emits local response metadata or deleted response fallback |
 | `/v1/responses/{response_id}/input_items` | Implemented | Stateful mode supports OpenAI-compatible upstream input item listing; otherwise emits local response input item fallback |
+| `/v1/responses/{response_id}/cancel` | Implemented | Stateful mode supports OpenAI-compatible upstream cancel relay; otherwise emits local cancelled response fallback |
 | `/v1/embeddings` | Implemented | Stateful mode supports OpenAI-compatible upstream relay; otherwise emits local embeddings fallback |
 | `/v1/files` | Implemented | Stateful mode supports OpenAI-compatible upstream multipart create and JSON list relay; otherwise emits local file fallback |
 | `/v1/files/{file_id}` | Implemented | Stateful mode supports OpenAI-compatible upstream retrieve and delete relay; otherwise emits local file metadata or deleted response fallback |
@@ -94,7 +99,7 @@
 
 | Capability | Current Behavior |
 |---|---|
-| Upstream proxying | Implemented across all currently defined contract families; stateful gateway relays OpenAI-compatible chat, chat SSE, completions, responses create/retrieve/delete plus response input items list, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, videos create/list/retrieve/delete/content/remix, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants create/list/retrieve/update/delete, webhooks create/list/retrieve/update/delete, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete/search plus vector store files create/list/retrieve/delete plus vector store file batches create/retrieve/cancel/list-files when provider and credential records are configured |
+| Upstream proxying | Implemented across all currently defined contract families; stateful gateway relays OpenAI-compatible chat create/list/retrieve/update/delete/message-list, chat SSE, completions, responses create/input_tokens/retrieve/delete/input_items/cancel/compact, embeddings, files create/list/retrieve/delete/content, upload create/part/complete/cancel, moderations, image generations, videos create/list/retrieve/delete/content/remix, audio transcriptions, audio translations, audio speech binary passthrough, fine-tuning jobs create/list/retrieve/cancel, assistants create/list/retrieve/update/delete, webhooks create/list/retrieve/update/delete, realtime sessions, evals, batches create/list/retrieve/cancel, and vector stores create/list/retrieve/update/delete/search plus vector store files create/list/retrieve/delete plus vector store file batches create/retrieve/cancel/list-files when provider and credential records are configured |
 | Model discovery | Driven by the local catalog, not upstream auto-sync |
 | Routing | Deterministic candidate selection from catalog models |
 | Provider dispatch | Executed through `sdkwork-api-provider-core` registry abstractions with `adapter_kind` plus `base_url` resolution; `openai`, `openrouter`, and `ollama` are currently registered |

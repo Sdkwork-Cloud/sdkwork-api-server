@@ -5,7 +5,9 @@ use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
-use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
+use sdkwork_api_contract_openai::chat_completions::{
+    CreateChatCompletionRequest, UpdateChatCompletionRequest,
+};
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
@@ -14,7 +16,9 @@ use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
-use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::responses::{
+    CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
+};
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
@@ -59,6 +63,51 @@ impl OpenRouterProviderAdapter {
         self.delegate.chat_completions(api_key, request).await
     }
 
+    pub async fn list_chat_completions(&self, api_key: &str) -> Result<Value> {
+        self.delegate.list_chat_completions(api_key).await
+    }
+
+    pub async fn retrieve_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .retrieve_chat_completion(api_key, completion_id)
+            .await
+    }
+
+    pub async fn update_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+        request: &UpdateChatCompletionRequest,
+    ) -> Result<Value> {
+        self.delegate
+            .update_chat_completion(api_key, completion_id, request)
+            .await
+    }
+
+    pub async fn delete_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .delete_chat_completion(api_key, completion_id)
+            .await
+    }
+
+    pub async fn list_chat_completion_messages(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.delegate
+            .list_chat_completion_messages(api_key, completion_id)
+            .await
+    }
+
     pub async fn chat_completions_stream(
         &self,
         api_key: &str,
@@ -71,6 +120,16 @@ impl OpenRouterProviderAdapter {
 
     pub async fn responses(&self, api_key: &str, request: &CreateResponseRequest) -> Result<Value> {
         self.delegate.responses(api_key, request).await
+    }
+
+    pub async fn count_response_input_tokens(
+        &self,
+        api_key: &str,
+        request: &CountResponseInputTokensRequest,
+    ) -> Result<Value> {
+        self.delegate
+            .count_response_input_tokens(api_key, request)
+            .await
     }
 
     pub async fn retrieve_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
@@ -89,6 +148,18 @@ impl OpenRouterProviderAdapter {
         self.delegate
             .list_response_input_items(api_key, response_id)
             .await
+    }
+
+    pub async fn cancel_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
+        self.delegate.cancel_response(api_key, response_id).await
+    }
+
+    pub async fn compact_response(
+        &self,
+        api_key: &str,
+        request: &CompactResponseRequest,
+    ) -> Result<Value> {
+        self.delegate.compact_response(api_key, request).await
     }
 
     pub async fn completions(
@@ -484,11 +555,36 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             ProviderRequest::ChatCompletionsStream(request) => Ok(ProviderOutput::Stream(
                 self.chat_completions_stream(api_key, request).await?,
             )),
+            ProviderRequest::ChatCompletionsList => Ok(ProviderOutput::Json(
+                self.list_chat_completions(api_key).await?,
+            )),
+            ProviderRequest::ChatCompletionsRetrieve(completion_id) => Ok(ProviderOutput::Json(
+                self.retrieve_chat_completion(api_key, completion_id)
+                    .await?,
+            )),
+            ProviderRequest::ChatCompletionsUpdate(completion_id, request) => {
+                Ok(ProviderOutput::Json(
+                    self.update_chat_completion(api_key, completion_id, request)
+                        .await?,
+                ))
+            }
+            ProviderRequest::ChatCompletionsDelete(completion_id) => Ok(ProviderOutput::Json(
+                self.delete_chat_completion(api_key, completion_id).await?,
+            )),
+            ProviderRequest::ChatCompletionsMessagesList(completion_id) => {
+                Ok(ProviderOutput::Json(
+                    self.list_chat_completion_messages(api_key, completion_id)
+                        .await?,
+                ))
+            }
             ProviderRequest::Completions(request) => Ok(ProviderOutput::Json(
                 self.completions(api_key, request).await?,
             )),
             ProviderRequest::Responses(request) => Ok(ProviderOutput::Json(
                 self.responses(api_key, request).await?,
+            )),
+            ProviderRequest::ResponsesInputTokens(request) => Ok(ProviderOutput::Json(
+                self.count_response_input_tokens(api_key, request).await?,
             )),
             ProviderRequest::ResponsesRetrieve(response_id) => Ok(ProviderOutput::Json(
                 self.retrieve_response(api_key, response_id).await?,
@@ -498,6 +594,12 @@ impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
             )),
             ProviderRequest::ResponsesInputItemsList(response_id) => Ok(ProviderOutput::Json(
                 self.list_response_input_items(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesCancel(response_id) => Ok(ProviderOutput::Json(
+                self.cancel_response(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesCompact(request) => Ok(ProviderOutput::Json(
+                self.compact_response(api_key, request).await?,
             )),
             ProviderRequest::Embeddings(request) => Ok(ProviderOutput::Json(
                 self.embeddings(api_key, request).await?,

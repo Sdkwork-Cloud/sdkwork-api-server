@@ -79,6 +79,62 @@ async fn response_delete_route_returns_ok() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+#[tokio::test]
+async fn response_input_tokens_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/input_tokens")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"model\":\"gpt-4.1\",\"input\":\"hi\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response_cancel_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/resp_1/cancel")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn response_compact_route_returns_ok() {
+    let app = sdkwork_api_interface_http::gateway_router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/compact")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"model\":\"gpt-4.1\",\"input\":\"hi\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -105,12 +161,24 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     let upstream = Router::new()
         .route("/v1/responses", post(upstream_responses_handler))
         .route(
+            "/v1/responses/input_tokens",
+            post(upstream_response_input_tokens_handler),
+        )
+        .route(
+            "/v1/responses/compact",
+            post(upstream_response_compact_handler),
+        )
+        .route(
             "/v1/responses/resp_1",
             get(upstream_response_retrieve_handler).delete(upstream_response_delete_handler),
         )
         .route(
             "/v1/responses/resp_1/input_items",
             get(upstream_response_input_items_handler),
+        )
+        .route(
+            "/v1/responses/resp_1/cancel",
+            post(upstream_response_cancel_handler),
         )
         .with_state(upstream_state.clone());
 
@@ -240,6 +308,7 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     assert_eq!(input_items_json["data"][0]["id"], "item_1");
 
     let delete_response = gateway_app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("DELETE")
@@ -253,6 +322,58 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     assert_eq!(delete_response.status(), StatusCode::OK);
     let delete_json = read_json(delete_response).await;
     assert_eq!(delete_json["deleted"], true);
+
+    let input_tokens_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/input_tokens")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"model\":\"gpt-4.1\",\"input\":\"count me\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(input_tokens_response.status(), StatusCode::OK);
+    let input_tokens_json = read_json(input_tokens_response).await;
+    assert_eq!(input_tokens_json["object"], "response.input_tokens");
+    assert_eq!(input_tokens_json["input_tokens"], 21);
+
+    let cancel_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/resp_1/cancel")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(cancel_response.status(), StatusCode::OK);
+    let cancel_json = read_json(cancel_response).await;
+    assert_eq!(cancel_json["status"], "cancelled");
+
+    let compact_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses/compact")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"compact me\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(compact_response.status(), StatusCode::OK);
+    let compact_json = read_json(compact_response).await;
+    assert_eq!(compact_json["object"], "response.compaction");
 }
 
 async fn upstream_responses_handler(
@@ -332,6 +453,64 @@ async fn upstream_response_delete_handler(
             "id":"resp_1",
             "object":"response.deleted",
             "deleted":true
+        })),
+    )
+}
+
+async fn upstream_response_input_tokens_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"response.input_tokens",
+            "input_tokens":21
+        })),
+    )
+}
+
+async fn upstream_response_cancel_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"resp_1",
+            "object":"response",
+            "model":"gpt-4.1",
+            "status":"cancelled",
+            "output":[]
+        })),
+    )
+}
+
+async fn upstream_response_compact_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"resp_cmp_1",
+            "object":"response.compaction",
+            "model":"gpt-4.1"
         })),
     )
 }

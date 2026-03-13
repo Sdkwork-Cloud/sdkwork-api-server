@@ -61,6 +61,142 @@ async fn adapter_posts_authorized_json_to_openai_compatible_upstream() {
 }
 
 #[tokio::test]
+async fn adapter_lists_chat_completions_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/chat/completions", get(capture_chat_list_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .list_chat_completions("sk-upstream-openai")
+        .await
+        .unwrap();
+
+    assert_eq!(response["object"], "list");
+    assert_eq!(response["data"][0]["id"], "chatcmpl_1");
+}
+
+#[tokio::test]
+async fn adapter_retrieves_chat_completion_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/chat/completions/chatcmpl_1",
+            get(capture_chat_retrieve_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .retrieve_chat_completion("sk-upstream-openai", "chatcmpl_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "chatcmpl_1");
+}
+
+#[tokio::test]
+async fn adapter_updates_chat_completion_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/chat/completions/chatcmpl_1",
+            post(capture_chat_update_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::chat_completions::UpdateChatCompletionRequest::new(
+        json!({"tier":"gold"}),
+    );
+    let response = adapter
+        .update_chat_completion("sk-upstream-openai", "chatcmpl_1", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["metadata"]["tier"], "gold");
+}
+
+#[tokio::test]
+async fn adapter_deletes_chat_completion_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/chat/completions/chatcmpl_1",
+            delete(capture_chat_delete_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .delete_chat_completion("sk-upstream-openai", "chatcmpl_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["deleted"], true);
+}
+
+#[tokio::test]
+async fn adapter_lists_chat_completion_messages_from_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/chat/completions/chatcmpl_1/messages",
+            get(capture_chat_messages_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .list_chat_completion_messages("sk-upstream-openai", "chatcmpl_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["data"][0]["id"], "msg_1");
+}
+
+#[tokio::test]
 async fn adapter_posts_legacy_completions_to_openai_compatible_upstream() {
     let state = CaptureState::default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -210,6 +346,111 @@ async fn adapter_deletes_response_on_openai_compatible_upstream() {
         .unwrap();
 
     assert_eq!(response["deleted"], true);
+}
+
+#[tokio::test]
+async fn adapter_counts_response_input_tokens_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/input_tokens",
+            post(capture_response_input_tokens_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::responses::CountResponseInputTokensRequest::new(
+        "gpt-4.1",
+        json!("hello"),
+    );
+
+    let response = adapter
+        .count_response_input_tokens("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["object"], "response.input_tokens");
+    assert_eq!(response["input_tokens"], 21);
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_cancels_response_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/resp_1/cancel",
+            post(capture_response_cancel_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let response = adapter
+        .cancel_response("sk-upstream-openai", "resp_1")
+        .await
+        .unwrap();
+
+    assert_eq!(response["status"], "cancelled");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_compacts_response_on_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route(
+            "/v1/responses/compact",
+            post(capture_response_compact_request),
+        )
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::responses::CompactResponseRequest::new(
+        "gpt-4.1",
+        json!("hello"),
+    );
+
+    let response = adapter
+        .compact_response("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response["object"], "response.compaction");
+    assert_eq!(response["model"], "gpt-4.1");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
 }
 
 #[tokio::test]
@@ -2010,6 +2251,116 @@ async fn capture_chat_request(
     )
 }
 
+async fn capture_chat_list_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "id":"chatcmpl_1",
+                "object":"chat.completion",
+                "model":"gpt-4.1",
+                "choices":[]
+            }]
+        })),
+    )
+}
+
+async fn capture_chat_retrieve_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion",
+            "model":"gpt-4.1",
+            "choices":[]
+        })),
+    )
+}
+
+async fn capture_chat_update_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion",
+            "model":"gpt-4.1",
+            "metadata":{"tier":"gold"},
+            "choices":[]
+        })),
+    )
+}
+
+async fn capture_chat_delete_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.raw_body.lock().unwrap() = Some(body.to_vec());
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"chatcmpl_1",
+            "object":"chat.completion.deleted",
+            "deleted":true
+        })),
+    )
+}
+
+async fn capture_chat_messages_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"list",
+            "data":[{
+                "id":"msg_1",
+                "object":"chat.completion.message",
+                "role":"assistant",
+                "content":"hello"
+            }]
+        })),
+    )
+}
+
 async fn capture_completion_request(
     State(state): State<CaptureState>,
     headers: HeaderMap,
@@ -2401,6 +2752,70 @@ async fn capture_response_delete_request(
             "id":"resp_1",
             "object":"response.deleted",
             "deleted":true
+        })),
+    )
+}
+
+async fn capture_response_input_tokens_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "object":"response.input_tokens",
+            "input_tokens":21
+        })),
+    )
+}
+
+async fn capture_response_cancel_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.raw_body.lock().unwrap() = Some(body.to_vec());
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"resp_1",
+            "object":"response",
+            "model":"gpt-4.1",
+            "status":"cancelled",
+            "output":[]
+        })),
+    )
+}
+
+async fn capture_response_compact_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id":"resp_cmp_1",
+            "object":"response.compaction",
+            "model":"gpt-4.1"
         })),
     )
 }

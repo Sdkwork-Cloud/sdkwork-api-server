@@ -8,7 +8,9 @@ use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
-use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
+use sdkwork_api_contract_openai::chat_completions::{
+    CreateChatCompletionRequest, UpdateChatCompletionRequest,
+};
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
@@ -17,7 +19,9 @@ use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
-use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::responses::{
+    CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
+};
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
@@ -42,11 +46,19 @@ pub trait ProviderAdapter {
 pub enum ProviderRequest<'a> {
     ChatCompletions(&'a CreateChatCompletionRequest),
     ChatCompletionsStream(&'a CreateChatCompletionRequest),
+    ChatCompletionsList,
+    ChatCompletionsRetrieve(&'a str),
+    ChatCompletionsUpdate(&'a str, &'a UpdateChatCompletionRequest),
+    ChatCompletionsDelete(&'a str),
+    ChatCompletionsMessagesList(&'a str),
     Completions(&'a CreateCompletionRequest),
     Responses(&'a CreateResponseRequest),
+    ResponsesInputTokens(&'a CountResponseInputTokensRequest),
     ResponsesRetrieve(&'a str),
     ResponsesDelete(&'a str),
     ResponsesInputItemsList(&'a str),
+    ResponsesCancel(&'a str),
+    ResponsesCompact(&'a CompactResponseRequest),
     Embeddings(&'a CreateEmbeddingRequest),
     Moderations(&'a CreateModerationRequest),
     ImagesGenerations(&'a CreateImageRequest),

@@ -6,7 +6,9 @@ use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
 };
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
-use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
+use sdkwork_api_contract_openai::chat_completions::{
+    CreateChatCompletionRequest, UpdateChatCompletionRequest,
+};
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::evals::CreateEvalRequest;
@@ -15,7 +17,9 @@ use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::CreateImageRequest;
 use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
-use sdkwork_api_contract_openai::responses::CreateResponseRequest;
+use sdkwork_api_contract_openai::responses::{
+    CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
+};
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest,
 };
@@ -58,6 +62,54 @@ impl OpenAiProviderAdapter {
             .await
     }
 
+    pub async fn list_chat_completions(&self, api_key: &str) -> Result<Value> {
+        self.get_json("/v1/chat/completions", api_key).await
+    }
+
+    pub async fn retrieve_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.get_json(&format!("/v1/chat/completions/{completion_id}"), api_key)
+            .await
+    }
+
+    pub async fn update_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+        request: &UpdateChatCompletionRequest,
+    ) -> Result<Value> {
+        self.post_json(
+            &format!("/v1/chat/completions/{completion_id}"),
+            api_key,
+            request,
+        )
+        .await
+    }
+
+    pub async fn delete_chat_completion(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.delete_json(&format!("/v1/chat/completions/{completion_id}"), api_key)
+            .await
+    }
+
+    pub async fn list_chat_completion_messages(
+        &self,
+        api_key: &str,
+        completion_id: &str,
+    ) -> Result<Value> {
+        self.get_json(
+            &format!("/v1/chat/completions/{completion_id}/messages"),
+            api_key,
+        )
+        .await
+    }
+
     pub async fn chat_completions_stream(
         &self,
         api_key: &str,
@@ -69,6 +121,15 @@ impl OpenAiProviderAdapter {
 
     pub async fn responses(&self, api_key: &str, request: &CreateResponseRequest) -> Result<Value> {
         self.post_json("/v1/responses", api_key, request).await
+    }
+
+    pub async fn count_response_input_tokens(
+        &self,
+        api_key: &str,
+        request: &CountResponseInputTokensRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/responses/input_tokens", api_key, request)
+            .await
     }
 
     pub async fn retrieve_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
@@ -87,6 +148,30 @@ impl OpenAiProviderAdapter {
         response_id: &str,
     ) -> Result<Value> {
         self.get_json(&format!("/v1/responses/{response_id}/input_items"), api_key)
+            .await
+    }
+
+    pub async fn cancel_response(&self, api_key: &str, response_id: &str) -> Result<Value> {
+        let response = self
+            .client
+            .post(format!(
+                "{}/v1/responses/{response_id}/cancel",
+                self.base_url
+            ))
+            .bearer_auth(api_key)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(response.json::<Value>().await?)
+    }
+
+    pub async fn compact_response(
+        &self,
+        api_key: &str,
+        request: &CompactResponseRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/responses/compact", api_key, request)
             .await
     }
 
@@ -665,11 +750,36 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::ChatCompletionsStream(request) => Ok(ProviderOutput::Stream(
                 self.chat_completions_stream(api_key, request).await?,
             )),
+            ProviderRequest::ChatCompletionsList => Ok(ProviderOutput::Json(
+                self.list_chat_completions(api_key).await?,
+            )),
+            ProviderRequest::ChatCompletionsRetrieve(completion_id) => Ok(ProviderOutput::Json(
+                self.retrieve_chat_completion(api_key, completion_id)
+                    .await?,
+            )),
+            ProviderRequest::ChatCompletionsUpdate(completion_id, request) => {
+                Ok(ProviderOutput::Json(
+                    self.update_chat_completion(api_key, completion_id, request)
+                        .await?,
+                ))
+            }
+            ProviderRequest::ChatCompletionsDelete(completion_id) => Ok(ProviderOutput::Json(
+                self.delete_chat_completion(api_key, completion_id).await?,
+            )),
+            ProviderRequest::ChatCompletionsMessagesList(completion_id) => {
+                Ok(ProviderOutput::Json(
+                    self.list_chat_completion_messages(api_key, completion_id)
+                        .await?,
+                ))
+            }
             ProviderRequest::Completions(request) => Ok(ProviderOutput::Json(
                 self.completions(api_key, request).await?,
             )),
             ProviderRequest::Responses(request) => Ok(ProviderOutput::Json(
                 self.responses(api_key, request).await?,
+            )),
+            ProviderRequest::ResponsesInputTokens(request) => Ok(ProviderOutput::Json(
+                self.count_response_input_tokens(api_key, request).await?,
             )),
             ProviderRequest::ResponsesRetrieve(response_id) => Ok(ProviderOutput::Json(
                 self.retrieve_response(api_key, response_id).await?,
@@ -679,6 +789,12 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             )),
             ProviderRequest::ResponsesInputItemsList(response_id) => Ok(ProviderOutput::Json(
                 self.list_response_input_items(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesCancel(response_id) => Ok(ProviderOutput::Json(
+                self.cancel_response(api_key, response_id).await?,
+            )),
+            ProviderRequest::ResponsesCompact(request) => Ok(ProviderOutput::Json(
+                self.compact_response(api_key, request).await?,
             )),
             ProviderRequest::Embeddings(request) => Ok(ProviderOutput::Json(
                 self.embeddings(api_key, request).await?,

@@ -11,8 +11,11 @@ use sdkwork_api_contract_openai::audio::{
     TranscriptionObject, TranslationObject,
 };
 use sdkwork_api_contract_openai::batches::{BatchObject, CreateBatchRequest, ListBatchesResponse};
-use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
-use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
+use sdkwork_api_contract_openai::chat_completions::{
+    ChatCompletionMessageObject, ChatCompletionResponse, CreateChatCompletionRequest,
+    DeleteChatCompletionResponse, ListChatCompletionMessagesResponse, ListChatCompletionsResponse,
+    UpdateChatCompletionRequest,
+};
 use sdkwork_api_contract_openai::completions::{CompletionObject, CreateCompletionRequest};
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse;
@@ -30,8 +33,9 @@ use sdkwork_api_contract_openai::moderations::{
 };
 use sdkwork_api_contract_openai::realtime::{CreateRealtimeSessionRequest, RealtimeSessionObject};
 use sdkwork_api_contract_openai::responses::{
-    CreateResponseRequest, DeleteResponseResponse, ListResponseInputItemsResponse,
-    ResponseInputItemObject, ResponseObject,
+    CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
+    DeleteResponseResponse, ListResponseInputItemsResponse, ResponseCompactionObject,
+    ResponseInputItemObject, ResponseInputTokensObject, ResponseObject,
 };
 use sdkwork_api_contract_openai::uploads::{
     AddUploadPartRequest, CompleteUploadRequest, CreateUploadRequest, UploadObject,
@@ -124,6 +128,141 @@ pub async fn relay_chat_completion_from_store(
     .await
 }
 
+pub async fn relay_list_chat_completions_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "chat_completion", "chat_completions").await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsList,
+    )
+    .await
+}
+
+pub async fn relay_get_chat_completion_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "chat_completion", completion_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsRetrieve(completion_id),
+    )
+    .await
+}
+
+pub async fn relay_update_chat_completion_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+    request: &UpdateChatCompletionRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "chat_completion", completion_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsUpdate(completion_id, request),
+    )
+    .await
+}
+
+pub async fn relay_delete_chat_completion_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "chat_completion", completion_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsDelete(completion_id),
+    )
+    .await
+}
+
+pub async fn relay_list_chat_completion_messages_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "chat_completion", completion_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ChatCompletionsMessagesList(completion_id),
+    )
+    .await
+}
+
 pub async fn relay_chat_completion_stream_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -178,6 +317,33 @@ pub async fn relay_response_from_store(
     .await
 }
 
+pub async fn relay_count_response_input_tokens_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CountResponseInputTokensRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesInputTokens(request),
+    )
+    .await
+}
+
 pub async fn relay_get_response_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -205,6 +371,33 @@ pub async fn relay_get_response_from_store(
     .await
 }
 
+pub async fn relay_cancel_response_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", response_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesCancel(response_id),
+    )
+    .await
+}
+
 pub async fn relay_delete_response_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -228,6 +421,33 @@ pub async fn relay_delete_response_from_store(
         provider.base_url,
         &api_key,
         ProviderRequest::ResponsesDelete(response_id),
+    )
+    .await
+}
+
+pub async fn relay_compact_response_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CompactResponseRequest,
+) -> Result<Option<Value>> {
+    let decision = simulate_route_with_store(store, "responses", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request(
+        &provider.adapter_kind,
+        provider.base_url,
+        &api_key,
+        ProviderRequest::ResponsesCompact(request),
     )
     .await
 }
@@ -1788,8 +2008,64 @@ pub fn create_chat_completion(
     Ok(ChatCompletionResponse::empty("chatcmpl_1", model))
 }
 
+pub fn list_chat_completions(
+    _tenant_id: &str,
+    _project_id: &str,
+) -> Result<ListChatCompletionsResponse> {
+    Ok(ListChatCompletionsResponse::new(vec![
+        ChatCompletionResponse::empty("chatcmpl_1", "gpt-4.1"),
+    ]))
+}
+
+pub fn get_chat_completion(
+    _tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+) -> Result<ChatCompletionResponse> {
+    Ok(ChatCompletionResponse::empty(completion_id, "gpt-4.1"))
+}
+
+pub fn update_chat_completion(
+    _tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+    metadata: Value,
+) -> Result<ChatCompletionResponse> {
+    Ok(ChatCompletionResponse::with_metadata(
+        completion_id,
+        "gpt-4.1",
+        metadata,
+    ))
+}
+
+pub fn delete_chat_completion(
+    _tenant_id: &str,
+    _project_id: &str,
+    completion_id: &str,
+) -> Result<DeleteChatCompletionResponse> {
+    Ok(DeleteChatCompletionResponse::deleted(completion_id))
+}
+
+pub fn list_chat_completion_messages(
+    _tenant_id: &str,
+    _project_id: &str,
+    _completion_id: &str,
+) -> Result<ListChatCompletionMessagesResponse> {
+    Ok(ListChatCompletionMessagesResponse::new(vec![
+        ChatCompletionMessageObject::assistant("msg_1", "hello"),
+    ]))
+}
+
 pub fn create_response(_tenant_id: &str, _project_id: &str, model: &str) -> Result<ResponseObject> {
     Ok(ResponseObject::empty("resp_1", model))
+}
+
+pub fn count_response_input_tokens(
+    _tenant_id: &str,
+    _project_id: &str,
+    _model: &str,
+) -> Result<ResponseInputTokensObject> {
+    Ok(ResponseInputTokensObject::new(42))
 }
 
 pub fn get_response(
@@ -1816,6 +2092,22 @@ pub fn delete_response(
     response_id: &str,
 ) -> Result<DeleteResponseResponse> {
     Ok(DeleteResponseResponse::deleted(response_id))
+}
+
+pub fn cancel_response(
+    _tenant_id: &str,
+    _project_id: &str,
+    response_id: &str,
+) -> Result<ResponseObject> {
+    Ok(ResponseObject::cancelled(response_id, "gpt-4.1"))
+}
+
+pub fn compact_response(
+    _tenant_id: &str,
+    _project_id: &str,
+    model: &str,
+) -> Result<ResponseCompactionObject> {
+    Ok(ResponseCompactionObject::new("resp_cmp_1", model))
 }
 
 pub fn create_completion(
