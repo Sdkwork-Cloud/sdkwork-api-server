@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sdkwork_api_domain_usage::UsageRecord;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 
 pub fn service_name() -> &'static str {
     "usage-service"
@@ -11,7 +11,7 @@ pub fn record_usage(project_id: &str, model: &str, provider: &str) -> Result<Usa
 }
 
 pub async fn persist_usage_record(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     project_id: &str,
     model: &str,
     provider: &str,
@@ -20,6 +20,6 @@ pub async fn persist_usage_record(
     store.insert_usage_record(&usage).await
 }
 
-pub async fn list_usage_records(store: &SqliteAdminStore) -> Result<Vec<UsageRecord>> {
+pub async fn list_usage_records(store: &dyn AdminStore) -> Result<Vec<UsageRecord>> {
     store.list_usage_records().await
 }

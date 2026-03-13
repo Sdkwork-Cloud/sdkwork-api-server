@@ -32,7 +32,7 @@ Backend:
   - batches
   - webhooks
   - evals
-- SQLite-backed control plane persistence for:
+- SQLite and PostgreSQL backed control plane persistence for:
   - tenants
   - projects
   - gateway API keys
@@ -81,7 +81,7 @@ Known gaps:
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - the broader API families beyond models/chat/responses/embeddings/streaming are contract-defined but not yet wired to HTTP handlers or upstream adapters
 - routing policies are still placeholder-only; current routing uses catalog candidates plus deterministic fallback
-- only SQLite is fully implemented as an active persistence driver; PostgreSQL, MySQL, and libsql remain extension boundaries
+- SQLite and PostgreSQL are active persistence drivers; MySQL and libsql remain extension boundaries
 
 ## Minimal Upstream Relay Setup
 

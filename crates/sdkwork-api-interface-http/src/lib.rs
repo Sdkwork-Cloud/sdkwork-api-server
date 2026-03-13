@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     body::Body,
     extract::Json as ExtractJson,
@@ -21,12 +23,13 @@ use sdkwork_api_contract_openai::chat_completions::CreateChatCompletionRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::responses::CreateResponseRequest;
 use sdkwork_api_contract_openai::streaming::SseFrame;
+use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use sqlx::SqlitePool;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GatewayApiState {
-    store: SqliteAdminStore,
+    store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 }
 
@@ -36,15 +39,25 @@ impl GatewayApiState {
     }
 
     pub fn with_master_key(pool: SqlitePool, credential_master_key: impl Into<String>) -> Self {
-        Self {
-            store: SqliteAdminStore::new(pool),
-            secret_manager: CredentialSecretManager::database_encrypted(credential_master_key),
-        }
+        Self::with_store_and_secret_manager(
+            Arc::new(SqliteAdminStore::new(pool)),
+            CredentialSecretManager::database_encrypted(credential_master_key),
+        )
     }
 
     pub fn with_secret_manager(pool: SqlitePool, secret_manager: CredentialSecretManager) -> Self {
         Self {
-            store: SqliteAdminStore::new(pool),
+            store: Arc::new(SqliteAdminStore::new(pool)),
+            secret_manager,
+        }
+    }
+
+    pub fn with_store_and_secret_manager(
+        store: Arc<dyn AdminStore>,
+        secret_manager: CredentialSecretManager,
+    ) -> Self {
+        Self {
+            store,
             secret_manager,
         }
     }
@@ -63,18 +76,35 @@ pub fn gateway_router_with_pool(pool: SqlitePool) -> Router {
     gateway_router_with_pool_and_master_key(pool, "local-dev-master-key")
 }
 
+pub fn gateway_router_with_store(store: Arc<dyn AdminStore>) -> Router {
+    gateway_router_with_store_and_secret_manager(
+        store,
+        CredentialSecretManager::database_encrypted("local-dev-master-key"),
+    )
+}
+
 pub fn gateway_router_with_pool_and_master_key(
     pool: SqlitePool,
     credential_master_key: impl Into<String>,
 ) -> Router {
-    gateway_router_with_pool_and_secret_manager(
-        pool,
+    gateway_router_with_store_and_secret_manager(
+        Arc::new(SqliteAdminStore::new(pool)),
         CredentialSecretManager::database_encrypted(credential_master_key),
     )
 }
 
 pub fn gateway_router_with_pool_and_secret_manager(
     pool: SqlitePool,
+    secret_manager: CredentialSecretManager,
+) -> Router {
+    gateway_router_with_store_and_secret_manager(
+        Arc::new(SqliteAdminStore::new(pool)),
+        secret_manager,
+    )
+}
+
+pub fn gateway_router_with_store_and_secret_manager(
+    store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 ) -> Router {
     Router::new()
@@ -86,7 +116,10 @@ pub fn gateway_router_with_pool_and_secret_manager(
         )
         .route("/v1/responses", post(responses_with_state_handler))
         .route("/v1/embeddings", post(embeddings_with_state_handler))
-        .with_state(GatewayApiState::with_secret_manager(pool, secret_manager))
+        .with_state(GatewayApiState::with_store_and_secret_manager(
+            store,
+            secret_manager,
+        ))
 }
 
 async fn list_models_handler() -> Json<sdkwork_api_contract_openai::models::ListModelsResponse> {
@@ -96,7 +129,7 @@ async fn list_models_handler() -> Json<sdkwork_api_contract_openai::models::List
 async fn list_models_from_store_handler(
     State(state): State<GatewayApiState>,
 ) -> Result<Json<sdkwork_api_contract_openai::models::ListModelsResponse>, Response> {
-    list_models_from_store(&state.store, "tenant-1", "project-1")
+    list_models_from_store(state.store.as_ref(), "tenant-1", "project-1")
         .await
         .map(Json)
         .map_err(|_| {
@@ -145,7 +178,7 @@ async fn chat_completions_with_state_handler(
 ) -> Response {
     if request.stream.unwrap_or(false) {
         match relay_chat_completion_stream_from_store(
-            &state.store,
+            state.store.as_ref(),
             &state.secret_manager,
             "tenant-1",
             "project-1",
@@ -155,7 +188,7 @@ async fn chat_completions_with_state_handler(
         {
             Ok(Some(response)) => {
                 let usage_result = record_gateway_usage(
-                    &state.store,
+                    state.store.as_ref(),
                     "chat_completion",
                     &request.model,
                     100,
@@ -183,7 +216,7 @@ async fn chat_completions_with_state_handler(
         }
     } else {
         match relay_chat_completion_from_store(
-            &state.store,
+            state.store.as_ref(),
             &state.secret_manager,
             "tenant-1",
             "project-1",
@@ -193,7 +226,7 @@ async fn chat_completions_with_state_handler(
         {
             Ok(Some(response)) => {
                 let usage_result = record_gateway_usage(
-                    &state.store,
+                    state.store.as_ref(),
                     "chat_completion",
                     &request.model,
                     100,
@@ -221,8 +254,14 @@ async fn chat_completions_with_state_handler(
         }
     }
 
-    let usage_result =
-        record_gateway_usage(&state.store, "chat_completion", &request.model, 100, 0.10).await;
+    let usage_result = record_gateway_usage(
+        state.store.as_ref(),
+        "chat_completion",
+        &request.model,
+        100,
+        0.10,
+    )
+    .await;
     if usage_result.is_err() {
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -267,7 +306,7 @@ async fn responses_with_state_handler(
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
     match relay_response_from_store(
-        &state.store,
+        state.store.as_ref(),
         &state.secret_manager,
         "tenant-1",
         "project-1",
@@ -276,7 +315,7 @@ async fn responses_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(&state.store, "responses", &request.model, 120, 0.12)
+            if record_gateway_usage(state.store.as_ref(), "responses", &request.model, 120, 0.12)
                 .await
                 .is_err()
             {
@@ -299,7 +338,7 @@ async fn responses_with_state_handler(
         }
     }
 
-    if record_gateway_usage(&state.store, "responses", &request.model, 120, 0.12)
+    if record_gateway_usage(state.store.as_ref(), "responses", &request.model, 120, 0.12)
         .await
         .is_err()
     {
@@ -319,7 +358,7 @@ async fn embeddings_with_state_handler(
     ExtractJson(request): ExtractJson<CreateEmbeddingRequest>,
 ) -> Response {
     match relay_embedding_from_store(
-        &state.store,
+        state.store.as_ref(),
         &state.secret_manager,
         "tenant-1",
         "project-1",
@@ -328,7 +367,7 @@ async fn embeddings_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            if record_gateway_usage(&state.store, "embeddings", &request.model, 10, 0.01)
+            if record_gateway_usage(state.store.as_ref(), "embeddings", &request.model, 10, 0.01)
                 .await
                 .is_err()
             {
@@ -351,7 +390,7 @@ async fn embeddings_with_state_handler(
         }
     }
 
-    if record_gateway_usage(&state.store, "embeddings", &request.model, 10, 0.01)
+    if record_gateway_usage(state.store.as_ref(), "embeddings", &request.model, 10, 0.01)
         .await
         .is_err()
     {
@@ -367,7 +406,7 @@ async fn embeddings_with_state_handler(
 }
 
 async fn record_gateway_usage(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     capability: &str,
     model: &str,
     units: u64,

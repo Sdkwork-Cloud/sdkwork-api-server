@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -67,7 +67,7 @@ impl CreateGatewayApiKey {
 }
 
 pub async fn persist_gateway_api_key(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
     environment: &str,
@@ -79,6 +79,6 @@ pub async fn persist_gateway_api_key(
     Ok(created)
 }
 
-pub async fn list_gateway_api_keys(store: &SqliteAdminStore) -> Result<Vec<GatewayApiKeyRecord>> {
+pub async fn list_gateway_api_keys(store: &dyn AdminStore) -> Result<Vec<GatewayApiKeyRecord>> {
     store.list_gateway_api_keys().await
 }

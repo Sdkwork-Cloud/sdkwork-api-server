@@ -11,6 +11,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 
 [dev-dependencies]

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 
 pub fn service_name() -> &'static str {
     "catalog-service"
@@ -20,12 +20,12 @@ pub fn create_provider(id: &str, channel_id: &str, display_name: &str) -> Result
     ))
 }
 
-pub async fn persist_channel(store: &SqliteAdminStore, id: &str, name: &str) -> Result<Channel> {
+pub async fn persist_channel(store: &dyn AdminStore, id: &str, name: &str) -> Result<Channel> {
     let channel = create_channel(id, name)?;
     store.insert_channel(&channel).await
 }
 
-pub async fn list_channels(store: &SqliteAdminStore) -> Result<Vec<Channel>> {
+pub async fn list_channels(store: &dyn AdminStore) -> Result<Vec<Channel>> {
     store.list_channels().await
 }
 
@@ -46,7 +46,7 @@ pub fn create_provider_with_config(
 }
 
 pub async fn persist_provider(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     id: &str,
     channel_id: &str,
     adapter_kind: &str,
@@ -58,7 +58,7 @@ pub async fn persist_provider(
     store.insert_provider(&provider).await
 }
 
-pub async fn list_providers(store: &SqliteAdminStore) -> Result<Vec<ProxyProvider>> {
+pub async fn list_providers(store: &dyn AdminStore) -> Result<Vec<ProxyProvider>> {
     store.list_providers().await
 }
 
@@ -67,7 +67,7 @@ pub fn create_model(external_name: &str, provider_id: &str) -> Result<ModelCatal
 }
 
 pub async fn persist_model(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     external_name: &str,
     provider_id: &str,
 ) -> Result<ModelCatalogEntry> {
@@ -75,6 +75,6 @@ pub async fn persist_model(
     store.insert_model(&model).await
 }
 
-pub async fn list_model_entries(store: &SqliteAdminStore) -> Result<Vec<ModelCatalogEntry>> {
+pub async fn list_model_entries(store: &dyn AdminStore) -> Result<Vec<ModelCatalogEntry>> {
     store.list_models().await
 }

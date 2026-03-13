@@ -15,6 +15,7 @@ sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde_json.workspace = true
 sqlx.workspace = true

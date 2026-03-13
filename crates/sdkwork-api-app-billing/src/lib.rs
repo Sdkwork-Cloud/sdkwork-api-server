@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sdkwork_api_domain_billing::LedgerEntry;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 
 pub fn service_name() -> &'static str {
     "billing-service"
@@ -15,7 +15,7 @@ pub fn book_usage_cost(project_id: &str, units: u64, amount: f64) -> Result<Ledg
 }
 
 pub async fn persist_ledger_entry(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     project_id: &str,
     units: u64,
     amount: f64,
@@ -24,6 +24,6 @@ pub async fn persist_ledger_entry(
     store.insert_ledger_entry(&entry).await
 }
 
-pub async fn list_ledger_entries(store: &SqliteAdminStore) -> Result<Vec<LedgerEntry>> {
+pub async fn list_ledger_entries(store: &dyn AdminStore) -> Result<Vec<LedgerEntry>> {
     store.list_ledger_entries().await
 }

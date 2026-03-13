@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sdkwork_api_domain_routing::RoutingDecision;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 
 pub fn service_name() -> &'static str {
     "routing-service"
@@ -14,7 +14,7 @@ pub fn simulate_route(_capability: &str, _model: &str) -> Result<RoutingDecision
 }
 
 pub async fn simulate_route_with_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     capability: &str,
     model: &str,
 ) -> Result<RoutingDecision> {

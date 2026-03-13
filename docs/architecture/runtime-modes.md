@@ -8,9 +8,9 @@ Characteristics:
 
 - services run as independent binaries
 - gateway and admin APIs are exposed over HTTP
-- PostgreSQL is the preferred deployment database
+- PostgreSQL is the preferred deployment database and is now supported by the shared admin store runtime
 - upstream credentials are expected to be managed by a server-side secret backend strategy
-- the current repository runs `gateway-service` and `admin-api-service` against the same SQLite database by default for local development
+- the current repository can run `gateway-service` and `admin-api-service` against either SQLite or PostgreSQL through the same storage abstraction
 
 ## Embedded Mode
 
@@ -34,6 +34,7 @@ The current repository includes:
 - a Tauri shell scaffold with an initial runtime command
 - a live React console that consumes admin APIs for workspace, channel mesh, routing simulation, and telemetry views
 - SQLite-backed control-plane persistence for identity, catalog, usage, and billing slices
+- PostgreSQL-backed control-plane persistence for the same admin store contract
 - encrypted upstream credential persistence and runtime secret resolution
 - stateful OpenAI-compatible upstream relay for chat completions, responses, embeddings, and chat SSE when provider configuration is present
 - runtime config modeling for storage dialect inference plus secret backend strategy selection

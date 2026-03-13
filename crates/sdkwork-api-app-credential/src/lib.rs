@@ -6,7 +6,7 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_secret_core::{decrypt, encrypt, CredentialSecretRef, SecretBackendKind};
 use sdkwork_api_secret_keyring::{KeyringBackend, KeyringSecretStore};
 use sdkwork_api_secret_local::LocalEncryptedFileSecretStore;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 
 pub fn service_name() -> &'static str {
     "credential-service"
@@ -89,7 +89,7 @@ impl CredentialSecretManager {
 
     async fn persist_secret(
         &self,
-        store: &SqliteAdminStore,
+        store: &dyn AdminStore,
         credential: &UpstreamCredential,
         secret_value: &str,
     ) -> Result<UpstreamCredential> {
@@ -116,7 +116,7 @@ impl CredentialSecretManager {
 
     async fn resolve_secret(
         &self,
-        store: &SqliteAdminStore,
+        store: &dyn AdminStore,
         credential: &UpstreamCredential,
     ) -> Result<String> {
         let secret_ref = self.secret_ref(credential);
@@ -170,7 +170,7 @@ pub fn save_credential_with_backend(
 }
 
 pub async fn persist_credential(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     tenant_id: &str,
     provider_id: &str,
     key_reference: &str,
@@ -180,7 +180,7 @@ pub async fn persist_credential(
 }
 
 pub async fn persist_credential_with_secret(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     master_key: &str,
     tenant_id: &str,
     provider_id: &str,
@@ -200,7 +200,7 @@ pub async fn persist_credential_with_secret(
 }
 
 pub async fn persist_credential_with_secret_and_manager(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     manager: &CredentialSecretManager,
     tenant_id: &str,
     provider_id: &str,
@@ -218,12 +218,12 @@ pub async fn persist_credential_with_secret_and_manager(
         .await
 }
 
-pub async fn list_credentials(store: &SqliteAdminStore) -> Result<Vec<UpstreamCredential>> {
+pub async fn list_credentials(store: &dyn AdminStore) -> Result<Vec<UpstreamCredential>> {
     store.list_credentials().await
 }
 
 pub async fn resolve_credential_secret(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     master_key: &str,
     tenant_id: &str,
     provider_id: &str,
@@ -235,7 +235,7 @@ pub async fn resolve_credential_secret(
 }
 
 pub async fn resolve_credential_secret_with_manager(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     manager: &CredentialSecretManager,
     tenant_id: &str,
     provider_id: &str,
@@ -249,7 +249,7 @@ pub async fn resolve_credential_secret_with_manager(
 }
 
 pub async fn resolve_provider_secret(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     master_key: &str,
     tenant_id: &str,
     provider_id: &str,
@@ -259,7 +259,7 @@ pub async fn resolve_provider_secret(
 }
 
 pub async fn resolve_provider_secret_with_manager(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     manager: &CredentialSecretManager,
     tenant_id: &str,
     provider_id: &str,

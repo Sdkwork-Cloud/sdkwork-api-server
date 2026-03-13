@@ -12,7 +12,7 @@ use sdkwork_api_provider_core::{ProviderRegistry, ProviderRequest};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
-use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use sdkwork_api_storage_core::AdminStore;
 use serde_json::Value;
 
 pub fn service_name() -> &'static str {
@@ -26,7 +26,7 @@ pub fn list_models(_tenant_id: &str, _project_id: &str) -> Result<ListModelsResp
 }
 
 pub async fn list_models_from_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     _tenant_id: &str,
     _project_id: &str,
 ) -> Result<ListModelsResponse> {
@@ -40,7 +40,7 @@ pub async fn list_models_from_store(
 }
 
 pub async fn relay_chat_completion_from_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
     _project_id: &str,
@@ -67,7 +67,7 @@ pub async fn relay_chat_completion_from_store(
 }
 
 pub async fn relay_chat_completion_stream_from_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
     _project_id: &str,
@@ -94,7 +94,7 @@ pub async fn relay_chat_completion_stream_from_store(
 }
 
 pub async fn relay_response_from_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
     _project_id: &str,
@@ -121,7 +121,7 @@ pub async fn relay_response_from_store(
 }
 
 pub async fn relay_embedding_from_store(
-    store: &SqliteAdminStore,
+    store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
     _project_id: &str,

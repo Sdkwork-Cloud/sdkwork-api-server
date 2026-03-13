@@ -66,6 +66,6 @@
 | Driver | Status |
 |---|---|
 | SQLite | Active implementation with control-plane and telemetry persistence |
-| PostgreSQL | Boundary crate implemented |
+| PostgreSQL | Active implementation with shared admin store parity and standalone service startup support |
 | MySQL | Boundary crate implemented |
 | libsql | Boundary crate implemented |

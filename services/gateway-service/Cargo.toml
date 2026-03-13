@@ -10,5 +10,7 @@ axum.workspace = true
 sdkwork-api-app-credential = { path = "../../crates/sdkwork-api-app-credential" }
 sdkwork-api-config = { path = "../../crates/sdkwork-api-config" }
 sdkwork-api-interface-http = { path = "../../crates/sdkwork-api-interface-http" }
+sdkwork-api-storage-core = { path = "../../crates/sdkwork-api-storage-core" }
+sdkwork-api-storage-postgres = { path = "../../crates/sdkwork-api-storage-postgres" }
 sdkwork-api-storage-sqlite = { path = "../../crates/sdkwork-api-storage-sqlite" }
 tokio.workspace = true

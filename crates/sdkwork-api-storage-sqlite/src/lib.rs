@@ -6,6 +6,7 @@ use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_secret_core::SecretEnvelope;
+use sdkwork_api_storage_core::{AdminStore, StorageDialect};
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
@@ -572,5 +573,129 @@ impl SqliteAdminStore {
                 },
             )
             .collect())
+    }
+}
+
+#[async_trait::async_trait]
+impl AdminStore for SqliteAdminStore {
+    fn dialect(&self) -> StorageDialect {
+        StorageDialect::Sqlite
+    }
+
+    async fn insert_channel(&self, channel: &Channel) -> Result<Channel> {
+        SqliteAdminStore::insert_channel(self, channel).await
+    }
+
+    async fn list_channels(&self) -> Result<Vec<Channel>> {
+        SqliteAdminStore::list_channels(self).await
+    }
+
+    async fn insert_provider(&self, provider: &ProxyProvider) -> Result<ProxyProvider> {
+        SqliteAdminStore::insert_provider(self, provider).await
+    }
+
+    async fn list_providers(&self) -> Result<Vec<ProxyProvider>> {
+        SqliteAdminStore::list_providers(self).await
+    }
+
+    async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>> {
+        SqliteAdminStore::find_provider(self, provider_id).await
+    }
+
+    async fn insert_credential(
+        &self,
+        credential: &UpstreamCredential,
+    ) -> Result<UpstreamCredential> {
+        SqliteAdminStore::insert_credential(self, credential).await
+    }
+
+    async fn insert_encrypted_credential(
+        &self,
+        credential: &UpstreamCredential,
+        envelope: &SecretEnvelope,
+    ) -> Result<UpstreamCredential> {
+        SqliteAdminStore::insert_encrypted_credential(self, credential, envelope).await
+    }
+
+    async fn list_credentials(&self) -> Result<Vec<UpstreamCredential>> {
+        SqliteAdminStore::list_credentials(self).await
+    }
+
+    async fn find_credential(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        key_reference: &str,
+    ) -> Result<Option<UpstreamCredential>> {
+        SqliteAdminStore::find_credential(self, tenant_id, provider_id, key_reference).await
+    }
+
+    async fn find_credential_envelope(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        key_reference: &str,
+    ) -> Result<Option<SecretEnvelope>> {
+        SqliteAdminStore::find_credential_envelope(self, tenant_id, provider_id, key_reference)
+            .await
+    }
+
+    async fn find_provider_credential(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+    ) -> Result<Option<UpstreamCredential>> {
+        SqliteAdminStore::find_provider_credential(self, tenant_id, provider_id).await
+    }
+
+    async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {
+        SqliteAdminStore::insert_model(self, model).await
+    }
+
+    async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>> {
+        SqliteAdminStore::list_models(self).await
+    }
+
+    async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
+        SqliteAdminStore::insert_usage_record(self, record).await
+    }
+
+    async fn list_usage_records(&self) -> Result<Vec<UsageRecord>> {
+        SqliteAdminStore::list_usage_records(self).await
+    }
+
+    async fn insert_ledger_entry(&self, entry: &LedgerEntry) -> Result<LedgerEntry> {
+        SqliteAdminStore::insert_ledger_entry(self, entry).await
+    }
+
+    async fn list_ledger_entries(&self) -> Result<Vec<LedgerEntry>> {
+        SqliteAdminStore::list_ledger_entries(self).await
+    }
+
+    async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant> {
+        SqliteAdminStore::insert_tenant(self, tenant).await
+    }
+
+    async fn list_tenants(&self) -> Result<Vec<Tenant>> {
+        SqliteAdminStore::list_tenants(self).await
+    }
+
+    async fn insert_project(&self, project: &Project) -> Result<Project> {
+        SqliteAdminStore::insert_project(self, project).await
+    }
+
+    async fn list_projects(&self) -> Result<Vec<Project>> {
+        SqliteAdminStore::list_projects(self).await
+    }
+
+    async fn insert_gateway_api_key(
+        &self,
+        record: &GatewayApiKeyRecord,
+    ) -> Result<GatewayApiKeyRecord> {
+        SqliteAdminStore::insert_gateway_api_key(self, record).await
+    }
+
+    async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
+        SqliteAdminStore::list_gateway_api_keys(self).await
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::State,
     http::StatusCode,
@@ -24,13 +26,14 @@ use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AdminApiState {
-    store: SqliteAdminStore,
+    store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 }
 
@@ -40,15 +43,25 @@ impl AdminApiState {
     }
 
     pub fn with_master_key(pool: SqlitePool, credential_master_key: impl Into<String>) -> Self {
-        Self {
-            store: SqliteAdminStore::new(pool),
-            secret_manager: CredentialSecretManager::database_encrypted(credential_master_key),
-        }
+        Self::with_store_and_secret_manager(
+            Arc::new(SqliteAdminStore::new(pool)),
+            CredentialSecretManager::database_encrypted(credential_master_key),
+        )
     }
 
     pub fn with_secret_manager(pool: SqlitePool, secret_manager: CredentialSecretManager) -> Self {
         Self {
-            store: SqliteAdminStore::new(pool),
+            store: Arc::new(SqliteAdminStore::new(pool)),
+            secret_manager,
+        }
+    }
+
+    pub fn with_store_and_secret_manager(
+        store: Arc<dyn AdminStore>,
+        secret_manager: CredentialSecretManager,
+    ) -> Self {
+        Self {
+            store,
             secret_manager,
         }
     }
@@ -151,18 +164,35 @@ pub fn admin_router_with_pool(pool: SqlitePool) -> Router {
     admin_router_with_pool_and_master_key(pool, "local-dev-master-key")
 }
 
+pub fn admin_router_with_store(store: Arc<dyn AdminStore>) -> Router {
+    admin_router_with_store_and_secret_manager(
+        store,
+        CredentialSecretManager::database_encrypted("local-dev-master-key"),
+    )
+}
+
 pub fn admin_router_with_pool_and_master_key(
     pool: SqlitePool,
     credential_master_key: impl Into<String>,
 ) -> Router {
-    admin_router_with_pool_and_secret_manager(
-        pool,
+    admin_router_with_store_and_secret_manager(
+        Arc::new(SqliteAdminStore::new(pool)),
         CredentialSecretManager::database_encrypted(credential_master_key),
     )
 }
 
 pub fn admin_router_with_pool_and_secret_manager(
     pool: SqlitePool,
+    secret_manager: CredentialSecretManager,
+) -> Router {
+    admin_router_with_store_and_secret_manager(
+        Arc::new(SqliteAdminStore::new(pool)),
+        secret_manager,
+    )
+}
+
+pub fn admin_router_with_store_and_secret_manager(
+    store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
 ) -> Router {
     Router::new()
@@ -201,7 +231,10 @@ pub fn admin_router_with_pool_and_secret_manager(
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route("/admin/routing/simulations", post(simulate_routing_handler))
-        .with_state(AdminApiState::with_secret_manager(pool, secret_manager))
+        .with_state(AdminApiState::with_store_and_secret_manager(
+            store,
+            secret_manager,
+        ))
 }
 
 async fn login_handler(
@@ -215,7 +248,7 @@ async fn login_handler(
 async fn list_channels_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Channel>>, StatusCode> {
-    list_channels(&state.store)
+    list_channels(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -225,7 +258,7 @@ async fn create_channel_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<Channel>), StatusCode> {
-    let channel = persist_channel(&state.store, &request.id, &request.name)
+    let channel = persist_channel(state.store.as_ref(), &request.id, &request.name)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(channel)))
@@ -234,7 +267,7 @@ async fn create_channel_handler(
 async fn list_providers_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<ProxyProvider>>, StatusCode> {
-    list_providers(&state.store)
+    list_providers(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -245,7 +278,7 @@ async fn create_provider_handler(
     Json(request): Json<CreateProviderRequest>,
 ) -> Result<(StatusCode, Json<ProxyProvider>), StatusCode> {
     let provider = persist_provider(
-        &state.store,
+        state.store.as_ref(),
         &request.id,
         &request.channel_id,
         &request.adapter_kind,
@@ -260,7 +293,7 @@ async fn create_provider_handler(
 async fn list_credentials_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<UpstreamCredential>>, StatusCode> {
-    list_credentials(&state.store)
+    list_credentials(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -271,7 +304,7 @@ async fn create_credential_handler(
     Json(request): Json<CreateCredentialRequest>,
 ) -> Result<(StatusCode, Json<UpstreamCredential>), StatusCode> {
     let credential = persist_credential_with_secret_and_manager(
-        &state.store,
+        state.store.as_ref(),
         &state.secret_manager,
         &request.tenant_id,
         &request.provider_id,
@@ -286,7 +319,7 @@ async fn create_credential_handler(
 async fn list_models_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<ModelCatalogEntry>>, StatusCode> {
-    list_model_entries(&state.store)
+    list_model_entries(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -296,16 +329,20 @@ async fn create_model_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateModelRequest>,
 ) -> Result<(StatusCode, Json<ModelCatalogEntry>), StatusCode> {
-    let model = persist_model(&state.store, &request.external_name, &request.provider_id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let model = persist_model(
+        state.store.as_ref(),
+        &request.external_name,
+        &request.provider_id,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(model)))
 }
 
 async fn list_tenants_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Tenant>>, StatusCode> {
-    list_tenants(&state.store)
+    list_tenants(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -315,7 +352,7 @@ async fn create_tenant_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateTenantRequest>,
 ) -> Result<(StatusCode, Json<Tenant>), StatusCode> {
-    let tenant = persist_tenant(&state.store, &request.id, &request.name)
+    let tenant = persist_tenant(state.store.as_ref(), &request.id, &request.name)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(tenant)))
@@ -324,7 +361,7 @@ async fn create_tenant_handler(
 async fn list_projects_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<Project>>, StatusCode> {
-    list_projects(&state.store)
+    list_projects(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -334,16 +371,21 @@ async fn create_project_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>), StatusCode> {
-    let project = persist_project(&state.store, &request.tenant_id, &request.id, &request.name)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let project = persist_project(
+        state.store.as_ref(),
+        &request.tenant_id,
+        &request.id,
+        &request.name,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(project)))
 }
 
 async fn list_api_keys_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<GatewayApiKeyRecord>>, StatusCode> {
-    list_gateway_api_keys(&state.store)
+    list_gateway_api_keys(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -354,7 +396,7 @@ async fn create_api_key_handler(
     Json(request): Json<CreateApiKeyRequest>,
 ) -> Result<(StatusCode, Json<CreatedGatewayApiKey>), StatusCode> {
     let created = persist_gateway_api_key(
-        &state.store,
+        state.store.as_ref(),
         &request.tenant_id,
         &request.project_id,
         &request.environment,
@@ -368,9 +410,10 @@ async fn simulate_routing_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<RoutingSimulationRequest>,
 ) -> Result<Json<RoutingSimulationResponse>, StatusCode> {
-    let decision = simulate_route_with_store(&state.store, &request.capability, &request.model)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let decision =
+        simulate_route_with_store(state.store.as_ref(), &request.capability, &request.model)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(RoutingSimulationResponse {
         selected_provider_id: decision.selected_provider_id,
         candidate_ids: decision.candidate_ids,
@@ -380,7 +423,7 @@ async fn simulate_routing_handler(
 async fn list_usage_records_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<UsageRecord>>, StatusCode> {
-    list_usage_records(&state.store)
+    list_usage_records(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
@@ -389,7 +432,7 @@ async fn list_usage_records_handler(
 async fn list_ledger_entries_handler(
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<LedgerEntry>>, StatusCode> {
-    list_ledger_entries(&state.store)
+    list_ledger_entries(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
