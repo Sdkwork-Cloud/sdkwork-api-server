@@ -1,151 +1,256 @@
 # sdkwork-api-server
 
-SDKWork API Gateway is a Rust and Tauri oriented OpenAI-compatible gateway workspace.
+[中文说明](./README.zh-CN.md)
 
-It is organized as a composable backend plus a pnpm-based console:
+SDKWork API Gateway is an OpenAI-compatible gateway and control-plane workspace built with Rust, Axum, React, pnpm, and Tauri.
 
-- `services/gateway-service`: OpenAI-style `/v1/*` data plane
-- `services/admin-api-service`: control plane for tenants, projects, gateway keys, channels, providers, models, routing, usage, and billing
-- `crates/*`: domain, application, storage, provider, secret, interface, and runtime layers
-- `console/`: React workspace aligned to the SDKWork package architecture
-- `console/src-tauri/`: desktop host shell for embedded runtime mode
+It is designed for two runtime shapes:
 
-## What Works Today
+- `server` mode: standalone HTTP services for the gateway and admin API
+- `embedded` mode: an in-process runtime consumed by the Tauri desktop shell
+
+The repository combines:
+
+- OpenAI-compatible `/v1/*` gateway interfaces
+- an admin control plane for tenants, projects, API keys, channels, providers, routing, usage, billing, and extensions
+- pluggable provider execution through built-in, connector, and native dynamic extension runtimes
+- configurable local secret persistence
+- a React console aligned with the SDKWork package architecture
+
+## Repository Layout
+
+```text
+.
+├── crates/                     # Domain, app, interface, storage, runtime, provider crates
+├── services/
+│   ├── admin-api-service/      # Standalone admin HTTP service
+│   └── gateway-service/        # Standalone OpenAI-compatible gateway HTTP service
+├── console/                    # React + pnpm workspace + optional Tauri shell
+├── docs/                       # Architecture notes and implementation plans
+└── README.zh-CN.md             # Chinese mirror of this operational guide
+```
+
+## Prerequisites
+
+Minimum recommended toolchain:
+
+- Rust stable with Cargo
+- Node.js 20+
+- pnpm 10+
+
+Optional, depending on how you run the project:
+
+- PostgreSQL 15+ for standalone PostgreSQL-backed deployments
+- Tauri CLI for desktop development, for example `cargo install tauri-cli`
+
+Shell examples below use PowerShell syntax such as `$env:NAME="value"`. On bash or zsh, replace those assignments with `export NAME=value`.
+
+## What You Can Run Today
 
 Backend:
 
-- Axum-based gateway and admin HTTP services
-- OpenAI-compatible contracts for:
-  - models
-  - chat completions
-  - completions
-  - responses
-  - embeddings
-  - SSE streaming
-  - files
-  - uploads
-  - audio
-  - images
-  - moderations
-  - realtime sessions
-  - assistants
-  - vector stores
-  - batches
-  - webhooks
-  - evals
-- SQLite and PostgreSQL backed control plane persistence for:
-  - tenants
-  - projects
-  - gateway API keys
-  - channels
-  - proxy providers
-  - model catalog entries
-  - extension installations
-  - extension instances
-  - upstream credential references
-  - usage records
-  - billing ledger entries
-- Catalog-backed `/v1/models`
-- Real upstream relay for stateful `/v1/chat/completions` and `/v1/completions`:
-  - extension-driven JSON relay for providers bound to OpenAI-compatible built-in extensions
-  - SSE relay for `stream = true` against OpenAI-compatible upstreams
-- Real upstream relay for stateful `/v1/responses` and `/v1/embeddings` when provider, model, and credential records are present
-- SSE relay for stateful `/v1/chat/completions` and `/v1/responses` when upstream providers or native dynamic extensions support streaming
-- Stub fallback responses for unconfigured providers or unsupported adapter kinds
-- Routing simulation API backed by persisted routing policies plus catalog or provider candidates
-- Runtime-aware routing assessment now considers:
-  - extension instance enablement
-  - connector and native dynamic runtime health
-  - persisted provider health snapshots when live runtime status is temporarily unavailable
-  - instance config hints such as `weight`, `cost`, and `latency_ms`
-  - explainable candidate scoring surfaced through admin simulation responses
-  - seeded `weighted_random` selection for reproducible traffic-shaping simulation
-- Built-in extension host with pluggable extension manifests for:
-  - `sdkwork.provider.openai.official`
-  - `sdkwork.provider.openrouter`
-  - `sdkwork.provider.ollama`
-- Persisted extension installation and instance config through admin APIs
-- Admin visibility for extension package discovery and active extension runtime status across:
-  - `connector`
-  - `native_dynamic`
-- Persisted provider health snapshots plus admin query support through `/admin/routing/health-snapshots`
-- Background provider health snapshot supervision for standalone services through `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
-- Standardized extension package metadata:
-  - runtime ID: `sdkwork.provider.*` / `sdkwork.channel.*`
-  - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
-  - Rust crate name: `sdkwork-api-ext-provider-*` / `sdkwork-api-ext-channel-*`
-  - explicit manifest permissions such as `network_outbound` and `spawn_process`
-  - connector health contracts such as `/health` plus polling interval metadata
-  - trust declarations with publisher identity plus ed25519 signature material
-- Configuration-driven extension load planning that merges manifest defaults, installation config, and instance overrides into one runtime plan
-- Filesystem discovery for external extension packages through `sdkwork-extension.toml` manifests loaded from configured extension search paths
-- Discovery-time validation of extension manifest standards is now surfaced through the admin package listing
-- Discovery-time trust verification is now surfaced through the admin package listing:
-  - `verified` packages are signed by a trusted publisher and may load
-  - `unsigned` packages remain discoverable and may be loadable when the runtime policy allows them
-  - `untrusted_signer` and `invalid_signature` packages are visible but blocked from runtime loading
-- Protocol-aware relay for discovered provider extensions when the manifest declares a supported protocol:
-  - `openai`
-  - `openrouter`
-  - `ollama`
-- Supervised connector runtime execution for discovered provider extensions:
-  - the host can start configured connector processes on demand
-  - the host can reuse a healthy externally managed connector endpoint when one is already running at the configured `base_url`
-- Native dynamic runtime execution for discovered provider extensions:
-  - trusted `native_dynamic` packages can now load through a stable JSON and stream ABI
-  - the host verifies required symbols plus manifest parity before registration
-  - JSON-capable provider operations can execute in-process through the loaded library
-  - chat `/v1/chat/completions` and responses `/v1/responses` SSE can now relay through an in-process native dynamic plugin
-  - binary stream passthrough is now active for `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content`
-  - optional `init`, `health_check`, and `shutdown` lifecycle hooks are now supported
-  - runtime health and lifecycle support are surfaced through `/admin/extensions/runtime-statuses`
-- Provider execution now consumes persisted extension installation and instance state during real dispatch:
-  - `enabled = false` on an installation or instance forces local fallback
-  - instance `base_url` overrides the provider catalog `base_url`
-- Runtime-selectable upstream credential persistence with three local strategies:
-  - `database_encrypted`
-  - `local_encrypted_file`
-  - `os_keyring`
-- Per-credential backend binding and runtime secret resolution through `credential_master_key`
-- Usage and billing telemetry recording from stateful gateway handlers
+- `admin-api-service` on `127.0.0.1:8081` by default
+- `gateway-service` on `127.0.0.1:8080` by default
 
-Console:
+Frontend:
 
-- pnpm workspace with typed package boundaries
-- typed `sdkwork-api-admin-sdk` client for control-plane APIs
-- live dashboard panels for:
-  - workspace tenants, projects, and gateway keys
-  - channels, providers, and model catalog
-  - routing policies and simulation
-  - usage and billing telemetry
-  - runtime posture
+- `console` web development server with local proxying to `/admin` and `/v1`
+- `console` production build through Vite
+- `console/src-tauri` desktop shell that can start an embedded runtime host
 
-## Current Limitations
+Persistence:
 
-The repository is now a working control-plane-first gateway skeleton, but it is not yet a full upstream relay product.
+- SQLite
+- PostgreSQL
 
-Known gaps:
+Current standalone binaries intentionally fail fast for unsupported URL schemes such as MySQL or libsql.
 
-- upstream relay currently supports OpenAI-compatible adapter kinds:
-  - `openai`
-  - `openrouter`
-  - `ollama`
-- provider execution is now `extension_id`-driven with `adapter_kind` retained as compatibility metadata and protocol hint
-- extension manifest discovery and configuration-driven loading are now active for both `connector` and `native_dynamic` package metadata
-- discovered provider extensions can relay through existing protocol adapters when the manifest declares a supported protocol
-- connector runtimes are now executable through host supervision or healthy external endpoint reuse, but they currently require HTTP health probes and the existing protocol-mapped adapter set
-- external extension trust policy is now real for discovered packages:
-  - trusted-signer verification is enforced for signed packages
-  - unsigned connector packages can be allowed or blocked by policy
-  - native dynamic packages are intended to run only when explicitly enabled and signed by a trusted publisher
-- native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, binary stream passthrough for audio speech plus file and video content, and optional package-runtime lifecycle hooks; hot reload remains future work
-- only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
-- broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
-- routing policies now support explicit `deterministic_priority`, `weighted_random`, and `slo_aware` strategies, with runtime-aware candidate assessment, policy order, provider availability, live runtime health, persisted provider health snapshots, instance-level cost or latency hints, and optional SLO thresholds for `max_cost`, `max_latency_ms`, and `require_healthy`
-- project-scoped quota-aware admission is now active for `/v1/chat/completions`, `/v1/completions`, `/v1/responses`, and `/v1/embeddings`, backed by persisted billing quota policies and OpenAI-compatible `429 insufficient_quota` responses
-- routing decision logs are now persisted for both admin simulations and real gateway selections, including SLO compliance or degraded-fallback evidence
-- geo affinity remains future work
-- SQLite and PostgreSQL are active persistence drivers; MySQL and libsql remain extension boundaries
+## Quick Start With SQLite
+
+This is the fastest way to bring up the whole stack locally.
+
+### 1. Start the admin API
+
+```bash
+$env:SDKWORK_DATABASE_URL="sqlite://sdkwork-api-server.db"
+cargo run -p admin-api-service
+```
+
+The admin API listens on `http://127.0.0.1:8081` by default.
+
+### 2. Start the gateway API
+
+Open a second terminal:
+
+```bash
+$env:SDKWORK_DATABASE_URL="sqlite://sdkwork-api-server.db"
+cargo run -p gateway-service
+```
+
+The gateway listens on `http://127.0.0.1:8080` by default.
+
+### 3. Start the web console
+
+Open a third terminal:
+
+```bash
+pnpm --dir console install
+pnpm --dir console dev
+```
+
+The console dev server runs on `http://127.0.0.1:5173` by default and proxies:
+
+- `/admin` -> `http://127.0.0.1:8081`
+- `/v1` -> `http://127.0.0.1:8080`
+
+### 4. Verify the services
+
+Gateway health:
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+Admin health:
+
+```bash
+curl http://127.0.0.1:8081/admin/health
+```
+
+## Quick Start With PostgreSQL
+
+Set `SDKWORK_DATABASE_URL` to a PostgreSQL connection string for both standalone services.
+
+Example:
+
+```bash
+$env:SDKWORK_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_server"
+cargo run -p admin-api-service
+```
+
+In another terminal:
+
+```bash
+$env:SDKWORK_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_server"
+cargo run -p gateway-service
+```
+
+The same migrations are applied automatically for the supported dialect.
+
+## Standalone Service Startup
+
+The standalone binaries both read `StandaloneConfig` from environment variables.
+
+Important defaults:
+
+- `SDKWORK_GATEWAY_BIND=127.0.0.1:8080`
+- `SDKWORK_ADMIN_BIND=127.0.0.1:8081`
+- `SDKWORK_DATABASE_URL=sqlite://sdkwork-api-server.db`
+- `SDKWORK_SECRET_BACKEND=database_encrypted`
+- `SDKWORK_CREDENTIAL_MASTER_KEY=local-dev-master-key`
+- `SDKWORK_ADMIN_JWT_SIGNING_SECRET=local-dev-admin-jwt-secret`
+- `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS=0`
+
+Recommended standalone startup sequence:
+
+1. choose a database URL
+2. start `admin-api-service`
+3. start `gateway-service`
+4. configure channels, providers, credentials, models, and routing through the admin API
+5. issue a gateway API key
+6. call the `/v1/*` gateway routes with the issued key
+
+## Console Web Startup
+
+The console is a pnpm workspace under `console/`.
+
+Install dependencies:
+
+```bash
+pnpm --dir console install
+```
+
+Run the development server:
+
+```bash
+pnpm --dir console dev
+```
+
+Typecheck the workspace:
+
+```bash
+pnpm --dir console -r typecheck
+```
+
+Build the web console:
+
+```bash
+pnpm --dir console build
+```
+
+The development server is configured for local backend development. Override the proxy targets if needed:
+
+- `SDKWORK_ADMIN_PROXY_TARGET`
+- `SDKWORK_GATEWAY_PROXY_TARGET`
+
+Example:
+
+```bash
+$env:SDKWORK_ADMIN_PROXY_TARGET="http://127.0.0.1:18081"
+$env:SDKWORK_GATEWAY_PROXY_TARGET="http://127.0.0.1:18080"
+pnpm --dir console dev
+```
+
+## Tauri Embedded Startup
+
+The Tauri shell lives under `console/src-tauri/` and currently exposes a minimal embedded runtime bootstrap.
+
+Recommended flow:
+
+```bash
+pnpm --dir console install
+pnpm --dir console dev
+cd console
+cargo tauri dev
+```
+
+Notes:
+
+- `cargo tauri dev` requires the Tauri CLI to be installed
+- the Tauri config uses the Vite dev server at `http://localhost:5173`
+- the desktop shell currently starts an ephemeral embedded runtime and exposes its base URL through a Tauri command
+
+## Runtime Configuration
+
+`StandaloneConfig` currently supports these environment variables:
+
+- `SDKWORK_GATEWAY_BIND`
+- `SDKWORK_ADMIN_BIND`
+- `SDKWORK_DATABASE_URL`
+- `SDKWORK_EXTENSION_PATHS`
+- `SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS`
+- `SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS`
+- `SDKWORK_EXTENSION_TRUSTED_SIGNERS`
+- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS`
+- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS`
+- `SDKWORK_SECRET_BACKEND`
+- `SDKWORK_CREDENTIAL_MASTER_KEY`
+- `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
+- `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
+- `SDKWORK_SECRET_LOCAL_FILE`
+- `SDKWORK_SECRET_KEYRING_SERVICE`
+
+Supported secret backend identifiers:
+
+- `database_encrypted`
+- `local_encrypted_file`
+- `os_keyring`
+
+Example signer configuration:
+
+```text
+SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-public-key>
+```
 
 ## Minimal Upstream Relay Setup
 
@@ -153,8 +258,9 @@ The current relay path expects:
 
 1. a channel
 2. a provider with `extension_id`, `adapter_kind`, and `base_url`
-3. an encrypted upstream credential
-4. a model catalog entry pointing at that provider
+3. an upstream credential
+4. a model catalog entry mapped to that provider
+5. a gateway API key for the target tenant and project
 
 Example provider payload:
 
@@ -183,117 +289,66 @@ Example credential payload:
 }
 ```
 
-`secret_value` is now persisted according to the active secret backend:
+The secret is stored according to the active backend, while the credential binding remains catalog-driven in the database.
 
-- `database_encrypted`: encrypted envelope stored in SQLite
-- `local_encrypted_file`: encrypted envelope stored in a local JSON file
-- `os_keyring`: encrypted envelope stored in the operating system keyring
-
-The credential binding itself remains in SQLite so routing and provider resolution stay catalog-driven. Gateway resolution uses the credential record's stored backend kind, so existing credentials remain readable even if the runtime default backend changes later.
-
-## Runtime Configuration
-
-`StandaloneConfig` now models:
-
-- `database_url`
-- inferred storage dialect via `storage_dialect()`
-- `extension_paths`
-- `enable_connector_extensions`
-- `enable_native_dynamic_extensions`
-- `extension_trusted_signers`
-- `require_signed_connector_extensions`
-- `require_signed_native_dynamic_extensions`
-- `secret_backend`
-- `credential_master_key`
-- `admin_jwt_signing_secret`
-- `secret_local_file`
-- `secret_keyring_service`
-
-It can now be loaded from environment variables:
-
-- `SDKWORK_GATEWAY_BIND`
-- `SDKWORK_ADMIN_BIND`
-- `SDKWORK_DATABASE_URL`
-- `SDKWORK_EXTENSION_PATHS`
-- `SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS`
-- `SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS`
-- `SDKWORK_EXTENSION_TRUSTED_SIGNERS`
-- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS`
-- `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS`
-- `SDKWORK_SECRET_BACKEND`
-- `SDKWORK_CREDENTIAL_MASTER_KEY`
-- `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
-- `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
-- `SDKWORK_SECRET_LOCAL_FILE`
-- `SDKWORK_SECRET_KEYRING_SERVICE`
-
-Trusted signer entries are currently configured as a semicolon-delimited list:
-
-```text
-SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-public-key>
-```
-
-Supported secret backend strategy identifiers are:
-
-- `database_encrypted`
-- `local_encrypted_file`
-- `os_keyring`
-
-Current standalone service binaries fail fast on unsupported storage dialects instead of silently assuming SQLite.
-
-## Development
+## Verification
 
 Backend verification:
 
 ```bash
-cargo test --workspace
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all --check
+cargo test --workspace -q -j 1
+$env:CARGO_BUILD_JOBS='1'; cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 Console verification:
 
 ```bash
-pnpm --dir console install
 pnpm --dir console -r typecheck
-pnpm --dir console typecheck
-pnpm --dir console exec vite build
+pnpm --dir console build
 ```
 
-## Architecture Notes
+## Capability Snapshot
 
-- `Channel` models the upstream ecosystem or vendor family, such as OpenAI, Anthropic, Google, or DeepSeek.
-- `ProxyProvider` models a concrete access path under one or more channels, such as an official endpoint, OpenRouter-style broker, or self-hosted Ollama node.
-- `ProxyProvider.extension_id` is now the runtime execution identity used to resolve a concrete extension package; `adapter_kind` remains useful as compatibility and protocol metadata.
-- `ProviderChannelBinding` now allows one provider to bind to multiple channel ecosystems without losing a primary channel for compatibility.
-- `ModelCatalogEntry` now carries capability and streaming metadata instead of only `external_name + provider_id`.
-- `RoutingPolicy` is now a first-class control-plane aggregate that can steer both admin simulation and real gateway relay using priority, explicit routing strategy, model pattern matching, ordered providers, and optional default provider fallback.
-- `RoutingPolicy` now also carries optional SLO thresholds so `slo_aware` selection can prefer compliant providers before gracefully degrading to the best-ranked fallback.
-- `RoutingDecisionLog` is now a persisted routing audit aggregate that records gateway and admin-simulation decisions with candidate evidence, tenant or project context, and SLO degraded state.
-- The backend is split into domain, application, interface, storage, provider, secret, and runtime crates to preserve controller/service/repository layering without forcing separate deployable processes for every boundary.
-- Standalone and embedded runtime modes share the same Rust crates; Tauri integration consumes the same admin and gateway capabilities through the runtime host boundary.
-- Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.
-- Provider dispatch is now routed through `sdkwork-api-extension-host`, which resolves factories by `extension_id` first and keeps legacy `adapter_kind` aliases as a fallback.
-- Extension runtime configuration is split into package metadata, installation state, and mounted instances so one extension can back multiple provider instances.
-- External extension trust is also explicit:
-  - discovery always reports packages for admin visibility
-  - runtime loading only admits packages whose trust report is `load_allowed = true`
-  - signed packages must match a trusted publisher key
-  - unsigned package admission is runtime-policy controlled
-- Extension load planning now follows a deterministic merge order:
-  - manifest metadata defines package identity and default entrypoint/schema references
-  - installation state selects runtime and package-level config
-  - instance state supplies environment-specific overrides such as `base_url`, `credential_ref`, and traffic weighting
-- Extension discovery now has a second manifest source in addition to built-ins:
-  - built-in extensions compiled into the gateway
-  - external manifests discovered from `SDKWORK_EXTENSION_PATHS`
-- Discovered provider extensions can participate in real relay execution when their manifest declares a supported protocol and their persisted installation or instance is enabled.
-- Connector-style discovered providers can now either be supervised as host-managed external processes or attached to an already running healthy endpoint at the configured `base_url`.
-- `openrouter` and `ollama` are registered as built-in OpenAI-compatible provider extensions in addition to the direct `openai` adapter.
+Implemented backend surfaces include:
 
-## Design Docs
+- OpenAI-compatible `/v1/models`
+- `/v1/chat/completions`
+- `/v1/completions`
+- `/v1/responses`
+- `/v1/embeddings`
+- SSE streaming for chat and responses
+- files, uploads, audio, images, moderations, realtime sessions, assistants, vector stores, batches, webhooks, evals, and videos as `relay` or `emulated` depending on runtime mode
 
-- `docs/plans/2026-03-13-sdkwork-api-gateway-design.md`
-- `docs/plans/2026-03-13-sdkwork-api-gateway-implementation.md`
-- `docs/api/compatibility-matrix.md`
-- `docs/architecture/runtime-modes.md`
+Control-plane features include:
+
+- tenants, projects, and gateway API keys
+- channels, proxy providers, and model catalog entries
+- encrypted upstream credentials
+- extension installations and instances
+- runtime status visibility and provider health snapshots
+- routing policies with `deterministic_priority`, `weighted_random`, and `slo_aware`
+- routing decision logs for admin simulation and real gateway dispatch
+- usage records, billing ledger entries, and quota policies
+
+For the up-to-date execution-truth matrix, see:
+
+- [`docs/api/compatibility-matrix.md`](./docs/api/compatibility-matrix.md)
+
+## Current Limitations
+
+- standalone binaries currently support SQLite and PostgreSQL only
+- the richest relay path today is for OpenAI-compatible provider protocols:
+  - `openai`
+  - `openrouter`
+  - `ollama`
+- hot reload for extensions is still future work
+- geo affinity and regional routing dimensions are still future work
+- some API families remain `emulated` instead of fully upstream-relayed in stateless or partially configured environments
+
+## Additional Docs
+
+- [`README.zh-CN.md`](./README.zh-CN.md)
+- [`docs/architecture/runtime-modes.md`](./docs/architecture/runtime-modes.md)
+- [`docs/api/compatibility-matrix.md`](./docs/api/compatibility-matrix.md)
+- [`docs/plans/`](./docs/plans/)
