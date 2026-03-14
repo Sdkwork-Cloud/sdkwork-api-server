@@ -266,7 +266,7 @@ async fn stateless_chat_route_relays_to_openai_compatible_provider() {
 }
 
 #[tokio::test]
-async fn stateless_chat_route_returns_bad_gateway_when_configured_upstream_fails() {
+async fn stateless_chat_route_returns_openai_error_envelope_on_upstream_failure() {
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
             sdkwork_api_interface_http::StatelessGatewayUpstream::from_adapter_kind(
@@ -292,6 +292,49 @@ async fn stateless_chat_route_returns_bad_gateway_when_configured_upstream_fails
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream chat completion"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
+#[tokio::test]
+async fn stateless_chat_stream_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::from_adapter_kind(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"messages\":[{\"role\":\"user\",\"content\":\"relay me\"}],\"stream\":true}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream chat completion stream"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
 }
 
 #[tokio::test]

@@ -6,7 +6,10 @@ use ed25519_dalek::SigningKey;
 use sdkwork_api_app_credential::{
     persist_credential_with_secret_and_manager, CredentialSecretManager,
 };
-use sdkwork_api_app_gateway::{builtin_extension_host, relay_chat_completion_from_store};
+use sdkwork_api_app_gateway::{
+    builtin_extension_host, execute_json_provider_request_with_runtime,
+    relay_chat_completion_from_store,
+};
 use sdkwork_api_contract_openai::chat_completions::{
     ChatMessageInput, CreateChatCompletionRequest,
 };
@@ -16,6 +19,7 @@ use sdkwork_api_extension_core::{
     ExtensionInstallation, ExtensionInstance, ExtensionRuntime, ExtensionSignature,
     ExtensionSignatureAlgorithm, ExtensionTrustDeclaration,
 };
+use sdkwork_api_provider_core::ProviderRequest;
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 use serde_json::{json, Value};
 use serial_test::serial;
@@ -358,6 +362,62 @@ async fn discovered_connector_extension_can_relay_through_supported_protocol() {
     .expect("upstream response");
 
     assert_eq!(response["id"], "chatcmpl_upstream");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+
+    upstream_thread.join().unwrap();
+    cleanup_dir(&extension_root);
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn extension_host_cache_reuses_configured_host_for_stable_policy() {
+    let extension_root = temp_extension_root("configured-host-cache");
+    let package_dir = extension_root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        discovered_connector_manifest(),
+    )
+    .unwrap();
+    let _guard = extension_env_guard(&extension_root);
+
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream_thread = thread::spawn({
+        let upstream_state = upstream_state.clone();
+        move || serve_connector_compatible_upstream(listener, upstream_state, 2)
+    });
+
+    let request = chat_request("gpt-4.1");
+    let first_response = execute_json_provider_request_with_runtime(
+        "sdkwork.provider.custom-openai",
+        format!("http://{address}"),
+        "sk-upstream-openai",
+        ProviderRequest::ChatCompletions(&request),
+    )
+    .await
+    .unwrap()
+    .expect("first cached response");
+
+    assert_eq!(first_response["id"], "chatcmpl_upstream");
+
+    cleanup_dir(&package_dir);
+
+    let second_response = execute_json_provider_request_with_runtime(
+        "sdkwork.provider.custom-openai",
+        format!("http://{address}"),
+        "sk-upstream-openai",
+        ProviderRequest::ChatCompletions(&request),
+    )
+    .await
+    .unwrap()
+    .expect("second cached response");
+
+    assert_eq!(second_response["id"], "chatcmpl_upstream");
     assert_eq!(
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")

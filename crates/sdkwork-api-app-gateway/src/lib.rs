@@ -104,9 +104,50 @@ use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
 use sdkwork_api_storage_core::AdminStore;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 pub const LOCAL_PROVIDER_ID: &str = "sdkwork.local";
+
+#[derive(Clone)]
+struct CachedConfiguredExtensionHost {
+    key: ConfiguredExtensionHostCacheKey,
+    host: ExtensionHost,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConfiguredExtensionHostCacheKey {
+    search_paths: Vec<PathBuf>,
+    enable_connector_extensions: bool,
+    enable_native_dynamic_extensions: bool,
+    require_signed_connector_extensions: bool,
+    require_signed_native_dynamic_extensions: bool,
+    trusted_signers: Vec<(String, String)>,
+}
+
+impl From<&ExtensionDiscoveryPolicy> for ConfiguredExtensionHostCacheKey {
+    fn from(policy: &ExtensionDiscoveryPolicy) -> Self {
+        let mut trusted_signers = policy
+            .trusted_signers
+            .iter()
+            .map(|(publisher, public_key)| (publisher.clone(), public_key.clone()))
+            .collect::<Vec<_>>();
+        trusted_signers.sort_unstable();
+
+        Self {
+            search_paths: policy.search_paths.clone(),
+            enable_connector_extensions: policy.enable_connector_extensions,
+            enable_native_dynamic_extensions: policy.enable_native_dynamic_extensions,
+            require_signed_connector_extensions: policy.require_signed_connector_extensions,
+            require_signed_native_dynamic_extensions: policy
+                .require_signed_native_dynamic_extensions,
+            trusted_signers,
+        }
+    }
+}
+
+static CONFIGURED_EXTENSION_HOST_CACHE: OnceLock<Mutex<Option<CachedConfiguredExtensionHost>>> =
+    OnceLock::new();
 
 pub fn service_name() -> &'static str {
     "gateway-service"
@@ -6029,11 +6070,33 @@ fn provider_runtime_key(provider: &ProxyProvider) -> &str {
 }
 
 fn configured_extension_host() -> Result<ExtensionHost> {
-    let mut host = builtin_extension_host();
     let policy = configured_extension_discovery_policy();
+    let cache_key = ConfiguredExtensionHostCacheKey::from(&policy);
+    let cache = CONFIGURED_EXTENSION_HOST_CACHE.get_or_init(|| Mutex::new(None));
+    let mut cache_guard = match cache.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
 
-    for package in discover_extension_packages(&policy)? {
-        let trust = verify_discovered_extension_package_trust(&package, &policy);
+    if let Some(cached) = cache_guard.as_ref() {
+        if cached.key == cache_key {
+            return Ok(cached.host.clone());
+        }
+    }
+
+    let host = build_configured_extension_host(&policy)?;
+    *cache_guard = Some(CachedConfiguredExtensionHost {
+        key: cache_key,
+        host: host.clone(),
+    });
+    Ok(host)
+}
+
+fn build_configured_extension_host(policy: &ExtensionDiscoveryPolicy) -> Result<ExtensionHost> {
+    let mut host = builtin_extension_host();
+
+    for package in discover_extension_packages(policy)? {
+        let trust = verify_discovered_extension_package_trust(&package, policy);
         if !trust.load_allowed {
             continue;
         }

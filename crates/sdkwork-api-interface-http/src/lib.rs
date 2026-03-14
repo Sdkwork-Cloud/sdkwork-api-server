@@ -1243,11 +1243,7 @@ async fn list_models_handler(request_context: StatelessGatewayRequest) -> Respon
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream model list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream model list");
         }
     }
 
@@ -1268,11 +1264,7 @@ async fn model_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream model",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream model");
         }
     }
 
@@ -1297,11 +1289,7 @@ async fn model_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream model delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream model delete");
         }
     }
 
@@ -1397,11 +1385,9 @@ async fn chat_completions_handler(
             Ok(Some(response)) => return upstream_passthrough_response(response),
             Ok(None) => {}
             Err(_) => {
-                return (
-                    axum::http::StatusCode::BAD_GATEWAY,
+                return bad_gateway_openai_response(
                     "failed to relay upstream chat completion stream",
-                )
-                    .into_response();
+                );
             }
         }
 
@@ -1426,11 +1412,7 @@ async fn chat_completions_handler(
             .expect("chat completion"),
         )
         .into_response(),
-        Err(_) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            "failed to relay upstream chat completion",
-        )
-            .into_response(),
+        Err(_) => bad_gateway_openai_response("failed to relay upstream chat completion"),
     }
 }
 
@@ -2454,11 +2436,7 @@ async fn responses_handler(
             Ok(Some(response)) => return upstream_passthrough_response(response),
             Ok(None) => {}
             Err(_) => {
-                return (
-                    axum::http::StatusCode::BAD_GATEWAY,
-                    "failed to relay upstream response stream",
-                )
-                    .into_response();
+                return bad_gateway_openai_response("failed to relay upstream response stream");
             }
         }
 
@@ -2477,11 +2455,7 @@ async fn responses_handler(
             .expect("response"),
         )
         .into_response(),
-        Err(_) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            "failed to relay upstream response",
-        )
-            .into_response(),
+        Err(_) => bad_gateway_openai_response("failed to relay upstream response"),
     }
 }
 
@@ -2719,11 +2693,7 @@ async fn embeddings_handler(
             .expect("embedding"),
         )
         .into_response(),
-        Err(_) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            "failed to relay upstream embedding",
-        )
-            .into_response(),
+        Err(_) => bad_gateway_openai_response("failed to relay upstream embedding"),
     }
 }
 
@@ -5605,11 +5575,9 @@ async fn chat_completions_with_state_handler(
             }
             Ok(None) => {}
             Err(_) => {
-                return (
-                    axum::http::StatusCode::BAD_GATEWAY,
+                return bad_gateway_openai_response(
                     "failed to relay upstream chat completion stream",
-                )
-                    .into_response();
+                );
             }
         }
     } else {
@@ -5645,11 +5613,7 @@ async fn chat_completions_with_state_handler(
             }
             Ok(None) => {}
             Err(_) => {
-                return (
-                    axum::http::StatusCode::BAD_GATEWAY,
-                    "failed to relay upstream chat completion",
-                )
-                    .into_response();
+                return bad_gateway_openai_response("failed to relay upstream chat completion");
             }
         }
     }
@@ -8254,11 +8218,7 @@ async fn responses_with_state_handler(
             }
             Ok(None) => {}
             Err(_) => {
-                return (
-                    axum::http::StatusCode::BAD_GATEWAY,
-                    "failed to relay upstream response stream",
-                )
-                    .into_response();
+                return bad_gateway_openai_response("failed to relay upstream response stream");
             }
         }
 
@@ -8317,11 +8277,7 @@ async fn responses_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response");
         }
     }
 
@@ -8949,11 +8905,7 @@ async fn embeddings_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream embedding",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream embedding");
         }
     }
 
@@ -15664,6 +15616,12 @@ fn quota_exceeded_response(project_id: &str, evaluation: &QuotaCheckResult) -> R
     );
     error.error.code = Some("quota_exceeded".to_owned());
     (StatusCode::TOO_MANY_REQUESTS, Json(error)).into_response()
+}
+
+fn bad_gateway_openai_response(message: impl Into<String>) -> Response {
+    let mut error = OpenAiErrorResponse::new(message, "server_error");
+    error.error.code = Some("bad_gateway".to_owned());
+    (StatusCode::BAD_GATEWAY, Json(error)).into_response()
 }
 
 fn quota_exceeded_message(project_id: &str, evaluation: &QuotaCheckResult) -> String {

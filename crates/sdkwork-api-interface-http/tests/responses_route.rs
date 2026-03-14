@@ -280,6 +280,78 @@ async fn stateless_responses_route_relays_stream_to_openai_compatible_provider()
 
 #[serial(extension_env)]
 #[tokio::test]
+async fn stateless_responses_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::from_adapter_kind(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"model\":\"gpt-4.1\",\"input\":\"relay me\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream response"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateless_responses_stream_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::from_adapter_kind(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"relay me\",\"stream\":true}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream response stream"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
+#[serial(extension_env)]
+#[tokio::test]
 async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     let upstream_state = UpstreamCaptureState::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
