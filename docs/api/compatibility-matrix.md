@@ -23,21 +23,21 @@ The table below reflects the current runtime truth as of 2026-03-14.
 | `/v1/completions` | `relay` | `relay` | Relays legacy text completions when provider wiring exists; stateless mode uses the configured single-upstream runtime or falls back locally |
 | `/v1/responses` | `relay` | `relay` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission; stateless mode relays the same core response operations through its configured upstream runtime |
 | `/v1/embeddings` | `relay` | `relay` | Uses catalog, credential, and provider state in stateful mode; stateless mode relays embeddings to its configured upstream runtime or falls back locally |
-| `/v1/files` | `relay` | `emulated` | Stateful mode relays multipart upload, metadata, and binary content |
-| `/v1/uploads` | `relay` | `emulated` | Upload creation, part upload, completion, and cancel relay in stateful mode |
-| `/v1/audio/*` | `relay` | `emulated` | Speech can relay binary or event-stream output |
-| `/v1/images/*` | `relay` | `emulated` | Generations, edits, and variations relay in stateful mode |
-| `/v1/moderations` | `relay` | `emulated` | Stateful mode relays provider moderation calls |
-| `/v1/realtime/sessions` | `relay` | `emulated` | Compatible request/response contract is present in both modes |
-| `/v1/assistants` | `relay` | `emulated` | Stateful mode relays create, list, retrieve, update, and delete |
-| `/v1/threads` | `relay` | `emulated` | Includes messages, runs, run steps, cancel, and tool output submission |
-| `/v1/conversations` | `relay` | `emulated` | Includes conversation items CRUD-compatible flows |
-| `/v1/vector_stores` | `relay` | `emulated` | Includes search, files, and file batch flows |
-| `/v1/batches` | `relay` | `emulated` | Create, list, retrieve, and cancel are wired in stateful mode |
-| `/v1/fine_tuning/jobs` | `relay` | `emulated` | Create, list, retrieve, and cancel are relay-capable |
-| `/v1/webhooks` | `relay` | `emulated` | CRUD-compatible relay path when upstream supports the same contract |
-| `/v1/evals` | `relay` | `emulated` | Stateful mode relays eval creation/listing-compatible flow |
-| `/v1/videos` | `relay` | `emulated` | Create, list, retrieve, content, delete, and remix relay in stateful mode |
+| `/v1/files` | `relay` | `relay` | Stateful mode relays multipart upload, metadata, and binary content; stateless mode relays the same surface through its configured upstream runtime or falls back locally |
+| `/v1/uploads` | `relay` | `relay` | Upload creation, part upload, completion, and cancel relay in stateful mode; stateless mode relays the same upload surface through its configured upstream runtime or falls back locally |
+| `/v1/audio/*` | `relay` | `relay` | Speech can relay binary or event-stream output; stateless mode also relays transcription and translation flows through its configured upstream runtime or falls back locally |
+| `/v1/images/*` | `relay` | `relay` | Generations, edits, and variations relay in stateful mode; stateless mode relays the same image operations through its configured upstream runtime or falls back locally |
+| `/v1/moderations` | `relay` | `relay` | Stateful mode relays provider moderation calls; stateless mode relays moderation through its configured upstream runtime or falls back locally |
+| `/v1/realtime/sessions` | `relay` | `relay` | Compatible request/response contract is present in both modes; stateless mode now relays realtime session creation through its configured upstream runtime or falls back locally |
+| `/v1/assistants` | `relay` | `relay` | Stateful mode relays create, list, retrieve, update, and delete; stateless mode relays the same assistants surface through its configured upstream runtime or falls back locally |
+| `/v1/threads` | `relay` | `relay` | Includes messages, runs, run steps, cancel, and tool output submission; stateless mode relays the same nested thread flows through its configured upstream runtime or falls back locally |
+| `/v1/conversations` | `relay` | `relay` | Includes conversation items CRUD-compatible flows; stateless mode relays the same conversation and item flows through its configured upstream runtime or falls back locally |
+| `/v1/vector_stores` | `relay` | `relay` | Includes search, files, and file batch flows; stateless mode relays the same vector store surface through its configured upstream runtime or falls back locally |
+| `/v1/batches` | `relay` | `relay` | Create, list, retrieve, and cancel are wired in stateful mode; stateless mode relays the same batch operations through its configured upstream runtime or falls back locally |
+| `/v1/fine_tuning/jobs` | `relay` | `relay` | Create, list, retrieve, and cancel are relay-capable; stateless mode relays the same fine-tuning job surface through its configured upstream runtime or falls back locally |
+| `/v1/webhooks` | `relay` | `relay` | CRUD-compatible relay path when upstream supports the same contract; stateless mode relays the same webhook surface through its configured upstream runtime or falls back locally |
+| `/v1/evals` | `relay` | `relay` | Stateful mode relays eval creation/listing-compatible flow; stateless mode relays eval creation through its configured upstream runtime or falls back locally |
+| `/v1/videos` | `relay` | `relay` | Create, list, retrieve, content, delete, and remix relay in stateful mode; stateless mode relays the same video surface through its configured upstream runtime or falls back locally |
 
 ## Control Plane
 

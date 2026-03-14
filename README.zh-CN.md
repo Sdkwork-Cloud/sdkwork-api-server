@@ -301,7 +301,7 @@ SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-pu
 - synthetic tenant ID: `sdkwork-stateless`
 - synthetic project ID: `sdkwork-stateless-default`
 - 未配置 upstream 时：继续返回 OpenAI 兼容的本地 fallback
-- 配置 upstream 后：无状态 router 会把核心 bootstrap API 转发到单个 OpenAI-compatible upstream
+- 配置 upstream 后：无状态 router 会把当前已支持的 OpenAI-compatible 数据面转发到单个 upstream runtime
 
 当前无状态 upstream relay 覆盖：
 
@@ -310,6 +310,15 @@ SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-pu
 - `/v1/completions`
 - `/v1/responses`，包含 SSE streaming，以及 retrieve / delete / cancel / input items / input token counting / compact
 - `/v1/embeddings`
+- `/v1/files`，包含 list / retrieve / delete / binary content relay
+- `/v1/uploads`，包含 part upload / complete / cancel relay
+- `/v1/audio/*`，包含 speech 二进制 relay，以及 transcription / translation relay
+- `/v1/images/*`，包含 generations / edits / variations relay
+- `/v1/moderations` 与 `/v1/realtime/sessions`
+- `/v1/assistants`、`/v1/threads`、`/v1/conversations`，以及它们的嵌套资源流
+- `/v1/vector_stores`，包含 search / files / file batch flows
+- `/v1/batches` 与 `/v1/fine_tuning/jobs`
+- `/v1/webhooks`、`/v1/evals`、`/v1/videos`，以及 video content / remix relay
 
 `runtime_key` 支持：
 
@@ -408,7 +417,7 @@ pnpm --dir console build
 - `/v1/embeddings`
 - chat / responses 的 SSE streaming
 - 面向内嵌与库模式的显式 stateless runtime 配置
-- files、uploads、audio、images、moderations、realtime sessions、assistants、vector stores、batches、webhooks、evals、videos 等能力，按运行模式表现为 `relay` 或 `emulated`
+- 在配置 upstream runtime 时，stateless 模式可对 files、uploads、audio、images、moderations、realtime sessions、assistants、threads、conversations、vector stores、batches、fine-tuning jobs、webhooks、evals、videos 执行 relay
 
 控制面能力包括：
 
@@ -437,7 +446,7 @@ pnpm --dir console build
   - `ollama`
 - extension hot reload 仍是后续工作
 - geo affinity / region-aware routing 仍是后续工作
-- stateless 核心 bootstrap 集合之外的部分 API 家族，在无状态或配置不完整环境下仍然保持 `emulated`
+- stateless 模式当前仍然假设单个 upstream runtime，尚未提供 stateful routing、quota、billing 等语义
 
 ## 进一步阅读
 

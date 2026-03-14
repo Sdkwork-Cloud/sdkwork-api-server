@@ -180,9 +180,7 @@ use sdkwork_api_contract_openai::chat_completions::{
 };
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::conversations::{
-    CreateConversationItemsRequest, CreateConversationRequest, DeleteConversationItemResponse,
-    DeleteConversationResponse, ListConversationItemsResponse, ListConversationsResponse,
-    UpdateConversationRequest,
+    CreateConversationItemsRequest, CreateConversationRequest, UpdateConversationRequest,
 };
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::errors::OpenAiErrorResponse;
@@ -198,13 +196,11 @@ use sdkwork_api_contract_openai::responses::{
     CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
 };
 use sdkwork_api_contract_openai::runs::{
-    CreateRunRequest, CreateThreadAndRunRequest, ListRunStepsResponse, ListRunsResponse, RunObject,
-    RunStepObject, SubmitToolOutputsRunRequest, UpdateRunRequest,
+    CreateRunRequest, CreateThreadAndRunRequest, SubmitToolOutputsRunRequest, UpdateRunRequest,
 };
 use sdkwork_api_contract_openai::streaming::SseFrame;
 use sdkwork_api_contract_openai::threads::{
-    CreateThreadMessageRequest, CreateThreadRequest, DeleteThreadMessageResponse,
-    DeleteThreadResponse, ListThreadMessagesResponse, UpdateThreadMessageRequest,
+    CreateThreadMessageRequest, CreateThreadRequest, UpdateThreadMessageRequest,
     UpdateThreadRequest,
 };
 use sdkwork_api_contract_openai::uploads::{
@@ -1354,27 +1350,70 @@ async fn chat_completion_messages_list_handler(
 
 async fn conversations_handler(
     request_context: StatelessGatewayRequest,
-    ExtractJson(_request): ExtractJson<CreateConversationRequest>,
-) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
+    ExtractJson(request): ExtractJson<CreateConversationRequest>,
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Conversations(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_conversation(request_context.tenant_id(), request_context.project_id())
             .expect("conversation"),
     )
+    .into_response()
 }
 
-async fn conversations_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<ListConversationsResponse> {
+async fn conversations_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ConversationsList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_conversations(request_context.tenant_id(), request_context.project_id())
             .expect("conversation list"),
     )
+    .into_response()
 }
 
 async fn conversation_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationsRetrieve(&conversation_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_conversation(
             request_context.tenant_id(),
@@ -1383,13 +1422,31 @@ async fn conversation_retrieve_handler(
         )
         .expect("conversation"),
     )
+    .into_response()
 }
 
 async fn conversation_update_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateConversationRequest>,
-) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationsUpdate(&conversation_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_conversation(
             request_context.tenant_id(),
@@ -1399,12 +1456,30 @@ async fn conversation_update_handler(
         )
         .expect("conversation update"),
     )
+    .into_response()
 }
 
 async fn conversation_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
-) -> Json<DeleteConversationResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationsDelete(&conversation_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_conversation(
             request_context.tenant_id(),
@@ -1413,13 +1488,31 @@ async fn conversation_delete_handler(
         )
         .expect("conversation delete"),
     )
+    .into_response()
 }
 
 async fn conversation_items_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
-    ExtractJson(_request): ExtractJson<CreateConversationItemsRequest>,
-) -> Json<ListConversationItemsResponse> {
+    ExtractJson(request): ExtractJson<CreateConversationItemsRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationItems(&conversation_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation items",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_conversation_items(
             request_context.tenant_id(),
@@ -1428,12 +1521,30 @@ async fn conversation_items_handler(
         )
         .expect("conversation items create"),
     )
+    .into_response()
 }
 
 async fn conversation_items_list_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
-) -> Json<ListConversationItemsResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationItemsList(&conversation_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation items list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_conversation_items(
             request_context.tenant_id(),
@@ -1442,12 +1553,30 @@ async fn conversation_items_list_handler(
         )
         .expect("conversation items list"),
     )
+    .into_response()
 }
 
 async fn conversation_item_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::conversations::ConversationItemObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationItemsRetrieve(&conversation_id, &item_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation item retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_conversation_item(
             request_context.tenant_id(),
@@ -1457,12 +1586,30 @@ async fn conversation_item_retrieve_handler(
         )
         .expect("conversation item"),
     )
+    .into_response()
 }
 
 async fn conversation_item_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
-) -> Json<DeleteConversationItemResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ConversationItemsDelete(&conversation_id, &item_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream conversation item delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_conversation_item(
             request_context.tenant_id(),
@@ -1472,19 +1619,50 @@ async fn conversation_item_delete_handler(
         )
         .expect("conversation item delete"),
     )
+    .into_response()
 }
 
 async fn threads_handler(
     request_context: StatelessGatewayRequest,
-    ExtractJson(_request): ExtractJson<CreateThreadRequest>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
+    ExtractJson(request): ExtractJson<CreateThreadRequest>,
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Threads(&request)).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread",
+            )
+                .into_response();
+        }
+    }
+
     Json(create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread"))
+        .into_response()
 }
 
 async fn thread_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadsRetrieve(&thread_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_thread(
             request_context.tenant_id(),
@@ -1493,13 +1671,31 @@ async fn thread_retrieve_handler(
         )
         .expect("thread retrieve"),
     )
+    .into_response()
 }
 
 async fn thread_update_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
-    ExtractJson(_request): ExtractJson<UpdateThreadRequest>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
+    ExtractJson(request): ExtractJson<UpdateThreadRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadsUpdate(&thread_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_thread(
             request_context.tenant_id(),
@@ -1508,12 +1704,27 @@ async fn thread_update_handler(
         )
         .expect("thread update"),
     )
+    .into_response()
 }
 
 async fn thread_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
-) -> Json<DeleteThreadResponse> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ThreadsDelete(&thread_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_thread(
             request_context.tenant_id(),
@@ -1522,13 +1733,31 @@ async fn thread_delete_handler(
         )
         .expect("thread delete"),
     )
+    .into_response()
 }
 
 async fn thread_messages_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateThreadMessageRequest>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadMessages(&thread_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread message",
+            )
+                .into_response();
+        }
+    }
+
     let text = request.content.as_str().unwrap_or("hello");
     Json(
         create_thread_message(
@@ -1540,12 +1769,30 @@ async fn thread_messages_handler(
         )
         .expect("thread message create"),
     )
+    .into_response()
 }
 
 async fn thread_messages_list_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
-) -> Json<ListThreadMessagesResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadMessagesList(&thread_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread messages list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_thread_messages(
             request_context.tenant_id(),
@@ -1554,12 +1801,30 @@ async fn thread_messages_list_handler(
         )
         .expect("thread messages list"),
     )
+    .into_response()
 }
 
 async fn thread_message_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadMessagesRetrieve(&thread_id, &message_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread message retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_thread_message(
             request_context.tenant_id(),
@@ -1569,13 +1834,31 @@ async fn thread_message_retrieve_handler(
         )
         .expect("thread message retrieve"),
     )
+    .into_response()
 }
 
 async fn thread_message_update_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
-    ExtractJson(_request): ExtractJson<UpdateThreadMessageRequest>,
-) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
+    ExtractJson(request): ExtractJson<UpdateThreadMessageRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadMessagesUpdate(&thread_id, &message_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread message update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_thread_message(
             request_context.tenant_id(),
@@ -1585,12 +1868,30 @@ async fn thread_message_update_handler(
         )
         .expect("thread message update"),
     )
+    .into_response()
 }
 
 async fn thread_message_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
-) -> Json<DeleteThreadMessageResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadMessagesDelete(&thread_id, &message_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread message delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_thread_message(
             request_context.tenant_id(),
@@ -1600,12 +1901,27 @@ async fn thread_message_delete_handler(
         )
         .expect("thread message delete"),
     )
+    .into_response()
 }
 
 async fn thread_and_run_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateThreadAndRunRequest>,
-) -> Json<RunObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ThreadsRuns(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread and run",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_thread_and_run(
             request_context.tenant_id(),
@@ -1614,13 +1930,31 @@ async fn thread_and_run_handler(
         )
         .expect("thread and run create"),
     )
+    .into_response()
 }
 
 async fn thread_runs_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateRunRequest>,
-) -> Json<RunObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRuns(&thread_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_thread_run(
             request_context.tenant_id(),
@@ -1631,12 +1965,30 @@ async fn thread_runs_handler(
         )
         .expect("thread run create"),
     )
+    .into_response()
 }
 
 async fn thread_runs_list_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
-) -> Json<ListRunsResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunsList(&thread_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread runs list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_thread_runs(
             request_context.tenant_id(),
@@ -1645,12 +1997,30 @@ async fn thread_runs_list_handler(
         )
         .expect("thread runs list"),
     )
+    .into_response()
 }
 
 async fn thread_run_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
-) -> Json<RunObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunsRetrieve(&thread_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_thread_run(
             request_context.tenant_id(),
@@ -1660,13 +2030,31 @@ async fn thread_run_retrieve_handler(
         )
         .expect("thread run"),
     )
+    .into_response()
 }
 
 async fn thread_run_update_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
-    ExtractJson(_request): ExtractJson<UpdateRunRequest>,
-) -> Json<RunObject> {
+    ExtractJson(request): ExtractJson<UpdateRunRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunsUpdate(&thread_id, &run_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_thread_run(
             request_context.tenant_id(),
@@ -1676,12 +2064,30 @@ async fn thread_run_update_handler(
         )
         .expect("thread run update"),
     )
+    .into_response()
 }
 
 async fn thread_run_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
-) -> Json<RunObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunsCancel(&thread_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run cancel",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         cancel_thread_run(
             request_context.tenant_id(),
@@ -1691,13 +2097,31 @@ async fn thread_run_cancel_handler(
         )
         .expect("thread run cancel"),
     )
+    .into_response()
 }
 
 async fn thread_run_submit_tool_outputs_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<SubmitToolOutputsRunRequest>,
-) -> Json<RunObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunsSubmitToolOutputs(&thread_id, &run_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run submit tool outputs",
+            )
+                .into_response();
+        }
+    }
+
     let tool_outputs = request
         .tool_outputs
         .iter()
@@ -1713,12 +2137,30 @@ async fn thread_run_submit_tool_outputs_handler(
         )
         .expect("thread run submit tool outputs"),
     )
+    .into_response()
 }
 
 async fn thread_run_steps_list_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
-) -> Json<ListRunStepsResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunStepsList(&thread_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run steps list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_thread_run_steps(
             request_context.tenant_id(),
@@ -1728,12 +2170,30 @@ async fn thread_run_steps_list_handler(
         )
         .expect("thread run steps"),
     )
+    .into_response()
 }
 
 async fn thread_run_step_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id, step_id)): Path<(String, String, String)>,
-) -> Json<RunStepObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ThreadRunStepsRetrieve(&thread_id, &run_id, &step_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream thread run step retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_thread_run_step(
             request_context.tenant_id(),
@@ -1744,6 +2204,7 @@ async fn thread_run_step_retrieve_handler(
         )
         .expect("thread run step"),
     )
+    .into_response()
 }
 
 async fn responses_handler(
@@ -2036,7 +2497,21 @@ async fn embeddings_handler(
 async fn moderations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateModerationRequest>,
-) -> Json<sdkwork_api_contract_openai::moderations::ModerationResponse> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Moderations(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream moderation",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_moderation(
             request_context.tenant_id(),
@@ -2045,12 +2520,30 @@ async fn moderations_handler(
         )
         .expect("moderation"),
     )
+    .into_response()
 }
 
 async fn image_generations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateImageRequest>,
-) -> Json<sdkwork_api_contract_openai::images::ImagesResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ImagesGenerations(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream image generation",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_image_generation(
             request_context.tenant_id(),
@@ -2059,6 +2552,7 @@ async fn image_generations_handler(
         )
         .expect("image generation"),
     )
+    .into_response()
 }
 
 async fn image_edits_handler(
@@ -2066,15 +2560,34 @@ async fn image_edits_handler(
     multipart: Multipart,
 ) -> Response {
     match parse_image_edit_request(multipart).await {
-        Ok(request) => Json(
-            create_image_edit(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
+        Ok(request) => {
+            match relay_stateless_json_request(
+                &request_context,
+                ProviderRequest::ImagesEdits(&request),
             )
-            .expect("image edit"),
-        )
-        .into_response(),
+            .await
+            {
+                Ok(Some(response)) => return Json(response).into_response(),
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        "failed to relay upstream image edit",
+                    )
+                        .into_response();
+                }
+            }
+
+            Json(
+                create_image_edit(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request,
+                )
+                .expect("image edit"),
+            )
+            .into_response()
+        }
         Err(response) => response,
     }
 }
@@ -2084,15 +2597,34 @@ async fn image_variations_handler(
     multipart: Multipart,
 ) -> Response {
     match parse_image_variation_request(multipart).await {
-        Ok(request) => Json(
-            create_image_variation(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
+        Ok(request) => {
+            match relay_stateless_json_request(
+                &request_context,
+                ProviderRequest::ImagesVariations(&request),
             )
-            .expect("image variation"),
-        )
-        .into_response(),
+            .await
+            {
+                Ok(Some(response)) => return Json(response).into_response(),
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        "failed to relay upstream image variation",
+                    )
+                        .into_response();
+                }
+            }
+
+            Json(
+                create_image_variation(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request,
+                )
+                .expect("image variation"),
+            )
+            .into_response()
+        }
         Err(response) => response,
     }
 }
@@ -2100,7 +2632,24 @@ async fn image_variations_handler(
 async fn transcriptions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranscriptionRequest>,
-) -> Json<sdkwork_api_contract_openai::audio::TranscriptionObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::AudioTranscriptions(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream transcription",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_transcription(
             request_context.tenant_id(),
@@ -2109,12 +2658,30 @@ async fn transcriptions_handler(
         )
         .expect("transcription"),
     )
+    .into_response()
 }
 
 async fn translations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranslationRequest>,
-) -> Json<sdkwork_api_contract_openai::audio::TranslationObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::AudioTranslations(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream translation",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_translation(
             request_context.tenant_id(),
@@ -2123,12 +2690,27 @@ async fn translations_handler(
         )
         .expect("translation"),
     )
+    .into_response()
 }
 
 async fn audio_speech_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateSpeechRequest>,
 ) -> Response {
+    match relay_stateless_stream_request(&request_context, ProviderRequest::AudioSpeech(&request))
+        .await
+    {
+        Ok(Some(response)) => return upstream_passthrough_response(response),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream audio speech",
+            )
+                .into_response();
+        }
+    }
+
     local_speech_response(
         request_context.tenant_id(),
         request_context.project_id(),
@@ -2138,29 +2720,70 @@ async fn audio_speech_handler(
 
 async fn files_handler(request_context: StatelessGatewayRequest, multipart: Multipart) -> Response {
     match parse_file_request(multipart).await {
-        Ok(request) => Json(
-            create_file(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
+        Ok(request) => {
+            match relay_stateless_json_request(&request_context, ProviderRequest::Files(&request))
+                .await
+            {
+                Ok(Some(response)) => return Json(response).into_response(),
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        "failed to relay upstream file",
+                    )
+                        .into_response();
+                }
+            }
+
+            Json(
+                create_file(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request,
+                )
+                .expect("file"),
             )
-            .expect("file"),
-        )
-        .into_response(),
+            .into_response()
+        }
         Err(response) => response,
     }
 }
 
-async fn files_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::files::ListFilesResponse> {
+async fn files_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::FilesList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream files list",
+            )
+                .into_response();
+        }
+    }
+
     Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
+        .into_response()
 }
 
 async fn file_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::files::FileObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::FilesRetrieve(&file_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream file retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_file(
             request_context.tenant_id(),
@@ -2169,12 +2792,27 @@ async fn file_retrieve_handler(
         )
         .expect("file retrieve"),
     )
+    .into_response()
 }
 
 async fn file_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::files::DeleteFileResponse> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::FilesDelete(&file_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream file delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_file(
             request_context.tenant_id(),
@@ -2183,12 +2821,27 @@ async fn file_delete_handler(
         )
         .expect("file delete"),
     )
+    .into_response()
 }
 
 async fn file_content_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Response {
+    match relay_stateless_stream_request(&request_context, ProviderRequest::FilesContent(&file_id))
+        .await
+    {
+        Ok(Some(response)) => return upstream_passthrough_response(response),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream file content",
+            )
+                .into_response();
+        }
+    }
+
     local_file_content_response(
         request_context.tenant_id(),
         request_context.project_id(),
@@ -2199,7 +2852,19 @@ async fn file_content_handler(
 async fn videos_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVideoRequest>,
-) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Videos(&request)).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_video(
             request_context.tenant_id(),
@@ -2209,21 +2874,47 @@ async fn videos_handler(
         )
         .expect("video"),
     )
+    .into_response()
 }
 
-async fn videos_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
+async fn videos_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VideosList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream videos list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_videos(request_context.tenant_id(), request_context.project_id())
             .expect("videos list"),
     )
+    .into_response()
 }
 
 async fn video_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::videos::VideoObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VideosRetrieve(&video_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_video(
             request_context.tenant_id(),
@@ -2232,12 +2923,27 @@ async fn video_retrieve_handler(
         )
         .expect("video retrieve"),
     )
+    .into_response()
 }
 
 async fn video_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::videos::DeleteVideoResponse> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VideosDelete(&video_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_video(
             request_context.tenant_id(),
@@ -2246,12 +2952,30 @@ async fn video_delete_handler(
         )
         .expect("video delete"),
     )
+    .into_response()
 }
 
 async fn video_content_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
 ) -> Response {
+    match relay_stateless_stream_request(
+        &request_context,
+        ProviderRequest::VideosContent(&video_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return upstream_passthrough_response(response),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video content",
+            )
+                .into_response();
+        }
+    }
+
     local_video_content_response(
         request_context.tenant_id(),
         request_context.project_id(),
@@ -2263,7 +2987,24 @@ async fn video_remix_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
     ExtractJson(request): ExtractJson<RemixVideoRequest>,
-) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VideosRemix(&video_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video remix",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         remix_video(
             request_context.tenant_id(),
@@ -2273,12 +3014,25 @@ async fn video_remix_handler(
         )
         .expect("video remix"),
     )
+    .into_response()
 }
 
 async fn uploads_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateUploadRequest>,
-) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Uploads(&request)).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream upload",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_upload(
             request_context.tenant_id(),
@@ -2287,6 +3041,7 @@ async fn uploads_handler(
         )
         .expect("upload"),
     )
+    .into_response()
 }
 
 async fn upload_parts_handler(
@@ -2295,15 +3050,34 @@ async fn upload_parts_handler(
     multipart: Multipart,
 ) -> Response {
     match parse_upload_part_request(upload_id, multipart).await {
-        Ok(request) => Json(
-            create_upload_part(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
+        Ok(request) => {
+            match relay_stateless_json_request(
+                &request_context,
+                ProviderRequest::UploadParts(&request),
             )
-            .expect("upload part"),
-        )
-        .into_response(),
+            .await
+            {
+                Ok(Some(response)) => return Json(response).into_response(),
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        "failed to relay upstream upload part",
+                    )
+                        .into_response();
+                }
+            }
+
+            Json(
+                create_upload_part(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request,
+                )
+                .expect("upload part"),
+            )
+            .into_response()
+        }
         Err(response) => response,
     }
 }
@@ -2312,8 +3086,22 @@ async fn upload_complete_handler(
     request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
     ExtractJson(mut request): ExtractJson<CompleteUploadRequest>,
-) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
+) -> Response {
     request.upload_id = upload_id;
+    match relay_stateless_json_request(&request_context, ProviderRequest::UploadComplete(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream upload complete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         complete_upload(
             request_context.tenant_id(),
@@ -2322,12 +3110,27 @@ async fn upload_complete_handler(
         )
         .expect("upload complete"),
     )
+    .into_response()
 }
 
 async fn upload_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::UploadCancel(&upload_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream upload cancel",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         cancel_upload(
             request_context.tenant_id(),
@@ -2336,12 +3139,27 @@ async fn upload_cancel_handler(
         )
         .expect("upload cancel"),
     )
+    .into_response()
 }
 
 async fn fine_tuning_jobs_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
-) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::FineTuningJobs(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_fine_tuning_job(
             request_context.tenant_id(),
@@ -2350,21 +3168,51 @@ async fn fine_tuning_jobs_handler(
         )
         .expect("fine tuning"),
     )
+    .into_response()
 }
 
-async fn fine_tuning_jobs_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::fine_tuning::ListFineTuningJobsResponse> {
+async fn fine_tuning_jobs_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::FineTuningJobsList).await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning jobs list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
             .expect("fine tuning list"),
     )
+    .into_response()
 }
 
 async fn fine_tuning_job_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningJobsRetrieve(&fine_tuning_job_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_fine_tuning_job(
             request_context.tenant_id(),
@@ -2373,12 +3221,30 @@ async fn fine_tuning_job_retrieve_handler(
         )
         .expect("fine tuning retrieve"),
     )
+    .into_response()
 }
 
 async fn fine_tuning_job_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningJobsCancel(&fine_tuning_job_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job cancel",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         cancel_fine_tuning_job(
             request_context.tenant_id(),
@@ -2387,12 +3253,27 @@ async fn fine_tuning_job_cancel_handler(
         )
         .expect("fine tuning cancel"),
     )
+    .into_response()
 }
 
 async fn assistants_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateAssistantRequest>,
-) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Assistants(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_assistant(
             request_context.tenant_id(),
@@ -2402,21 +3283,50 @@ async fn assistants_handler(
         )
         .expect("assistant"),
     )
+    .into_response()
 }
 
-async fn assistants_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::assistants::ListAssistantsResponse> {
+async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::AssistantsList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistants list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_assistants(request_context.tenant_id(), request_context.project_id())
             .expect("assistants list"),
     )
+    .into_response()
 }
 
 async fn assistant_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::AssistantsRetrieve(&assistant_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_assistant(
             request_context.tenant_id(),
@@ -2425,13 +3335,31 @@ async fn assistant_retrieve_handler(
         )
         .expect("assistant retrieve"),
     )
+    .into_response()
 }
 
 async fn assistant_update_handler(
     request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateAssistantRequest>,
-) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::AssistantsUpdate(&assistant_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_assistant(
             request_context.tenant_id(),
@@ -2441,12 +3369,30 @@ async fn assistant_update_handler(
         )
         .expect("assistant update"),
     )
+    .into_response()
 }
 
 async fn assistant_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::assistants::DeleteAssistantResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::AssistantsDelete(&assistant_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream assistant delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_assistant(
             request_context.tenant_id(),
@@ -2455,12 +3401,26 @@ async fn assistant_delete_handler(
         )
         .expect("assistant delete"),
     )
+    .into_response()
 }
 
 async fn webhooks_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateWebhookRequest>,
-) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Webhooks(&request)).await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream webhook",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_webhook(
             request_context.tenant_id(),
@@ -2470,21 +3430,50 @@ async fn webhooks_handler(
         )
         .expect("webhook"),
     )
+    .into_response()
 }
 
-async fn webhooks_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::webhooks::ListWebhooksResponse> {
+async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::WebhooksList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream webhooks list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_webhooks(request_context.tenant_id(), request_context.project_id())
             .expect("webhooks list"),
     )
+    .into_response()
 }
 
 async fn webhook_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::WebhooksRetrieve(&webhook_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream webhook retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_webhook(
             request_context.tenant_id(),
@@ -2493,13 +3482,31 @@ async fn webhook_retrieve_handler(
         )
         .expect("webhook retrieve"),
     )
+    .into_response()
 }
 
 async fn webhook_update_handler(
     request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateWebhookRequest>,
-) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::WebhooksUpdate(&webhook_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream webhook update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_webhook(
             request_context.tenant_id(),
@@ -2512,12 +3519,30 @@ async fn webhook_update_handler(
         )
         .expect("webhook update"),
     )
+    .into_response()
 }
 
 async fn webhook_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::webhooks::DeleteWebhookResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::WebhooksDelete(&webhook_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream webhook delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_webhook(
             request_context.tenant_id(),
@@ -2526,12 +3551,30 @@ async fn webhook_delete_handler(
         )
         .expect("webhook delete"),
     )
+    .into_response()
 }
 
 async fn realtime_sessions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateRealtimeSessionRequest>,
-) -> Json<sdkwork_api_contract_openai::realtime::RealtimeSessionObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::RealtimeSessions(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream realtime session",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_realtime_session(
             request_context.tenant_id(),
@@ -2540,12 +3583,25 @@ async fn realtime_sessions_handler(
         )
         .expect("realtime session"),
     )
+    .into_response()
 }
 
 async fn evals_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateEvalRequest>,
-) -> Json<sdkwork_api_contract_openai::evals::EvalObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Evals(&request)).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_eval(
             request_context.tenant_id(),
@@ -2554,12 +3610,25 @@ async fn evals_handler(
         )
         .expect("eval"),
     )
+    .into_response()
 }
 
 async fn batches_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateBatchRequest>,
-) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Batches(&request)).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream batch",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_batch(
             request_context.tenant_id(),
@@ -2569,21 +3638,50 @@ async fn batches_handler(
         )
         .expect("batch"),
     )
+    .into_response()
 }
 
-async fn batches_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::batches::ListBatchesResponse> {
+async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::BatchesList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream batches list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_batches(request_context.tenant_id(), request_context.project_id())
             .expect("batches list"),
     )
+    .into_response()
 }
 
 async fn batch_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::BatchesRetrieve(&batch_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream batch retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_batch(
             request_context.tenant_id(),
@@ -2592,12 +3690,27 @@ async fn batch_retrieve_handler(
         )
         .expect("batch retrieve"),
     )
+    .into_response()
 }
 
 async fn batch_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::BatchesCancel(&batch_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream batch cancel",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         cancel_batch(
             request_context.tenant_id(),
@@ -2606,21 +3719,47 @@ async fn batch_cancel_handler(
         )
         .expect("batch cancel"),
     )
+    .into_response()
 }
 
-async fn vector_stores_list_handler(
-    request_context: StatelessGatewayRequest,
-) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoresResponse> {
+async fn vector_stores_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VectorStoresList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector stores list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_vector_stores(request_context.tenant_id(), request_context.project_id())
             .expect("vector stores list"),
     )
+    .into_response()
 }
 
 async fn vector_stores_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVectorStoreRequest>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VectorStores(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_vector_store(
             request_context.tenant_id(),
@@ -2629,12 +3768,30 @@ async fn vector_stores_handler(
         )
         .expect("vector store"),
     )
+    .into_response()
 }
 
 async fn vector_store_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoresRetrieve(&vector_store_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_vector_store(
             request_context.tenant_id(),
@@ -2643,13 +3800,31 @@ async fn vector_store_retrieve_handler(
         )
         .expect("vector store retrieve"),
     )
+    .into_response()
 }
 
 async fn vector_store_update_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateVectorStoreRequest>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoresUpdate(&vector_store_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_vector_store(
             request_context.tenant_id(),
@@ -2659,12 +3834,30 @@ async fn vector_store_update_handler(
         )
         .expect("vector store update"),
     )
+    .into_response()
 }
 
 async fn vector_store_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::DeleteVectorStoreResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoresDelete(&vector_store_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_vector_store(
             request_context.tenant_id(),
@@ -2673,13 +3866,31 @@ async fn vector_store_delete_handler(
         )
         .expect("vector store delete"),
     )
+    .into_response()
 }
 
 async fn vector_store_search_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<SearchVectorStoreRequest>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::SearchVectorStoreResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoresSearch(&vector_store_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store search",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         search_vector_store(
             request_context.tenant_id(),
@@ -2689,13 +3900,31 @@ async fn vector_store_search_handler(
         )
         .expect("vector store search"),
     )
+    .into_response()
 }
 
 async fn vector_store_files_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileRequest>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFiles(&vector_store_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_vector_store_file(
             request_context.tenant_id(),
@@ -2705,12 +3934,30 @@ async fn vector_store_files_handler(
         )
         .expect("vector store file"),
     )
+    .into_response()
 }
 
 async fn vector_store_files_list_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoreFilesResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFilesList(&vector_store_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store files list",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_vector_store_files(
             request_context.tenant_id(),
@@ -2719,12 +3966,30 @@ async fn vector_store_files_list_handler(
         )
         .expect("vector store files list"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((vector_store_id, file_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFilesRetrieve(&vector_store_id, &file_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_vector_store_file(
             request_context.tenant_id(),
@@ -2734,12 +3999,30 @@ async fn vector_store_file_retrieve_handler(
         )
         .expect("vector store file retrieve"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((vector_store_id, file_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::DeleteVectorStoreFileResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFilesDelete(&vector_store_id, &file_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file delete",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         delete_vector_store_file(
             request_context.tenant_id(),
@@ -2749,13 +4032,31 @@ async fn vector_store_file_delete_handler(
         )
         .expect("vector store file delete"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_batches_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileBatchRequest>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFileBatches(&vector_store_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file batch",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         create_vector_store_file_batch(
             request_context.tenant_id(),
@@ -2765,12 +4066,30 @@ async fn vector_store_file_batches_handler(
         )
         .expect("vector store file batch"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_batch_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFileBatchesRetrieve(&vector_store_id, &batch_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file batch retrieve",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         get_vector_store_file_batch(
             request_context.tenant_id(),
@@ -2780,12 +4099,30 @@ async fn vector_store_file_batch_retrieve_handler(
         )
         .expect("vector store file batch retrieve"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_batch_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFileBatchesCancel(&vector_store_id, &batch_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file batch cancel",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         cancel_vector_store_file_batch(
             request_context.tenant_id(),
@@ -2795,12 +4132,30 @@ async fn vector_store_file_batch_cancel_handler(
         )
         .expect("vector store file batch cancel"),
     )
+    .into_response()
 }
 
 async fn vector_store_file_batch_files_handler(
     request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
-) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoreFilesResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VectorStoreFileBatchesListFiles(&vector_store_id, &batch_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream vector store file batch files",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         list_vector_store_file_batch_files(
             request_context.tenant_id(),
@@ -2810,6 +4165,7 @@ async fn vector_store_file_batch_files_handler(
         )
         .expect("vector store file batch files"),
     )
+    .into_response()
 }
 
 async fn chat_completions_with_state_handler(

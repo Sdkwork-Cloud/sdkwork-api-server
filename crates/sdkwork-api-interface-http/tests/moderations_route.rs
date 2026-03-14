@@ -30,6 +30,52 @@ async fn moderations_route_returns_ok() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+#[tokio::test]
+async fn stateless_moderations_route_relays_to_openai_compatible_provider() {
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/v1/moderations", post(upstream_moderations_handler))
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::new(
+                "openai",
+                format!("http://{address}"),
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/moderations")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"omni-moderation-latest\",\"input\":\"relay me\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["id"], "modr_upstream");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-stateless-openai")
+    );
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await

@@ -43,6 +43,59 @@ async fn audio_speech_route_returns_audio_content() {
     assert!(!bytes.is_empty());
 }
 
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateless_audio_speech_route_relays_to_openai_compatible_provider() {
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/v1/audio/speech", post(upstream_audio_speech_handler))
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::new(
+                "openai",
+                format!("http://{address}"),
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/speech")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4o-mini-tts\",\"voice\":\"nova\",\"input\":\"relay me\",\"response_format\":\"mp3\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("audio/mpeg")
+    );
+    assert_eq!(read_bytes(response).await, b"AUDIO");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-stateless-openai")
+    );
+}
+
 async fn read_bytes(response: axum::response::Response) -> Vec<u8> {
     axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
