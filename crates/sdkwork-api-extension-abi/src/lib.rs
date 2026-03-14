@@ -1,5 +1,5 @@
 use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_void};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,6 +10,8 @@ pub const SDKWORK_EXTENSION_ABI_VERSION_SYMBOL: &[u8] = b"sdkwork_extension_abi_
 pub const SDKWORK_EXTENSION_MANIFEST_JSON_SYMBOL: &[u8] = b"sdkwork_extension_manifest_json\0";
 pub const SDKWORK_EXTENSION_PROVIDER_EXECUTE_JSON_SYMBOL: &[u8] =
     b"sdkwork_extension_provider_execute_json\0";
+pub const SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL: &[u8] =
+    b"sdkwork_extension_provider_execute_stream_json\0";
 pub const SDKWORK_EXTENSION_FREE_STRING_SYMBOL: &[u8] = b"sdkwork_extension_free_string\0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -74,6 +76,67 @@ impl ProviderInvocationResult {
         Self::Error {
             message: message.into(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ProviderStreamInvocationResult {
+    Streamed {
+        content_type: String,
+    },
+    Unsupported {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
+    Error {
+        message: String,
+    },
+}
+
+impl ProviderStreamInvocationResult {
+    pub fn streamed(content_type: impl Into<String>) -> Self {
+        Self::Streamed {
+            content_type: content_type.into(),
+        }
+    }
+
+    pub fn unsupported(message: impl Into<String>) -> Self {
+        Self::Unsupported {
+            message: Some(message.into()),
+        }
+    }
+
+    pub fn error(message: impl Into<String>) -> Self {
+        Self::Error {
+            message: message.into(),
+        }
+    }
+}
+
+#[repr(C)]
+pub struct ProviderStreamWriter {
+    pub context: *mut c_void,
+    pub set_content_type: Option<unsafe extern "C" fn(*mut c_void, *const c_char) -> bool>,
+    pub write_chunk: Option<unsafe extern "C" fn(*mut c_void, *const u8, usize) -> bool>,
+}
+
+impl ProviderStreamWriter {
+    pub fn set_content_type(&self, content_type: &str) -> bool {
+        let Some(callback) = self.set_content_type else {
+            return false;
+        };
+        let Ok(content_type) = CString::new(content_type) else {
+            return false;
+        };
+        unsafe { callback(self.context, content_type.as_ptr()) }
+    }
+
+    pub fn write_chunk(&self, chunk: &[u8]) -> bool {
+        let Some(callback) = self.write_chunk else {
+            return false;
+        };
+        unsafe { callback(self.context, chunk.as_ptr(), chunk.len()) }
     }
 }
 

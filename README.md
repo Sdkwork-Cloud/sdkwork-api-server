@@ -80,9 +80,11 @@ Backend:
   - the host can start configured connector processes on demand
   - the host can reuse a healthy externally managed connector endpoint when one is already running at the configured `base_url`
 - Native dynamic runtime execution for discovered provider extensions:
-  - trusted `native_dynamic` packages can now load through a stable JSON ABI
+  - trusted `native_dynamic` packages can now load through a stable JSON and stream ABI
   - the host verifies required symbols plus manifest parity before registration
   - JSON-capable provider operations can execute in-process through the loaded library
+  - chat `/v1/chat/completions` SSE can now relay through an in-process native dynamic plugin
+  - generic binary stream parity and richer lifecycle hooks remain future work
 - Provider execution now consumes persisted extension installation and instance state during real dispatch:
   - `enabled = false` on an installation or instance forces local fallback
   - instance `base_url` overrides the provider catalog `base_url`

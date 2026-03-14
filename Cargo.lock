@@ -1701,8 +1701,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "axum",
  "base64",
+ "bytes",
  "ed25519-dalek",
+ "futures-util",
  "libloading",
  "sdkwork-api-contract-openai",
  "sdkwork-api-ext-provider-native-mock",
@@ -1713,6 +1716,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "tokio-stream",
  "toml",
 ]
 
@@ -1756,6 +1760,7 @@ dependencies = [
  "anyhow",
  "axum",
  "base64",
+ "ed25519-dalek",
  "reqwest",
  "sdkwork-api-app-billing",
  "sdkwork-api-app-credential",
@@ -1764,13 +1769,18 @@ dependencies = [
  "sdkwork-api-app-routing",
  "sdkwork-api-app-usage",
  "sdkwork-api-contract-openai",
+ "sdkwork-api-ext-provider-native-mock",
+ "sdkwork-api-extension-core",
  "sdkwork-api-interface-admin",
+ "sdkwork-api-provider-core",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "tokio",
+ "toml",
  "tower",
 ]
 
@@ -1788,6 +1798,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
+ "futures-util",
  "reqwest",
  "sdkwork-api-contract-openai",
  "serde_json",
@@ -1817,6 +1829,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
+ "futures-util",
  "reqwest",
  "sdkwork-api-contract-openai",
  "sdkwork-api-domain-catalog",

@@ -68,7 +68,7 @@ The extension architecture is intentionally layered.
 | Runtime | Current Status | Notes |
 |---|---|---|
 | `builtin` | Active | First-party provider extensions are registered in-process through `sdkwork-api-extension-host` |
-| `native_dynamic` | Active with JSON ABI execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, and executed for JSON-capable provider operations |
+| `native_dynamic` | Active with JSON and chat-stream ABI execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, and executed for JSON-capable provider operations plus chat `/v1/chat/completions` SSE stream relay |
 | `connector` | Active with supervised execution | Manifest discovery and config-driven loading are active; the host can start configured connector processes, probe HTTP health endpoints, reuse healthy external endpoints, and relay through the current protocol adapter set |
 
 ## Configuration Layers
@@ -106,7 +106,7 @@ Configuration-driven loading now uses a stable merge order:
 2. installation-level runtime choice and package config
 3. instance-level overrides such as `base_url`, `credential_ref`, and rollout weights
 
-This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations through the current ABI boundary. Stream ABI, hot reload, and richer lifecycle hooks remain future work.
+This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations and chat/SSE stream relay through the current ABI boundary. Generic binary streams, hot reload, and richer lifecycle hooks remain future work.
 
 The runtime now also supports two manifest sources:
 

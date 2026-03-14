@@ -1,8 +1,13 @@
 use std::collections::HashMap;
+use std::io;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use bytes::Bytes;
+use futures_util::stream::Stream;
+use futures_util::StreamExt;
 use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
@@ -160,7 +165,47 @@ pub enum ProviderRequest<'a> {
 
 pub enum ProviderOutput {
     Json(Value),
-    Stream(reqwest::Response),
+    Stream(ProviderStreamOutput),
+}
+
+pub type ProviderByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, io::Error>> + Send>>;
+
+pub struct ProviderStreamOutput {
+    content_type: String,
+    body: ProviderByteStream,
+}
+
+impl ProviderStreamOutput {
+    pub fn new<S>(content_type: impl Into<String>, body: S) -> Self
+    where
+        S: Stream<Item = Result<Bytes, io::Error>> + Send + 'static,
+    {
+        Self {
+            content_type: content_type.into(),
+            body: Box::pin(body),
+        }
+    }
+
+    pub fn from_reqwest_response(response: reqwest::Response) -> Self {
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_owned();
+        let body = response
+            .bytes_stream()
+            .map(|item| item.map_err(io::Error::other));
+        Self::new(content_type, body)
+    }
+
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    pub fn into_body_stream(self) -> ProviderByteStream {
+        self.body
+    }
 }
 
 impl ProviderOutput {
@@ -171,10 +216,10 @@ impl ProviderOutput {
         }
     }
 
-    pub fn into_stream(self) -> Option<reqwest::Response> {
+    pub fn into_stream(self) -> Option<ProviderStreamOutput> {
         match self {
             Self::Json(_) => None,
-            Self::Stream(response) => Some(response),
+            Self::Stream(stream) => Some(stream),
         }
     }
 }

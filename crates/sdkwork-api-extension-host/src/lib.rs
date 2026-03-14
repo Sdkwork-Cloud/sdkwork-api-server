@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
+use std::io;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -12,13 +13,18 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result as AnyhowResult};
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use bytes::Bytes;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use futures_util::stream;
+use futures_util::StreamExt;
 use libloading::Library;
 use sdkwork_api_extension_abi::{
-    from_raw_c_str, into_raw_c_string, ProviderInvocation, ProviderInvocationResult,
+    free_raw_c_string, from_raw_c_str, into_raw_c_string, ProviderInvocation,
+    ProviderInvocationResult, ProviderStreamInvocationResult, ProviderStreamWriter,
     SDKWORK_EXTENSION_ABI_VERSION, SDKWORK_EXTENSION_ABI_VERSION_SYMBOL,
     SDKWORK_EXTENSION_FREE_STRING_SYMBOL, SDKWORK_EXTENSION_MANIFEST_JSON_SYMBOL,
     SDKWORK_EXTENSION_PROVIDER_EXECUTE_JSON_SYMBOL,
+    SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL,
 };
 use sdkwork_api_extension_core::{
     ExtensionInstallation, ExtensionInstance, ExtensionManifest, ExtensionRuntime,
@@ -26,10 +32,13 @@ use sdkwork_api_extension_core::{
 };
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
+    ProviderStreamOutput,
 };
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Clone)]
 pub struct BuiltinExtensionFactory {
@@ -48,6 +57,8 @@ type ProviderFactory =
 type AbiVersionFn = unsafe extern "C" fn() -> u32;
 type ManifestJsonFn = unsafe extern "C" fn() -> *const c_char;
 type ExecuteJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+type ExecuteStreamJsonFn =
+    unsafe extern "C" fn(*const c_char, *const ProviderStreamWriter) -> *mut c_char;
 type FreeStringFn = unsafe extern "C" fn(*mut c_char);
 
 #[derive(Clone)]
@@ -266,6 +277,7 @@ struct NativeDynamicRuntime {
     entrypoint: String,
     _library: Library,
     execute_json: ExecuteJsonFn,
+    execute_stream_json: Option<ExecuteStreamJsonFn>,
     free_string: FreeStringFn,
 }
 
@@ -275,6 +287,16 @@ unsafe impl Sync for NativeDynamicRuntime {}
 struct NativeDynamicProviderAdapter {
     runtime: Arc<NativeDynamicRuntime>,
     base_url: String,
+}
+
+struct HostStreamWriterContext {
+    sender: UnboundedSender<NativeDynamicStreamEvent>,
+}
+
+enum NativeDynamicStreamEvent {
+    ContentType(String),
+    Chunk(Bytes),
+    Finished(ProviderStreamInvocationResult),
 }
 
 static CONNECTOR_PROCESS_REGISTRY: OnceLock<Mutex<HashMap<String, ManagedConnectorProcess>>> =
@@ -865,6 +887,12 @@ impl ProviderExecutionAdapter for NativeDynamicProviderAdapter {
         request: ProviderRequest<'_>,
     ) -> AnyhowResult<ProviderOutput> {
         let invocation = provider_invocation_from_request(request, api_key, &self.base_url)?;
+        if invocation.expects_stream {
+            let stream =
+                execute_native_dynamic_stream_invocation(Arc::clone(&self.runtime), &invocation)
+                    .await?;
+            return Ok(ProviderOutput::Stream(stream));
+        }
         let result = execute_native_dynamic_invocation(&self.runtime, &invocation)?;
         match result {
             ProviderInvocationResult::Json { body } => Ok(ProviderOutput::Json(body)),
@@ -1177,6 +1205,10 @@ fn load_native_dynamic_runtime(
             SDKWORK_EXTENSION_PROVIDER_EXECUTE_JSON_SYMBOL,
             entrypoint,
         )?;
+        let execute_stream_json = try_load_native_dynamic_symbol::<ExecuteStreamJsonFn>(
+            &library,
+            SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL,
+        );
         let free_string = load_native_dynamic_symbol::<FreeStringFn>(
             &library,
             SDKWORK_EXTENSION_FREE_STRING_SYMBOL,
@@ -1209,6 +1241,7 @@ fn load_native_dynamic_runtime(
                 entrypoint: entrypoint.display().to_string(),
                 _library: library,
                 execute_json,
+                execute_stream_json,
                 free_string,
             }),
             manifest,
@@ -1231,6 +1264,10 @@ unsafe fn load_native_dynamic_symbol<T: Copy>(
                 .to_owned(),
             message: error.to_string(),
         })
+}
+
+unsafe fn try_load_native_dynamic_symbol<T: Copy>(library: &Library, symbol: &[u8]) -> Option<T> {
+    library.get::<T>(symbol).ok().map(|loaded| *loaded)
 }
 
 fn ensure_native_dynamic_manifest_matches(
@@ -1276,7 +1313,7 @@ fn execute_native_dynamic_invocation(
     })?;
     let raw_payload = into_raw_c_string(payload);
     let raw_result = unsafe { (runtime.execute_json)(raw_payload.cast_const()) };
-    unsafe { sdkwork_api_extension_abi::free_raw_c_string(raw_payload) };
+    unsafe { free_raw_c_string(raw_payload) };
     let Some(raw_result_json) = (unsafe { from_raw_c_str(raw_result) }) else {
         return Err(ExtensionHostError::NativeDynamicResponseParseFailed {
             entrypoint: runtime.entrypoint.clone(),
@@ -1291,6 +1328,161 @@ fn execute_native_dynamic_invocation(
             message: error.to_string(),
         }
     })
+}
+
+async fn execute_native_dynamic_stream_invocation(
+    runtime: Arc<NativeDynamicRuntime>,
+    invocation: &ProviderInvocation,
+) -> Result<ProviderStreamOutput, ExtensionHostError> {
+    let Some(execute_stream_json) = runtime.execute_stream_json else {
+        return Err(ExtensionHostError::NativeDynamicInvocationFailed {
+            entrypoint: runtime.entrypoint.clone(),
+            message: "plugin does not export stream execution".to_owned(),
+        });
+    };
+
+    let payload = serde_json::to_string(invocation).map_err(|error| {
+        ExtensionHostError::NativeDynamicInvocationSerializeFailed {
+            operation: invocation.operation.clone(),
+            message: error.to_string(),
+        }
+    })?;
+
+    let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+    let runtime_for_thread = Arc::clone(&runtime);
+    std::thread::spawn(move || {
+        let raw_payload = into_raw_c_string(payload);
+        let mut writer_context = Box::new(HostStreamWriterContext {
+            sender: event_sender.clone(),
+        });
+        let writer = ProviderStreamWriter {
+            context: (&mut *writer_context as *mut HostStreamWriterContext).cast::<c_void>(),
+            set_content_type: Some(host_stream_writer_set_content_type),
+            write_chunk: Some(host_stream_writer_write_chunk),
+        };
+
+        let raw_result =
+            unsafe { execute_stream_json(raw_payload.cast_const(), &writer as *const _) };
+        unsafe { free_raw_c_string(raw_payload) };
+
+        let result = if raw_result.is_null() {
+            ProviderStreamInvocationResult::error("plugin returned null stream result")
+        } else {
+            let decoded = unsafe { from_raw_c_str(raw_result) };
+            unsafe { (runtime_for_thread.free_string)(raw_result) };
+            match decoded {
+                Some(raw_result_json) => {
+                    serde_json::from_str(&raw_result_json).unwrap_or_else(|error| {
+                        ProviderStreamInvocationResult::error(format!(
+                            "invalid stream result payload: {error}"
+                        ))
+                    })
+                }
+                None => {
+                    ProviderStreamInvocationResult::error("plugin returned invalid stream result")
+                }
+            }
+        };
+
+        let _ = event_sender.send(NativeDynamicStreamEvent::Finished(result));
+    });
+
+    let mut content_type = None;
+    let mut prefix_chunk = None;
+    match event_receiver.recv().await {
+        Some(NativeDynamicStreamEvent::ContentType(value)) => {
+            content_type = Some(value);
+        }
+        Some(NativeDynamicStreamEvent::Chunk(value)) => {
+            prefix_chunk = Some(value);
+        }
+        Some(NativeDynamicStreamEvent::Finished(result)) => {
+            return match result {
+                ProviderStreamInvocationResult::Streamed { content_type } => {
+                    Ok(ProviderStreamOutput::new(content_type, stream::empty()))
+                }
+                ProviderStreamInvocationResult::Unsupported { message } => {
+                    Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                        entrypoint: runtime.entrypoint.clone(),
+                        message: message.unwrap_or_else(|| {
+                            "native dynamic provider reported unsupported stream operation"
+                                .to_owned()
+                        }),
+                    })
+                }
+                ProviderStreamInvocationResult::Error { message } => {
+                    Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                        entrypoint: runtime.entrypoint.clone(),
+                        message,
+                    })
+                }
+            };
+        }
+        None => {
+            return Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                entrypoint: runtime.entrypoint.clone(),
+                message: "plugin closed stream without producing metadata or chunks".to_owned(),
+            });
+        }
+    }
+
+    let content_type = content_type.unwrap_or_else(|| "application/octet-stream".to_owned());
+    let trailing_stream = UnboundedReceiverStream::new(event_receiver).filter_map(|event| async {
+        match event {
+            NativeDynamicStreamEvent::ContentType(_) => None,
+            NativeDynamicStreamEvent::Chunk(bytes) => Some(Ok(bytes)),
+            NativeDynamicStreamEvent::Finished(ProviderStreamInvocationResult::Streamed {
+                ..
+            }) => None,
+            NativeDynamicStreamEvent::Finished(ProviderStreamInvocationResult::Unsupported {
+                message,
+            }) => Some(Err(io::Error::other(message.unwrap_or_else(|| {
+                "native dynamic provider reported unsupported stream operation".to_owned()
+            })))),
+            NativeDynamicStreamEvent::Finished(ProviderStreamInvocationResult::Error {
+                message,
+            }) => Some(Err(io::Error::other(message))),
+        }
+    });
+
+    let body_stream = stream::iter(prefix_chunk.into_iter().map(Ok)).chain(trailing_stream);
+
+    Ok(ProviderStreamOutput::new(content_type, body_stream))
+}
+
+unsafe extern "C" fn host_stream_writer_set_content_type(
+    context: *mut c_void,
+    content_type: *const c_char,
+) -> bool {
+    if context.is_null() {
+        return false;
+    }
+    let Some(content_type) = from_raw_c_str(content_type) else {
+        return false;
+    };
+    let context = &*(context.cast::<HostStreamWriterContext>());
+    context
+        .sender
+        .send(NativeDynamicStreamEvent::ContentType(content_type))
+        .is_ok()
+}
+
+unsafe extern "C" fn host_stream_writer_write_chunk(
+    context: *mut c_void,
+    chunk_ptr: *const u8,
+    chunk_len: usize,
+) -> bool {
+    if context.is_null() || chunk_ptr.is_null() {
+        return false;
+    }
+    let chunk = std::slice::from_raw_parts(chunk_ptr, chunk_len);
+    let context = &*(context.cast::<HostStreamWriterContext>());
+    context
+        .sender
+        .send(NativeDynamicStreamEvent::Chunk(Bytes::copy_from_slice(
+            chunk,
+        )))
+        .is_ok()
 }
 
 fn serialize_json_body<T: Serialize>(

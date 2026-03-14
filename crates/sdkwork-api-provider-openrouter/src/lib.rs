@@ -40,6 +40,7 @@ use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookR
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
+    ProviderStreamOutput,
 };
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use serde_json::Value;
@@ -203,7 +204,7 @@ impl OpenRouterProviderAdapter {
         &self,
         api_key: &str,
         request: &CreateChatCompletionRequest,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<ProviderStreamOutput> {
         self.delegate
             .chat_completions_stream(api_key, request)
             .await
@@ -397,7 +398,7 @@ impl OpenRouterProviderAdapter {
         &self,
         api_key: &str,
         request: &CreateSpeechRequest,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<ProviderStreamOutput> {
         self.delegate.audio_speech(api_key, request).await
     }
 
@@ -417,7 +418,7 @@ impl OpenRouterProviderAdapter {
         self.delegate.delete_file(api_key, file_id).await
     }
 
-    pub async fn file_content(&self, api_key: &str, file_id: &str) -> Result<reqwest::Response> {
+    pub async fn file_content(&self, api_key: &str, file_id: &str) -> Result<ProviderStreamOutput> {
         self.delegate.file_content(api_key, file_id).await
     }
 
@@ -708,7 +709,11 @@ impl OpenRouterProviderAdapter {
         self.delegate.delete_video(api_key, video_id).await
     }
 
-    pub async fn video_content(&self, api_key: &str, video_id: &str) -> Result<reqwest::Response> {
+    pub async fn video_content(
+        &self,
+        api_key: &str,
+        video_id: &str,
+    ) -> Result<ProviderStreamOutput> {
         self.delegate.video_content(api_key, video_id).await
     }
 

@@ -55,7 +55,9 @@ async-trait = "0.1"
 anyhow = "1.0"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
+bytes = "1"
 ed25519-dalek = "2.1"
+futures-util = "0.3"
 jsonwebtoken = "9.3"
 keyring = "3.6.2"
 libloading = "0.8"
@@ -66,5 +68,6 @@ serde_json = "1.0"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "postgres"] }
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
+tokio-stream = "0.1"
 tower = { version = "0.5", features = ["util"] }
 toml = "0.8"

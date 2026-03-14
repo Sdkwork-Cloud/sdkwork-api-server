@@ -217,6 +217,7 @@ use sdkwork_api_contract_openai::vector_stores::{
 };
 use sdkwork_api_contract_openai::videos::{CreateVideoRequest, RemixVideoRequest};
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
+use sdkwork_api_provider_core::ProviderStreamOutput;
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -4257,18 +4258,12 @@ async fn thread_run_step_retrieve_with_state_handler(
     .into_response()
 }
 
-fn upstream_passthrough_response(response: reqwest::Response) -> Response {
-    let content_type = response
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("text/event-stream")
-        .to_owned();
-
+fn upstream_passthrough_response(response: ProviderStreamOutput) -> Response {
+    let content_type = response.content_type().to_owned();
     Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, content_type)
-        .body(Body::from_stream(response.bytes_stream()))
+        .body(Body::from_stream(response.into_body_stream()))
         .expect("valid upstream stream response")
 }
 

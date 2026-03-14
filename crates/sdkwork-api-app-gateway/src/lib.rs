@@ -80,7 +80,7 @@ use sdkwork_api_extension_host::{
     verify_discovered_extension_package_trust, BuiltinProviderExtensionFactory,
     DiscoveredExtensionPackage, ExtensionDiscoveryPolicy, ExtensionHost,
 };
-use sdkwork_api_provider_core::ProviderRequest;
+use sdkwork_api_provider_core::{ProviderRequest, ProviderStreamOutput};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
@@ -521,7 +521,7 @@ pub async fn relay_chat_completion_stream_from_store(
     tenant_id: &str,
     _project_id: &str,
     request: &CreateChatCompletionRequest,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let decision = simulate_route_with_store(store, "chat_completion", &request.model).await?;
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
         return Ok(None);
@@ -1643,7 +1643,7 @@ pub async fn relay_speech_from_store(
     tenant_id: &str,
     _project_id: &str,
     request: &CreateSpeechRequest,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let decision = simulate_route_with_store(store, "audio_speech", &request.model).await?;
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
         return Ok(None);
@@ -1777,7 +1777,7 @@ pub async fn relay_file_content_from_store(
     tenant_id: &str,
     _project_id: &str,
     file_id: &str,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let decision = simulate_route_with_store(store, "files", file_id).await?;
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
         return Ok(None);
@@ -2947,7 +2947,7 @@ pub async fn relay_video_content_from_store(
     tenant_id: &str,
     _project_id: &str,
     video_id: &str,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let decision = simulate_route_with_store(store, "videos", video_id).await?;
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
         return Ok(None);
@@ -4048,7 +4048,7 @@ async fn execute_stream_provider_request_for_provider(
     provider: &ProxyProvider,
     api_key: &str,
     request: ProviderRequest<'_>,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let descriptor =
         provider_execution_descriptor_for_provider(store, provider, api_key.to_owned()).await?;
     debug_assert!(descriptor.local_fallback || descriptor.provider_id == provider.id);
@@ -4085,7 +4085,7 @@ async fn execute_stream_provider_request(
     base_url: String,
     api_key: &str,
     request: ProviderRequest<'_>,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<ProviderStreamOutput>> {
     let host = configured_extension_host()?;
     let Some(adapter) = host.resolve_provider(runtime_key, base_url) else {
         return Ok(None);

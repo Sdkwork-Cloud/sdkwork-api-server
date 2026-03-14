@@ -44,6 +44,7 @@ use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookR
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
+    ProviderStreamOutput,
 };
 use serde_json::Value;
 
@@ -218,7 +219,7 @@ impl OpenAiProviderAdapter {
         &self,
         api_key: &str,
         request: &CreateChatCompletionRequest,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<ProviderStreamOutput> {
         self.post_stream("/v1/chat/completions", api_key, request)
             .await
     }
@@ -583,7 +584,7 @@ impl OpenAiProviderAdapter {
         &self,
         api_key: &str,
         request: &CreateSpeechRequest,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<ProviderStreamOutput> {
         self.post_stream("/v1/audio/speech", api_key, request).await
     }
 
@@ -613,7 +614,7 @@ impl OpenAiProviderAdapter {
             .await
     }
 
-    pub async fn file_content(&self, api_key: &str, file_id: &str) -> Result<reqwest::Response> {
+    pub async fn file_content(&self, api_key: &str, file_id: &str) -> Result<ProviderStreamOutput> {
         self.get_stream(&format!("/v1/files/{file_id}/content"), api_key)
             .await
     }
@@ -953,7 +954,11 @@ impl OpenAiProviderAdapter {
             .await
     }
 
-    pub async fn video_content(&self, api_key: &str, video_id: &str) -> Result<reqwest::Response> {
+    pub async fn video_content(
+        &self,
+        api_key: &str,
+        video_id: &str,
+    ) -> Result<ProviderStreamOutput> {
         self.get_stream(&format!("/v1/videos/{video_id}/content"), api_key)
             .await
     }
@@ -1017,7 +1022,7 @@ impl OpenAiProviderAdapter {
         path: &str,
         api_key: &str,
         request: &T,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<ProviderStreamOutput> {
         let response = self
             .authorized_request(reqwest::Method::POST, path, api_key)
             .json(request)
@@ -1025,7 +1030,7 @@ impl OpenAiProviderAdapter {
             .await?
             .error_for_status()?;
 
-        Ok(response)
+        Ok(ProviderStreamOutput::from_reqwest_response(response))
     }
 
     async fn get_json(&self, path: &str, api_key: &str) -> Result<Value> {
@@ -1038,14 +1043,14 @@ impl OpenAiProviderAdapter {
         Ok(response.json::<Value>().await?)
     }
 
-    async fn get_stream(&self, path: &str, api_key: &str) -> Result<reqwest::Response> {
+    async fn get_stream(&self, path: &str, api_key: &str) -> Result<ProviderStreamOutput> {
         let response = self
             .authorized_request(reqwest::Method::GET, path, api_key)
             .send()
             .await?
             .error_for_status()?;
 
-        Ok(response)
+        Ok(ProviderStreamOutput::from_reqwest_response(response))
     }
 
     async fn delete_json(&self, path: &str, api_key: &str) -> Result<Value> {

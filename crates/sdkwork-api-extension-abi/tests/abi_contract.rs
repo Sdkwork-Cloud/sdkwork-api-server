@@ -1,5 +1,6 @@
 use sdkwork_api_extension_abi::{
-    ProviderInvocation, ProviderInvocationResult, SDKWORK_EXTENSION_ABI_VERSION,
+    ProviderInvocation, ProviderInvocationResult, ProviderStreamInvocationResult,
+    SDKWORK_EXTENSION_ABI_VERSION,
 };
 
 #[test]
@@ -23,4 +24,13 @@ fn serializes_provider_invocation_and_result_envelopes() {
     assert_eq!(SDKWORK_EXTENSION_ABI_VERSION, 1);
     assert_eq!(encoded_result["kind"], "json");
     assert_eq!(encoded_result["body"]["id"], "chatcmpl_native");
+}
+
+#[test]
+fn serializes_provider_stream_result_envelopes() {
+    let result = ProviderStreamInvocationResult::streamed("text/event-stream");
+    let encoded_result = serde_json::to_value(&result).expect("stream result json");
+
+    assert_eq!(encoded_result["kind"], "streamed");
+    assert_eq!(encoded_result["content_type"], "text/event-stream");
 }

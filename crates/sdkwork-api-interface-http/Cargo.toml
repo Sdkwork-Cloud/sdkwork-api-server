@@ -17,12 +17,18 @@ sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
+sdkwork-api-provider-core = { path = "../sdkwork-api-provider-core" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde_json.workspace = true
 sqlx.workspace = true
 
 [dev-dependencies]
+ed25519-dalek.workspace = true
+sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
+sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
+sha2.workspace = true
+toml.workspace = true
 sdkwork-api-interface-admin = { path = "../sdkwork-api-interface-admin" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde_json.workspace = true

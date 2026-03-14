@@ -66,7 +66,7 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | Runtime Mode | Level | Notes |
 |---|---|---|
 | `builtin` | `native` | Active today through `sdkwork-api-extension-host` and built-in provider factories |
-| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, and dynamic library symbol resolution path; stream ABI remains out of scope |
+| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, dynamic library symbol resolution, and callback-based chat/SSE stream execution for `/v1/chat/completions`; generic binary stream parity remains future work |
 | `connector` | `native` | Managed process lifecycle is active in the host, with HTTP health checks, reusable external endpoint attachment, protocol-mapped relay through the current adapter set, and trust-policy gating for discovered external packages |
 
 ## Current Built-In Extension IDs

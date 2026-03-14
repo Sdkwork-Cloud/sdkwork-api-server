@@ -6,6 +6,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 
@@ -887,9 +888,13 @@ async fn adapter_reads_video_content_from_openai_compatible_upstream() {
         .video_content("sk-upstream-openai", "video_1")
         .await
         .unwrap();
-    let bytes = response.bytes().await.unwrap();
+    let mut stream = response.into_body_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        bytes.extend_from_slice(&chunk.unwrap());
+    }
 
-    assert_eq!(bytes.as_ref(), b"UPSTREAM-VIDEO");
+    assert_eq!(bytes.as_slice(), b"UPSTREAM-VIDEO");
 }
 
 #[tokio::test]
@@ -2112,14 +2117,13 @@ async fn adapter_posts_audio_speech_to_openai_compatible_upstream() {
         .await
         .unwrap();
 
-    assert_eq!(
-        response
-            .headers()
-            .get("content-type")
-            .and_then(|value| value.to_str().ok()),
-        Some("audio/mpeg")
-    );
-    assert_eq!(response.bytes().await.unwrap().as_ref(), b"AUDIO");
+    assert_eq!(response.content_type(), "audio/mpeg");
+    let mut stream = response.into_body_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        bytes.extend_from_slice(&chunk.unwrap());
+    }
+    assert_eq!(bytes.as_slice(), b"AUDIO");
     assert_eq!(
         state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
@@ -2283,16 +2287,15 @@ async fn adapter_streams_file_content_from_openai_compatible_upstream() {
         .file_content("sk-upstream-openai", "file_1")
         .await
         .unwrap();
-    let content_type = response
-        .headers()
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
-    let bytes = response.bytes().await.unwrap();
+    let content_type = response.content_type().to_owned();
+    let mut stream = response.into_body_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        bytes.extend_from_slice(&chunk.unwrap());
+    }
 
     assert_eq!(content_type, "application/jsonl");
-    assert_eq!(&bytes[..], b"{}");
+    assert_eq!(bytes.as_slice(), b"{}");
     assert_eq!(
         state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
