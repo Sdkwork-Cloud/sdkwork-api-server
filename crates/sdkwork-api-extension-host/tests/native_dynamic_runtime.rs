@@ -90,11 +90,75 @@ async fn executes_native_dynamic_responses_stream_request() {
     assert!(body.contains("[DONE]"));
 }
 
+#[tokio::test]
+async fn executes_native_dynamic_audio_speech_stream_request() {
+    let library_path = native_dynamic_fixture_library_path();
+    let adapter = load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1")
+        .expect("native dynamic provider adapter");
+    let mut request = sdkwork_api_contract_openai::audio::CreateSpeechRequest::new(
+        "gpt-4o-mini-tts",
+        "nova",
+        "hello",
+    );
+    request.response_format = Some("mp3".to_owned());
+
+    let output = adapter
+        .execute("sk-native", ProviderRequest::AudioSpeech(&request))
+        .await
+        .expect("native dynamic audio speech output");
+    let stream = output.into_stream().expect("stream output");
+    assert_eq!(stream.content_type(), "audio/mpeg");
+
+    let bytes = read_provider_stream_bytes(stream).await;
+    assert_eq!(bytes, b"NATIVE-AUDIO");
+}
+
+#[tokio::test]
+async fn executes_native_dynamic_file_content_stream_request() {
+    let library_path = native_dynamic_fixture_library_path();
+    let adapter = load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1")
+        .expect("native dynamic provider adapter");
+
+    let output = adapter
+        .execute("sk-native", ProviderRequest::FilesContent("file_1"))
+        .await
+        .expect("native dynamic file content output");
+    let stream = output.into_stream().expect("stream output");
+    assert_eq!(stream.content_type(), "application/jsonl");
+
+    let bytes = read_provider_stream_bytes(stream).await;
+    assert_eq!(bytes, b"{\"source\":\"native_dynamic\"}\n");
+}
+
+#[tokio::test]
+async fn executes_native_dynamic_video_content_stream_request() {
+    let library_path = native_dynamic_fixture_library_path();
+    let adapter = load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1")
+        .expect("native dynamic provider adapter");
+
+    let output = adapter
+        .execute("sk-native", ProviderRequest::VideosContent("video_1"))
+        .await
+        .expect("native dynamic video content output");
+    let stream = output.into_stream().expect("stream output");
+    assert_eq!(stream.content_type(), "video/mp4");
+
+    let bytes = read_provider_stream_bytes(stream).await;
+    assert_eq!(bytes, b"NATIVE-VIDEO");
+}
+
 async fn read_provider_stream(stream: ProviderStreamOutput) -> String {
     let bytes = axum::body::to_bytes(Body::from_stream(stream.into_body_stream()), usize::MAX)
         .await
         .expect("stream body");
     String::from_utf8(bytes.to_vec()).expect("utf8 stream body")
+}
+
+async fn read_provider_stream_bytes(stream: ProviderStreamOutput) -> Vec<u8> {
+    axum::body::to_bytes(Body::from_stream(stream.into_body_stream()), usize::MAX)
+        .await
+        .expect("stream body")
+        .to_vec()
 }
 
 fn native_dynamic_fixture_library_path() -> PathBuf {

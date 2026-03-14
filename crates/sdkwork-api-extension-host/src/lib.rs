@@ -1754,7 +1754,7 @@ fn provider_invocation_from_request(
             invocation_with_body!("audio.translations.create", [], body, false)
         }
         ProviderRequest::AudioSpeech(body) => {
-            invocation_with_body!("audio.speech.create", [], body, false)
+            invocation_with_body!("audio.speech.create", [], body, true)
         }
         ProviderRequest::Files(body) => invocation_with_body!("files.create", [], body, false),
         ProviderRequest::FilesList => invocation_without_body!("files.list", [], false),
@@ -1765,7 +1765,7 @@ fn provider_invocation_from_request(
             invocation_without_body!("files.delete", [file_id], false)
         }
         ProviderRequest::FilesContent(file_id) => {
-            invocation_without_body!("files.content", [file_id], false)
+            invocation_without_body!("files.content", [file_id], true)
         }
         ProviderRequest::Uploads(body) => invocation_with_body!("uploads.create", [], body, false),
         ProviderRequest::UploadParts(body) => {
@@ -1892,7 +1892,7 @@ fn provider_invocation_from_request(
             invocation_without_body!("videos.delete", [video_id], false)
         }
         ProviderRequest::VideosContent(video_id) => {
-            invocation_without_body!("videos.content", [video_id], false)
+            invocation_without_body!("videos.content", [video_id], true)
         }
         ProviderRequest::VideosRemix(video_id, body) => {
             invocation_with_body!("videos.remix", [video_id], body, false)
@@ -2412,6 +2412,7 @@ fn parse_http_health_url(health_url: &str) -> Result<(SocketAddr, String), Exten
 #[cfg(test)]
 mod tests {
     use super::provider_invocation_from_request;
+    use sdkwork_api_contract_openai::audio::CreateSpeechRequest;
     use sdkwork_api_contract_openai::responses::CreateResponseRequest;
     use sdkwork_api_contract_openai::uploads::CompleteUploadRequest;
     use sdkwork_api_provider_core::ProviderRequest;
@@ -2451,6 +2452,48 @@ mod tests {
         .expect("provider invocation");
 
         assert_eq!(invocation.operation, "responses.create");
+        assert!(invocation.expects_stream);
+    }
+
+    #[test]
+    fn audio_speech_invocation_marks_stream_expectation() {
+        let mut request = CreateSpeechRequest::new("gpt-4o-mini-tts", "nova", "hello");
+        request.response_format = Some("mp3".to_owned());
+
+        let invocation = provider_invocation_from_request(
+            ProviderRequest::AudioSpeech(&request),
+            "sk-native",
+            "https://example.com/v1",
+        )
+        .expect("provider invocation");
+
+        assert_eq!(invocation.operation, "audio.speech.create");
+        assert!(invocation.expects_stream);
+    }
+
+    #[test]
+    fn files_content_invocation_marks_stream_expectation() {
+        let invocation = provider_invocation_from_request(
+            ProviderRequest::FilesContent("file_1"),
+            "sk-native",
+            "https://example.com/v1",
+        )
+        .expect("provider invocation");
+
+        assert_eq!(invocation.operation, "files.content");
+        assert!(invocation.expects_stream);
+    }
+
+    #[test]
+    fn videos_content_invocation_marks_stream_expectation() {
+        let invocation = provider_invocation_from_request(
+            ProviderRequest::VideosContent("video_1"),
+            "sk-native",
+            "https://example.com/v1",
+        )
+        .expect("provider invocation");
+
+        assert_eq!(invocation.operation, "videos.content");
         assert!(invocation.expects_stream);
     }
 }

@@ -882,6 +882,18 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
         "responses.stream",
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "audio.speech.create",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "files.content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "videos.content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
 }
 
 fn sign_native_dynamic_package(

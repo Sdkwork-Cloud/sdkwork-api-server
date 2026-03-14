@@ -44,6 +44,18 @@ fn manifest_json() -> &'static CString {
                 .with_capability(CapabilityDescriptor::new(
                     "responses.stream",
                     CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "audio.speech.create",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "files.content",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "videos.content",
+                    CompatibilityLevel::Native,
                 )),
             )
             .expect("manifest json"),
@@ -180,6 +192,68 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
             } else if !writer.write_chunk(first_frame.as_bytes())
                 || !writer.write_chunk(done_frame.as_bytes())
             {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before all chunks were written",
+                )
+            } else {
+                ProviderStreamInvocationResult::streamed(content_type)
+            }
+        }
+        (Some(invocation), Some(writer))
+            if invocation.operation == "audio.speech.create" && invocation.expects_stream =>
+        {
+            let response_format = invocation.body["response_format"].as_str().unwrap_or("mp3");
+            let content_type = match response_format {
+                "wav" => "audio/wav",
+                "opus" => "audio/opus",
+                "aac" => "audio/aac",
+                "flac" => "audio/flac",
+                "pcm" => "audio/pcm",
+                _ => "audio/mpeg",
+            };
+            let bytes = b"NATIVE-AUDIO";
+
+            if !writer.set_content_type(content_type) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before content type was set",
+                )
+            } else if !writer.write_chunk(bytes) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before all chunks were written",
+                )
+            } else {
+                ProviderStreamInvocationResult::streamed(content_type)
+            }
+        }
+        (Some(invocation), Some(writer))
+            if invocation.operation == "files.content" && invocation.expects_stream =>
+        {
+            let content_type = "application/jsonl";
+            let bytes = b"{\"source\":\"native_dynamic\"}\n";
+
+            if !writer.set_content_type(content_type) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before content type was set",
+                )
+            } else if !writer.write_chunk(bytes) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before all chunks were written",
+                )
+            } else {
+                ProviderStreamInvocationResult::streamed(content_type)
+            }
+        }
+        (Some(invocation), Some(writer))
+            if invocation.operation == "videos.content" && invocation.expects_stream =>
+        {
+            let content_type = "video/mp4";
+            let bytes = b"NATIVE-VIDEO";
+
+            if !writer.set_content_type(content_type) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before content type was set",
+                )
+            } else if !writer.write_chunk(bytes) {
                 ProviderStreamInvocationResult::error(
                     "host stream receiver closed before all chunks were written",
                 )
