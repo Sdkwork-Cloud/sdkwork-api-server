@@ -8,7 +8,7 @@ use sdkwork_api_app_routing::{
     simulate_route_with_store_seeded,
 };
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
-use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
+use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingPolicy, RoutingStrategy};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_extension_host::{
     ensure_connector_runtime_started, load_native_dynamic_provider_adapter,
@@ -452,6 +452,111 @@ async fn route_simulation_can_use_seeded_weighted_random_strategy() {
     assert_eq!(decision.selected_provider_id, "provider-heavy");
     assert_eq!(decision.strategy.as_deref(), Some("weighted_random"));
     assert_eq!(decision.selection_seed, Some(15));
+}
+
+#[serial(routing_runtime)]
+#[tokio::test]
+async fn route_simulation_falls_back_to_persisted_provider_health_snapshot() {
+    shutdown_all_connector_runtimes().unwrap();
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-unhealthy-snapshot",
+                "openai",
+                "openai",
+                "https://unhealthy.example/v1",
+                "Unhealthy Snapshot Provider",
+            )
+            .with_extension_id("sdkwork.provider.snapshot.unhealthy"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-healthy-snapshot",
+                "openai",
+                "openai",
+                "https://healthy.example/v1",
+                "Healthy Snapshot Provider",
+            )
+            .with_extension_id("sdkwork.provider.snapshot.healthy"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "gpt-4.1",
+            "provider-unhealthy-snapshot",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "gpt-4.1",
+            "provider-healthy-snapshot",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_provider_health_snapshot(
+            &ProviderHealthSnapshot::new(
+                "provider-unhealthy-snapshot",
+                "sdkwork.provider.snapshot.unhealthy",
+                "builtin",
+                100,
+            )
+            .with_running(true)
+            .with_healthy(false)
+            .with_message("persisted unhealthy"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_provider_health_snapshot(
+            &ProviderHealthSnapshot::new(
+                "provider-healthy-snapshot",
+                "sdkwork.provider.snapshot.healthy",
+                "builtin",
+                200,
+            )
+            .with_running(true)
+            .with_healthy(true)
+            .with_message("persisted healthy"),
+        )
+        .await
+        .unwrap();
+
+    let policy = RoutingPolicy::new("policy-snapshot", "chat_completion", "gpt-4.1")
+        .with_priority(100)
+        .with_ordered_provider_ids(vec![
+            "provider-unhealthy-snapshot".to_owned(),
+            "provider-healthy-snapshot".to_owned(),
+        ]);
+    persist_routing_policy(&store, &policy).await.unwrap();
+
+    let decision = simulate_route_with_store(&store, "chat_completion", "gpt-4.1")
+        .await
+        .unwrap();
+
+    assert_eq!(decision.selected_provider_id, "provider-healthy-snapshot");
+    assert_eq!(
+        decision.assessments[0].provider_id,
+        "provider-healthy-snapshot"
+    );
+    assert_eq!(
+        decision.assessments[0].health,
+        sdkwork_api_domain_routing::RoutingCandidateHealth::Healthy
+    );
 }
 
 #[cfg(windows)]

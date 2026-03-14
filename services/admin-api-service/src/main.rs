@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use sdkwork_api_app_credential::CredentialSecretManager;
+use sdkwork_api_app_extension::start_provider_health_snapshot_supervision;
 use sdkwork_api_config::StandaloneConfig;
 use sdkwork_api_interface_admin::admin_router_with_store_and_secret_manager_and_jwt_secret;
 use sdkwork_api_storage_core::{AdminStore, StorageDialect};
@@ -28,6 +29,10 @@ async fn main() -> anyhow::Result<()> {
         }
         None => anyhow::bail!("admin-api-service received unsupported database URL scheme"),
     };
+    let _runtime_snapshot_supervisor = start_provider_health_snapshot_supervision(
+        store.clone(),
+        config.runtime_snapshot_interval_secs,
+    );
     let secret_manager = CredentialSecretManager::new(
         config.secret_backend,
         config.credential_master_key.clone(),

@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "axum",
  "sdkwork-api-app-credential",
+ "sdkwork-api-app-extension",
  "sdkwork-api-config",
  "sdkwork-api-interface-admin",
  "sdkwork-api-storage-core",
@@ -517,6 +518,7 @@ dependencies = [
  "anyhow",
  "axum",
  "sdkwork-api-app-credential",
+ "sdkwork-api-app-extension",
  "sdkwork-api-config",
  "sdkwork-api-interface-http",
  "sdkwork-api-storage-core",
@@ -1513,12 +1515,16 @@ name = "sdkwork-api-app-extension"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "sdkwork-api-domain-catalog",
+ "sdkwork-api-domain-routing",
  "sdkwork-api-extension-core",
  "sdkwork-api-extension-host",
  "sdkwork-api-storage-core",
+ "sdkwork-api-storage-sqlite",
  "serde",
  "serde_json",
  "serial_test",
+ "tokio",
 ]
 
 [[package]]

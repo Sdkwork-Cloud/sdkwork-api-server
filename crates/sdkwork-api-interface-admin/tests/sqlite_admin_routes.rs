@@ -767,6 +767,49 @@ async fn list_active_native_dynamic_runtime_statuses_from_admin_api() {
     shutdown_all_native_dynamic_runtimes().unwrap();
 }
 
+#[serial(extension_env)]
+#[tokio::test]
+async fn list_provider_health_snapshots_from_admin_api() {
+    let pool = memory_pool().await;
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    store
+        .insert_provider_health_snapshot(
+            &sdkwork_api_domain_routing::ProviderHealthSnapshot::new(
+                "provider-openai-official",
+                "sdkwork.provider.openai.official",
+                "builtin",
+                1234,
+            )
+            .with_running(true)
+            .with_healthy(true)
+            .with_message("healthy"),
+        )
+        .await
+        .unwrap();
+
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/health-snapshots")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json.as_array().unwrap().len(), 1);
+    assert_eq!(json[0]["provider_id"], "provider-openai-official");
+    assert_eq!(json[0]["healthy"], true);
+    assert_eq!(json[0]["message"], "healthy");
+}
+
 fn temp_extension_root(suffix: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let millis = SystemTime::now()

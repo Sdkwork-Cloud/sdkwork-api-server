@@ -19,8 +19,8 @@ use sdkwork_api_app_credential::{list_credentials, persist_credential_with_secre
 use sdkwork_api_app_extension::{
     configured_extension_discovery_policy_from_env, list_discovered_extension_packages,
     list_extension_installations, list_extension_instances, list_extension_runtime_statuses,
-    persist_extension_installation, persist_extension_instance, ExtensionDiscoveryPolicy,
-    PersistExtensionInstanceInput,
+    list_provider_health_snapshots, persist_extension_installation, persist_extension_instance,
+    ExtensionDiscoveryPolicy, PersistExtensionInstanceInput,
 };
 use sdkwork_api_app_identity::{
     issue_jwt, list_gateway_api_keys, persist_gateway_api_key, verify_jwt, Claims,
@@ -38,7 +38,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
+use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingPolicy, RoutingStrategy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -322,6 +322,10 @@ pub fn admin_router() -> Router {
         .route("/admin/billing/ledger", get(|| async { "billing-ledger" }))
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route(
+            "/admin/routing/health-snapshots",
+            get(|| async { "health-snapshots" }),
+        )
+        .route(
             "/admin/routing/simulations",
             post(|| async { "simulations" }),
         )
@@ -432,6 +436,10 @@ pub fn admin_router_with_store_and_secret_manager_and_jwt_secret(
         .route(
             "/admin/routing/policies",
             get(list_routing_policies_handler).post(create_routing_policy_handler),
+        )
+        .route(
+            "/admin/routing/health-snapshots",
+            get(list_provider_health_snapshots_handler),
         )
         .route("/admin/routing/simulations", post(simulate_routing_handler))
         .with_state(state)
@@ -714,6 +722,16 @@ async fn list_extension_runtime_statuses_handler(
     _state: State<AdminApiState>,
 ) -> Result<Json<Vec<sdkwork_api_app_extension::ExtensionRuntimeStatusRecord>>, StatusCode> {
     list_extension_runtime_statuses()
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn list_provider_health_snapshots_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ProviderHealthSnapshot>>, StatusCode> {
+    list_provider_health_snapshots(state.store.as_ref())
+        .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }

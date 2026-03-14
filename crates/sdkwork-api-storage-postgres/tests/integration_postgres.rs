@@ -1,6 +1,6 @@
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
-use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
+use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingPolicy, RoutingStrategy};
 use sdkwork_api_secret_core::encrypt;
 use sdkwork_api_storage_postgres::{run_migrations, PostgresAdminStore};
 
@@ -98,4 +98,32 @@ async fn postgres_store_persists_routing_policies_when_url_is_provided() {
         Some("provider-openai-official")
     );
     assert_eq!(stored.strategy, RoutingStrategy::WeightedRandom);
+}
+
+#[tokio::test]
+async fn postgres_store_persists_provider_health_snapshots_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+    let store = PostgresAdminStore::new(pool);
+
+    let snapshot = ProviderHealthSnapshot::new(
+        "provider-openai-official",
+        "sdkwork.provider.openai.official",
+        "builtin",
+        1234,
+    )
+    .with_running(true)
+    .with_healthy(true)
+    .with_message("healthy");
+
+    store
+        .insert_provider_health_snapshot(&snapshot)
+        .await
+        .unwrap();
+
+    let snapshots = store.list_provider_health_snapshots().await.unwrap();
+    assert!(snapshots.iter().any(|entry| entry == &snapshot));
 }

@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{ensure, Result};
-use sdkwork_api_app_extension::{list_extension_runtime_statuses, ExtensionRuntimeStatusRecord};
+use sdkwork_api_app_extension::{
+    list_extension_runtime_statuses, matching_runtime_statuses_for_provider,
+    ExtensionRuntimeStatusRecord,
+};
 use sdkwork_api_domain_catalog::ProxyProvider;
 use sdkwork_api_domain_routing::{
-    select_policy, RoutingCandidateAssessment, RoutingCandidateHealth, RoutingDecision,
-    RoutingPolicy, RoutingStrategy,
+    select_policy, ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingCandidateHealth,
+    RoutingDecision, RoutingPolicy, RoutingStrategy,
 };
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
 use sdkwork_api_storage_core::AdminStore;
@@ -164,6 +167,8 @@ async fn simulate_route_with_store_inner(
         .map(|instance| (instance.instance_id.clone(), instance))
         .collect::<HashMap<_, _>>();
     let runtime_statuses = list_extension_runtime_statuses()?;
+    let latest_provider_health =
+        latest_provider_health_snapshots(store.list_provider_health_snapshots().await?);
 
     let mut assessments = candidate_ids
         .iter()
@@ -176,6 +181,7 @@ async fn simulate_route_with_store_inner(
                 &instances_by_provider_id,
                 &installations_by_id,
                 &runtime_statuses,
+                latest_provider_health.get(provider_id),
             )
         })
         .collect::<Vec<_>>();
@@ -361,6 +367,7 @@ fn assess_candidate(
     instances_by_provider_id: &HashMap<String, ExtensionInstance>,
     installations_by_id: &HashMap<String, ExtensionInstallation>,
     runtime_statuses: &[ExtensionRuntimeStatusRecord],
+    persisted_provider_health: Option<&ProviderHealthSnapshot>,
 ) -> RoutingCandidateAssessment {
     let mut assessment = RoutingCandidateAssessment::new(provider_id).with_policy_rank(policy_rank);
 
@@ -410,11 +417,27 @@ fn assess_candidate(
 
     assessment = assessment.with_available(available);
 
-    let matching_statuses = matching_runtime_statuses(provider, instance, runtime_statuses);
+    let matching_statuses =
+        matching_runtime_statuses_for_provider(provider, instance, runtime_statuses);
     if matching_statuses.is_empty() {
-        assessment = assessment
-            .with_health(RoutingCandidateHealth::Unknown)
-            .with_reason("no runtime health signal is available");
+        if let Some(snapshot) = persisted_provider_health {
+            let health = if snapshot.healthy {
+                RoutingCandidateHealth::Healthy
+            } else {
+                RoutingCandidateHealth::Unhealthy
+            };
+            assessment = assessment.with_health(health).with_reason(format!(
+                "used persisted runtime health snapshot from {} at {}",
+                snapshot.runtime, snapshot.observed_at_ms
+            ));
+            if let Some(message) = &snapshot.message {
+                assessment = assessment.with_reason(format!("snapshot message = {message}"));
+            }
+        } else {
+            assessment = assessment
+                .with_health(RoutingCandidateHealth::Unknown)
+                .with_reason("no runtime health signal is available");
+        }
     } else if matching_statuses.iter().any(|status| status.healthy) {
         let runtime = matching_statuses[0].runtime.as_str();
         assessment = assessment
@@ -440,27 +463,16 @@ fn assess_candidate(
     assessment
 }
 
-fn matching_runtime_statuses<'a>(
-    provider: &ProxyProvider,
-    instance: Option<&ExtensionInstance>,
-    runtime_statuses: &'a [ExtensionRuntimeStatusRecord],
-) -> Vec<&'a ExtensionRuntimeStatusRecord> {
-    if let Some(instance) = instance {
-        let exact = runtime_statuses
-            .iter()
-            .filter(|status| status.instance_id == instance.instance_id)
-            .collect::<Vec<_>>();
-        if !exact.is_empty() {
-            return exact;
-        }
+fn latest_provider_health_snapshots(
+    snapshots: Vec<ProviderHealthSnapshot>,
+) -> HashMap<String, ProviderHealthSnapshot> {
+    let mut latest = HashMap::new();
+    for snapshot in snapshots {
+        latest
+            .entry(snapshot.provider_id.clone())
+            .or_insert(snapshot);
     }
-
-    runtime_statuses
-        .iter()
-        .filter(|status| {
-            status.extension_id == provider.extension_id && status.instance_id.is_empty()
-        })
-        .collect()
+    latest
 }
 
 fn compare_assessments(

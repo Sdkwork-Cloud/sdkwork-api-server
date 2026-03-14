@@ -1,6 +1,6 @@
 use sdkwork_api_domain_routing::{
-    RoutingCandidateAssessment, RoutingCandidateHealth, RoutingDecision, RoutingPolicy,
-    RoutingStrategy,
+    ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingCandidateHealth, RoutingDecision,
+    RoutingPolicy, RoutingStrategy,
 };
 
 #[test]
@@ -89,4 +89,27 @@ fn policy_can_switch_to_weighted_random_strategy() {
         .with_strategy(RoutingStrategy::WeightedRandom);
 
     assert_eq!(policy.strategy, RoutingStrategy::WeightedRandom);
+}
+
+#[test]
+fn provider_health_snapshot_captures_runtime_observation() {
+    let snapshot = ProviderHealthSnapshot::new(
+        "provider-openai-official",
+        "sdkwork.provider.openai.official",
+        "builtin",
+        1_710_000_000_000,
+    )
+    .with_instance_id("provider-openai-official")
+    .with_running(true)
+    .with_healthy(true)
+    .with_message("healthy");
+
+    assert_eq!(snapshot.provider_id, "provider-openai-official");
+    assert_eq!(
+        snapshot.instance_id.as_deref(),
+        Some("provider-openai-official")
+    );
+    assert!(snapshot.running);
+    assert!(snapshot.healthy);
+    assert_eq!(snapshot.message.as_deref(), Some("healthy"));
 }

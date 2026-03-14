@@ -61,6 +61,7 @@ The current repository includes:
 - connector runtime supervision is now active for discovered packages, including host-managed process startup, HTTP health probing, and reuse of already healthy external endpoints
 - native dynamic runtime execution is now active for trusted provider packages through a narrow JSON ABI, with manifest matching, optional lifecycle hooks, health contracts, and symbol validation at load time
 - gateway runtime loading now skips external packages whose trust policy does not allow execution, so blocked connector or native-dynamic packages fall back cleanly instead of entering the execution host
+- standalone services can now supervise provider runtime health in the background and persist provider-centric health snapshots for later routing fallback or admin inspection
 
 ## Extension Runtime Status
 
@@ -107,7 +108,7 @@ Configuration-driven loading now uses a stable merge order:
 2. installation-level runtime choice and package config
 3. instance-level overrides such as `base_url`, `credential_ref`, and rollout weights
 
-This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations, chat or responses SSE stream relay, the current binary stream routes for audio speech plus file and video content, and package-runtime lifecycle or health contracts through the same ABI boundary. Hot reload and scheduled health supervision remain future work.
+This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations, chat or responses SSE stream relay, the current binary stream routes for audio speech plus file and video content, and package-runtime lifecycle or health contracts through the same ABI boundary. Background health snapshot supervision is now active for standalone services, while hot reload remains future work.
 
 The runtime now also supports two manifest sources:
 
@@ -132,6 +133,7 @@ Routing remains intentionally conservative in this batch:
 - policy precedence is deterministic by `priority DESC` then `policy_id ASC`
 - model matching supports exact and glob-style `*` patterns
 - provider selection now considers availability, runtime health, and instance-level `cost`, `latency_ms`, and `weight` hints in addition to ordered preference plus optional default provider
-- persisted health telemetry, quota or SLO-aware admission, and regional policy dimensions remain future work
+- provider health now falls back to the latest persisted snapshot when live runtime status is unavailable
+- quota or SLO-aware admission and regional policy dimensions remain future work
 
 The runtime host is still intentionally lightweight, but the core gateway, admin, routing, credential, and provider relay slices now run against the same Rust workspace and can be assembled in-process for embedded mode.

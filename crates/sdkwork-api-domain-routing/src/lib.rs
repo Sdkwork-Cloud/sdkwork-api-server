@@ -162,6 +162,72 @@ impl RoutingDecision {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderHealthSnapshot {
+    pub provider_id: String,
+    pub extension_id: String,
+    pub runtime: String,
+    pub observed_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_id: Option<String>,
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub healthy: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+impl ProviderHealthSnapshot {
+    pub fn new(
+        provider_id: impl Into<String>,
+        extension_id: impl Into<String>,
+        runtime: impl Into<String>,
+        observed_at_ms: u64,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            extension_id: extension_id.into(),
+            runtime: runtime.into(),
+            observed_at_ms,
+            instance_id: None,
+            running: false,
+            healthy: false,
+            message: None,
+        }
+    }
+
+    pub fn with_instance_id(mut self, instance_id: impl Into<String>) -> Self {
+        self.instance_id = Some(instance_id.into());
+        self
+    }
+
+    pub fn with_instance_id_option(mut self, instance_id: Option<String>) -> Self {
+        self.instance_id = instance_id;
+        self
+    }
+
+    pub fn with_running(mut self, running: bool) -> Self {
+        self.running = running;
+        self
+    }
+
+    pub fn with_healthy(mut self, healthy: bool) -> Self {
+        self.healthy = healthy;
+        self
+    }
+
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = Some(message.into());
+        self
+    }
+
+    pub fn with_message_option(mut self, message: Option<String>) -> Self {
+        self.message = message;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoutingPolicy {
     pub policy_id: String,
     pub capability: String,

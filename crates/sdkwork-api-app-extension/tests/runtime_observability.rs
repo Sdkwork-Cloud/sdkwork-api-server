@@ -1,11 +1,14 @@
 use sdkwork_api_app_extension::{
-    list_discovered_extension_packages, list_extension_runtime_statuses,
+    capture_provider_health_snapshots, list_discovered_extension_packages,
+    list_extension_runtime_statuses,
 };
+use sdkwork_api_domain_catalog::{Channel, ProxyProvider};
 use sdkwork_api_extension_host::{
     ensure_connector_runtime_started, load_native_dynamic_provider_adapter,
     shutdown_all_connector_runtimes, shutdown_all_native_dynamic_runtimes,
     ExtensionDiscoveryPolicy, ExtensionLoadPlan,
 };
+use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 use serde_json::json;
 use serial_test::serial;
 use std::fs;
@@ -107,6 +110,48 @@ fn lists_active_native_dynamic_runtime_statuses_from_host_registry() {
     assert!(statuses[0].supports_health_check);
     assert!(statuses[0].supports_shutdown);
     assert_eq!(statuses[0].message.as_deref(), Some("native mock healthy"));
+
+    shutdown_all_native_dynamic_runtimes().unwrap();
+}
+
+#[serial(extension_runtime)]
+#[tokio::test]
+async fn captures_provider_health_snapshots_from_runtime_statuses() {
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-native-mock",
+                "openai",
+                "openai",
+                "https://example.com/v1",
+                "Native Mock",
+            )
+            .with_extension_id("sdkwork.provider.native.mock"),
+        )
+        .await
+        .unwrap();
+
+    let library_path = native_dynamic_fixture_library_path();
+    let _adapter =
+        load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1").unwrap();
+
+    let captured = capture_provider_health_snapshots(&store).await.unwrap();
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].provider_id, "provider-native-mock");
+    assert_eq!(captured[0].runtime, "native_dynamic");
+    assert!(captured[0].healthy);
+
+    let stored = store.list_provider_health_snapshots().await.unwrap();
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].provider_id, "provider-native-mock");
 
     shutdown_all_native_dynamic_runtimes().unwrap();
 }

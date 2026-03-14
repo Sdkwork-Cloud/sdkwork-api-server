@@ -73,6 +73,17 @@ export interface RoutingSimulationResult {
   assessments: RoutingCandidateAssessment[];
 }
 
+export interface ProviderHealthSnapshot {
+  provider_id: string;
+  extension_id: string;
+  runtime: string;
+  observed_at_ms: number;
+  instance_id?: string;
+  running: boolean;
+  healthy: boolean;
+  message?: string;
+}
+
 export interface UsageRecord {
   project_id: string;
   model: string;

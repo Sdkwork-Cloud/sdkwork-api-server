@@ -3,6 +3,7 @@ import type {
   GatewayApiKeyRecord,
   LedgerEntry,
   ModelCatalogRecord,
+  ProviderHealthSnapshot,
   ProjectRecord,
   ProxyProviderRecord,
   RoutingSimulationResult,
@@ -75,6 +76,10 @@ export function listUsageRecords(): Promise<UsageRecord[]> {
 
 export function listLedgerEntries(): Promise<LedgerEntry[]> {
   return getJson<LedgerEntry[]>('/billing/ledger');
+}
+
+export function listProviderHealthSnapshots(): Promise<ProviderHealthSnapshot[]> {
+  return getJson<ProviderHealthSnapshot[]>('/routing/health-snapshots');
 }
 
 export function simulateRoute(

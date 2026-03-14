@@ -1,4 +1,10 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use anyhow::Result;
+use sdkwork_api_domain_catalog::ProxyProvider;
+use sdkwork_api_domain_routing::ProviderHealthSnapshot;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_extension_host::{
     discover_extension_packages,
@@ -11,6 +17,8 @@ use sdkwork_api_extension_host::{
 use sdkwork_api_storage_core::AdminStore;
 use serde::Serialize;
 use serde_json::Value;
+use tokio::task::JoinHandle;
+use tokio::time::MissedTickBehavior;
 
 pub use sdkwork_api_extension_host::ExtensionDiscoveryPolicy;
 
@@ -117,6 +125,68 @@ pub fn list_extension_runtime_statuses() -> Result<Vec<ExtensionRuntimeStatusRec
     Ok(statuses)
 }
 
+pub async fn list_provider_health_snapshots(
+    store: &dyn AdminStore,
+) -> Result<Vec<ProviderHealthSnapshot>> {
+    store.list_provider_health_snapshots().await
+}
+
+pub async fn capture_provider_health_snapshots(
+    store: &dyn AdminStore,
+) -> Result<Vec<ProviderHealthSnapshot>> {
+    let providers = store.list_providers().await?;
+    let instances = store
+        .list_extension_instances()
+        .await?
+        .into_iter()
+        .map(|instance| (instance.instance_id.clone(), instance))
+        .collect::<HashMap<_, _>>();
+    let statuses = list_extension_runtime_statuses()?;
+    let observed_at_ms = unix_timestamp_ms();
+
+    let mut snapshots = Vec::new();
+    for provider in providers {
+        let Some(snapshot) = provider_health_snapshot_from_runtime(
+            &provider,
+            instances.get(&provider.id),
+            &statuses,
+            observed_at_ms,
+        ) else {
+            continue;
+        };
+        store.insert_provider_health_snapshot(&snapshot).await?;
+        snapshots.push(snapshot);
+    }
+
+    Ok(snapshots)
+}
+
+pub fn start_provider_health_snapshot_supervision(
+    store: Arc<dyn AdminStore>,
+    interval_secs: u64,
+) -> Option<JoinHandle<()>> {
+    if interval_secs == 0 {
+        return None;
+    }
+
+    Some(tokio::spawn(async move {
+        if let Err(error) = capture_provider_health_snapshots(store.as_ref()).await {
+            eprintln!("provider health snapshot startup capture failed: {error}");
+        }
+
+        let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        interval.tick().await;
+
+        loop {
+            interval.tick().await;
+            if let Err(error) = capture_provider_health_snapshots(store.as_ref()).await {
+                eprintln!("provider health snapshot capture failed: {error}");
+            }
+        }
+    }))
+}
+
 pub async fn persist_extension_instance(
     store: &dyn AdminStore,
     input: PersistExtensionInstanceInput<'_>,
@@ -216,6 +286,69 @@ impl From<NativeDynamicRuntimeStatus> for ExtensionRuntimeStatusRecord {
             message: value.message,
         }
     }
+}
+
+pub fn matching_runtime_statuses_for_provider<'a>(
+    provider: &ProxyProvider,
+    instance: Option<&ExtensionInstance>,
+    runtime_statuses: &'a [ExtensionRuntimeStatusRecord],
+) -> Vec<&'a ExtensionRuntimeStatusRecord> {
+    if let Some(instance) = instance {
+        let exact = runtime_statuses
+            .iter()
+            .filter(|status| status.instance_id == instance.instance_id)
+            .collect::<Vec<_>>();
+        if !exact.is_empty() {
+            return exact;
+        }
+    }
+
+    runtime_statuses
+        .iter()
+        .filter(|status| {
+            status.extension_id == provider.extension_id && status.instance_id.is_empty()
+        })
+        .collect()
+}
+
+fn provider_health_snapshot_from_runtime(
+    provider: &ProxyProvider,
+    instance: Option<&ExtensionInstance>,
+    runtime_statuses: &[ExtensionRuntimeStatusRecord],
+    observed_at_ms: u64,
+) -> Option<ProviderHealthSnapshot> {
+    let matching_statuses =
+        matching_runtime_statuses_for_provider(provider, instance, runtime_statuses);
+    let primary_status = matching_statuses.first()?;
+
+    let instance_id = matching_statuses
+        .iter()
+        .find_map(|status| (!status.instance_id.is_empty()).then(|| status.instance_id.clone()));
+    let running = matching_statuses.iter().any(|status| status.running);
+    let healthy = matching_statuses.iter().any(|status| status.healthy);
+    let message = matching_statuses
+        .iter()
+        .find_map(|status| status.message.clone());
+
+    Some(
+        ProviderHealthSnapshot::new(
+            &provider.id,
+            &provider.extension_id,
+            &primary_status.runtime,
+            observed_at_ms,
+        )
+        .with_instance_id_option(instance_id)
+        .with_running(running)
+        .with_healthy(healthy)
+        .with_message_option(message),
+    )
+}
+
+fn unix_timestamp_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
 }
 
 fn env_flag(key: &str, default: bool) -> bool {

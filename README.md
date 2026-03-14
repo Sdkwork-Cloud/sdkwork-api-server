@@ -56,6 +56,7 @@ Backend:
 - Runtime-aware routing assessment now considers:
   - extension instance enablement
   - connector and native dynamic runtime health
+  - persisted provider health snapshots when live runtime status is temporarily unavailable
   - instance config hints such as `weight`, `cost`, and `latency_ms`
   - explainable candidate scoring surfaced through admin simulation responses
   - seeded `weighted_random` selection for reproducible traffic-shaping simulation
@@ -67,6 +68,8 @@ Backend:
 - Admin visibility for extension package discovery and active extension runtime status across:
   - `connector`
   - `native_dynamic`
+- Persisted provider health snapshots plus admin query support through `/admin/routing/health-snapshots`
+- Background provider health snapshot supervision for standalone services through `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
 - Standardized extension package metadata:
   - runtime ID: `sdkwork.provider.*` / `sdkwork.channel.*`
   - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
@@ -135,10 +138,10 @@ Known gaps:
   - trusted-signer verification is enforced for signed packages
   - unsigned connector packages can be allowed or blocked by policy
   - native dynamic packages are intended to run only when explicitly enabled and signed by a trusted publisher
-- native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, binary stream passthrough for audio speech plus file and video content, and optional package-runtime lifecycle hooks; hot reload and scheduled health supervision are not implemented yet
+- native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, binary stream passthrough for audio speech plus file and video content, and optional package-runtime lifecycle hooks; hot reload remains future work
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
-- routing policies now support explicit `deterministic_priority` and `weighted_random` strategies, with runtime-aware candidate assessment, policy order, provider availability, runtime health, and instance-level cost or latency hints
+- routing policies now support explicit `deterministic_priority` and `weighted_random` strategies, with runtime-aware candidate assessment, policy order, provider availability, live runtime health, persisted provider health snapshots, and instance-level cost or latency hints
 - geo affinity, quota-aware admission, and SLO-aware routing are not implemented yet
 - SQLite and PostgreSQL are active persistence drivers; MySQL and libsql remain extension boundaries
 
@@ -218,6 +221,7 @@ It can now be loaded from environment variables:
 - `SDKWORK_SECRET_BACKEND`
 - `SDKWORK_CREDENTIAL_MASTER_KEY`
 - `SDKWORK_ADMIN_JWT_SIGNING_SECRET`
+- `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
 - `SDKWORK_SECRET_LOCAL_FILE`
 - `SDKWORK_SECRET_KEYRING_SERVICE`
 

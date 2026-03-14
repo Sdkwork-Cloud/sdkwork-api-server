@@ -8,7 +8,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
+use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingPolicy, RoutingStrategy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -188,6 +188,20 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             provider_id TEXT NOT NULL,
             position INTEGER NOT NULL,
             PRIMARY KEY (policy_id, provider_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS routing_provider_health (
+            provider_id TEXT NOT NULL,
+            extension_id TEXT NOT NULL,
+            runtime TEXT NOT NULL,
+            observed_at_ms INTEGER NOT NULL,
+            instance_id TEXT,
+            running INTEGER NOT NULL DEFAULT 0,
+            healthy INTEGER NOT NULL DEFAULT 0,
+            message TEXT
         )",
     )
     .execute(&pool)
@@ -746,6 +760,65 @@ impl SqliteAdminStore {
         Ok(policies)
     }
 
+    pub async fn insert_provider_health_snapshot(
+        &self,
+        snapshot: &ProviderHealthSnapshot,
+    ) -> Result<ProviderHealthSnapshot> {
+        sqlx::query(
+            "INSERT INTO routing_provider_health (provider_id, extension_id, runtime, observed_at_ms, instance_id, running, healthy, message)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&snapshot.provider_id)
+        .bind(&snapshot.extension_id)
+        .bind(&snapshot.runtime)
+        .bind(i64::try_from(snapshot.observed_at_ms)?)
+        .bind(&snapshot.instance_id)
+        .bind(if snapshot.running { 1_i64 } else { 0_i64 })
+        .bind(if snapshot.healthy { 1_i64 } else { 0_i64 })
+        .bind(&snapshot.message)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(snapshot.clone())
+    }
+
+    pub async fn list_provider_health_snapshots(&self) -> Result<Vec<ProviderHealthSnapshot>> {
+        let rows =
+            sqlx::query_as::<_, (String, String, String, i64, Option<String>, i64, i64, Option<String>)>(
+                "SELECT provider_id, extension_id, runtime, observed_at_ms, instance_id, running, healthy, message
+                 FROM routing_provider_health
+                 ORDER BY observed_at_ms DESC, provider_id, runtime, instance_id",
+            )
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter()
+            .map(
+                |(
+                    provider_id,
+                    extension_id,
+                    runtime,
+                    observed_at_ms,
+                    instance_id,
+                    running,
+                    healthy,
+                    message,
+                )| {
+                    Ok(ProviderHealthSnapshot::new(
+                        provider_id,
+                        extension_id,
+                        runtime,
+                        u64::try_from(observed_at_ms)?,
+                    )
+                    .with_instance_id_option(instance_id)
+                    .with_running(running != 0)
+                    .with_healthy(healthy != 0)
+                    .with_message_option(message))
+                },
+            )
+            .collect()
+    }
+
     pub async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
         sqlx::query("INSERT INTO usage_records (project_id, model, provider_id) VALUES (?, ?, ?)")
             .bind(&record.project_id)
@@ -1108,6 +1181,17 @@ impl AdminStore for SqliteAdminStore {
 
     async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
         SqliteAdminStore::list_routing_policies(self).await
+    }
+
+    async fn insert_provider_health_snapshot(
+        &self,
+        snapshot: &ProviderHealthSnapshot,
+    ) -> Result<ProviderHealthSnapshot> {
+        SqliteAdminStore::insert_provider_health_snapshot(self, snapshot).await
+    }
+
+    async fn list_provider_health_snapshots(&self) -> Result<Vec<ProviderHealthSnapshot>> {
+        SqliteAdminStore::list_provider_health_snapshots(self).await
     }
 
     async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {

@@ -23,6 +23,7 @@ pub struct StandaloneConfig {
     pub require_signed_connector_extensions: bool,
     pub require_signed_native_dynamic_extensions: bool,
     pub admin_jwt_signing_secret: String,
+    pub runtime_snapshot_interval_secs: u64,
     pub secret_backend: SecretBackendKind,
     pub credential_master_key: String,
     pub secret_local_file: String,
@@ -42,6 +43,7 @@ impl Default for StandaloneConfig {
             require_signed_connector_extensions: false,
             require_signed_native_dynamic_extensions: true,
             admin_jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
+            runtime_snapshot_interval_secs: 0,
             secret_backend: SecretBackendKind::DatabaseEncrypted,
             credential_master_key: "local-dev-master-key".to_owned(),
             secret_local_file: "sdkwork-api-secrets.json".to_owned(),
@@ -124,6 +126,11 @@ impl StandaloneConfig {
                 .get("SDKWORK_ADMIN_JWT_SIGNING_SECRET")
                 .cloned()
                 .unwrap_or(default.admin_jwt_signing_secret),
+            runtime_snapshot_interval_secs: parse_u64_env(
+                &values,
+                "SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS",
+                default.runtime_snapshot_interval_secs,
+            )?,
             secret_backend,
             credential_master_key: values
                 .get("SDKWORK_CREDENTIAL_MASTER_KEY")
@@ -168,6 +175,15 @@ fn parse_bool_env(values: &HashMap<String, String>, key: &str, default: bool) ->
     }
 }
 
+fn parse_u64_env(values: &HashMap<String, String>, key: &str, default: u64) -> Result<u64> {
+    match values.get(key) {
+        Some(value) => value
+            .parse::<u64>()
+            .map_err(|error| anyhow::anyhow!("invalid unsigned integer for {key}: {error}")),
+        None => Ok(default),
+    }
+}
+
 fn parse_trusted_signers_env(
     values: &HashMap<String, String>,
     key: &str,
@@ -204,4 +220,18 @@ fn parse_trusted_signers(value: &str, key: &str) -> Result<HashMap<String, Strin
         }
     }
     Ok(trusted_signers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StandaloneConfig;
+
+    #[test]
+    fn parses_runtime_snapshot_interval_from_env_pairs() {
+        let config =
+            StandaloneConfig::from_pairs([("SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS", "30")])
+                .unwrap();
+
+        assert_eq!(config.runtime_snapshot_interval_secs, 30);
+    }
 }
