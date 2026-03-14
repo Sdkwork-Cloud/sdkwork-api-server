@@ -11,6 +11,7 @@ use axum::{
 };
 use sdkwork_api_app_billing::{
     create_quota_policy, list_ledger_entries, list_quota_policies, persist_quota_policy,
+    summarize_billing_from_store,
 };
 use sdkwork_api_app_catalog::{
     list_channels, list_model_entries, list_providers, persist_channel,
@@ -34,7 +35,8 @@ use sdkwork_api_app_routing::{
 };
 use sdkwork_api_app_tenant::{list_projects, list_tenants, persist_project, persist_tenant};
 use sdkwork_api_app_usage::list_usage_records;
-use sdkwork_api_domain_billing::{LedgerEntry, QuotaPolicy};
+use sdkwork_api_app_usage::summarize_usage_records_from_store;
+use sdkwork_api_domain_billing::{BillingSummary, LedgerEntry, QuotaPolicy};
 use sdkwork_api_domain_catalog::{
     Channel, ModelCapability, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
 };
@@ -45,7 +47,7 @@ use sdkwork_api_domain_routing::{
     RoutingStrategy,
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
-use sdkwork_api_domain_usage::UsageRecord;
+use sdkwork_api_domain_usage::{UsageRecord, UsageSummary};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -343,7 +345,12 @@ pub fn admin_router() -> Router {
             get(|| async { "extension-runtime-statuses" }),
         )
         .route("/admin/usage/records", get(|| async { "usage-records" }))
+        .route("/admin/usage/summary", get(|| async { "usage-summary" }))
         .route("/admin/billing/ledger", get(|| async { "billing-ledger" }))
+        .route(
+            "/admin/billing/summary",
+            get(|| async { "billing-summary" }),
+        )
         .route(
             "/admin/billing/quota-policies",
             get(|| async { "billing-quota-policies" }),
@@ -464,7 +471,9 @@ pub fn admin_router_with_store_and_secret_manager_and_jwt_secret(
             get(list_extension_runtime_statuses_handler),
         )
         .route("/admin/usage/records", get(list_usage_records_handler))
+        .route("/admin/usage/summary", get(usage_summary_handler))
         .route("/admin/billing/ledger", get(list_ledger_entries_handler))
+        .route("/admin/billing/summary", get(billing_summary_handler))
         .route(
             "/admin/billing/quota-policies",
             get(list_quota_policies_handler).post(create_quota_policy_handler),
@@ -860,11 +869,31 @@ async fn list_usage_records_handler(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+async fn usage_summary_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<UsageSummary>, StatusCode> {
+    summarize_usage_records_from_store(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
 async fn list_ledger_entries_handler(
     _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<LedgerEntry>>, StatusCode> {
     list_ledger_entries(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn billing_summary_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<BillingSummary>, StatusCode> {
+    summarize_billing_from_store(state.store.as_ref())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)

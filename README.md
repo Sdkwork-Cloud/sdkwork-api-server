@@ -329,7 +329,8 @@ Control-plane features include:
 - runtime status visibility and provider health snapshots
 - routing policies with `deterministic_priority`, `weighted_random`, and `slo_aware`
 - routing decision logs for admin simulation and real gateway dispatch
-- usage records, billing ledger entries, and quota policies
+- usage records and usage summaries
+- billing ledger entries, billing summaries, and quota policies
 
 For the up-to-date execution-truth matrix, see:
 

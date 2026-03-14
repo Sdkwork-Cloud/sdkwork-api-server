@@ -61,7 +61,9 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | `/admin/routing/decision-logs` | `native` | Lists persisted gateway and admin-simulation routing decisions, including SLO degraded state and per-candidate evidence |
 | `/admin/routing/simulations` | `native` | Catalog-backed routing decision preview with candidate assessment, runtime health, selection reasons, SLO compliance metadata, and persisted audit logging |
 | `/admin/usage/records` | `native` | Lists gateway-recorded usage |
+| `/admin/usage/summary` | `native` | Aggregated usage counts by project, provider, and model for operator dashboards |
 | `/admin/billing/ledger` | `native` | Lists gateway-booked billing entries |
+| `/admin/billing/summary` | `native` | Aggregated billing, quota, and exhaustion posture by project |
 | `/admin/billing/quota-policies` | `native` | Creates and lists project-scoped hard quota policies used by stateful admission control |
 
 ## Extension Runtime

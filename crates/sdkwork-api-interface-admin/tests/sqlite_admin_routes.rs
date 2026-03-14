@@ -880,6 +880,123 @@ async fn list_provider_health_snapshots_from_admin_api() {
 
 #[serial(extension_env)]
 #[tokio::test]
+async fn usage_summary_from_admin_api_reports_grouped_counts() {
+    let pool = memory_pool().await;
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    store
+        .insert_usage_record(&sdkwork_api_domain_usage::UsageRecord::new(
+            "project-1",
+            "gpt-4.1",
+            "provider-openai",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_usage_record(&sdkwork_api_domain_usage::UsageRecord::new(
+            "project-1",
+            "gpt-4.1",
+            "provider-openai",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_usage_record(&sdkwork_api_domain_usage::UsageRecord::new(
+            "project-2",
+            "text-embedding-3-large",
+            "provider-openrouter",
+        ))
+        .await
+        .unwrap();
+
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/summary")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["total_requests"], 3);
+    assert_eq!(json["project_count"], 2);
+    assert_eq!(json["provider_count"], 2);
+    assert_eq!(json["projects"][0]["project_id"], "project-1");
+    assert_eq!(json["projects"][0]["request_count"], 2);
+    assert_eq!(json["providers"][0]["provider"], "provider-openai");
+    assert_eq!(json["providers"][0]["request_count"], 2);
+    assert_eq!(json["models"][0]["model"], "gpt-4.1");
+    assert_eq!(json["models"][0]["request_count"], 2);
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn billing_summary_from_admin_api_reports_quota_posture() {
+    let pool = memory_pool().await;
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    store
+        .insert_ledger_entry(&sdkwork_api_domain_billing::LedgerEntry::new(
+            "project-1",
+            70,
+            0.70,
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_ledger_entry(&sdkwork_api_domain_billing::LedgerEntry::new(
+            "project-1",
+            40,
+            0.40,
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_quota_policy(&sdkwork_api_domain_billing::QuotaPolicy::new(
+            "quota-project-1",
+            "project-1",
+            100,
+        ))
+        .await
+        .unwrap();
+
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/billing/summary")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["total_entries"], 2);
+    assert_eq!(json["total_units"], 110);
+    assert_eq!(json["active_quota_policy_count"], 1);
+    assert_eq!(json["exhausted_project_count"], 1);
+    assert_eq!(json["projects"][0]["project_id"], "project-1");
+    assert_eq!(json["projects"][0]["entry_count"], 2);
+    assert_eq!(json["projects"][0]["used_units"], 110);
+    assert_eq!(json["projects"][0]["quota_policy_id"], "quota-project-1");
+    assert_eq!(json["projects"][0]["remaining_units"], 0);
+    assert_eq!(json["projects"][0]["exhausted"], true);
+}
+
+#[serial(extension_env)]
+#[tokio::test]
 async fn create_and_list_quota_policies_from_admin_api() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);

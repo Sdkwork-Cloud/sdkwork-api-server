@@ -128,6 +128,33 @@ export interface UsageRecord {
   provider: string;
 }
 
+export interface UsageProjectSummary {
+  project_id: string;
+  request_count: number;
+}
+
+export interface UsageProviderSummary {
+  provider: string;
+  request_count: number;
+  project_count: number;
+}
+
+export interface UsageModelSummary {
+  model: string;
+  request_count: number;
+  provider_count: number;
+}
+
+export interface UsageSummary {
+  total_requests: number;
+  project_count: number;
+  model_count: number;
+  provider_count: number;
+  projects: UsageProjectSummary[];
+  providers: UsageProviderSummary[];
+  models: UsageModelSummary[];
+}
+
 export interface LedgerEntry {
   project_id: string;
   units: number;
@@ -139,4 +166,25 @@ export interface QuotaPolicyRecord {
   project_id: string;
   max_units: number;
   enabled: boolean;
+}
+
+export interface ProjectBillingSummary {
+  project_id: string;
+  entry_count: number;
+  used_units: number;
+  booked_amount: number;
+  quota_policy_id?: string;
+  quota_limit_units?: number;
+  remaining_units?: number;
+  exhausted: boolean;
+}
+
+export interface BillingSummary {
+  total_entries: number;
+  project_count: number;
+  total_units: number;
+  total_amount: number;
+  active_quota_policy_count: number;
+  exhausted_project_count: number;
+  projects: ProjectBillingSummary[];
 }

@@ -1,29 +1,43 @@
 import { useEffect, useState } from 'react';
-import { listLedgerEntries, listQuotaPolicies, listUsageRecords } from 'sdkwork-api-admin-sdk';
-import type { LedgerEntry, QuotaPolicyRecord, UsageRecord } from 'sdkwork-api-types';
+import { getBillingSummary, getUsageSummary } from 'sdkwork-api-admin-sdk';
+import type { BillingSummary, ProjectBillingSummary, UsageSummary } from 'sdkwork-api-types';
 
 interface UsageSnapshot {
-  usageRecords: UsageRecord[];
-  ledgerEntries: LedgerEntry[];
-  quotaPolicies: QuotaPolicyRecord[];
+  usage: UsageSummary;
+  billing: BillingSummary;
 }
 
 const emptySnapshot: UsageSnapshot = {
-  usageRecords: [],
-  ledgerEntries: [],
-  quotaPolicies: [],
+  usage: {
+    total_requests: 0,
+    project_count: 0,
+    model_count: 0,
+    provider_count: 0,
+    projects: [],
+    providers: [],
+    models: [],
+  },
+  billing: {
+    total_entries: 0,
+    project_count: 0,
+    total_units: 0,
+    total_amount: 0,
+    active_quota_policy_count: 0,
+    exhausted_project_count: 0,
+    projects: [],
+  },
 };
 
-function totalLedgerAmount(entries: LedgerEntry[]): string {
-  const total = entries.reduce((sum, entry) => sum + entry.amount, 0);
-  return total.toFixed(2);
+function formatAmount(amount: number): string {
+  return amount.toFixed(2);
 }
 
-function totalEnabledQuotaUnits(policies: QuotaPolicyRecord[]): string {
-  const total = policies
-    .filter((policy) => policy.enabled)
-    .reduce((sum, policy) => sum + policy.max_units, 0);
-  return total.toLocaleString();
+function billingPosture(project: ProjectBillingSummary): string {
+  if (project.quota_limit_units === undefined) {
+    return `${project.used_units} units / no active quota`;
+  }
+
+  return `${project.used_units} of ${project.quota_limit_units} units / ${project.exhausted ? 'exhausted' : `${project.remaining_units ?? 0} remaining`}`;
 }
 
 export function RequestExplorerPage() {
@@ -33,14 +47,14 @@ export function RequestExplorerPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void Promise.all([listUsageRecords(), listLedgerEntries(), listQuotaPolicies()])
-      .then(([usageRecords, ledgerEntries, quotaPolicies]) => {
+    void Promise.all([getUsageSummary(), getBillingSummary()])
+      .then(([usage, billing]) => {
         if (cancelled) {
           return;
         }
 
-        setSnapshot({ usageRecords, ledgerEntries, quotaPolicies });
-        setStatus('Gateway telemetry and quota policies are streaming from admin usage and billing APIs.');
+        setSnapshot({ usage, billing });
+        setStatus('Backend-owned usage and billing summaries are streaming from admin APIs.');
       })
       .catch(() => {
         if (!cancelled) {
@@ -65,69 +79,92 @@ export function RequestExplorerPage() {
 
       <div className="metric-grid">
         <article className="metric-card">
-          <span className="metric-label">Usage Events</span>
-          <strong>{snapshot.usageRecords.length}</strong>
+          <span className="metric-label">Usage Requests</span>
+          <strong>{snapshot.usage.total_requests}</strong>
         </article>
         <article className="metric-card">
           <span className="metric-label">Ledger Entries</span>
-          <strong>{snapshot.ledgerEntries.length}</strong>
+          <strong>{snapshot.billing.total_entries}</strong>
         </article>
         <article className="metric-card">
           <span className="metric-label">Booked Amount</span>
-          <strong>{totalLedgerAmount(snapshot.ledgerEntries)}</strong>
+          <strong>{formatAmount(snapshot.billing.total_amount)}</strong>
         </article>
         <article className="metric-card">
-          <span className="metric-label">Enabled Quota Units</span>
-          <strong>{totalEnabledQuotaUnits(snapshot.quotaPolicies)}</strong>
+          <span className="metric-label">Active Quota Policies</span>
+          <strong>{snapshot.billing.active_quota_policy_count}</strong>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">Exhausted Projects</span>
+          <strong>{snapshot.billing.exhausted_project_count}</strong>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">Tracked Models</span>
+          <strong>{snapshot.usage.model_count}</strong>
         </article>
       </div>
 
       <div className="detail-grid">
         <article className="detail-card">
-          <h3>Usage Records</h3>
+          <h3>Usage By Project</h3>
           <ul className="compact-list">
-            {snapshot.usageRecords.map((record, index) => (
-              <li key={`${record.project_id}:${record.model}:${index}`}>
-                <strong>{record.model}</strong>
-                <span>{record.provider}</span>
+            {snapshot.usage.projects.map((project) => (
+              <li key={project.project_id}>
+                <strong>{project.project_id}</strong>
+                <span>{project.request_count} requests</span>
               </li>
             ))}
-            {!snapshot.usageRecords.length && (
+            {!snapshot.usage.projects.length && (
               <li className="empty">No gateway requests have been recorded yet.</li>
             )}
           </ul>
         </article>
 
         <article className="detail-card">
-          <h3>Billing Ledger</h3>
+          <h3>Usage By Provider</h3>
           <ul className="compact-list">
-            {snapshot.ledgerEntries.map((entry, index) => (
-              <li key={`${entry.project_id}:${entry.units}:${index}`}>
-                <strong>{entry.project_id}</strong>
+            {snapshot.usage.providers.map((provider) => (
+              <li key={provider.provider}>
+                <strong>{provider.provider}</strong>
                 <span>
-                  {entry.units} units / {entry.amount.toFixed(2)}
+                  {provider.request_count} requests / {provider.project_count} projects
                 </span>
               </li>
             ))}
-            {!snapshot.ledgerEntries.length && (
-              <li className="empty">No billing entries have been booked yet.</li>
+            {!snapshot.usage.providers.length && (
+              <li className="empty">No provider traffic has been recorded yet.</li>
             )}
           </ul>
         </article>
 
         <article className="detail-card">
-          <h3>Quota Policies</h3>
+          <h3>Usage By Model</h3>
           <ul className="compact-list">
-            {snapshot.quotaPolicies.map((policy) => (
-              <li key={policy.policy_id}>
-                <strong>{policy.project_id}</strong>
+            {snapshot.usage.models.map((model) => (
+              <li key={model.model}>
+                <strong>{model.model}</strong>
                 <span>
-                  {policy.max_units.toLocaleString()} units / {policy.enabled ? 'enabled' : 'disabled'}
+                  {model.request_count} requests / {model.provider_count} providers
                 </span>
               </li>
             ))}
-            {!snapshot.quotaPolicies.length && (
-              <li className="empty">No quota policies have been configured yet.</li>
+            {!snapshot.usage.models.length && (
+              <li className="empty">No model traffic has been recorded yet.</li>
+            )}
+          </ul>
+        </article>
+
+        <article className="detail-card">
+          <h3>Billing Posture</h3>
+          <ul className="compact-list">
+            {snapshot.billing.projects.map((project) => (
+              <li key={project.project_id}>
+                <strong>{project.project_id}</strong>
+                <span>{billingPosture(project)}</span>
+              </li>
+            ))}
+            {!snapshot.billing.projects.length && (
+              <li className="empty">No billing posture is available yet.</li>
             )}
           </ul>
         </article>

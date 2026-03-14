@@ -329,7 +329,8 @@ pnpm --dir console build
 - runtime status 可观测性与 provider health snapshots
 - 支持 `deterministic_priority`、`weighted_random`、`slo_aware` 的 routing policies
 - 管理模拟与真实网关分发的 routing decision logs
-- usage records、billing ledger entries、quota policies
+- usage records 与 usage summaries
+- billing ledger entries、billing summaries、quota policies
 
 最新兼容矩阵请查看：
 

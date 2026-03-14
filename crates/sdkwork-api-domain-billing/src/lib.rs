@@ -87,3 +87,59 @@ impl QuotaCheckResult {
 fn default_enabled() -> bool {
     true
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProjectBillingSummary {
+    pub project_id: String,
+    pub entry_count: u64,
+    pub used_units: u64,
+    pub booked_amount: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_policy_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_limit_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remaining_units: Option<u64>,
+    #[serde(default)]
+    pub exhausted: bool,
+}
+
+impl ProjectBillingSummary {
+    pub fn new(project_id: impl Into<String>) -> Self {
+        Self {
+            project_id: project_id.into(),
+            entry_count: 0,
+            used_units: 0,
+            booked_amount: 0.0,
+            quota_policy_id: None,
+            quota_limit_units: None,
+            remaining_units: None,
+            exhausted: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BillingSummary {
+    pub total_entries: u64,
+    pub project_count: u64,
+    pub total_units: u64,
+    pub total_amount: f64,
+    pub active_quota_policy_count: u64,
+    pub exhausted_project_count: u64,
+    pub projects: Vec<ProjectBillingSummary>,
+}
+
+impl BillingSummary {
+    pub fn empty() -> Self {
+        Self {
+            total_entries: 0,
+            project_count: 0,
+            total_units: 0,
+            total_amount: 0.0,
+            active_quota_policy_count: 0,
+            exhausted_project_count: 0,
+            projects: Vec::new(),
+        }
+    }
+}
