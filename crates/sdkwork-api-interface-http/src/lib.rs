@@ -203,6 +203,7 @@ use sdkwork_api_contract_openai::chat_completions::{
     CreateChatCompletionRequest, UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
+use sdkwork_api_contract_openai::containers::{CreateContainerFileRequest, CreateContainerRequest};
 use sdkwork_api_contract_openai::conversations::{
     CreateConversationItemsRequest, CreateConversationRequest, UpdateConversationRequest,
 };
@@ -212,7 +213,9 @@ use sdkwork_api_contract_openai::evals::{
     CreateEvalRequest, CreateEvalRunRequest, UpdateEvalRequest,
 };
 use sdkwork_api_contract_openai::files::CreateFileRequest;
-use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
+use sdkwork_api_contract_openai::fine_tuning::{
+    CreateFineTuningCheckpointPermissionsRequest, CreateFineTuningJobRequest,
+};
 use sdkwork_api_contract_openai::images::{
     CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageUpload,
 };
@@ -237,7 +240,8 @@ use sdkwork_api_contract_openai::vector_stores::{
     SearchVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_contract_openai::videos::{
-    CreateVideoRequest, ExtendVideoRequest, RemixVideoRequest, UpdateVideoCharacterRequest,
+    CreateVideoCharacterRequest, CreateVideoRequest, EditVideoRequest, ExtendVideoRequest,
+    RemixVideoRequest, UpdateVideoCharacterRequest,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
@@ -602,6 +606,26 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
             "/v1/audio/voice_consents",
             post(audio_voice_consents_handler),
         )
+        .route(
+            "/v1/containers",
+            get(containers_list_handler).post(containers_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}",
+            get(container_retrieve_handler).delete(container_delete_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files",
+            get(container_files_list_handler).post(container_files_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files/{file_id}",
+            get(container_file_retrieve_handler).delete(container_file_delete_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files/{file_id}/content",
+            get(container_file_content_handler),
+        )
         .route("/v1/files", get(files_list_handler).post(files_handler))
         .route(
             "/v1/files/{file_id}",
@@ -615,6 +639,16 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
         )
         .route("/v1/videos/{video_id}/content", get(video_content_handler))
         .route("/v1/videos/{video_id}/remix", post(video_remix_handler))
+        .route(
+            "/v1/videos/characters",
+            post(video_character_create_handler),
+        )
+        .route(
+            "/v1/videos/characters/{character_id}",
+            get(video_character_retrieve_canonical_handler),
+        )
+        .route("/v1/videos/edits", post(video_edits_handler))
+        .route("/v1/videos/extensions", post(video_extensions_handler))
         .route(
             "/v1/videos/{video_id}/characters",
             get(video_characters_list_handler),
@@ -655,6 +689,23 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
             get(fine_tuning_job_checkpoints_handler),
         )
         .route(
+            "/v1/fine_tuning/jobs/{fine_tuning_job_id}/pause",
+            post(fine_tuning_job_pause_handler),
+        )
+        .route(
+            "/v1/fine_tuning/jobs/{fine_tuning_job_id}/resume",
+            post(fine_tuning_job_resume_handler),
+        )
+        .route(
+            "/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions",
+            get(fine_tuning_checkpoint_permissions_list_handler)
+                .post(fine_tuning_checkpoint_permissions_handler),
+        )
+        .route(
+            "/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions/{permission_id}",
+            axum::routing::delete(fine_tuning_checkpoint_permission_delete_handler),
+        )
+        .route(
             "/v1/assistants",
             get(assistants_list_handler).post(assistants_handler),
         )
@@ -688,7 +739,19 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
         )
         .route(
             "/v1/evals/{eval_id}/runs/{run_id}",
-            get(eval_run_retrieve_handler),
+            get(eval_run_retrieve_handler).delete(eval_run_delete_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/cancel",
+            post(eval_run_cancel_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/output_items",
+            get(eval_run_output_items_list_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}",
+            get(eval_run_output_item_retrieve_handler),
         )
         .route(
             "/v1/batches",
@@ -931,6 +994,27 @@ pub fn gateway_router_with_store_and_secret_manager(
             post(audio_voice_consents_with_state_handler),
         )
         .route(
+            "/v1/containers",
+            get(containers_list_with_state_handler).post(containers_with_state_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}",
+            get(container_retrieve_with_state_handler).delete(container_delete_with_state_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files",
+            get(container_files_list_with_state_handler).post(container_files_with_state_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files/{file_id}",
+            get(container_file_retrieve_with_state_handler)
+                .delete(container_file_delete_with_state_handler),
+        )
+        .route(
+            "/v1/containers/{container_id}/files/{file_id}/content",
+            get(container_file_content_with_state_handler),
+        )
+        .route(
             "/v1/files",
             get(files_list_with_state_handler).post(files_with_state_handler),
         )
@@ -957,6 +1041,19 @@ pub fn gateway_router_with_store_and_secret_manager(
         .route(
             "/v1/videos/{video_id}/remix",
             post(video_remix_with_state_handler),
+        )
+        .route(
+            "/v1/videos/characters",
+            post(video_character_create_with_state_handler),
+        )
+        .route(
+            "/v1/videos/characters/{character_id}",
+            get(video_character_retrieve_canonical_with_state_handler),
+        )
+        .route("/v1/videos/edits", post(video_edits_with_state_handler))
+        .route(
+            "/v1/videos/extensions",
+            post(video_extensions_with_state_handler),
         )
         .route(
             "/v1/videos/{video_id}/characters",
@@ -1005,6 +1102,23 @@ pub fn gateway_router_with_store_and_secret_manager(
             get(fine_tuning_job_checkpoints_with_state_handler),
         )
         .route(
+            "/v1/fine_tuning/jobs/{fine_tuning_job_id}/pause",
+            post(fine_tuning_job_pause_with_state_handler),
+        )
+        .route(
+            "/v1/fine_tuning/jobs/{fine_tuning_job_id}/resume",
+            post(fine_tuning_job_resume_with_state_handler),
+        )
+        .route(
+            "/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions",
+            get(fine_tuning_checkpoint_permissions_list_with_state_handler)
+                .post(fine_tuning_checkpoint_permissions_with_state_handler),
+        )
+        .route(
+            "/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions/{permission_id}",
+            axum::routing::delete(fine_tuning_checkpoint_permission_delete_with_state_handler),
+        )
+        .route(
             "/v1/assistants",
             get(assistants_list_with_state_handler).post(assistants_with_state_handler),
         )
@@ -1044,7 +1158,19 @@ pub fn gateway_router_with_store_and_secret_manager(
         )
         .route(
             "/v1/evals/{eval_id}/runs/{run_id}",
-            get(eval_run_retrieve_with_state_handler),
+            get(eval_run_retrieve_with_state_handler).delete(eval_run_delete_with_state_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/cancel",
+            post(eval_run_cancel_with_state_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/output_items",
+            get(eval_run_output_items_list_with_state_handler),
+        )
+        .route(
+            "/v1/evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}",
+            get(eval_run_output_item_retrieve_with_state_handler),
         )
         .route(
             "/v1/batches",
@@ -3008,6 +3134,283 @@ async fn file_content_handler(
     )
 }
 
+async fn containers_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<CreateContainerRequest>,
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Containers(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("container"),
+    )
+    .into_response()
+}
+
+async fn containers_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ContainersList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream containers list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_containers(
+            request_context.tenant_id(),
+            request_context.project_id(),
+        )
+        .expect("containers list"),
+    )
+    .into_response()
+}
+
+async fn container_retrieve_handler(
+    request_context: StatelessGatewayRequest,
+    Path(container_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainersRetrieve(&container_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container retrieve"),
+    )
+    .into_response()
+}
+
+async fn container_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path(container_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainersDelete(&container_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container delete"),
+    )
+    .into_response()
+}
+
+async fn container_files_handler(
+    request_context: StatelessGatewayRequest,
+    Path(container_id): Path<String>,
+    ExtractJson(request): ExtractJson<CreateContainerFileRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainerFiles(&container_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &request,
+        )
+        .expect("container file"),
+    )
+    .into_response()
+}
+
+async fn container_files_list_handler(
+    request_context: StatelessGatewayRequest,
+    Path(container_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainerFilesList(&container_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container files list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_container_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container files list"),
+    )
+    .into_response()
+}
+
+async fn container_file_retrieve_handler(
+    request_context: StatelessGatewayRequest,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainerFilesRetrieve(&container_id, &file_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &file_id,
+        )
+        .expect("container file retrieve"),
+    )
+    .into_response()
+}
+
+async fn container_file_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ContainerFilesDelete(&container_id, &file_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &file_id,
+        )
+        .expect("container file delete"),
+    )
+    .into_response()
+}
+
+async fn container_file_content_handler(
+    request_context: StatelessGatewayRequest,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_stream_request(
+        &request_context,
+        ProviderRequest::ContainerFilesContent(&container_id, &file_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return upstream_passthrough_response(response),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file content",
+            )
+                .into_response();
+        }
+    }
+
+    local_container_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    )
+}
+
 async fn videos_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVideoRequest>,
@@ -3306,6 +3709,131 @@ async fn video_extend_handler(
             &request.prompt,
         )
         .expect("video extend"),
+    )
+    .into_response()
+}
+
+async fn video_character_create_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<CreateVideoCharacterRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VideoCharactersCreate(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video character create",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_video_character(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video character create"),
+    )
+    .into_response()
+}
+
+async fn video_character_retrieve_canonical_handler(
+    request_context: StatelessGatewayRequest,
+    Path(character_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VideoCharactersCanonicalRetrieve(&character_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video character retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_video_character_canonical(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &character_id,
+        )
+        .expect("video character canonical retrieve"),
+    )
+    .into_response()
+}
+
+async fn video_edits_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<EditVideoRequest>,
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::VideosEdits(&request))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video edits",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::edit_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video edits"),
+    )
+    .into_response()
+}
+
+async fn video_extensions_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<ExtendVideoRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::VideosExtensions(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video extensions",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::extensions_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video extensions"),
     )
     .into_response()
 }
@@ -3609,6 +4137,170 @@ async fn fine_tuning_job_checkpoints_handler(
             &fine_tuning_job_id,
         )
         .expect("fine tuning job checkpoints"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_job_pause_handler(
+    request_context: StatelessGatewayRequest,
+    Path(fine_tuning_job_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningJobsPause(&fine_tuning_job_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job pause",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::pause_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning pause"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_job_resume_handler(
+    request_context: StatelessGatewayRequest,
+    Path(fine_tuning_job_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningJobsResume(&fine_tuning_job_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job resume",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::resume_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning resume"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permissions_handler(
+    request_context: StatelessGatewayRequest,
+    Path(fine_tuned_model_checkpoint): Path<String>,
+    ExtractJson(request): ExtractJson<CreateFineTuningCheckpointPermissionsRequest>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningCheckpointPermissions(&fine_tuned_model_checkpoint, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permissions create",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("fine tuning checkpoint permissions create"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permissions_list_handler(
+    request_context: StatelessGatewayRequest,
+    Path(fine_tuned_model_checkpoint): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningCheckpointPermissionsList(&fine_tuned_model_checkpoint),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permissions list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuned_model_checkpoint,
+        )
+        .expect("fine tuning checkpoint permissions list"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permission_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path((fine_tuned_model_checkpoint, permission_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::FineTuningCheckpointPermissionsDelete(
+            &fine_tuned_model_checkpoint,
+            &permission_id,
+        ),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permission delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &permission_id,
+        )
+        .expect("fine tuning checkpoint permission delete"),
     )
     .into_response()
 }
@@ -4171,6 +4863,139 @@ async fn eval_run_retrieve_handler(
             &run_id,
         )
         .expect("eval run retrieve"),
+    )
+    .into_response()
+}
+
+async fn eval_run_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::EvalRunsDelete(&eval_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_eval_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run delete"),
+    )
+    .into_response()
+}
+
+async fn eval_run_cancel_handler(
+    request_context: StatelessGatewayRequest,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::EvalRunsCancel(&eval_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run cancel",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::cancel_eval_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run cancel"),
+    )
+    .into_response()
+}
+
+async fn eval_run_output_items_list_handler(
+    request_context: StatelessGatewayRequest,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::EvalRunOutputItemsList(&eval_id, &run_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run output items list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_eval_run_output_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run output items list"),
+    )
+    .into_response()
+}
+
+async fn eval_run_output_item_retrieve_handler(
+    request_context: StatelessGatewayRequest,
+    Path((eval_id, run_id, output_item_id)): Path<(String, String, String)>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::EvalRunOutputItemsRetrieve(&eval_id, &run_id, &output_item_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run output item retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_eval_run_output_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+            &output_item_id,
+        )
+        .expect("eval run output item retrieve"),
     )
     .into_response()
 }
@@ -7349,6 +8174,26 @@ fn local_file_content_response(tenant_id: &str, project_id: &str, file_id: &str)
         .expect("valid local file content response")
 }
 
+fn local_container_file_content_response(
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+    file_id: &str,
+) -> Response {
+    let bytes = sdkwork_api_app_gateway::container_file_content(
+        tenant_id,
+        project_id,
+        container_id,
+        file_id,
+    )
+    .expect("container file content");
+    Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .body(Body::from(bytes))
+        .expect("valid local container file content response")
+}
+
 fn local_video_content_response(tenant_id: &str, project_id: &str, video_id: &str) -> Response {
     let bytes = video_content(tenant_id, project_id, video_id).expect("video content");
     Response::builder()
@@ -9200,6 +10045,692 @@ async fn file_content_with_state_handler(
     )
 }
 
+async fn containers_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<CreateContainerRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &request.name,
+                10,
+                0.01,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container create",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &request.name,
+        10,
+        0.01,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("container"),
+    )
+    .into_response()
+}
+
+async fn containers_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_list_containers_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                "containers",
+                5,
+                0.005,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream containers list",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        "containers",
+        5,
+        0.005,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_containers(
+            request_context.tenant_id(),
+            request_context.project_id(),
+        )
+        .expect("containers list"),
+    )
+    .into_response()
+}
+
+async fn container_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_get_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container retrieve"),
+    )
+    .into_response()
+}
+
+async fn container_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_delete_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_container(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container delete"),
+    )
+    .into_response()
+}
+
+async fn container_files_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+    ExtractJson(request): ExtractJson<CreateContainerFileRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_container_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                8,
+                0.008,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file create",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        8,
+        0.008,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &request,
+        )
+        .expect("container file"),
+    )
+    .into_response()
+}
+
+async fn container_files_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_list_container_files_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container files list",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_container_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+        )
+        .expect("container files list"),
+    )
+    .into_response()
+}
+
+async fn container_file_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_get_container_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                3,
+                0.003,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        3,
+        0.003,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &file_id,
+        )
+        .expect("container file retrieve"),
+    )
+    .into_response()
+}
+
+async fn container_file_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_delete_container_file_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                3,
+                0.003,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        3,
+        0.003,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_container_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &container_id,
+            &file_id,
+        )
+        .expect("container file delete"),
+    )
+    .into_response()
+}
+
+async fn container_file_content_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((container_id, file_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_container_file_content_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                3,
+                0.003,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return upstream_passthrough_response(response);
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream container file content",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        3,
+        0.003,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    local_container_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    )
+}
+
 async fn videos_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
@@ -9964,6 +11495,310 @@ async fn video_extend_with_state_handler(
     .into_response()
 }
 
+async fn video_character_create_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<CreateVideoCharacterRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_create_video_character_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &request.video_id,
+                40,
+                0.04,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video character create",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &request.video_id,
+        40,
+        0.04,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_video_character(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video character create"),
+    )
+    .into_response()
+}
+
+async fn video_character_retrieve_canonical_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(character_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_get_video_character_canonical_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &character_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &character_id,
+                20,
+                0.02,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video character retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &character_id,
+        20,
+        0.02,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_video_character_canonical(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &character_id,
+        )
+        .expect("video character canonical retrieve"),
+    )
+    .into_response()
+}
+
+async fn video_edits_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<EditVideoRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_edit_video_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                &request.video_id,
+                80,
+                0.08,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video edits",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        &request.video_id,
+        80,
+        0.08,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::edit_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video edits"),
+    )
+    .into_response()
+}
+
+async fn video_extensions_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<ExtendVideoRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_extensions_video_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "videos",
+                request.video_id.as_deref().unwrap_or("videos"),
+                80,
+                0.08,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream video extensions",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "videos",
+        request.video_id.as_deref().unwrap_or("videos"),
+        80,
+        0.08,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::extensions_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("video extensions"),
+    )
+    .into_response()
+}
+
 async fn uploads_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
@@ -10723,6 +12558,389 @@ async fn fine_tuning_job_checkpoints_with_state_handler(
             &fine_tuning_job_id,
         )
         .expect("fine tuning job checkpoints"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_job_pause_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(fine_tuning_job_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_pause_fine_tuning_job_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                &fine_tuning_job_id,
+                8,
+                0.008,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job pause",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        &fine_tuning_job_id,
+        8,
+        0.008,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::pause_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning pause"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_job_resume_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(fine_tuning_job_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_resume_fine_tuning_job_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                &fine_tuning_job_id,
+                8,
+                0.008,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning job resume",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        &fine_tuning_job_id,
+        8,
+        0.008,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::resume_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning resume"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permissions_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(fine_tuned_model_checkpoint): Path<String>,
+    ExtractJson(request): ExtractJson<CreateFineTuningCheckpointPermissionsRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_fine_tuning_checkpoint_permissions_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                &fine_tuned_model_checkpoint,
+                5,
+                0.005,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permissions create",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        &fine_tuned_model_checkpoint,
+        5,
+        0.005,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("fine tuning checkpoint permissions create"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(fine_tuned_model_checkpoint): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_list_fine_tuning_checkpoint_permissions_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                &fine_tuned_model_checkpoint,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permissions list",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        &fine_tuned_model_checkpoint,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuned_model_checkpoint,
+        )
+        .expect("fine tuning checkpoint permissions list"),
+    )
+    .into_response()
+}
+
+async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((fine_tuned_model_checkpoint, permission_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_delete_fine_tuning_checkpoint_permission_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+        &permission_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "fine_tuning",
+                &fine_tuned_model_checkpoint,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream fine tuning checkpoint permission delete",
+            )
+                .into_response();
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "fine_tuning",
+        &fine_tuned_model_checkpoint,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &permission_id,
+        )
+        .expect("fine tuning checkpoint permission delete"),
     )
     .into_response()
 }
@@ -11889,6 +14107,160 @@ async fn eval_run_retrieve_with_state_handler(
             &run_id,
         )
         .expect("eval run retrieve"),
+    )
+    .into_response()
+}
+
+async fn eval_run_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_delete_eval_run_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::delete_eval_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run delete"),
+    )
+    .into_response()
+}
+
+async fn eval_run_cancel_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_cancel_eval_run_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run cancel",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::cancel_eval_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run cancel"),
+    )
+    .into_response()
+}
+
+async fn eval_run_output_items_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((eval_id, run_id)): Path<(String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_list_eval_run_output_items_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run output items list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::list_eval_run_output_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+        )
+        .expect("eval run output items list"),
+    )
+    .into_response()
+}
+
+async fn eval_run_output_item_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path((eval_id, run_id, output_item_id)): Path<(String, String, String)>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_get_eval_run_output_item_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+        &output_item_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream eval run output item retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        sdkwork_api_app_gateway::get_eval_run_output_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &eval_id,
+            &run_id,
+            &output_item_id,
+        )
+        .expect("eval run output item retrieve"),
     )
     .into_response()
 }

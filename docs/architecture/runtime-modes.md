@@ -7,10 +7,10 @@ Server mode is the standalone deployment shape.
 Characteristics:
 
 - services run as independent binaries
-- gateway and admin APIs are exposed over HTTP
+- gateway, admin, and public portal APIs are exposed over HTTP
 - PostgreSQL is the preferred deployment database and is now supported by the shared admin store runtime
 - upstream credentials are expected to be managed by a server-side secret backend strategy
-- the current repository can run `gateway-service` and `admin-api-service` against either SQLite or PostgreSQL through the same storage abstraction
+- the current repository can run `gateway-service`, `admin-api-service`, and `portal-api-service` against either SQLite or PostgreSQL through the same storage abstraction
 
 ## Embedded Mode
 
@@ -20,10 +20,11 @@ Characteristics:
 
 - the runtime is hosted in-process through `sdkwork-api-runtime-host`
 - the Tauri shell under `console/src-tauri/` can start or call into the embedded runtime
+- the same React console build can be opened in a normal browser or hosted inside Tauri through hash-routed portal and admin shells
 - loopback binding is the default trust boundary
 - SQLite is the preferred local persistence strategy
 - OS keyring is the preferred secret backend when available
-- the React console packages can target the same admin API surface in both standalone and embedded modes
+- the React console packages can target the same portal and admin surfaces in both standalone and embedded modes
 
 ## Current Implementation State
 
@@ -32,7 +33,10 @@ The current repository includes:
 - a minimal `EmbeddedRuntime` abstraction
 - a loopback base URL contract
 - a Tauri shell scaffold with an initial runtime command
-- a live React console that consumes admin APIs for workspace, channel mesh, routing simulation, and telemetry views
+- a live React console with browser and Tauri-friendly hash routes for `#/portal/register`, `#/portal/login`, `#/portal/dashboard`, and `#/admin`
+- a public portal API surface for self-service registration, login, workspace inspection, and scoped API key issuance
+- a package-bounded portal frontend split across SDK, auth, and user dashboard modules
+- a standalone `portal-api-service` with dedicated JWT signing config and bind address
 - SQLite-backed control-plane persistence for identity, catalog, usage, and billing slices
 - PostgreSQL-backed control-plane persistence for the same admin store contract
 - encrypted upstream credential persistence and runtime secret resolution
@@ -46,8 +50,9 @@ The current repository includes:
 - environment-driven standalone config loading for bind addresses, database URL, secret backend, credential master key, local secret file path, and keyring service name
 - environment-driven extension discovery config for manifest search paths plus connector and native-dynamic runtime toggles
 - signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
+- signed portal JWT authentication isolated from admin JWT issuer and audience settings
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
-- explicit stateless gateway runtime modeling with synthetic tenant and project scope plus optional single-upstream relay across the current OpenAI-compatible data-plane surface, including files, uploads, audio with voices and voice consents, images, assistants, threads, conversations, vector stores, batches, fine-tuning jobs with events and checkpoints, webhooks, evals with run flows, and videos with characters and extend
+- explicit stateless gateway runtime modeling with synthetic tenant and project scope plus optional single-upstream relay across the current OpenAI-compatible data-plane surface, including containers with container-file content, files, uploads, audio with voices and voice consents, images, assistants, threads, conversations, vector stores, batches, fine-tuning jobs with events, checkpoints, pause or resume, checkpoint permissions, webhooks, evals with run delete or cancel and output item flows, and videos with official canonical character, edits, extensions, legacy aliases, and extend routes
 - shared Prometheus-compatible HTTP metrics exposed through `/metrics` on both admin and gateway routers
 - shared `x-request-id` propagation and structured HTTP request tracing across both admin and gateway routers, with tracing initialized by the standalone binaries
 - persisted routing policies shared by admin simulations and real gateway provider dispatch
@@ -74,7 +79,7 @@ The extension architecture is intentionally layered.
 | Runtime | Current Status | Notes |
 |---|---|---|
 | `builtin` | Active | First-party provider extensions are registered in-process through `sdkwork-api-extension-host` |
-| `native_dynamic` | Active with JSON, generic stream ABI, and lifecycle execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, executed for JSON-capable provider operations plus `/v1/chat/completions` and `/v1/responses` SSE relay and binary stream passthrough for `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content`, and observed through optional `init`, `health_check`, and `shutdown` hooks |
+| `native_dynamic` | Active with JSON, generic stream ABI, and lifecycle execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, executed for JSON-capable provider operations plus `/v1/chat/completions` and `/v1/responses` SSE relay and binary stream passthrough for `/v1/audio/speech`, `/v1/files/{file_id}/content`, `/v1/containers/{container_id}/files/{file_id}/content`, and `/v1/videos/{video_id}/content`, and observed through optional `init`, `health_check`, and `shutdown` hooks |
 | `connector` | Active with supervised execution | Manifest discovery and config-driven loading are active; the host can start configured connector processes, probe HTTP health endpoints, reuse healthy external endpoints, and relay through the current protocol adapter set |
 
 ## Configuration Layers
@@ -114,6 +119,15 @@ The extension package standard also distinguishes three names:
 
 The provider operation vocabulary is also additive and stable across builtin, connector, and native-dynamic runtimes. Recent extensions to that contract now include:
 
+- `containers.create`
+- `containers.list`
+- `containers.retrieve`
+- `containers.delete`
+- `containers.files.create`
+- `containers.files.list`
+- `containers.files.retrieve`
+- `containers.files.delete`
+- `containers.files.content.retrieve`
 - `audio.voices.list`
 - `audio.voice_consents.create`
 - `evals.list`
@@ -123,11 +137,23 @@ The provider operation vocabulary is also additive and stable across builtin, co
 - `evals.runs.list`
 - `evals.runs.create`
 - `evals.runs.retrieve`
+- `evals.runs.delete`
+- `evals.runs.cancel`
+- `evals.runs.output_items.list`
+- `evals.runs.output_items.retrieve`
 - `fine_tuning.jobs.events.list`
 - `fine_tuning.jobs.checkpoints.list`
+- `fine_tuning.jobs.pause`
+- `fine_tuning.jobs.resume`
+- `fine_tuning.checkpoints.permissions.create`
+- `fine_tuning.checkpoints.permissions.list`
+- `fine_tuning.checkpoints.permissions.delete`
+- `videos.characters.create`
 - `videos.characters.list`
 - `videos.characters.retrieve`
 - `videos.characters.update`
+- `videos.edits.create`
+- `videos.extensions.create`
 - `videos.extend`
 
 Configuration-driven loading now uses a stable merge order:

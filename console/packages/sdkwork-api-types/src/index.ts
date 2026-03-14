@@ -32,6 +32,33 @@ export interface CreatedGatewayApiKey {
   environment: string;
 }
 
+export interface PortalWorkspaceScope {
+  tenant_id: string;
+  project_id: string;
+}
+
+export interface PortalUserProfile {
+  id: string;
+  email: string;
+  display_name: string;
+  workspace_tenant_id: string;
+  workspace_project_id: string;
+  active: boolean;
+  created_at_ms: number;
+}
+
+export interface PortalAuthSession {
+  token: string;
+  user: PortalUserProfile;
+  workspace: PortalWorkspaceScope;
+}
+
+export interface PortalWorkspaceSummary {
+  user: PortalUserProfile;
+  tenant: TenantRecord;
+  project: ProjectRecord;
+}
+
 export interface ChannelRecord {
   id: string;
   name: string;

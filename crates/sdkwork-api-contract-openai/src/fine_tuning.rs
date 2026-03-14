@@ -38,6 +38,18 @@ impl FineTuningJobObject {
         job.status = "cancelled";
         job
     }
+
+    pub fn paused(id: impl Into<String>, model: impl Into<String>) -> Self {
+        let mut job = Self::new(id, model);
+        job.status = "paused";
+        job
+    }
+
+    pub fn running(id: impl Into<String>, model: impl Into<String>) -> Self {
+        let mut job = Self::new(id, model);
+        job.status = "running";
+        job
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +133,66 @@ impl ListFineTuningJobCheckpointsResponse {
         Self {
             object: "list",
             data,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateFineTuningCheckpointPermissionsRequest {
+    pub project_ids: Vec<String>,
+}
+
+impl CreateFineTuningCheckpointPermissionsRequest {
+    pub fn new(project_ids: Vec<String>) -> Self {
+        Self { project_ids }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FineTuningCheckpointPermissionObject {
+    pub id: String,
+    pub object: &'static str,
+    pub project_id: String,
+}
+
+impl FineTuningCheckpointPermissionObject {
+    pub fn new(id: impl Into<String>, project_id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "fine_tuning.permission",
+            project_id: project_id.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListFineTuningCheckpointPermissionsResponse {
+    pub object: &'static str,
+    pub data: Vec<FineTuningCheckpointPermissionObject>,
+}
+
+impl ListFineTuningCheckpointPermissionsResponse {
+    pub fn new(data: Vec<FineTuningCheckpointPermissionObject>) -> Self {
+        Self {
+            object: "list",
+            data,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteFineTuningCheckpointPermissionResponse {
+    pub id: String,
+    pub object: &'static str,
+    pub deleted: bool,
+}
+
+impl DeleteFineTuningCheckpointPermissionResponse {
+    pub fn deleted(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "fine_tuning.permission.deleted",
+            deleted: true,
         }
     }
 }

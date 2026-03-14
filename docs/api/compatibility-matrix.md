@@ -23,6 +23,7 @@ The table below reflects the current runtime truth as of 2026-03-14.
 | `/v1/completions` | `relay` | `relay` | Relays legacy text completions when provider wiring exists; stateless mode uses the configured single-upstream runtime or falls back locally |
 | `/v1/responses` | `relay` | `relay` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission; stateless mode relays the same core response operations through its configured upstream runtime |
 | `/v1/embeddings` | `relay` | `relay` | Uses catalog, credential, and provider state in stateful mode; stateless mode relays embeddings to its configured upstream runtime or falls back locally |
+| `/v1/containers` | `relay` | `relay` | Container create, list, retrieve, delete, container file create, list, retrieve, delete, and binary content relay are now wired in both modes |
 | `/v1/files` | `relay` | `relay` | Stateful mode relays multipart upload, metadata, and binary content; stateless mode relays the same surface through its configured upstream runtime or falls back locally |
 | `/v1/uploads` | `relay` | `relay` | Upload creation, part upload, completion, and cancel relay in stateful mode; stateless mode relays the same upload surface through its configured upstream runtime or falls back locally |
 | `/v1/audio/*` | `relay` | `relay` | Speech can relay binary or event-stream output; both modes now also cover transcription, translation, voices listing, and voice consent flows through the configured upstream runtime or local compatible fallback |
@@ -34,10 +35,10 @@ The table below reflects the current runtime truth as of 2026-03-14.
 | `/v1/conversations` | `relay` | `relay` | Includes conversation items CRUD-compatible flows; stateless mode relays the same conversation and item flows through its configured upstream runtime or falls back locally |
 | `/v1/vector_stores` | `relay` | `relay` | Includes search, files, and file batch flows; stateless mode relays the same vector store surface through its configured upstream runtime or falls back locally |
 | `/v1/batches` | `relay` | `relay` | Create, list, retrieve, and cancel are wired in stateful mode; stateless mode relays the same batch operations through its configured upstream runtime or falls back locally |
-| `/v1/fine_tuning/jobs` | `relay` | `relay` | Create, list, retrieve, cancel, events, and checkpoints are relay-capable; stateless mode relays the same fine-tuning job surface through its configured upstream runtime or falls back locally |
+| `/v1/fine_tuning/jobs` | `relay` | `relay` | Create, list, retrieve, cancel, events, checkpoints, pause, resume, checkpoint permission create or list or delete are relay-capable; stateless mode relays the same fine-tuning surface through its configured upstream runtime or falls back locally |
 | `/v1/webhooks` | `relay` | `relay` | CRUD-compatible relay path when upstream supports the same contract; stateless mode relays the same webhook surface through its configured upstream runtime or falls back locally |
-| `/v1/evals` | `relay` | `relay` | Create, list, retrieve, update, delete, run list, run create, and run retrieve are relay-capable in both modes, with stateless mode using its configured upstream runtime or compatible local fallback |
-| `/v1/videos` | `relay` | `relay` | Create, list, retrieve, content, delete, remix, characters list, character retrieve or update, and extend relay in both modes, with stateless mode using its configured upstream runtime or compatible local fallback |
+| `/v1/evals` | `relay` | `relay` | Create, list, retrieve, update, delete, run list, run create, run retrieve, run delete, run cancel, output item list, and output item retrieve are relay-capable in both modes |
+| `/v1/videos` | `relay` | `relay` | Create, list, retrieve, content, delete, remix, official characters create or retrieve, official edits, official extensions, legacy nested character aliases, character update, and extend relay are available in both modes |
 
 ## Control Plane
 
@@ -46,6 +47,9 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | Endpoint Family | Level | Notes |
 |---|---|---|
 | `/admin/auth/*` | `native` | Signed JWT login plus authenticated caller inspection |
+| `/portal/auth/*` | `native` | Public self-service registration, login, and authenticated caller inspection with a dedicated portal JWT boundary |
+| `/portal/workspace` | `native` | Returns the caller-owned default tenant and project workspace summary |
+| `/portal/api-keys` | `native` | Self-service gateway API key issuance and scoped listing for the caller-owned workspace |
 | `/admin/tenants` | `native` | SQLite and PostgreSQL backed |
 | `/admin/projects` | `native` | SQLite and PostgreSQL backed |
 | `/admin/api-keys` | `native` | Gateway API key issuance plus tenancy-aware lookup |
@@ -71,15 +75,15 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | Runtime Mode | Level | Notes |
 |---|---|---|
 | `builtin` | `native` | Active today through `sdkwork-api-extension-host` and built-in provider factories |
-| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, dynamic library symbol resolution, optional `init` or `health_check` or `shutdown` lifecycle hooks, and callback-based stream execution for `/v1/chat/completions`, `/v1/responses`, `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content` |
+| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, dynamic library symbol resolution, optional `init` or `health_check` or `shutdown` lifecycle hooks, and callback-based stream execution for `/v1/chat/completions`, `/v1/responses`, `/v1/audio/speech`, `/v1/files/{file_id}/content`, `/v1/containers/{container_id}/files/{file_id}/content`, and `/v1/videos/{video_id}/content` |
 | `connector` | `native` | Managed process lifecycle is active in the host, with HTTP health checks, reusable external endpoint attachment, protocol-mapped relay through the current adapter set, and trust-policy gating for discovered external packages |
 
 ## Operational Endpoints
 
 | Endpoint | Level | Notes |
 |---|---|---|
-| `/health` | `native` | Basic liveness endpoint exposed by gateway and admin services |
-| `/metrics` | `native` | Prometheus-compatible HTTP request counters and duration summaries exposed by gateway and admin services |
+| `/health` | `native` | Basic liveness endpoint exposed by gateway, admin, and portal services |
+| `/metrics` | `native` | Prometheus-compatible HTTP request counters and duration summaries exposed by gateway, admin, and portal services |
 
 ## Operational Conventions
 

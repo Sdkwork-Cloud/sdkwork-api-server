@@ -60,3 +60,68 @@ impl GatewayApiKeyRecord {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortalUserRecord {
+    pub id: String,
+    pub email: String,
+    pub display_name: String,
+    pub password_salt: String,
+    pub password_hash: String,
+    pub workspace_tenant_id: String,
+    pub workspace_project_id: String,
+    pub active: bool,
+    pub created_at_ms: u64,
+}
+
+impl PortalUserRecord {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: impl Into<String>,
+        email: impl Into<String>,
+        display_name: impl Into<String>,
+        password_salt: impl Into<String>,
+        password_hash: impl Into<String>,
+        workspace_tenant_id: impl Into<String>,
+        workspace_project_id: impl Into<String>,
+        active: bool,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            email: email.into(),
+            display_name: display_name.into(),
+            password_salt: password_salt.into(),
+            password_hash: password_hash.into(),
+            workspace_tenant_id: workspace_tenant_id.into(),
+            workspace_project_id: workspace_project_id.into(),
+            active,
+            created_at_ms,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortalUserProfile {
+    pub id: String,
+    pub email: String,
+    pub display_name: String,
+    pub workspace_tenant_id: String,
+    pub workspace_project_id: String,
+    pub active: bool,
+    pub created_at_ms: u64,
+}
+
+impl From<&PortalUserRecord> for PortalUserProfile {
+    fn from(value: &PortalUserRecord) -> Self {
+        Self {
+            id: value.id.clone(),
+            email: value.email.clone(),
+            display_name: value.display_name.clone(),
+            workspace_tenant_id: value.workspace_tenant_id.clone(),
+            workspace_project_id: value.workspace_project_id.clone(),
+            active: value.active,
+            created_at_ms: value.created_at_ms,
+        }
+    }
+}

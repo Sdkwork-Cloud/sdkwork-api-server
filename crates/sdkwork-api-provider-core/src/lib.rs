@@ -18,6 +18,7 @@ use sdkwork_api_contract_openai::chat_completions::{
     CreateChatCompletionRequest, UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
+use sdkwork_api_contract_openai::containers::{CreateContainerFileRequest, CreateContainerRequest};
 use sdkwork_api_contract_openai::conversations::{
     CreateConversationItemsRequest, CreateConversationRequest, UpdateConversationRequest,
 };
@@ -26,6 +27,7 @@ use sdkwork_api_contract_openai::evals::{
     CreateEvalRequest, CreateEvalRunRequest, UpdateEvalRequest,
 };
 use sdkwork_api_contract_openai::files::CreateFileRequest;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningCheckpointPermissionsRequest;
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 use sdkwork_api_contract_openai::images::{
     CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest,
@@ -50,7 +52,8 @@ use sdkwork_api_contract_openai::vector_stores::{
     SearchVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_contract_openai::videos::{
-    CreateVideoRequest, ExtendVideoRequest, RemixVideoRequest, UpdateVideoCharacterRequest,
+    CreateVideoCharacterRequest, CreateVideoRequest, EditVideoRequest, ExtendVideoRequest,
+    RemixVideoRequest, UpdateVideoCharacterRequest,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
 use serde_json::Value;
@@ -76,6 +79,15 @@ pub enum ProviderRequest<'a> {
     ChatCompletionsDelete(&'a str),
     ChatCompletionsMessagesList(&'a str),
     Completions(&'a CreateCompletionRequest),
+    Containers(&'a CreateContainerRequest),
+    ContainersList,
+    ContainersRetrieve(&'a str),
+    ContainersDelete(&'a str),
+    ContainerFiles(&'a str, &'a CreateContainerFileRequest),
+    ContainerFilesList(&'a str),
+    ContainerFilesRetrieve(&'a str, &'a str),
+    ContainerFilesDelete(&'a str, &'a str),
+    ContainerFilesContent(&'a str, &'a str),
     ModelsDelete(&'a str),
     Threads(&'a CreateThreadRequest),
     ThreadsRetrieve(&'a str),
@@ -137,6 +149,11 @@ pub enum ProviderRequest<'a> {
     FineTuningJobsCancel(&'a str),
     FineTuningJobsEvents(&'a str),
     FineTuningJobsCheckpoints(&'a str),
+    FineTuningJobsPause(&'a str),
+    FineTuningJobsResume(&'a str),
+    FineTuningCheckpointPermissions(&'a str, &'a CreateFineTuningCheckpointPermissionsRequest),
+    FineTuningCheckpointPermissionsList(&'a str),
+    FineTuningCheckpointPermissionsDelete(&'a str, &'a str),
     Assistants(&'a CreateAssistantRequest),
     AssistantsList,
     AssistantsRetrieve(&'a str),
@@ -151,6 +168,10 @@ pub enum ProviderRequest<'a> {
     EvalRunsList(&'a str),
     EvalRuns(&'a str, &'a CreateEvalRunRequest),
     EvalRunsRetrieve(&'a str, &'a str),
+    EvalRunsDelete(&'a str, &'a str),
+    EvalRunsCancel(&'a str, &'a str),
+    EvalRunOutputItemsList(&'a str, &'a str),
+    EvalRunOutputItemsRetrieve(&'a str, &'a str, &'a str),
     Batches(&'a CreateBatchRequest),
     BatchesList,
     BatchesRetrieve(&'a str),
@@ -175,9 +196,13 @@ pub enum ProviderRequest<'a> {
     VideosDelete(&'a str),
     VideosContent(&'a str),
     VideosRemix(&'a str, &'a RemixVideoRequest),
+    VideoCharactersCreate(&'a CreateVideoCharacterRequest),
     VideoCharactersList(&'a str),
     VideoCharactersRetrieve(&'a str, &'a str),
+    VideoCharactersCanonicalRetrieve(&'a str),
     VideoCharactersUpdate(&'a str, &'a str, &'a UpdateVideoCharacterRequest),
+    VideosEdits(&'a EditVideoRequest),
+    VideosExtensions(&'a ExtendVideoRequest),
     VideosExtend(&'a str, &'a ExtendVideoRequest),
     Webhooks(&'a CreateWebhookRequest),
     WebhooksList,

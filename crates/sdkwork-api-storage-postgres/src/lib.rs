@@ -5,7 +5,7 @@ use sdkwork_api_domain_catalog::{
     ProviderChannelBinding, ProxyProvider,
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
-use sdkwork_api_domain_identity::GatewayApiKeyRecord;
+use sdkwork_api_domain_identity::{GatewayApiKeyRecord, PortalUserRecord};
 use sdkwork_api_domain_routing::{
     ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingDecisionLog, RoutingDecisionSource,
     RoutingPolicy, RoutingStrategy,
@@ -104,13 +104,101 @@ fn decode_routing_assessments(assessments_json: &str) -> Result<Vec<RoutingCandi
     Ok(serde_json::from_str(assessments_json)?)
 }
 
+type PortalUserRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    bool,
+    i64,
+);
+
+fn decode_portal_user_row(row: Option<PortalUserRow>) -> Result<Option<PortalUserRecord>> {
+    row.map(
+        |(
+            id,
+            email,
+            display_name,
+            password_salt,
+            password_hash,
+            workspace_tenant_id,
+            workspace_project_id,
+            active,
+            created_at_ms,
+        )| {
+            Ok(PortalUserRecord {
+                id,
+                email,
+                display_name,
+                password_salt,
+                password_hash,
+                workspace_tenant_id,
+                workspace_project_id,
+                active,
+                created_at_ms: u64::try_from(created_at_ms)?,
+            })
+        },
+    )
+    .transpose()
+}
+
 pub async fn run_migrations(url: &str) -> Result<PgPool> {
     let pool = PgPoolOptions::new().max_connections(5).connect(url).await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS identity_users (
             id TEXT PRIMARY KEY NOT NULL,
-            email TEXT NOT NULL
+            email TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            password_salt TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL DEFAULT '',
+            workspace_tenant_id TEXT NOT NULL DEFAULT '',
+            workspace_project_id TEXT NOT NULL DEFAULT '',
+            active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS password_salt TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS workspace_tenant_id TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS workspace_project_id TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_users_email ON identity_users (email)",
     )
     .execute(&pool)
     .await?;
@@ -1066,6 +1154,16 @@ impl PostgresAdminStore {
             .collect())
     }
 
+    pub async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
+        let row = sqlx::query_as::<_, (String, String)>(
+            "SELECT id, name FROM tenant_records WHERE id = $1",
+        )
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(id, name)| Tenant { id, name }))
+    }
+
     pub async fn insert_project(&self, project: &Project) -> Result<Project> {
         sqlx::query(
             "INSERT INTO tenant_projects (id, tenant_id, name) VALUES ($1, $2, $3)
@@ -1093,6 +1191,72 @@ impl PostgresAdminStore {
                 name,
             })
             .collect())
+    }
+
+    pub async fn find_project(&self, project_id: &str) -> Result<Option<Project>> {
+        let row = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT tenant_id, id, name FROM tenant_projects WHERE id = $1",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(tenant_id, id, name)| Project {
+            tenant_id,
+            id,
+            name,
+        }))
+    }
+
+    pub async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord> {
+        sqlx::query(
+            "INSERT INTO identity_users (id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT(id) DO UPDATE SET
+             email = excluded.email,
+             display_name = excluded.display_name,
+             password_salt = excluded.password_salt,
+             password_hash = excluded.password_hash,
+             workspace_tenant_id = excluded.workspace_tenant_id,
+             workspace_project_id = excluded.workspace_project_id,
+             active = excluded.active,
+             created_at_ms = excluded.created_at_ms",
+        )
+        .bind(&user.id)
+        .bind(&user.email)
+        .bind(&user.display_name)
+        .bind(&user.password_salt)
+        .bind(&user.password_hash)
+        .bind(&user.workspace_tenant_id)
+        .bind(&user.workspace_project_id)
+        .bind(user.active)
+        .bind(i64::try_from(user.created_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(user.clone())
+    }
+
+    pub async fn find_portal_user_by_email(&self, email: &str) -> Result<Option<PortalUserRecord>> {
+        let row = sqlx::query_as::<_, (String, String, String, String, String, String, String, bool, i64)>(
+            "SELECT id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms
+             FROM identity_users
+             WHERE email = $1",
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await?;
+        decode_portal_user_row(row)
+    }
+
+    pub async fn find_portal_user_by_id(&self, user_id: &str) -> Result<Option<PortalUserRecord>> {
+        let row = sqlx::query_as::<_, (String, String, String, String, String, String, String, bool, i64)>(
+            "SELECT id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms
+             FROM identity_users
+             WHERE id = $1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        decode_portal_user_row(row)
     }
 
     pub async fn insert_gateway_api_key(
@@ -1414,12 +1578,32 @@ impl AdminStore for PostgresAdminStore {
         PostgresAdminStore::list_tenants(self).await
     }
 
+    async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
+        PostgresAdminStore::find_tenant(self, tenant_id).await
+    }
+
     async fn insert_project(&self, project: &Project) -> Result<Project> {
         PostgresAdminStore::insert_project(self, project).await
     }
 
     async fn list_projects(&self) -> Result<Vec<Project>> {
         PostgresAdminStore::list_projects(self).await
+    }
+
+    async fn find_project(&self, project_id: &str) -> Result<Option<Project>> {
+        PostgresAdminStore::find_project(self, project_id).await
+    }
+
+    async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord> {
+        PostgresAdminStore::insert_portal_user(self, user).await
+    }
+
+    async fn find_portal_user_by_email(&self, email: &str) -> Result<Option<PortalUserRecord>> {
+        PostgresAdminStore::find_portal_user_by_email(self, email).await
+    }
+
+    async fn find_portal_user_by_id(&self, user_id: &str) -> Result<Option<PortalUserRecord>> {
+        PostgresAdminStore::find_portal_user_by_id(self, user_id).await
     }
 
     async fn insert_gateway_api_key(

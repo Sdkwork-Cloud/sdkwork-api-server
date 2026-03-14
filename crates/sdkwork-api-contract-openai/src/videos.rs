@@ -31,12 +31,45 @@ impl RemixVideoRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtendVideoRequest {
     pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_id: Option<String>,
 }
 
 impl ExtendVideoRequest {
     pub fn new(prompt: impl Into<String>) -> Self {
         Self {
             prompt: prompt.into(),
+            video_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVideoCharacterRequest {
+    pub name: String,
+    pub video_id: String,
+}
+
+impl CreateVideoCharacterRequest {
+    pub fn new(name: impl Into<String>, video_id: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            video_id: video_id.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditVideoRequest {
+    pub prompt: String,
+    pub video_id: String,
+}
+
+impl EditVideoRequest {
+    pub fn new(prompt: impl Into<String>, video_id: impl Into<String>) -> Self {
+        Self {
+            prompt: prompt.into(),
+            video_id: video_id.into(),
         }
     }
 }

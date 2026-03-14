@@ -15,6 +15,7 @@ pub enum RuntimeMode {
 pub struct StandaloneConfig {
     pub gateway_bind: String,
     pub admin_bind: String,
+    pub portal_bind: String,
     pub database_url: String,
     pub extension_paths: Vec<String>,
     pub enable_connector_extensions: bool,
@@ -23,6 +24,7 @@ pub struct StandaloneConfig {
     pub require_signed_connector_extensions: bool,
     pub require_signed_native_dynamic_extensions: bool,
     pub admin_jwt_signing_secret: String,
+    pub portal_jwt_signing_secret: String,
     pub runtime_snapshot_interval_secs: u64,
     pub secret_backend: SecretBackendKind,
     pub credential_master_key: String,
@@ -35,6 +37,7 @@ impl Default for StandaloneConfig {
         Self {
             gateway_bind: "127.0.0.1:8080".to_owned(),
             admin_bind: "127.0.0.1:8081".to_owned(),
+            portal_bind: "127.0.0.1:8082".to_owned(),
             database_url: "sqlite://sdkwork-api-server.db".to_owned(),
             extension_paths: Vec::new(),
             enable_connector_extensions: true,
@@ -43,6 +46,7 @@ impl Default for StandaloneConfig {
             require_signed_connector_extensions: false,
             require_signed_native_dynamic_extensions: true,
             admin_jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
+            portal_jwt_signing_secret: "local-dev-portal-jwt-secret".to_owned(),
             runtime_snapshot_interval_secs: 0,
             secret_backend: SecretBackendKind::DatabaseEncrypted,
             credential_master_key: "local-dev-master-key".to_owned(),
@@ -89,6 +93,10 @@ impl StandaloneConfig {
                 .get("SDKWORK_ADMIN_BIND")
                 .cloned()
                 .unwrap_or(default.admin_bind),
+            portal_bind: values
+                .get("SDKWORK_PORTAL_BIND")
+                .cloned()
+                .unwrap_or(default.portal_bind),
             database_url: values
                 .get("SDKWORK_DATABASE_URL")
                 .cloned()
@@ -126,6 +134,10 @@ impl StandaloneConfig {
                 .get("SDKWORK_ADMIN_JWT_SIGNING_SECRET")
                 .cloned()
                 .unwrap_or(default.admin_jwt_signing_secret),
+            portal_jwt_signing_secret: values
+                .get("SDKWORK_PORTAL_JWT_SIGNING_SECRET")
+                .cloned()
+                .unwrap_or(default.portal_jwt_signing_secret),
             runtime_snapshot_interval_secs: parse_u64_env(
                 &values,
                 "SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS",
@@ -233,5 +245,17 @@ mod tests {
                 .unwrap();
 
         assert_eq!(config.runtime_snapshot_interval_secs, 30);
+    }
+
+    #[test]
+    fn parses_portal_env_pairs() {
+        let config = StandaloneConfig::from_pairs([
+            ("SDKWORK_PORTAL_BIND", "127.0.0.1:8082"),
+            ("SDKWORK_PORTAL_JWT_SIGNING_SECRET", "portal-secret"),
+        ])
+        .unwrap();
+
+        assert_eq!(config.portal_bind, "127.0.0.1:8082");
+        assert_eq!(config.portal_jwt_signing_secret, "portal-secret");
     }
 }

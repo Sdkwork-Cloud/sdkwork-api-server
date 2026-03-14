@@ -145,3 +145,52 @@ impl ListEvalRunsResponse {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteEvalRunResponse {
+    pub id: String,
+    pub object: &'static str,
+    pub deleted: bool,
+}
+
+impl DeleteEvalRunResponse {
+    pub fn deleted(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "eval.run.deleted",
+            deleted: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EvalRunOutputItemObject {
+    pub id: String,
+    pub object: &'static str,
+    pub status: &'static str,
+}
+
+impl EvalRunOutputItemObject {
+    pub fn passed(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            object: "eval.run.output_item",
+            status: "pass",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListEvalRunOutputItemsResponse {
+    pub object: &'static str,
+    pub data: Vec<EvalRunOutputItemObject>,
+}
+
+impl ListEvalRunOutputItemsResponse {
+    pub fn new(data: Vec<EvalRunOutputItemObject>) -> Self {
+        Self {
+            object: "list",
+            data,
+        }
+    }
+}

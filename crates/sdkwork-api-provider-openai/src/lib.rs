@@ -11,6 +11,7 @@ use sdkwork_api_contract_openai::chat_completions::{
     CreateChatCompletionRequest, UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
+use sdkwork_api_contract_openai::containers::{CreateContainerFileRequest, CreateContainerRequest};
 use sdkwork_api_contract_openai::conversations::{
     CreateConversationItemsRequest, CreateConversationRequest, UpdateConversationRequest,
 };
@@ -19,7 +20,9 @@ use sdkwork_api_contract_openai::evals::{
     CreateEvalRequest, CreateEvalRunRequest, UpdateEvalRequest,
 };
 use sdkwork_api_contract_openai::files::CreateFileRequest;
-use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
+use sdkwork_api_contract_openai::fine_tuning::{
+    CreateFineTuningCheckpointPermissionsRequest, CreateFineTuningJobRequest,
+};
 use sdkwork_api_contract_openai::images::{
     CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest,
 };
@@ -43,7 +46,8 @@ use sdkwork_api_contract_openai::vector_stores::{
     SearchVectorStoreRequest, UpdateVectorStoreRequest,
 };
 use sdkwork_api_contract_openai::videos::{
-    CreateVideoRequest, ExtendVideoRequest, RemixVideoRequest, UpdateVideoCharacterRequest,
+    CreateVideoCharacterRequest, CreateVideoRequest, EditVideoRequest, ExtendVideoRequest,
+    RemixVideoRequest, UpdateVideoCharacterRequest,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
@@ -299,6 +303,86 @@ impl OpenAiProviderAdapter {
         request: &CreateCompletionRequest,
     ) -> Result<Value> {
         self.post_json("/v1/completions", api_key, request).await
+    }
+
+    pub async fn containers(
+        &self,
+        api_key: &str,
+        request: &CreateContainerRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/containers", api_key, request).await
+    }
+
+    pub async fn list_containers(&self, api_key: &str) -> Result<Value> {
+        self.get_json("/v1/containers", api_key).await
+    }
+
+    pub async fn retrieve_container(&self, api_key: &str, container_id: &str) -> Result<Value> {
+        self.get_json(&format!("/v1/containers/{container_id}"), api_key)
+            .await
+    }
+
+    pub async fn delete_container(&self, api_key: &str, container_id: &str) -> Result<Value> {
+        self.delete_json(&format!("/v1/containers/{container_id}"), api_key)
+            .await
+    }
+
+    pub async fn create_container_file(
+        &self,
+        api_key: &str,
+        container_id: &str,
+        request: &CreateContainerFileRequest,
+    ) -> Result<Value> {
+        self.post_json(
+            &format!("/v1/containers/{container_id}/files"),
+            api_key,
+            request,
+        )
+        .await
+    }
+
+    pub async fn list_container_files(&self, api_key: &str, container_id: &str) -> Result<Value> {
+        self.get_json(&format!("/v1/containers/{container_id}/files"), api_key)
+            .await
+    }
+
+    pub async fn retrieve_container_file(
+        &self,
+        api_key: &str,
+        container_id: &str,
+        file_id: &str,
+    ) -> Result<Value> {
+        self.get_json(
+            &format!("/v1/containers/{container_id}/files/{file_id}"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn delete_container_file(
+        &self,
+        api_key: &str,
+        container_id: &str,
+        file_id: &str,
+    ) -> Result<Value> {
+        self.delete_json(
+            &format!("/v1/containers/{container_id}/files/{file_id}"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn container_file_content(
+        &self,
+        api_key: &str,
+        container_id: &str,
+        file_id: &str,
+    ) -> Result<ProviderStreamOutput> {
+        self.get_stream(
+            &format!("/v1/containers/{container_id}/files/{file_id}/content"),
+            api_key,
+        )
+        .await
     }
 
     pub async fn list_models(&self, api_key: &str) -> Result<Value> {
@@ -721,18 +805,8 @@ impl OpenAiProviderAdapter {
     }
 
     pub async fn cancel_fine_tuning_job(&self, api_key: &str, job_id: &str) -> Result<Value> {
-        let response = self
-            .client
-            .post(format!(
-                "{}/v1/fine_tuning/jobs/{job_id}/cancel",
-                self.base_url
-            ))
-            .bearer_auth(api_key)
-            .send()
-            .await?
-            .error_for_status()?;
-
-        Ok(response.json::<Value>().await?)
+        self.post_empty_json(&format!("/v1/fine_tuning/jobs/{job_id}/cancel"), api_key)
+            .await
     }
 
     pub async fn list_fine_tuning_job_events(&self, api_key: &str, job_id: &str) -> Result<Value> {
@@ -747,6 +821,57 @@ impl OpenAiProviderAdapter {
     ) -> Result<Value> {
         self.get_json(
             &format!("/v1/fine_tuning/jobs/{job_id}/checkpoints"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn pause_fine_tuning_job(&self, api_key: &str, job_id: &str) -> Result<Value> {
+        self.post_empty_json(&format!("/v1/fine_tuning/jobs/{job_id}/pause"), api_key)
+            .await
+    }
+
+    pub async fn resume_fine_tuning_job(&self, api_key: &str, job_id: &str) -> Result<Value> {
+        self.post_empty_json(&format!("/v1/fine_tuning/jobs/{job_id}/resume"), api_key)
+            .await
+    }
+
+    pub async fn create_fine_tuning_checkpoint_permissions(
+        &self,
+        api_key: &str,
+        fine_tuned_model_checkpoint: &str,
+        request: &CreateFineTuningCheckpointPermissionsRequest,
+    ) -> Result<Value> {
+        self.post_json(
+            &format!("/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions"),
+            api_key,
+            request,
+        )
+        .await
+    }
+
+    pub async fn list_fine_tuning_checkpoint_permissions(
+        &self,
+        api_key: &str,
+        fine_tuned_model_checkpoint: &str,
+    ) -> Result<Value> {
+        self.get_json(
+            &format!("/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn delete_fine_tuning_checkpoint_permission(
+        &self,
+        api_key: &str,
+        fine_tuned_model_checkpoint: &str,
+        permission_id: &str,
+    ) -> Result<Value> {
+        self.delete_json(
+            &format!(
+                "/v1/fine_tuning/checkpoints/{fine_tuned_model_checkpoint}/permissions/{permission_id}"
+            ),
             api_key,
         )
         .await
@@ -844,6 +969,56 @@ impl OpenAiProviderAdapter {
     ) -> Result<Value> {
         self.get_json(&format!("/v1/evals/{eval_id}/runs/{run_id}"), api_key)
             .await
+    }
+
+    pub async fn delete_eval_run(
+        &self,
+        api_key: &str,
+        eval_id: &str,
+        run_id: &str,
+    ) -> Result<Value> {
+        self.delete_json(&format!("/v1/evals/{eval_id}/runs/{run_id}"), api_key)
+            .await
+    }
+
+    pub async fn cancel_eval_run(
+        &self,
+        api_key: &str,
+        eval_id: &str,
+        run_id: &str,
+    ) -> Result<Value> {
+        self.post_empty_json(
+            &format!("/v1/evals/{eval_id}/runs/{run_id}/cancel"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn list_eval_run_output_items(
+        &self,
+        api_key: &str,
+        eval_id: &str,
+        run_id: &str,
+    ) -> Result<Value> {
+        self.get_json(
+            &format!("/v1/evals/{eval_id}/runs/{run_id}/output_items"),
+            api_key,
+        )
+        .await
+    }
+
+    pub async fn retrieve_eval_run_output_item(
+        &self,
+        api_key: &str,
+        eval_id: &str,
+        run_id: &str,
+        output_item_id: &str,
+    ) -> Result<Value> {
+        self.get_json(
+            &format!("/v1/evals/{eval_id}/runs/{run_id}/output_items/{output_item_id}"),
+            api_key,
+        )
+        .await
     }
 
     pub async fn batches(&self, api_key: &str, request: &CreateBatchRequest) -> Result<Value> {
@@ -1074,6 +1249,15 @@ impl OpenAiProviderAdapter {
             .await
     }
 
+    pub async fn create_video_character(
+        &self,
+        api_key: &str,
+        request: &CreateVideoCharacterRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/videos/characters", api_key, request)
+            .await
+    }
+
     pub async fn list_video_characters(&self, api_key: &str, video_id: &str) -> Result<Value> {
         self.get_json(&format!("/v1/videos/{video_id}/characters"), api_key)
             .await
@@ -1092,6 +1276,15 @@ impl OpenAiProviderAdapter {
         .await
     }
 
+    pub async fn retrieve_video_character_canonical(
+        &self,
+        api_key: &str,
+        character_id: &str,
+    ) -> Result<Value> {
+        self.get_json(&format!("/v1/videos/characters/{character_id}"), api_key)
+            .await
+    }
+
     pub async fn update_video_character(
         &self,
         api_key: &str,
@@ -1105,6 +1298,19 @@ impl OpenAiProviderAdapter {
             request,
         )
         .await
+    }
+
+    pub async fn edit_video(&self, api_key: &str, request: &EditVideoRequest) -> Result<Value> {
+        self.post_json("/v1/videos/edits", api_key, request).await
+    }
+
+    pub async fn extensions_video(
+        &self,
+        api_key: &str,
+        request: &ExtendVideoRequest,
+    ) -> Result<Value> {
+        self.post_json("/v1/videos/extensions", api_key, request)
+            .await
     }
 
     pub async fn extend_video(
@@ -1303,6 +1509,43 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::Completions(request) => Ok(ProviderOutput::Json(
                 self.completions(api_key, request).await?,
             )),
+            ProviderRequest::Containers(request) => Ok(ProviderOutput::Json(
+                self.containers(api_key, request).await?,
+            )),
+            ProviderRequest::ContainersList => {
+                Ok(ProviderOutput::Json(self.list_containers(api_key).await?))
+            }
+            ProviderRequest::ContainersRetrieve(container_id) => Ok(ProviderOutput::Json(
+                self.retrieve_container(api_key, container_id).await?,
+            )),
+            ProviderRequest::ContainersDelete(container_id) => Ok(ProviderOutput::Json(
+                self.delete_container(api_key, container_id).await?,
+            )),
+            ProviderRequest::ContainerFiles(container_id, request) => Ok(ProviderOutput::Json(
+                self.create_container_file(api_key, container_id, request)
+                    .await?,
+            )),
+            ProviderRequest::ContainerFilesList(container_id) => Ok(ProviderOutput::Json(
+                self.list_container_files(api_key, container_id).await?,
+            )),
+            ProviderRequest::ContainerFilesRetrieve(container_id, file_id) => {
+                Ok(ProviderOutput::Json(
+                    self.retrieve_container_file(api_key, container_id, file_id)
+                        .await?,
+                ))
+            }
+            ProviderRequest::ContainerFilesDelete(container_id, file_id) => {
+                Ok(ProviderOutput::Json(
+                    self.delete_container_file(api_key, container_id, file_id)
+                        .await?,
+                ))
+            }
+            ProviderRequest::ContainerFilesContent(container_id, file_id) => {
+                Ok(ProviderOutput::Stream(
+                    self.container_file_content(api_key, container_id, file_id)
+                        .await?,
+                ))
+            }
             ProviderRequest::ModelsDelete(model_id) => Ok(ProviderOutput::Json(
                 self.delete_model(api_key, model_id).await?,
             )),
@@ -1518,6 +1761,43 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
                 self.list_fine_tuning_job_checkpoints(api_key, job_id)
                     .await?,
             )),
+            ProviderRequest::FineTuningJobsPause(job_id) => Ok(ProviderOutput::Json(
+                self.pause_fine_tuning_job(api_key, job_id).await?,
+            )),
+            ProviderRequest::FineTuningJobsResume(job_id) => Ok(ProviderOutput::Json(
+                self.resume_fine_tuning_job(api_key, job_id).await?,
+            )),
+            ProviderRequest::FineTuningCheckpointPermissions(
+                fine_tuned_model_checkpoint,
+                request,
+            ) => Ok(ProviderOutput::Json(
+                self.create_fine_tuning_checkpoint_permissions(
+                    api_key,
+                    fine_tuned_model_checkpoint,
+                    request,
+                )
+                .await?,
+            )),
+            ProviderRequest::FineTuningCheckpointPermissionsList(fine_tuned_model_checkpoint) => {
+                Ok(ProviderOutput::Json(
+                    self.list_fine_tuning_checkpoint_permissions(
+                        api_key,
+                        fine_tuned_model_checkpoint,
+                    )
+                    .await?,
+                ))
+            }
+            ProviderRequest::FineTuningCheckpointPermissionsDelete(
+                fine_tuned_model_checkpoint,
+                permission_id,
+            ) => Ok(ProviderOutput::Json(
+                self.delete_fine_tuning_checkpoint_permission(
+                    api_key,
+                    fine_tuned_model_checkpoint,
+                    permission_id,
+                )
+                .await?,
+            )),
             ProviderRequest::Assistants(request) => Ok(ProviderOutput::Json(
                 self.assistants(api_key, request).await?,
             )),
@@ -1559,6 +1839,22 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::EvalRunsRetrieve(eval_id, run_id) => Ok(ProviderOutput::Json(
                 self.retrieve_eval_run(api_key, eval_id, run_id).await?,
             )),
+            ProviderRequest::EvalRunsDelete(eval_id, run_id) => Ok(ProviderOutput::Json(
+                self.delete_eval_run(api_key, eval_id, run_id).await?,
+            )),
+            ProviderRequest::EvalRunsCancel(eval_id, run_id) => Ok(ProviderOutput::Json(
+                self.cancel_eval_run(api_key, eval_id, run_id).await?,
+            )),
+            ProviderRequest::EvalRunOutputItemsList(eval_id, run_id) => Ok(ProviderOutput::Json(
+                self.list_eval_run_output_items(api_key, eval_id, run_id)
+                    .await?,
+            )),
+            ProviderRequest::EvalRunOutputItemsRetrieve(eval_id, run_id, output_item_id) => {
+                Ok(ProviderOutput::Json(
+                    self.retrieve_eval_run_output_item(api_key, eval_id, run_id, output_item_id)
+                        .await?,
+                ))
+            }
             ProviderRequest::Batches(request) => {
                 Ok(ProviderOutput::Json(self.batches(api_key, request).await?))
             }
@@ -1659,6 +1955,9 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             ProviderRequest::VideosRemix(video_id, request) => Ok(ProviderOutput::Json(
                 self.remix_video(api_key, video_id, request).await?,
             )),
+            ProviderRequest::VideoCharactersCreate(request) => Ok(ProviderOutput::Json(
+                self.create_video_character(api_key, request).await?,
+            )),
             ProviderRequest::VideoCharactersList(video_id) => Ok(ProviderOutput::Json(
                 self.list_video_characters(api_key, video_id).await?,
             )),
@@ -1674,6 +1973,18 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
                         .await?,
                 ))
             }
+            ProviderRequest::VideoCharactersCanonicalRetrieve(character_id) => {
+                Ok(ProviderOutput::Json(
+                    self.retrieve_video_character_canonical(api_key, character_id)
+                        .await?,
+                ))
+            }
+            ProviderRequest::VideosEdits(request) => Ok(ProviderOutput::Json(
+                self.edit_video(api_key, request).await?,
+            )),
+            ProviderRequest::VideosExtensions(request) => Ok(ProviderOutput::Json(
+                self.extensions_video(api_key, request).await?,
+            )),
             ProviderRequest::VideosExtend(video_id, request) => Ok(ProviderOutput::Json(
                 self.extend_video(api_key, video_id, request).await?,
             )),

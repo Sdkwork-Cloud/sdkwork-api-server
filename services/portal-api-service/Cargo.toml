@@ -1,0 +1,20 @@
+[package]
+name = "portal-api-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+sdkwork-api-config = { path = "../../crates/sdkwork-api-config" }
+sdkwork-api-interface-portal = { path = "../../crates/sdkwork-api-interface-portal" }
+sdkwork-api-observability = { path = "../../crates/sdkwork-api-observability" }
+sdkwork-api-storage-core = { path = "../../crates/sdkwork-api-storage-core" }
+sdkwork-api-storage-postgres = { path = "../../crates/sdkwork-api-storage-postgres" }
+sdkwork-api-storage-sqlite = { path = "../../crates/sdkwork-api-storage-sqlite" }
+tokio = { workspace = true, features = ["net"] }
+
+[[bin]]
+name = "portal-api-service"
+path = "src/main.rs"

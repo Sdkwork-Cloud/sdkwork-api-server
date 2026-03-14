@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use sdkwork_api_domain_billing::{LedgerEntry, QuotaPolicy};
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
-use sdkwork_api_domain_identity::GatewayApiKeyRecord;
+use sdkwork_api_domain_identity::{GatewayApiKeyRecord, PortalUserRecord};
 use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingDecisionLog, RoutingPolicy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
@@ -96,9 +96,15 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant>;
     async fn list_tenants(&self) -> Result<Vec<Tenant>>;
+    async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>>;
 
     async fn insert_project(&self, project: &Project) -> Result<Project>;
     async fn list_projects(&self) -> Result<Vec<Project>>;
+    async fn find_project(&self, project_id: &str) -> Result<Option<Project>>;
+
+    async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord>;
+    async fn find_portal_user_by_email(&self, email: &str) -> Result<Option<PortalUserRecord>>;
+    async fn find_portal_user_by_id(&self, user_id: &str) -> Result<Option<PortalUserRecord>>;
 
     async fn insert_gateway_api_key(
         &self,

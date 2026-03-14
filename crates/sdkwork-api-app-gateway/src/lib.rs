@@ -18,6 +18,11 @@ use sdkwork_api_contract_openai::chat_completions::{
     UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::{CompletionObject, CreateCompletionRequest};
+use sdkwork_api_contract_openai::containers::{
+    ContainerFileObject, ContainerObject, CreateContainerFileRequest, CreateContainerRequest,
+    DeleteContainerFileResponse, DeleteContainerResponse, ListContainerFilesResponse,
+    ListContainersResponse,
+};
 use sdkwork_api_contract_openai::conversations::{
     ConversationItemObject, ConversationObject, CreateConversationItemsRequest,
     CreateConversationRequest, DeleteConversationItemResponse, DeleteConversationResponse,
@@ -26,16 +31,19 @@ use sdkwork_api_contract_openai::conversations::{
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingRequest;
 use sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse;
 use sdkwork_api_contract_openai::evals::{
-    CreateEvalRequest, CreateEvalRunRequest, DeleteEvalResponse, EvalObject, EvalRunObject,
-    ListEvalRunsResponse, ListEvalsResponse, UpdateEvalRequest,
+    CreateEvalRequest, CreateEvalRunRequest, DeleteEvalResponse, DeleteEvalRunResponse, EvalObject,
+    EvalRunObject, EvalRunOutputItemObject, ListEvalRunOutputItemsResponse, ListEvalRunsResponse,
+    ListEvalsResponse, UpdateEvalRequest,
 };
 use sdkwork_api_contract_openai::files::{
     CreateFileRequest, DeleteFileResponse, FileObject, ListFilesResponse,
 };
 use sdkwork_api_contract_openai::fine_tuning::{
-    CreateFineTuningJobRequest, FineTuningJobCheckpointObject, FineTuningJobEventObject,
-    FineTuningJobObject, ListFineTuningJobCheckpointsResponse, ListFineTuningJobEventsResponse,
-    ListFineTuningJobsResponse,
+    CreateFineTuningCheckpointPermissionsRequest, CreateFineTuningJobRequest,
+    DeleteFineTuningCheckpointPermissionResponse, FineTuningCheckpointPermissionObject,
+    FineTuningJobCheckpointObject, FineTuningJobEventObject, FineTuningJobObject,
+    ListFineTuningCheckpointPermissionsResponse, ListFineTuningJobCheckpointsResponse,
+    ListFineTuningJobEventsResponse, ListFineTuningJobsResponse,
 };
 use sdkwork_api_contract_openai::images::{
     CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageObject,
@@ -71,9 +79,9 @@ use sdkwork_api_contract_openai::vector_stores::{
     UpdateVectorStoreRequest, VectorStoreFileBatchObject, VectorStoreFileObject, VectorStoreObject,
 };
 use sdkwork_api_contract_openai::videos::{
-    CreateVideoRequest, DeleteVideoResponse, ExtendVideoRequest, RemixVideoRequest,
-    UpdateVideoCharacterRequest, VideoCharacterObject, VideoCharactersResponse, VideoObject,
-    VideosResponse,
+    CreateVideoCharacterRequest, CreateVideoRequest, DeleteVideoResponse, EditVideoRequest,
+    ExtendVideoRequest, RemixVideoRequest, UpdateVideoCharacterRequest, VideoCharacterObject,
+    VideoCharactersResponse, VideoObject, VideosResponse,
 };
 use sdkwork_api_contract_openai::webhooks::{
     CreateWebhookRequest, DeleteWebhookResponse, ListWebhooksResponse, UpdateWebhookRequest,
@@ -2123,6 +2131,315 @@ pub async fn relay_audio_voice_consent_from_store(
     .await
 }
 
+pub async fn relay_container_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateContainerRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        &request.name,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::Containers(request),
+    )
+    .await
+}
+
+pub async fn relay_list_containers_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        "containers",
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainersList,
+    )
+    .await
+}
+
+pub async fn relay_get_container_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainersRetrieve(container_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_container_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainersDelete(container_id),
+    )
+    .await
+}
+
+pub async fn relay_container_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+    request: &CreateContainerFileRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainerFiles(container_id, request),
+    )
+    .await
+}
+
+pub async fn relay_list_container_files_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainerFilesList(container_id),
+    )
+    .await
+}
+
+pub async fn relay_get_container_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+    file_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainerFilesRetrieve(container_id, file_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_container_file_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+    file_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainerFilesDelete(container_id, file_id),
+    )
+    .await
+}
+
+pub async fn relay_container_file_content_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    container_id: &str,
+    file_id: &str,
+) -> Result<Option<ProviderStreamOutput>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "containers",
+        container_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_stream_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ContainerFilesContent(container_id, file_id),
+    )
+    .await
+}
+
 pub async fn relay_file_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -2567,6 +2884,166 @@ pub async fn relay_list_fine_tuning_job_checkpoints_from_store(
         &provider,
         &api_key,
         ProviderRequest::FineTuningJobsCheckpoints(job_id),
+    )
+    .await
+}
+
+pub async fn relay_pause_fine_tuning_job_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    job_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "fine_tuning", job_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::FineTuningJobsPause(job_id),
+    )
+    .await
+}
+
+pub async fn relay_resume_fine_tuning_job_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    job_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "fine_tuning", job_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::FineTuningJobsResume(job_id),
+    )
+    .await
+}
+
+pub async fn relay_fine_tuning_checkpoint_permissions_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    checkpoint_id: &str,
+    request: &CreateFineTuningCheckpointPermissionsRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "fine_tuning",
+        checkpoint_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::FineTuningCheckpointPermissions(checkpoint_id, request),
+    )
+    .await
+}
+
+pub async fn relay_list_fine_tuning_checkpoint_permissions_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    checkpoint_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "fine_tuning",
+        checkpoint_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::FineTuningCheckpointPermissionsList(checkpoint_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_fine_tuning_checkpoint_permission_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    checkpoint_id: &str,
+    permission_id: &str,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "fine_tuning",
+        checkpoint_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::FineTuningCheckpointPermissionsDelete(checkpoint_id, permission_id),
     )
     .await
 }
@@ -3143,6 +3620,123 @@ pub async fn relay_get_eval_run_from_store(
         &provider,
         &api_key,
         ProviderRequest::EvalRunsRetrieve(eval_id, run_id),
+    )
+    .await
+}
+
+pub async fn relay_delete_eval_run_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    eval_id: &str,
+    run_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "evals", eval_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::EvalRunsDelete(eval_id, run_id),
+    )
+    .await
+}
+
+pub async fn relay_cancel_eval_run_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    eval_id: &str,
+    run_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "evals", eval_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::EvalRunsCancel(eval_id, run_id),
+    )
+    .await
+}
+
+pub async fn relay_list_eval_run_output_items_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    eval_id: &str,
+    run_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "evals", eval_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::EvalRunOutputItemsList(eval_id, run_id),
+    )
+    .await
+}
+
+pub async fn relay_get_eval_run_output_item_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    eval_id: &str,
+    run_id: &str,
+    output_item_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "evals", eval_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::EvalRunOutputItemsRetrieve(eval_id, run_id, output_item_id),
     )
     .await
 }
@@ -3922,6 +4516,40 @@ pub async fn relay_remix_video_from_store(
     .await
 }
 
+pub async fn relay_create_video_character_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateVideoCharacterRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "videos",
+        &request.video_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::VideoCharactersCreate(request),
+    )
+    .await
+}
+
 pub async fn relay_list_video_characters_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -4005,6 +4633,102 @@ pub async fn relay_update_video_character_from_store(
         &provider,
         &api_key,
         ProviderRequest::VideoCharactersUpdate(video_id, character_id, request),
+    )
+    .await
+}
+
+pub async fn relay_get_video_character_canonical_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    character_id: &str,
+) -> Result<Option<Value>> {
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), "videos", character_id).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::VideoCharactersCanonicalRetrieve(character_id),
+    )
+    .await
+}
+
+pub async fn relay_edit_video_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &EditVideoRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "videos",
+        &request.video_id,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::VideosEdits(request),
+    )
+    .await
+}
+
+pub async fn relay_extensions_video_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &ExtendVideoRequest,
+) -> Result<Option<Value>> {
+    let decision = select_gateway_route(
+        store,
+        tenant_id,
+        Some(project_id),
+        "videos",
+        request.video_id.as_deref().unwrap_or("videos"),
+    )
+    .await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::VideosExtensions(request),
     )
     .await
 }
@@ -4366,6 +5090,83 @@ pub fn file_content(_tenant_id: &str, _project_id: &str, _file_id: &str) -> Resu
     Ok(b"{}".to_vec())
 }
 
+pub fn create_container(
+    _tenant_id: &str,
+    _project_id: &str,
+    request: &CreateContainerRequest,
+) -> Result<ContainerObject> {
+    Ok(ContainerObject::new("container_1", &request.name))
+}
+
+pub fn list_containers(_tenant_id: &str, _project_id: &str) -> Result<ListContainersResponse> {
+    Ok(ListContainersResponse::new(vec![ContainerObject::new(
+        "container_1",
+        "ci-container",
+    )]))
+}
+
+pub fn get_container(
+    _tenant_id: &str,
+    _project_id: &str,
+    container_id: &str,
+) -> Result<ContainerObject> {
+    Ok(ContainerObject::new(container_id, "ci-container"))
+}
+
+pub fn delete_container(
+    _tenant_id: &str,
+    _project_id: &str,
+    container_id: &str,
+) -> Result<DeleteContainerResponse> {
+    Ok(DeleteContainerResponse::deleted(container_id))
+}
+
+pub fn create_container_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    container_id: &str,
+    request: &CreateContainerFileRequest,
+) -> Result<ContainerFileObject> {
+    Ok(ContainerFileObject::new(&request.file_id, container_id))
+}
+
+pub fn list_container_files(
+    _tenant_id: &str,
+    _project_id: &str,
+    container_id: &str,
+) -> Result<ListContainerFilesResponse> {
+    Ok(ListContainerFilesResponse::new(vec![
+        ContainerFileObject::new("file_1", container_id),
+    ]))
+}
+
+pub fn get_container_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    container_id: &str,
+    file_id: &str,
+) -> Result<ContainerFileObject> {
+    Ok(ContainerFileObject::new(file_id, container_id))
+}
+
+pub fn delete_container_file(
+    _tenant_id: &str,
+    _project_id: &str,
+    _container_id: &str,
+    file_id: &str,
+) -> Result<DeleteContainerFileResponse> {
+    Ok(DeleteContainerFileResponse::deleted(file_id))
+}
+
+pub fn container_file_content(
+    _tenant_id: &str,
+    _project_id: &str,
+    _container_id: &str,
+    _file_id: &str,
+) -> Result<Vec<u8>> {
+    Ok(b"CONTAINER-FILE".to_vec())
+}
+
 pub fn create_speech_response(
     _tenant_id: &str,
     _project_id: &str,
@@ -4441,6 +5242,14 @@ pub fn remix_video(
     )]))
 }
 
+pub fn create_video_character(
+    _tenant_id: &str,
+    _project_id: &str,
+    request: &CreateVideoCharacterRequest,
+) -> Result<VideoCharacterObject> {
+    Ok(VideoCharacterObject::new("char_1", &request.name))
+}
+
 pub fn list_video_characters(
     _tenant_id: &str,
     _project_id: &str,
@@ -4455,6 +5264,14 @@ pub fn get_video_character(
     _tenant_id: &str,
     _project_id: &str,
     _video_id: &str,
+    character_id: &str,
+) -> Result<VideoCharacterObject> {
+    Ok(VideoCharacterObject::new(character_id, "Hero"))
+}
+
+pub fn get_video_character_canonical(
+    _tenant_id: &str,
+    _project_id: &str,
     character_id: &str,
 ) -> Result<VideoCharacterObject> {
     Ok(VideoCharacterObject::new(character_id, "Hero"))
@@ -4478,6 +5295,28 @@ pub fn extend_video(
     _project_id: &str,
     _video_id: &str,
     _prompt: &str,
+) -> Result<VideosResponse> {
+    Ok(VideosResponse::new(vec![VideoObject::new(
+        "video_1_extended",
+        "https://example.com/video-extended.mp4",
+    )]))
+}
+
+pub fn edit_video(
+    _tenant_id: &str,
+    _project_id: &str,
+    _request: &EditVideoRequest,
+) -> Result<VideosResponse> {
+    Ok(VideosResponse::new(vec![VideoObject::new(
+        "video_1_edited",
+        "https://example.com/video-edited.mp4",
+    )]))
+}
+
+pub fn extensions_video(
+    _tenant_id: &str,
+    _project_id: &str,
+    _request: &ExtendVideoRequest,
 ) -> Result<VideosResponse> {
     Ok(VideosResponse::new(vec![VideoObject::new(
         "video_1_extended",
@@ -4570,6 +5409,57 @@ pub fn list_fine_tuning_job_checkpoints(
     Ok(ListFineTuningJobCheckpointsResponse::new(vec![
         FineTuningJobCheckpointObject::new("ftckpt_1", "ft:gpt-4.1-mini:checkpoint-1"),
     ]))
+}
+
+pub fn pause_fine_tuning_job(
+    _tenant_id: &str,
+    _project_id: &str,
+    job_id: &str,
+) -> Result<FineTuningJobObject> {
+    Ok(FineTuningJobObject::paused(job_id, "gpt-4.1-mini"))
+}
+
+pub fn resume_fine_tuning_job(
+    _tenant_id: &str,
+    _project_id: &str,
+    job_id: &str,
+) -> Result<FineTuningJobObject> {
+    Ok(FineTuningJobObject::running(job_id, "gpt-4.1-mini"))
+}
+
+pub fn create_fine_tuning_checkpoint_permissions(
+    _tenant_id: &str,
+    _project_id: &str,
+    request: &CreateFineTuningCheckpointPermissionsRequest,
+) -> Result<ListFineTuningCheckpointPermissionsResponse> {
+    let project_id = request
+        .project_ids
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "project-2".to_owned());
+    Ok(ListFineTuningCheckpointPermissionsResponse::new(vec![
+        FineTuningCheckpointPermissionObject::new("perm_1", project_id),
+    ]))
+}
+
+pub fn list_fine_tuning_checkpoint_permissions(
+    _tenant_id: &str,
+    _project_id: &str,
+    _checkpoint_id: &str,
+) -> Result<ListFineTuningCheckpointPermissionsResponse> {
+    Ok(ListFineTuningCheckpointPermissionsResponse::new(vec![
+        FineTuningCheckpointPermissionObject::new("perm_1", "project-2"),
+    ]))
+}
+
+pub fn delete_fine_tuning_checkpoint_permission(
+    _tenant_id: &str,
+    _project_id: &str,
+    permission_id: &str,
+) -> Result<DeleteFineTuningCheckpointPermissionResponse> {
+    Ok(DeleteFineTuningCheckpointPermissionResponse::deleted(
+        permission_id,
+    ))
 }
 
 pub fn create_assistant(
@@ -4905,6 +5795,49 @@ pub fn get_eval_run(
     run_id: &str,
 ) -> Result<EvalRunObject> {
     Ok(EvalRunObject::completed(run_id))
+}
+
+pub fn delete_eval_run(
+    _tenant_id: &str,
+    _project_id: &str,
+    _eval_id: &str,
+    run_id: &str,
+) -> Result<DeleteEvalRunResponse> {
+    Ok(DeleteEvalRunResponse::deleted(run_id))
+}
+
+pub fn cancel_eval_run(
+    _tenant_id: &str,
+    _project_id: &str,
+    _eval_id: &str,
+    run_id: &str,
+) -> Result<EvalRunObject> {
+    Ok(EvalRunObject {
+        id: run_id.to_owned(),
+        object: "eval.run",
+        status: "cancelled",
+    })
+}
+
+pub fn list_eval_run_output_items(
+    _tenant_id: &str,
+    _project_id: &str,
+    _eval_id: &str,
+    _run_id: &str,
+) -> Result<ListEvalRunOutputItemsResponse> {
+    Ok(ListEvalRunOutputItemsResponse::new(vec![
+        EvalRunOutputItemObject::passed("output_item_1"),
+    ]))
+}
+
+pub fn get_eval_run_output_item(
+    _tenant_id: &str,
+    _project_id: &str,
+    _eval_id: &str,
+    _run_id: &str,
+    output_item_id: &str,
+) -> Result<EvalRunOutputItemObject> {
+    Ok(EvalRunOutputItemObject::passed(output_item_id))
 }
 
 pub fn create_batch(

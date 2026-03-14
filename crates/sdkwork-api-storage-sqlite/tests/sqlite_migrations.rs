@@ -9,4 +9,12 @@ async fn creates_identity_and_tenant_tables() {
             .await
             .unwrap();
     assert_eq!(row.0, "identity_users");
+
+    let columns: Vec<(String,)> =
+        sqlx::query_as("select name from pragma_table_info('identity_users') order by cid")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(columns.iter().any(|(name,)| name == "display_name"));
+    assert!(columns.iter().any(|(name,)| name == "workspace_tenant_id"));
 }
