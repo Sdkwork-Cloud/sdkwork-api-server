@@ -84,6 +84,15 @@ impl BuiltinProviderExtensionFactory {
     }
 }
 
+fn provider_runtime_aliases(adapter_kind: &str) -> &'static [&'static str] {
+    match adapter_kind {
+        "openai" => &["openai", "openai-compatible", "custom-openai"],
+        "openrouter" => &["openrouter", "openrouter-compatible"],
+        "ollama" => &["ollama", "ollama-compatible"],
+        _ => &[],
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct ExtensionHost {
     manifests: HashMap<String, ExtensionManifest>,
@@ -930,11 +939,18 @@ impl ExtensionHost {
 
     pub fn register_builtin_provider(&mut self, factory: BuiltinProviderExtensionFactory) {
         let extension_id = factory.manifest.id.clone();
+        let aliases = provider_runtime_aliases(&factory.adapter_kind)
+            .iter()
+            .map(|alias| (*alias).to_owned())
+            .collect::<Vec<_>>();
         self.register_builtin_manifest(factory.manifest);
         self.provider_factories
             .insert(extension_id.clone(), factory.factory);
         self.provider_aliases
-            .insert(factory.adapter_kind, extension_id);
+            .insert(factory.adapter_kind, extension_id.clone());
+        for alias in aliases {
+            self.provider_aliases.insert(alias, extension_id.clone());
+        }
     }
 
     pub fn register_discovered_provider<F>(
@@ -946,6 +962,11 @@ impl ExtensionHost {
         F: Fn(String) -> Box<dyn ProviderExecutionAdapter> + Send + Sync + 'static,
     {
         let extension_id = package.manifest.id.clone();
+        let adapter_kind = adapter_kind.into();
+        let aliases = provider_runtime_aliases(&adapter_kind)
+            .iter()
+            .map(|alias| (*alias).to_owned())
+            .collect::<Vec<_>>();
         self.package_roots
             .insert(extension_id.clone(), package.root_dir.clone());
         self.manifests
@@ -953,7 +974,10 @@ impl ExtensionHost {
         self.provider_factories
             .insert(extension_id.clone(), Arc::new(factory));
         self.provider_aliases
-            .insert(adapter_kind.into(), extension_id);
+            .insert(adapter_kind, extension_id.clone());
+        for alias in aliases {
+            self.provider_aliases.insert(alias, extension_id.clone());
+        }
     }
 
     pub fn register_discovered_native_dynamic_provider(
@@ -1876,6 +1900,10 @@ fn provider_invocation_from_request(
     }
 
     Ok(match request {
+        ProviderRequest::ModelsList => invocation_without_body!("models.list", [], false),
+        ProviderRequest::ModelsRetrieve(model_id) => {
+            invocation_without_body!("models.retrieve", [model_id], false)
+        }
         ProviderRequest::ChatCompletions(body) => {
             invocation_with_body!("chat.completions.create", [], body, false)
         }

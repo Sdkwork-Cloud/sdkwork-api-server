@@ -296,6 +296,15 @@ impl OpenAiProviderAdapter {
         self.post_json("/v1/completions", api_key, request).await
     }
 
+    pub async fn list_models(&self, api_key: &str) -> Result<Value> {
+        self.get_json("/v1/models", api_key).await
+    }
+
+    pub async fn retrieve_model(&self, api_key: &str, model_id: &str) -> Result<Value> {
+        self.get_json(&format!("/v1/models/{model_id}"), api_key)
+            .await
+    }
+
     pub async fn delete_model(&self, api_key: &str, model_id: &str) -> Result<Value> {
         self.delete_json(&format!("/v1/models/{model_id}"), api_key)
             .await
@@ -1130,6 +1139,12 @@ impl ProviderAdapter for OpenAiProviderAdapter {
 impl ProviderExecutionAdapter for OpenAiProviderAdapter {
     async fn execute(&self, api_key: &str, request: ProviderRequest<'_>) -> Result<ProviderOutput> {
         match request {
+            ProviderRequest::ModelsList => {
+                Ok(ProviderOutput::Json(self.list_models(api_key).await?))
+            }
+            ProviderRequest::ModelsRetrieve(model_id) => Ok(ProviderOutput::Json(
+                self.retrieve_model(api_key, model_id).await?,
+            )),
             ProviderRequest::ChatCompletions(request) => Ok(ProviderOutput::Json(
                 self.chat_completions(api_key, request).await?,
             )),

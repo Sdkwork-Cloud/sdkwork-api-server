@@ -118,9 +118,10 @@ use sdkwork_api_app_gateway::update_vector_store;
 use sdkwork_api_app_gateway::update_webhook;
 use sdkwork_api_app_gateway::video_content;
 use sdkwork_api_app_gateway::{
-    create_embedding, create_response, delete_model_from_store, list_models_from_store,
-    planned_execution_provider_id_for_route, relay_assistant_from_store, relay_batch_from_store,
-    relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
+    create_embedding, create_response, delete_model_from_store,
+    execute_json_provider_request_with_runtime, execute_stream_provider_request_with_runtime,
+    list_models_from_store, planned_execution_provider_id_for_route, relay_assistant_from_store,
+    relay_batch_from_store, relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
     relay_cancel_response_from_store, relay_cancel_thread_run_from_store,
     relay_cancel_upload_from_store, relay_cancel_vector_store_file_batch_from_store,
     relay_chat_completion_from_store, relay_chat_completion_stream_from_store,
@@ -175,8 +176,7 @@ use sdkwork_api_contract_openai::audio::{
 };
 use sdkwork_api_contract_openai::batches::CreateBatchRequest;
 use sdkwork_api_contract_openai::chat_completions::{
-    CreateChatCompletionRequest, DeleteChatCompletionResponse, ListChatCompletionMessagesResponse,
-    ListChatCompletionsResponse, UpdateChatCompletionRequest,
+    CreateChatCompletionRequest, UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::CreateCompletionRequest;
 use sdkwork_api_contract_openai::conversations::{
@@ -196,8 +196,6 @@ use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
 use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 use sdkwork_api_contract_openai::responses::{
     CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
-    DeleteResponseResponse, ListResponseInputItemsResponse, ResponseCompactionObject,
-    ResponseInputTokensObject, ResponseObject,
 };
 use sdkwork_api_contract_openai::runs::{
     CreateRunRequest, CreateThreadAndRunRequest, ListRunStepsResponse, ListRunsResponse, RunObject,
@@ -219,11 +217,14 @@ use sdkwork_api_contract_openai::vector_stores::{
 use sdkwork_api_contract_openai::videos::{CreateVideoRequest, RemixVideoRequest};
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
-use sdkwork_api_provider_core::ProviderStreamOutput;
+use sdkwork_api_provider_core::{ProviderRequest, ProviderStreamOutput};
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
 use sqlx::SqlitePool;
+
+const DEFAULT_STATELESS_TENANT_ID: &str = "sdkwork-stateless";
+const DEFAULT_STATELESS_PROJECT_ID: &str = "sdkwork-stateless-default";
 
 #[derive(Clone)]
 pub struct GatewayApiState {
@@ -305,7 +306,145 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatelessGatewayUpstream {
+    runtime_key: String,
+    base_url: String,
+    api_key: String,
+}
+
+impl StatelessGatewayUpstream {
+    pub fn new(
+        runtime_key: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            runtime_key: runtime_key.into(),
+            base_url: base_url.into(),
+            api_key: api_key.into(),
+        }
+    }
+
+    pub fn from_adapter_kind(
+        adapter_kind: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
+        Self::new(adapter_kind, base_url, api_key)
+    }
+
+    pub fn runtime_key(&self) -> &str {
+        &self.runtime_key
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatelessGatewayConfig {
+    tenant_id: String,
+    project_id: String,
+    upstream: Option<StatelessGatewayUpstream>,
+}
+
+impl Default for StatelessGatewayConfig {
+    fn default() -> Self {
+        Self {
+            tenant_id: DEFAULT_STATELESS_TENANT_ID.to_owned(),
+            project_id: DEFAULT_STATELESS_PROJECT_ID.to_owned(),
+            upstream: None,
+        }
+    }
+}
+
+impl StatelessGatewayConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_identity(
+        mut self,
+        tenant_id: impl Into<String>,
+        project_id: impl Into<String>,
+    ) -> Self {
+        self.tenant_id = tenant_id.into();
+        self.project_id = project_id.into();
+        self
+    }
+
+    pub fn with_upstream(mut self, upstream: StatelessGatewayUpstream) -> Self {
+        self.upstream = Some(upstream);
+        self
+    }
+
+    pub fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
+
+    pub fn project_id(&self) -> &str {
+        &self.project_id
+    }
+
+    pub fn upstream(&self) -> Option<&StatelessGatewayUpstream> {
+        self.upstream.as_ref()
+    }
+
+    fn into_context(self) -> StatelessGatewayContext {
+        StatelessGatewayContext {
+            tenant_id: Arc::from(self.tenant_id),
+            project_id: Arc::from(self.project_id),
+            upstream: self.upstream.map(Arc::new),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct StatelessGatewayContext {
+    tenant_id: Arc<str>,
+    project_id: Arc<str>,
+    upstream: Option<Arc<StatelessGatewayUpstream>>,
+}
+
+#[derive(Clone, Debug)]
+struct StatelessGatewayRequest(StatelessGatewayContext);
+
+impl StatelessGatewayRequest {
+    fn tenant_id(&self) -> &str {
+        &self.0.tenant_id
+    }
+
+    fn project_id(&self) -> &str {
+        &self.0.project_id
+    }
+
+    fn upstream(&self) -> Option<&StatelessGatewayUpstream> {
+        self.0.upstream.as_deref()
+    }
+}
+
+impl FromRequestParts<StatelessGatewayContext> for StatelessGatewayRequest {
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        _parts: &mut Parts,
+        state: &StatelessGatewayContext,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Self(state.clone()))
+    }
+}
+
 pub fn gateway_router() -> Router {
+    gateway_router_with_stateless_config(StatelessGatewayConfig::default())
+}
+
+pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> Router {
     let service_name: Arc<str> = Arc::from("gateway");
     let metrics = Arc::new(HttpMetricsRegistry::new("gateway"));
     Router::new()
@@ -543,6 +682,7 @@ pub fn gateway_router() -> Router {
             service_name,
             observe_http_tracing,
         ))
+        .with_state(config.into_context())
 }
 
 pub fn gateway_router_with_pool(pool: SqlitePool) -> Router {
@@ -869,20 +1009,82 @@ pub fn gateway_router_with_store_and_secret_manager(
         ))
 }
 
-async fn list_models_handler() -> Json<sdkwork_api_contract_openai::models::ListModelsResponse> {
-    Json(list_models("tenant-1", "project-1").expect("models response"))
+async fn list_models_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ModelsList).await {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream model list",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        list_models(request_context.tenant_id(), request_context.project_id())
+            .expect("models response"),
+    )
+    .into_response()
 }
 
 async fn model_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(model_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::models::ModelObject> {
-    Json(get_model("tenant-1", "project-1", &model_id).expect("model response"))
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ModelsRetrieve(&model_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream model",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        get_model(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &model_id,
+        )
+        .expect("model response"),
+    )
+    .into_response()
 }
 
 async fn model_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(model_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::models::DeleteModelResponse> {
-    Json(delete_model("tenant-1", "project-1", &model_id).expect("model delete response"))
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ModelsDelete(&model_id))
+        .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream model delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        delete_model(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &model_id,
+        )
+        .expect("model delete response"),
+    )
+    .into_response()
 }
 
 async fn list_models_from_store_handler(
@@ -953,91 +1155,245 @@ async fn model_delete_from_store_handler(
 }
 
 async fn chat_completions_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
 ) -> Response {
     if request.stream.unwrap_or(false) {
+        match relay_stateless_stream_request(
+            &request_context,
+            ProviderRequest::ChatCompletionsStream(&request),
+        )
+        .await
+        {
+            Ok(Some(response)) => return upstream_passthrough_response(response),
+            Ok(None) => {}
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_GATEWAY,
+                    "failed to relay upstream chat completion stream",
+                )
+                    .into_response();
+            }
+        }
+
         let body = format!(
             "{}{}",
             SseFrame::data("{\"id\":\"chatcmpl_1\",\"object\":\"chat.completion.chunk\"}"),
             SseFrame::data("[DONE]")
         );
-        ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
-    } else {
-        Json(
-            create_chat_completion("tenant-1", "project-1", &request.model)
-                .expect("chat completion"),
+        return ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response();
+    }
+
+    match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletions(&request))
+        .await
+    {
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => Json(
+            create_chat_completion(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            )
+            .expect("chat completion"),
         )
-        .into_response()
+        .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            "failed to relay upstream chat completion",
+        )
+            .into_response(),
     }
 }
 
-async fn chat_completions_list_handler() -> Json<ListChatCompletionsResponse> {
-    Json(list_chat_completions("tenant-1", "project-1").expect("chat completions"))
+async fn chat_completions_list_handler(request_context: StatelessGatewayRequest) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletionsList).await
+    {
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => Json(
+            list_chat_completions(request_context.tenant_id(), request_context.project_id())
+                .expect("chat completions"),
+        )
+        .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            "failed to relay upstream chat completion list",
+        )
+            .into_response(),
+    }
 }
 
 async fn chat_completion_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
-) -> Json<sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse> {
-    Json(get_chat_completion("tenant-1", "project-1", &completion_id).expect("chat completion"))
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ChatCompletionsRetrieve(&completion_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream chat completion retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        get_chat_completion(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &completion_id,
+        )
+        .expect("chat completion"),
+    )
+    .into_response()
 }
 
 async fn chat_completion_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateChatCompletionRequest>,
-) -> Json<sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse> {
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ChatCompletionsUpdate(&completion_id, &request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream chat completion update",
+            )
+                .into_response();
+        }
+    }
+
     Json(
         update_chat_completion(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &completion_id,
             request.metadata.unwrap_or(serde_json::json!({})),
         )
         .expect("chat completion update"),
     )
+    .into_response()
 }
 
 async fn chat_completion_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
-) -> Json<DeleteChatCompletionResponse> {
-    Json(
-        delete_chat_completion("tenant-1", "project-1", &completion_id)
-            .expect("chat completion delete"),
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ChatCompletionsDelete(&completion_id),
     )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream chat completion delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        delete_chat_completion(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &completion_id,
+        )
+        .expect("chat completion delete"),
+    )
+    .into_response()
 }
 
 async fn chat_completion_messages_list_handler(
+    request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
-) -> Json<ListChatCompletionMessagesResponse> {
-    Json(
-        list_chat_completion_messages("tenant-1", "project-1", &completion_id)
-            .expect("chat completion messages"),
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ChatCompletionsMessagesList(&completion_id),
     )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream chat completion messages",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        list_chat_completion_messages(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &completion_id,
+        )
+        .expect("chat completion messages"),
+    )
+    .into_response()
 }
 
 async fn conversations_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(_request): ExtractJson<CreateConversationRequest>,
 ) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
-    Json(create_conversation("tenant-1", "project-1").expect("conversation"))
+    Json(
+        create_conversation(request_context.tenant_id(), request_context.project_id())
+            .expect("conversation"),
+    )
 }
 
-async fn conversations_list_handler() -> Json<ListConversationsResponse> {
-    Json(list_conversations("tenant-1", "project-1").expect("conversation list"))
+async fn conversations_list_handler(
+    request_context: StatelessGatewayRequest,
+) -> Json<ListConversationsResponse> {
+    Json(
+        list_conversations(request_context.tenant_id(), request_context.project_id())
+            .expect("conversation list"),
+    )
 }
 
 async fn conversation_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
-    Json(get_conversation("tenant-1", "project-1", &conversation_id).expect("conversation"))
+    Json(
+        get_conversation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation"),
+    )
 }
 
 async fn conversation_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateConversationRequest>,
 ) -> Json<sdkwork_api_contract_openai::conversations::ConversationObject> {
     Json(
         update_conversation(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &conversation_id,
             request.metadata.unwrap_or(serde_json::json!({})),
         )
@@ -1046,136 +1402,229 @@ async fn conversation_update_handler(
 }
 
 async fn conversation_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
 ) -> Json<DeleteConversationResponse> {
     Json(
-        delete_conversation("tenant-1", "project-1", &conversation_id)
-            .expect("conversation delete"),
+        delete_conversation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation delete"),
     )
 }
 
 async fn conversation_items_handler(
+    request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
     ExtractJson(_request): ExtractJson<CreateConversationItemsRequest>,
 ) -> Json<ListConversationItemsResponse> {
     Json(
-        create_conversation_items("tenant-1", "project-1", &conversation_id)
-            .expect("conversation items create"),
+        create_conversation_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation items create"),
     )
 }
 
 async fn conversation_items_list_handler(
+    request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
 ) -> Json<ListConversationItemsResponse> {
     Json(
-        list_conversation_items("tenant-1", "project-1", &conversation_id)
-            .expect("conversation items list"),
+        list_conversation_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+        )
+        .expect("conversation items list"),
     )
 }
 
 async fn conversation_item_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::conversations::ConversationItemObject> {
     Json(
-        get_conversation_item("tenant-1", "project-1", &conversation_id, &item_id)
-            .expect("conversation item"),
+        get_conversation_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+            &item_id,
+        )
+        .expect("conversation item"),
     )
 }
 
 async fn conversation_item_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Json<DeleteConversationItemResponse> {
     Json(
-        delete_conversation_item("tenant-1", "project-1", &conversation_id, &item_id)
-            .expect("conversation item delete"),
+        delete_conversation_item(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &conversation_id,
+            &item_id,
+        )
+        .expect("conversation item delete"),
     )
 }
 
 async fn threads_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(_request): ExtractJson<CreateThreadRequest>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
-    Json(create_thread("tenant-1", "project-1").expect("thread"))
+    Json(create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread"))
 }
 
 async fn thread_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
-    Json(get_thread("tenant-1", "project-1", &thread_id).expect("thread retrieve"))
+    Json(
+        get_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread retrieve"),
+    )
 }
 
 async fn thread_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(_request): ExtractJson<UpdateThreadRequest>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadObject> {
-    Json(update_thread("tenant-1", "project-1", &thread_id).expect("thread update"))
+    Json(
+        update_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread update"),
+    )
 }
 
-async fn thread_delete_handler(Path(thread_id): Path<String>) -> Json<DeleteThreadResponse> {
-    Json(delete_thread("tenant-1", "project-1", &thread_id).expect("thread delete"))
+async fn thread_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path(thread_id): Path<String>,
+) -> Json<DeleteThreadResponse> {
+    Json(
+        delete_thread(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread delete"),
+    )
 }
 
 async fn thread_messages_handler(
+    request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateThreadMessageRequest>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
     let text = request.content.as_str().unwrap_or("hello");
     Json(
-        create_thread_message("tenant-1", "project-1", &thread_id, &request.role, text)
-            .expect("thread message create"),
+        create_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &request.role,
+            text,
+        )
+        .expect("thread message create"),
     )
 }
 
 async fn thread_messages_list_handler(
+    request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
 ) -> Json<ListThreadMessagesResponse> {
-    Json(list_thread_messages("tenant-1", "project-1", &thread_id).expect("thread messages list"))
+    Json(
+        list_thread_messages(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread messages list"),
+    )
 }
 
 async fn thread_message_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
     Json(
-        get_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message retrieve"),
+        get_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message retrieve"),
     )
 }
 
 async fn thread_message_update_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
     ExtractJson(_request): ExtractJson<UpdateThreadMessageRequest>,
 ) -> Json<sdkwork_api_contract_openai::threads::ThreadMessageObject> {
     Json(
-        update_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message update"),
+        update_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message update"),
     )
 }
 
 async fn thread_message_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Json<DeleteThreadMessageResponse> {
     Json(
-        delete_thread_message("tenant-1", "project-1", &thread_id, &message_id)
-            .expect("thread message delete"),
+        delete_thread_message(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &message_id,
+        )
+        .expect("thread message delete"),
     )
 }
 
 async fn thread_and_run_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateThreadAndRunRequest>,
 ) -> Json<RunObject> {
     Json(
-        create_thread_and_run("tenant-1", "project-1", &request.assistant_id)
-            .expect("thread and run create"),
+        create_thread_and_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.assistant_id,
+        )
+        .expect("thread and run create"),
     )
 }
 
 async fn thread_runs_handler(
+    request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateRunRequest>,
 ) -> Json<RunObject> {
     Json(
         create_thread_run(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &thread_id,
             &request.assistant_id,
             request.model.as_deref(),
@@ -1184,34 +1633,68 @@ async fn thread_runs_handler(
     )
 }
 
-async fn thread_runs_list_handler(Path(thread_id): Path<String>) -> Json<ListRunsResponse> {
-    Json(list_thread_runs("tenant-1", "project-1", &thread_id).expect("thread runs list"))
+async fn thread_runs_list_handler(
+    request_context: StatelessGatewayRequest,
+    Path(thread_id): Path<String>,
+) -> Json<ListRunsResponse> {
+    Json(
+        list_thread_runs(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+        )
+        .expect("thread runs list"),
+    )
 }
 
 async fn thread_run_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Json<RunObject> {
-    Json(get_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run"))
+    Json(
+        get_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run"),
+    )
 }
 
 async fn thread_run_update_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(_request): ExtractJson<UpdateRunRequest>,
 ) -> Json<RunObject> {
     Json(
-        update_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run update"),
+        update_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run update"),
     )
 }
 
 async fn thread_run_cancel_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Json<RunObject> {
     Json(
-        cancel_thread_run("tenant-1", "project-1", &thread_id, &run_id).expect("thread run cancel"),
+        cancel_thread_run(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run cancel"),
     )
 }
 
 async fn thread_run_submit_tool_outputs_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<SubmitToolOutputsRunRequest>,
 ) -> Json<RunObject> {
@@ -1221,114 +1704,393 @@ async fn thread_run_submit_tool_outputs_handler(
         .map(|output| (output.tool_call_id.as_str(), output.output.as_str()))
         .collect();
     Json(
-        submit_thread_run_tool_outputs("tenant-1", "project-1", &thread_id, &run_id, tool_outputs)
-            .expect("thread run submit tool outputs"),
+        submit_thread_run_tool_outputs(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+            tool_outputs,
+        )
+        .expect("thread run submit tool outputs"),
     )
 }
 
 async fn thread_run_steps_list_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Json<ListRunStepsResponse> {
     Json(
-        list_thread_run_steps("tenant-1", "project-1", &thread_id, &run_id)
-            .expect("thread run steps"),
+        list_thread_run_steps(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+        )
+        .expect("thread run steps"),
     )
 }
 
 async fn thread_run_step_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((thread_id, run_id, step_id)): Path<(String, String, String)>,
 ) -> Json<RunStepObject> {
     Json(
-        get_thread_run_step("tenant-1", "project-1", &thread_id, &run_id, &step_id)
-            .expect("thread run step"),
+        get_thread_run_step(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &thread_id,
+            &run_id,
+            &step_id,
+        )
+        .expect("thread run step"),
     )
 }
 
-async fn responses_handler(ExtractJson(request): ExtractJson<CreateResponseRequest>) -> Response {
+async fn responses_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<CreateResponseRequest>,
+) -> Response {
     if request.stream.unwrap_or(false) {
+        match relay_stateless_stream_request(
+            &request_context,
+            ProviderRequest::ResponsesStream(&request),
+        )
+        .await
+        {
+            Ok(Some(response)) => return upstream_passthrough_response(response),
+            Ok(None) => {}
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_GATEWAY,
+                    "failed to relay upstream response stream",
+                )
+                    .into_response();
+            }
+        }
+
         return local_response_stream_response("resp_1", &request.model);
     }
 
-    Json(create_response("tenant-1", "project-1", &request.model).expect("response"))
-        .into_response()
+    match relay_stateless_json_request(&request_context, ProviderRequest::Responses(&request)).await
+    {
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => Json(
+            create_response(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            )
+            .expect("response"),
+        )
+        .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            "failed to relay upstream response",
+        )
+            .into_response(),
+    }
 }
 
 async fn response_input_tokens_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CountResponseInputTokensRequest>,
-) -> Json<ResponseInputTokensObject> {
-    Json(
-        count_response_input_tokens("tenant-1", "project-1", &request.model)
-            .expect("response input tokens"),
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesInputTokens(&request),
     )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response input tokens",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        count_response_input_tokens(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("response input tokens"),
+    )
+    .into_response()
 }
 
-async fn response_retrieve_handler(Path(response_id): Path<String>) -> Json<ResponseObject> {
-    Json(get_response("tenant-1", "project-1", &response_id).expect("response retrieve"))
+async fn response_retrieve_handler(
+    request_context: StatelessGatewayRequest,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesRetrieve(&response_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response retrieve",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        get_response(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &response_id,
+        )
+        .expect("response retrieve"),
+    )
+    .into_response()
 }
 
 async fn response_input_items_list_handler(
+    request_context: StatelessGatewayRequest,
     Path(response_id): Path<String>,
-) -> Json<ListResponseInputItemsResponse> {
-    Json(
-        list_response_input_items("tenant-1", "project-1", &response_id)
-            .expect("response input items"),
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesInputItemsList(&response_id),
     )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response input items",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        list_response_input_items(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &response_id,
+        )
+        .expect("response input items"),
+    )
+    .into_response()
 }
 
-async fn response_delete_handler(Path(response_id): Path<String>) -> Json<DeleteResponseResponse> {
-    Json(delete_response("tenant-1", "project-1", &response_id).expect("response delete"))
+async fn response_delete_handler(
+    request_context: StatelessGatewayRequest,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesDelete(&response_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response delete",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        delete_response(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &response_id,
+        )
+        .expect("response delete"),
+    )
+    .into_response()
 }
 
-async fn response_cancel_handler(Path(response_id): Path<String>) -> Json<ResponseObject> {
-    Json(cancel_response("tenant-1", "project-1", &response_id).expect("response cancel"))
+async fn response_cancel_handler(
+    request_context: StatelessGatewayRequest,
+    Path(response_id): Path<String>,
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesCancel(&response_id),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response cancel",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        cancel_response(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &response_id,
+        )
+        .expect("response cancel"),
+    )
+    .into_response()
 }
 
 async fn response_compact_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CompactResponseRequest>,
-) -> Json<ResponseCompactionObject> {
-    Json(compact_response("tenant-1", "project-1", &request.model).expect("response compact"))
+) -> Response {
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesCompact(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                "failed to relay upstream response compact",
+            )
+                .into_response();
+        }
+    }
+
+    Json(
+        compact_response(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("response compact"),
+    )
+    .into_response()
 }
 
 async fn completions_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateCompletionRequest>,
-) -> Json<sdkwork_api_contract_openai::completions::CompletionObject> {
-    Json(create_completion("tenant-1", "project-1", &request.model).expect("completion"))
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Completions(&request))
+        .await
+    {
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => Json(
+            create_completion(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            )
+            .expect("completion"),
+        )
+        .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            "failed to relay upstream completion",
+        )
+            .into_response(),
+    }
 }
 
 async fn embeddings_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateEmbeddingRequest>,
-) -> Json<sdkwork_api_contract_openai::embeddings::CreateEmbeddingResponse> {
-    Json(create_embedding("tenant-1", "project-1", &request.model).expect("embedding"))
+) -> Response {
+    match relay_stateless_json_request(&request_context, ProviderRequest::Embeddings(&request))
+        .await
+    {
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => Json(
+            create_embedding(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            )
+            .expect("embedding"),
+        )
+        .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            "failed to relay upstream embedding",
+        )
+            .into_response(),
+    }
 }
 
 async fn moderations_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateModerationRequest>,
 ) -> Json<sdkwork_api_contract_openai::moderations::ModerationResponse> {
-    Json(create_moderation("tenant-1", "project-1", &request.model).expect("moderation"))
-}
-
-async fn image_generations_handler(
-    ExtractJson(request): ExtractJson<CreateImageRequest>,
-) -> Json<sdkwork_api_contract_openai::images::ImagesResponse> {
     Json(
-        create_image_generation("tenant-1", "project-1", &request.model).expect("image generation"),
+        create_moderation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("moderation"),
     )
 }
 
-async fn image_edits_handler(multipart: Multipart) -> Response {
+async fn image_generations_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<CreateImageRequest>,
+) -> Json<sdkwork_api_contract_openai::images::ImagesResponse> {
+    Json(
+        create_image_generation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("image generation"),
+    )
+}
+
+async fn image_edits_handler(
+    request_context: StatelessGatewayRequest,
+    multipart: Multipart,
+) -> Response {
     match parse_image_edit_request(multipart).await {
-        Ok(request) => {
-            Json(create_image_edit("tenant-1", "project-1", &request).expect("image edit"))
-                .into_response()
-        }
+        Ok(request) => Json(
+            create_image_edit(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .expect("image edit"),
+        )
+        .into_response(),
         Err(response) => response,
     }
 }
 
-async fn image_variations_handler(multipart: Multipart) -> Response {
+async fn image_variations_handler(
+    request_context: StatelessGatewayRequest,
+    multipart: Multipart,
+) -> Response {
     match parse_image_variation_request(multipart).await {
         Ok(request) => Json(
-            create_image_variation("tenant-1", "project-1", &request).expect("image variation"),
+            create_image_variation(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .expect("image variation"),
         )
         .into_response(),
         Err(response) => response,
@@ -1336,170 +2098,344 @@ async fn image_variations_handler(multipart: Multipart) -> Response {
 }
 
 async fn transcriptions_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranscriptionRequest>,
 ) -> Json<sdkwork_api_contract_openai::audio::TranscriptionObject> {
-    Json(create_transcription("tenant-1", "project-1", &request.model).expect("transcription"))
+    Json(
+        create_transcription(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("transcription"),
+    )
 }
 
 async fn translations_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranslationRequest>,
 ) -> Json<sdkwork_api_contract_openai::audio::TranslationObject> {
-    Json(create_translation("tenant-1", "project-1", &request.model).expect("translation"))
+    Json(
+        create_translation(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("translation"),
+    )
 }
 
-async fn audio_speech_handler(ExtractJson(request): ExtractJson<CreateSpeechRequest>) -> Response {
-    local_speech_response("tenant-1", "project-1", &request)
+async fn audio_speech_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(request): ExtractJson<CreateSpeechRequest>,
+) -> Response {
+    local_speech_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
 }
 
-async fn files_handler(multipart: Multipart) -> Response {
+async fn files_handler(request_context: StatelessGatewayRequest, multipart: Multipart) -> Response {
     match parse_file_request(multipart).await {
-        Ok(request) => {
-            Json(create_file("tenant-1", "project-1", &request).expect("file")).into_response()
-        }
+        Ok(request) => Json(
+            create_file(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .expect("file"),
+        )
+        .into_response(),
         Err(response) => response,
     }
 }
 
-async fn files_list_handler() -> Json<sdkwork_api_contract_openai::files::ListFilesResponse> {
-    Json(list_files("tenant-1", "project-1").expect("files list"))
+async fn files_list_handler(
+    request_context: StatelessGatewayRequest,
+) -> Json<sdkwork_api_contract_openai::files::ListFilesResponse> {
+    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
 }
 
 async fn file_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::files::FileObject> {
-    Json(get_file("tenant-1", "project-1", &file_id).expect("file retrieve"))
+    Json(
+        get_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &file_id,
+        )
+        .expect("file retrieve"),
+    )
 }
 
 async fn file_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::files::DeleteFileResponse> {
-    Json(delete_file("tenant-1", "project-1", &file_id).expect("file delete"))
+    Json(
+        delete_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &file_id,
+        )
+        .expect("file delete"),
+    )
 }
 
-async fn file_content_handler(Path(file_id): Path<String>) -> Response {
-    local_file_content_response("tenant-1", "project-1", &file_id)
+async fn file_content_handler(
+    request_context: StatelessGatewayRequest,
+    Path(file_id): Path<String>,
+) -> Response {
+    local_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    )
 }
 
 async fn videos_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVideoRequest>,
 ) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
-    Json(create_video("tenant-1", "project-1", &request.model, &request.prompt).expect("video"))
+    Json(
+        create_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+            &request.prompt,
+        )
+        .expect("video"),
+    )
 }
 
-async fn videos_list_handler() -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
-    Json(list_videos("tenant-1", "project-1").expect("videos list"))
+async fn videos_list_handler(
+    request_context: StatelessGatewayRequest,
+) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
+    Json(
+        list_videos(request_context.tenant_id(), request_context.project_id())
+            .expect("videos list"),
+    )
 }
 
 async fn video_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::videos::VideoObject> {
-    Json(get_video("tenant-1", "project-1", &video_id).expect("video retrieve"))
+    Json(
+        get_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+        )
+        .expect("video retrieve"),
+    )
 }
 
 async fn video_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::videos::DeleteVideoResponse> {
-    Json(delete_video("tenant-1", "project-1", &video_id).expect("video delete"))
+    Json(
+        delete_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+        )
+        .expect("video delete"),
+    )
 }
 
-async fn video_content_handler(Path(video_id): Path<String>) -> Response {
-    local_video_content_response("tenant-1", "project-1", &video_id)
+async fn video_content_handler(
+    request_context: StatelessGatewayRequest,
+    Path(video_id): Path<String>,
+) -> Response {
+    local_video_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+    )
 }
 
 async fn video_remix_handler(
+    request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
     ExtractJson(request): ExtractJson<RemixVideoRequest>,
 ) -> Json<sdkwork_api_contract_openai::videos::VideosResponse> {
-    Json(remix_video("tenant-1", "project-1", &video_id, &request.prompt).expect("video remix"))
+    Json(
+        remix_video(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &video_id,
+            &request.prompt,
+        )
+        .expect("video remix"),
+    )
 }
 
 async fn uploads_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateUploadRequest>,
 ) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
-    Json(create_upload("tenant-1", "project-1", &request).expect("upload"))
+    Json(
+        create_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("upload"),
+    )
 }
 
-async fn upload_parts_handler(Path(upload_id): Path<String>, multipart: Multipart) -> Response {
+async fn upload_parts_handler(
+    request_context: StatelessGatewayRequest,
+    Path(upload_id): Path<String>,
+    multipart: Multipart,
+) -> Response {
     match parse_upload_part_request(upload_id, multipart).await {
-        Ok(request) => {
-            Json(create_upload_part("tenant-1", "project-1", &request).expect("upload part"))
-                .into_response()
-        }
+        Ok(request) => Json(
+            create_upload_part(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .expect("upload part"),
+        )
+        .into_response(),
         Err(response) => response,
     }
 }
 
 async fn upload_complete_handler(
+    request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
     ExtractJson(mut request): ExtractJson<CompleteUploadRequest>,
 ) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
     request.upload_id = upload_id;
-    Json(complete_upload("tenant-1", "project-1", &request).expect("upload complete"))
+    Json(
+        complete_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .expect("upload complete"),
+    )
 }
 
 async fn upload_cancel_handler(
+    request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::uploads::UploadObject> {
-    Json(cancel_upload("tenant-1", "project-1", &upload_id).expect("upload cancel"))
+    Json(
+        cancel_upload(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &upload_id,
+        )
+        .expect("upload cancel"),
+    )
 }
 
 async fn fine_tuning_jobs_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
 ) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
-    Json(create_fine_tuning_job("tenant-1", "project-1", &request.model).expect("fine tuning"))
+    Json(
+        create_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("fine tuning"),
+    )
 }
 
 async fn fine_tuning_jobs_list_handler(
+    request_context: StatelessGatewayRequest,
 ) -> Json<sdkwork_api_contract_openai::fine_tuning::ListFineTuningJobsResponse> {
-    Json(list_fine_tuning_jobs("tenant-1", "project-1").expect("fine tuning list"))
+    Json(
+        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
+            .expect("fine tuning list"),
+    )
 }
 
 async fn fine_tuning_job_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
     Json(
-        get_fine_tuning_job("tenant-1", "project-1", &fine_tuning_job_id)
-            .expect("fine tuning retrieve"),
+        get_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning retrieve"),
     )
 }
 
 async fn fine_tuning_job_cancel_handler(
+    request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::fine_tuning::FineTuningJobObject> {
     Json(
-        cancel_fine_tuning_job("tenant-1", "project-1", &fine_tuning_job_id)
-            .expect("fine tuning cancel"),
+        cancel_fine_tuning_job(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &fine_tuning_job_id,
+        )
+        .expect("fine tuning cancel"),
     )
 }
 
 async fn assistants_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateAssistantRequest>,
 ) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
     Json(
-        create_assistant("tenant-1", "project-1", &request.name, &request.model)
-            .expect("assistant"),
+        create_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+            &request.model,
+        )
+        .expect("assistant"),
     )
 }
 
 async fn assistants_list_handler(
+    request_context: StatelessGatewayRequest,
 ) -> Json<sdkwork_api_contract_openai::assistants::ListAssistantsResponse> {
-    Json(list_assistants("tenant-1", "project-1").expect("assistants list"))
+    Json(
+        list_assistants(request_context.tenant_id(), request_context.project_id())
+            .expect("assistants list"),
+    )
 }
 
 async fn assistant_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
-    Json(get_assistant("tenant-1", "project-1", &assistant_id).expect("assistant retrieve"))
+    Json(
+        get_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &assistant_id,
+        )
+        .expect("assistant retrieve"),
+    )
 }
 
 async fn assistant_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateAssistantRequest>,
 ) -> Json<sdkwork_api_contract_openai::assistants::AssistantObject> {
     Json(
         update_assistant(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &assistant_id,
             request.name.as_deref().unwrap_or("assistant"),
         )
@@ -1508,36 +2444,66 @@ async fn assistant_update_handler(
 }
 
 async fn assistant_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(assistant_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::assistants::DeleteAssistantResponse> {
-    Json(delete_assistant("tenant-1", "project-1", &assistant_id).expect("assistant delete"))
+    Json(
+        delete_assistant(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &assistant_id,
+        )
+        .expect("assistant delete"),
+    )
 }
 
 async fn webhooks_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateWebhookRequest>,
 ) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
-    Json(create_webhook("tenant-1", "project-1", &request.url, &request.events).expect("webhook"))
+    Json(
+        create_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.url,
+            &request.events,
+        )
+        .expect("webhook"),
+    )
 }
 
-async fn webhooks_list_handler() -> Json<sdkwork_api_contract_openai::webhooks::ListWebhooksResponse>
-{
-    Json(list_webhooks("tenant-1", "project-1").expect("webhooks list"))
+async fn webhooks_list_handler(
+    request_context: StatelessGatewayRequest,
+) -> Json<sdkwork_api_contract_openai::webhooks::ListWebhooksResponse> {
+    Json(
+        list_webhooks(request_context.tenant_id(), request_context.project_id())
+            .expect("webhooks list"),
+    )
 }
 
 async fn webhook_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
-    Json(get_webhook("tenant-1", "project-1", &webhook_id).expect("webhook retrieve"))
+    Json(
+        get_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &webhook_id,
+        )
+        .expect("webhook retrieve"),
+    )
 }
 
 async fn webhook_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateWebhookRequest>,
 ) -> Json<sdkwork_api_contract_openai::webhooks::WebhookObject> {
     Json(
         update_webhook(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &webhook_id,
             request
                 .url
@@ -1549,32 +2515,55 @@ async fn webhook_update_handler(
 }
 
 async fn webhook_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(webhook_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::webhooks::DeleteWebhookResponse> {
-    Json(delete_webhook("tenant-1", "project-1", &webhook_id).expect("webhook delete"))
+    Json(
+        delete_webhook(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &webhook_id,
+        )
+        .expect("webhook delete"),
+    )
 }
 
 async fn realtime_sessions_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateRealtimeSessionRequest>,
 ) -> Json<sdkwork_api_contract_openai::realtime::RealtimeSessionObject> {
     Json(
-        create_realtime_session("tenant-1", "project-1", &request.model).expect("realtime session"),
+        create_realtime_session(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        )
+        .expect("realtime session"),
     )
 }
 
 async fn evals_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateEvalRequest>,
 ) -> Json<sdkwork_api_contract_openai::evals::EvalObject> {
-    Json(create_eval("tenant-1", "project-1", &request.name).expect("eval"))
+    Json(
+        create_eval(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+        )
+        .expect("eval"),
+    )
 }
 
 async fn batches_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateBatchRequest>,
 ) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
     Json(
         create_batch(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &request.endpoint,
             &request.input_file_id,
         )
@@ -1582,49 +2571,89 @@ async fn batches_handler(
     )
 }
 
-async fn batches_list_handler() -> Json<sdkwork_api_contract_openai::batches::ListBatchesResponse> {
-    Json(list_batches("tenant-1", "project-1").expect("batches list"))
+async fn batches_list_handler(
+    request_context: StatelessGatewayRequest,
+) -> Json<sdkwork_api_contract_openai::batches::ListBatchesResponse> {
+    Json(
+        list_batches(request_context.tenant_id(), request_context.project_id())
+            .expect("batches list"),
+    )
 }
 
 async fn batch_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
-    Json(get_batch("tenant-1", "project-1", &batch_id).expect("batch retrieve"))
+    Json(
+        get_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &batch_id,
+        )
+        .expect("batch retrieve"),
+    )
 }
 
 async fn batch_cancel_handler(
+    request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::batches::BatchObject> {
-    Json(cancel_batch("tenant-1", "project-1", &batch_id).expect("batch cancel"))
+    Json(
+        cancel_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &batch_id,
+        )
+        .expect("batch cancel"),
+    )
 }
 
 async fn vector_stores_list_handler(
+    request_context: StatelessGatewayRequest,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoresResponse> {
-    Json(list_vector_stores("tenant-1", "project-1").expect("vector stores list"))
+    Json(
+        list_vector_stores(request_context.tenant_id(), request_context.project_id())
+            .expect("vector stores list"),
+    )
 }
 
 async fn vector_stores_handler(
+    request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVectorStoreRequest>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
-    Json(create_vector_store("tenant-1", "project-1", &request.name).expect("vector store"))
+    Json(
+        create_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.name,
+        )
+        .expect("vector store"),
+    )
 }
 
 async fn vector_store_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
     Json(
-        get_vector_store("tenant-1", "project-1", &vector_store_id).expect("vector store retrieve"),
+        get_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store retrieve"),
     )
 }
 
 async fn vector_store_update_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateVectorStoreRequest>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreObject> {
     Json(
         update_vector_store(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &vector_store_id,
             request.name.as_deref().unwrap_or("vector-store"),
         )
@@ -1633,69 +2662,104 @@ async fn vector_store_update_handler(
 }
 
 async fn vector_store_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::DeleteVectorStoreResponse> {
     Json(
-        delete_vector_store("tenant-1", "project-1", &vector_store_id)
-            .expect("vector store delete"),
+        delete_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store delete"),
     )
 }
 
 async fn vector_store_search_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<SearchVectorStoreRequest>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::SearchVectorStoreResponse> {
     Json(
-        search_vector_store("tenant-1", "project-1", &vector_store_id, &request.query)
-            .expect("vector store search"),
+        search_vector_store(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &request.query,
+        )
+        .expect("vector store search"),
     )
 }
 
 async fn vector_store_files_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileRequest>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
     Json(
-        create_vector_store_file("tenant-1", "project-1", &vector_store_id, &request.file_id)
-            .expect("vector store file"),
+        create_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &request.file_id,
+        )
+        .expect("vector store file"),
     )
 }
 
 async fn vector_store_files_list_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoreFilesResponse> {
     Json(
-        list_vector_store_files("tenant-1", "project-1", &vector_store_id)
-            .expect("vector store files list"),
+        list_vector_store_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+        )
+        .expect("vector store files list"),
     )
 }
 
 async fn vector_store_file_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((vector_store_id, file_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileObject> {
     Json(
-        get_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
-            .expect("vector store file retrieve"),
+        get_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &file_id,
+        )
+        .expect("vector store file retrieve"),
     )
 }
 
 async fn vector_store_file_delete_handler(
+    request_context: StatelessGatewayRequest,
     Path((vector_store_id, file_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::DeleteVectorStoreFileResponse> {
     Json(
-        delete_vector_store_file("tenant-1", "project-1", &vector_store_id, &file_id)
-            .expect("vector store file delete"),
+        delete_vector_store_file(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &file_id,
+        )
+        .expect("vector store file delete"),
     )
 }
 
 async fn vector_store_file_batches_handler(
+    request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateVectorStoreFileBatchRequest>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
     Json(
         create_vector_store_file_batch(
-            "tenant-1",
-            "project-1",
+            request_context.tenant_id(),
+            request_context.project_id(),
             &vector_store_id,
             &request.file_ids,
         )
@@ -1704,29 +2768,47 @@ async fn vector_store_file_batches_handler(
 }
 
 async fn vector_store_file_batch_retrieve_handler(
+    request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
     Json(
-        get_vector_store_file_batch("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch retrieve"),
+        get_vector_store_file_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch retrieve"),
     )
 }
 
 async fn vector_store_file_batch_cancel_handler(
+    request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::VectorStoreFileBatchObject> {
     Json(
-        cancel_vector_store_file_batch("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch cancel"),
+        cancel_vector_store_file_batch(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch cancel"),
     )
 }
 
 async fn vector_store_file_batch_files_handler(
+    request_context: StatelessGatewayRequest,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
 ) -> Json<sdkwork_api_contract_openai::vector_stores::ListVectorStoreFilesResponse> {
     Json(
-        list_vector_store_file_batch_files("tenant-1", "project-1", &vector_store_id, &batch_id)
-            .expect("vector store file batch files"),
+        list_vector_store_file_batch_files(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &vector_store_id,
+            &batch_id,
+        )
+        .expect("vector store file batch files"),
     )
 }
 
@@ -9463,6 +10545,40 @@ async fn record_gateway_usage_for_project(
     persist_usage_record(store, project_id, model, &provider_id).await?;
     persist_ledger_entry(store, project_id, units, amount).await?;
     Ok(())
+}
+
+async fn relay_stateless_json_request(
+    request_context: &StatelessGatewayRequest,
+    request: ProviderRequest<'_>,
+) -> anyhow::Result<Option<Value>> {
+    let Some(upstream) = request_context.upstream() else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_with_runtime(
+        upstream.runtime_key(),
+        upstream.base_url(),
+        upstream.api_key(),
+        request,
+    )
+    .await
+}
+
+async fn relay_stateless_stream_request(
+    request_context: &StatelessGatewayRequest,
+    request: ProviderRequest<'_>,
+) -> anyhow::Result<Option<ProviderStreamOutput>> {
+    let Some(upstream) = request_context.upstream() else {
+        return Ok(None);
+    };
+
+    execute_stream_provider_request_with_runtime(
+        upstream.runtime_key(),
+        upstream.base_url(),
+        upstream.api_key(),
+        request,
+    )
+    .await
 }
 
 fn local_speech_response(

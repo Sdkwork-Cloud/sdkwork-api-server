@@ -47,6 +47,7 @@ The current repository includes:
 - environment-driven extension discovery config for manifest search paths plus connector and native-dynamic runtime toggles
 - signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
+- explicit stateless gateway runtime modeling with synthetic tenant and project scope plus optional single-upstream relay for core bootstrap APIs
 - shared Prometheus-compatible HTTP metrics exposed through `/metrics` on both admin and gateway routers
 - shared `x-request-id` propagation and structured HTTP request tracing across both admin and gateway routers, with tracing initialized by the standalone binaries
 - persisted routing policies shared by admin simulations and real gateway provider dispatch
@@ -92,6 +93,12 @@ Provider execution identity is now split deliberately:
 
 - `extension_id`: the canonical runtime key used by the gateway to resolve a provider extension implementation
 - `adapter_kind`: a compatibility alias and protocol hint that lets older records and OpenAI-compatible provider families continue to map cleanly during migration
+
+The stateless bootstrap runtime now mirrors that split:
+
+- `StatelessGatewayUpstream.runtime_key` can point at either a canonical `extension_id` or a compatibility alias
+- built-in compatibility aliases currently include `openai`, `openai-compatible`, `custom-openai`, `openrouter`, `openrouter-compatible`, `ollama`, and `ollama-compatible`
+- library consumers can keep bootstrap wiring narrow while still moving cleanly to explicit extension IDs later
 
 The extension package standard also distinguishes three names:
 

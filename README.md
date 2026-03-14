@@ -51,6 +51,7 @@ Backend:
 
 - `admin-api-service` on `127.0.0.1:8081` by default
 - `gateway-service` on `127.0.0.1:8080` by default
+- stateless in-process `/v1/*` router construction through `sdkwork-api-interface-http::gateway_router_with_stateless_config(...)`
 - Prometheus-compatible `/metrics` endpoints on both services
 - shared `x-request-id` propagation and structured HTTP request tracing on both services
 
@@ -276,6 +277,55 @@ Example signer configuration:
 SDKWORK_EXTENSION_TRUSTED_SIGNERS=sdkwork=<base64-public-key>;partner=<base64-public-key>
 ```
 
+## Stateless Library Bootstrap
+
+For embedded or library-hosted use cases that do not want a database-backed control plane yet, the gateway crate now exposes an explicit stateless runtime contract.
+
+Defaults:
+
+- synthetic tenant ID: `sdkwork-stateless`
+- synthetic project ID: `sdkwork-stateless-default`
+- no configured upstream: OpenAI-compatible local fallback remains active
+- configured upstream: the stateless router relays the core bootstrap APIs to one OpenAI-compatible upstream
+
+Current stateless upstream-relay coverage:
+
+- `/v1/models`
+- `/v1/chat/completions`, including SSE streaming plus list, retrieve, update, delete, and messages list
+- `/v1/completions`
+- `/v1/responses`, including SSE streaming plus retrieve, delete, cancel, input items, input token counting, and compact
+- `/v1/embeddings`
+
+Runtime-key resolution accepts:
+
+- built-in aliases such as `openai`, `openrouter`, and `ollama`
+- compatibility aliases such as `openai-compatible`, `custom-openai`, `openrouter-compatible`, and `ollama-compatible`
+- explicit extension IDs such as `sdkwork.provider.openai.official`
+
+Behavior:
+
+- if no stateless upstream is configured, the router returns compatible local responses
+- if a runtime key cannot be resolved, the router falls back locally
+- if an explicitly configured upstream resolves but fails during execution, the router returns `502 Bad Gateway`
+
+Minimal example:
+
+```rust
+use sdkwork_api_interface_http::{
+    gateway_router_with_stateless_config, StatelessGatewayConfig, StatelessGatewayUpstream,
+};
+
+let router = gateway_router_with_stateless_config(
+    StatelessGatewayConfig::default().with_upstream(
+        StatelessGatewayUpstream::from_adapter_kind(
+            "custom-openai",
+            "https://api.openai.com",
+            "sk-upstream-openai",
+        ),
+    ),
+);
+```
+
 ## Minimal Upstream Relay Setup
 
 The current relay path expects:
@@ -342,6 +392,7 @@ Implemented backend surfaces include:
 - `/v1/responses`
 - `/v1/embeddings`
 - SSE streaming for chat and responses
+- explicit stateless runtime configuration for library and embedded bootstrap use cases
 - files, uploads, audio, images, moderations, realtime sessions, assistants, vector stores, batches, webhooks, evals, and videos as `relay` or `emulated` depending on runtime mode
 
 Control-plane features include:
@@ -371,7 +422,7 @@ For the up-to-date execution-truth matrix, see:
   - `ollama`
 - hot reload for extensions is still future work
 - geo affinity and regional routing dimensions are still future work
-- some API families remain `emulated` instead of fully upstream-relayed in stateless or partially configured environments
+- some API families outside the stateless core bootstrap set still remain `emulated` in stateless or partially configured environments
 
 ## Additional Docs
 

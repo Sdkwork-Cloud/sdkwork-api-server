@@ -77,6 +77,14 @@ impl OpenRouterProviderAdapter {
         self.delegate.list_chat_completions(api_key).await
     }
 
+    pub async fn list_models(&self, api_key: &str) -> Result<Value> {
+        self.delegate.list_models(api_key).await
+    }
+
+    pub async fn retrieve_model(&self, api_key: &str, model_id: &str) -> Result<Value> {
+        self.delegate.retrieve_model(api_key, model_id).await
+    }
+
     pub async fn retrieve_chat_completion(
         &self,
         api_key: &str,

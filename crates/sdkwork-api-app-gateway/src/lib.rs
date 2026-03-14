@@ -4704,6 +4704,24 @@ async fn execute_stream_provider_request(
     Ok(response.into_stream())
 }
 
+pub async fn execute_json_provider_request_with_runtime(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+) -> Result<Option<Value>> {
+    execute_json_provider_request(runtime_key, base_url.into(), api_key, request).await
+}
+
+pub async fn execute_stream_provider_request_with_runtime(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+) -> Result<Option<ProviderStreamOutput>> {
+    execute_stream_provider_request(runtime_key, base_url.into(), api_key, request).await
+}
+
 fn fallback_speech_bytes(format: &str) -> Vec<u8> {
     match format {
         "wav" => vec![

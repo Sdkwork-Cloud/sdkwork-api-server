@@ -61,6 +61,8 @@ pub trait ProviderAdapter {
 }
 
 pub enum ProviderRequest<'a> {
+    ModelsList,
+    ModelsRetrieve(&'a str),
     ChatCompletions(&'a CreateChatCompletionRequest),
     ChatCompletionsStream(&'a CreateChatCompletionRequest),
     ChatCompletionsList,

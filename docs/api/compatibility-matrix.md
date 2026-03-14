@@ -18,11 +18,11 @@ The table below reflects the current runtime truth as of 2026-03-14.
 
 | API Family | Stateful Gateway | Stateless Gateway | Notes |
 |---|---|---|---|
-| `/v1/models` | `native` | `emulated` | Stateful mode reads the local catalog; stateless mode returns a compatible local list |
-| `/v1/chat/completions` | `relay` | `emulated` | Supports JSON and SSE relay for configured OpenAI-compatible upstreams, with project quota admission in stateful mode |
-| `/v1/completions` | `relay` | `emulated` | Relays legacy text completions when provider wiring exists and enforces project quota admission in stateful mode |
-| `/v1/responses` | `relay` | `emulated` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission |
-| `/v1/embeddings` | `relay` | `emulated` | Uses catalog, credential, and provider state in stateful mode, with project quota admission before dispatch |
+| `/v1/models` | `native` | `relay` | Stateful mode reads the local catalog; stateless mode relays model list and retrieve when a stateless upstream runtime is configured and otherwise falls back to a compatible local catalog |
+| `/v1/chat/completions` | `relay` | `relay` | Supports JSON and SSE relay for configured OpenAI-compatible upstreams; stateless mode now also relays list, retrieve, update, delete, and messages list when one upstream runtime is configured |
+| `/v1/completions` | `relay` | `relay` | Relays legacy text completions when provider wiring exists; stateless mode uses the configured single-upstream runtime or falls back locally |
+| `/v1/responses` | `relay` | `relay` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission; stateless mode relays the same core response operations through its configured upstream runtime |
+| `/v1/embeddings` | `relay` | `relay` | Uses catalog, credential, and provider state in stateful mode; stateless mode relays embeddings to its configured upstream runtime or falls back locally |
 | `/v1/files` | `relay` | `emulated` | Stateful mode relays multipart upload, metadata, and binary content |
 | `/v1/uploads` | `relay` | `emulated` | Upload creation, part upload, completion, and cancel relay in stateful mode |
 | `/v1/audio/*` | `relay` | `emulated` | Speech can relay binary or event-stream output |
