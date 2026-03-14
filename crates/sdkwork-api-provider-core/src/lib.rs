@@ -98,6 +98,7 @@ pub enum ProviderRequest<'a> {
     ConversationItemsRetrieve(&'a str, &'a str),
     ConversationItemsDelete(&'a str, &'a str),
     Responses(&'a CreateResponseRequest),
+    ResponsesStream(&'a CreateResponseRequest),
     ResponsesInputTokens(&'a CountResponseInputTokensRequest),
     ResponsesRetrieve(&'a str),
     ResponsesDelete(&'a str),

@@ -1259,6 +1259,33 @@ pub async fn relay_response_from_store(
     .await
 }
 
+pub async fn relay_response_stream_from_store(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateResponseRequest,
+) -> Result<Option<ProviderStreamOutput>> {
+    let decision = simulate_route_with_store(store, "responses", &request.model).await?;
+    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_stream_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::ResponsesStream(request),
+    )
+    .await
+}
+
 pub async fn relay_count_response_input_tokens_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,

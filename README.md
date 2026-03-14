@@ -50,6 +50,7 @@ Backend:
   - extension-driven JSON relay for providers bound to OpenAI-compatible built-in extensions
   - SSE relay for `stream = true` against OpenAI-compatible upstreams
 - Real upstream relay for stateful `/v1/responses` and `/v1/embeddings` when provider, model, and credential records are present
+- SSE relay for stateful `/v1/chat/completions` and `/v1/responses` when upstream providers or native dynamic extensions support streaming
 - Stub fallback responses for unconfigured providers or unsupported adapter kinds
 - Routing simulation API backed by persisted routing policies plus catalog or provider candidates
 - Built-in extension host with pluggable extension manifests for:
@@ -124,7 +125,7 @@ Known gaps:
   - trusted-signer verification is enforced for signed packages
   - unsigned connector packages can be allowed or blocked by policy
   - native dynamic packages are intended to run only when explicitly enabled and signed by a trusted publisher
-- native dynamic execution currently supports JSON-capable provider operations only; stream ABI and hot reload are not implemented yet
+- native dynamic execution now supports JSON-capable provider operations plus chat/SSE stream relay; generic binary streams and hot reload are not implemented yet
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
 - routing policies now support deterministic priority-based selection with ordered provider fallback and optional defaults

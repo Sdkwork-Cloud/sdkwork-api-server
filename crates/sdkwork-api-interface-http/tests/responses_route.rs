@@ -1,6 +1,7 @@
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::Value;
@@ -142,6 +143,13 @@ async fn read_json(response: axum::response::Response) -> Value {
         .await
         .unwrap();
     serde_json::from_slice(&bytes).unwrap()
+}
+
+async fn read_text(response: axum::response::Response) -> String {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
 }
 
 async fn memory_pool() -> SqlitePool {
@@ -391,6 +399,126 @@ async fn stateful_responses_route_relays_to_openai_compatible_provider() {
     assert_eq!(compact_json["object"], "response.compaction");
 }
 
+#[tokio::test]
+async fn stateful_responses_route_relays_stream_to_openai_compatible_provider() {
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_stream_handler))
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let _ = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/channels")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"id\":\"openai\",\"name\":\"OpenAI\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-openai-official\",\"channel_id\":\"openai\",\"adapter_kind\":\"openai\",\"base_url\":\"http://{address}\",\"display_name\":\"OpenAI Official\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(provider.status(), StatusCode::CREATED);
+
+    let credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"tenant_id\":\"tenant-1\",\"provider_id\":\"provider-openai-official\",\"key_reference\":\"cred-openai\",\"secret_value\":\"sk-upstream-openai\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(credential.status(), StatusCode::CREATED);
+
+    let model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-openai-official\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(model.status(), StatusCode::CREATED);
+
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"hi\",\"stream\":true}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("text/event-stream")
+    );
+
+    let body = read_text(response).await;
+    assert!(body.contains("resp_upstream_stream"));
+    assert!(body.contains("[DONE]"));
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
 async fn upstream_responses_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
@@ -409,6 +537,22 @@ async fn upstream_responses_handler(
             "output":[]
         })),
     )
+}
+
+async fn upstream_responses_stream_handler(
+    State(state): State<UpstreamCaptureState>,
+    headers: axum::http::HeaderMap,
+) -> axum::response::Response {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/event-stream")],
+        "data: {\"id\":\"resp_upstream_stream\",\"type\":\"response.output_text.delta\"}\n\ndata: [DONE]\n\n",
+    )
+        .into_response()
 }
 
 async fn upstream_response_retrieve_handler(

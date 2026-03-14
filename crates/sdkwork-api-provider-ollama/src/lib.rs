@@ -214,6 +214,14 @@ impl OllamaProviderAdapter {
         self.delegate.responses(api_key, request).await
     }
 
+    pub async fn responses_stream(
+        &self,
+        api_key: &str,
+        request: &CreateResponseRequest,
+    ) -> Result<ProviderStreamOutput> {
+        self.delegate.responses_stream(api_key, request).await
+    }
+
     pub async fn count_response_input_tokens(
         &self,
         api_key: &str,

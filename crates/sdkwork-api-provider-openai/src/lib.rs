@@ -228,6 +228,14 @@ impl OpenAiProviderAdapter {
         self.post_json("/v1/responses", api_key, request).await
     }
 
+    pub async fn responses_stream(
+        &self,
+        api_key: &str,
+        request: &CreateResponseRequest,
+    ) -> Result<ProviderStreamOutput> {
+        self.post_stream("/v1/responses", api_key, request).await
+    }
+
     pub async fn count_response_input_tokens(
         &self,
         api_key: &str,
@@ -1272,6 +1280,9 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
             }
             ProviderRequest::Responses(request) => Ok(ProviderOutput::Json(
                 self.responses(api_key, request).await?,
+            )),
+            ProviderRequest::ResponsesStream(request) => Ok(ProviderOutput::Stream(
+                self.responses_stream(api_key, request).await?,
             )),
             ProviderRequest::ResponsesInputTokens(request) => Ok(ProviderOutput::Json(
                 self.count_response_input_tokens(api_key, request).await?,

@@ -21,7 +21,7 @@ The table below reflects the current runtime truth as of 2026-03-14.
 | `/v1/models` | `native` | `emulated` | Stateful mode reads the local catalog; stateless mode returns a compatible local list |
 | `/v1/chat/completions` | `relay` | `emulated` | Supports JSON and SSE relay for configured OpenAI-compatible upstreams |
 | `/v1/completions` | `relay` | `emulated` | Relays legacy text completions when provider wiring exists |
-| `/v1/responses` | `relay` | `emulated` | Stateful mode relays create, retrieve, delete, cancel, compact, and input item flows |
+| `/v1/responses` | `relay` | `emulated` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, and SSE streaming |
 | `/v1/embeddings` | `relay` | `emulated` | Uses catalog, credential, and provider state in stateful mode |
 | `/v1/files` | `relay` | `emulated` | Stateful mode relays multipart upload, metadata, and binary content |
 | `/v1/uploads` | `relay` | `emulated` | Upload creation, part upload, completion, and cancel relay in stateful mode |

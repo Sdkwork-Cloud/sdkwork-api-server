@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -294,6 +295,49 @@ async fn adapter_posts_responses_to_openai_compatible_upstream() {
         .unwrap();
 
     assert_eq!(response["id"], "resp_upstream");
+    assert_eq!(
+        state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-upstream-openai")
+    );
+}
+
+#[tokio::test]
+async fn adapter_posts_streaming_responses_to_openai_compatible_upstream() {
+    let state = CaptureState::default();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+
+    let app = Router::new()
+        .route("/v1/responses", post(capture_responses_stream_request))
+        .with_state(state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let adapter =
+        sdkwork_api_provider_openai::OpenAiProviderAdapter::new(format!("http://{address}"));
+    let request = sdkwork_api_contract_openai::responses::CreateResponseRequest {
+        model: "gpt-4.1".to_owned(),
+        input: Value::String("hello".to_owned()),
+        stream: Some(true),
+    };
+
+    let response = adapter
+        .responses_stream("sk-upstream-openai", &request)
+        .await
+        .unwrap();
+
+    assert_eq!(response.content_type(), "text/event-stream");
+    let mut stream = response.into_body_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        bytes.extend_from_slice(&chunk.unwrap());
+    }
+
+    let body = String::from_utf8(bytes).unwrap();
+    assert!(body.contains("resp_upstream_stream"));
+    assert!(body.contains("[DONE]"));
     assert_eq!(
         state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
@@ -3165,6 +3209,24 @@ async fn capture_responses_request(
             "output":[]
         })),
     )
+}
+
+async fn capture_responses_stream_request(
+    State(state): State<CaptureState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> axum::response::Response {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.body.lock().unwrap() = Some(body);
+
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/event-stream")],
+        "data: {\"id\":\"resp_upstream_stream\",\"type\":\"response.output_text.delta\"}\n\ndata: [DONE]\n\n",
+    )
+        .into_response()
 }
 
 async fn capture_response_retrieve_request(

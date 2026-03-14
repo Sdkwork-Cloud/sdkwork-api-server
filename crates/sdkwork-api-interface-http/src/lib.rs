@@ -153,10 +153,10 @@ use sdkwork_api_app_gateway::{
     relay_list_vector_store_files_from_store, relay_list_vector_stores_from_store,
     relay_list_videos_from_store, relay_list_webhooks_from_store, relay_moderation_from_store,
     relay_realtime_session_from_store, relay_remix_video_from_store, relay_response_from_store,
-    relay_search_vector_store_from_store, relay_speech_from_store,
-    relay_submit_thread_run_tool_outputs_from_store, relay_thread_and_run_from_store,
-    relay_thread_from_store, relay_thread_messages_from_store, relay_thread_run_from_store,
-    relay_transcription_from_store, relay_translation_from_store,
+    relay_response_stream_from_store, relay_search_vector_store_from_store,
+    relay_speech_from_store, relay_submit_thread_run_tool_outputs_from_store,
+    relay_thread_and_run_from_store, relay_thread_from_store, relay_thread_messages_from_store,
+    relay_thread_run_from_store, relay_transcription_from_store, relay_translation_from_store,
     relay_update_assistant_from_store, relay_update_chat_completion_from_store,
     relay_update_conversation_from_store, relay_update_thread_from_store,
     relay_update_thread_message_from_store, relay_update_thread_run_from_store,
@@ -1186,10 +1186,13 @@ async fn thread_run_step_retrieve_handler(
     )
 }
 
-async fn responses_handler(
-    ExtractJson(request): ExtractJson<CreateResponseRequest>,
-) -> Json<ResponseObject> {
+async fn responses_handler(ExtractJson(request): ExtractJson<CreateResponseRequest>) -> Response {
+    if request.stream.unwrap_or(false) {
+        return local_response_stream_response("resp_1", &request.model);
+    }
+
     Json(create_response("tenant-1", "project-1", &request.model).expect("response"))
+        .into_response()
 }
 
 async fn response_input_tokens_handler(
@@ -4290,6 +4293,70 @@ async fn responses_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
+    if request.stream.unwrap_or(false) {
+        match relay_response_stream_from_store(
+            state.store.as_ref(),
+            &state.secret_manager,
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .await
+        {
+            Ok(Some(response)) => {
+                if record_gateway_usage_for_project(
+                    state.store.as_ref(),
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    "responses",
+                    &request.model,
+                    120,
+                    0.12,
+                )
+                .await
+                .is_err()
+                {
+                    return (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to record usage",
+                    )
+                        .into_response();
+                }
+
+                return upstream_passthrough_response(response);
+            }
+            Ok(None) => {}
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_GATEWAY,
+                    "failed to relay upstream response stream",
+                )
+                    .into_response();
+            }
+        }
+
+        if record_gateway_usage_for_project(
+            state.store.as_ref(),
+            request_context.tenant_id(),
+            request_context.project_id(),
+            "responses",
+            &request.model,
+            120,
+            0.12,
+        )
+        .await
+        .is_err()
+        {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to record usage",
+            )
+                .into_response();
+        }
+
+        return local_response_stream_response("resp_1", &request.model);
+    }
+
     match relay_response_from_store(
         state.store.as_ref(),
         &state.secret_manager,
@@ -9282,6 +9349,37 @@ fn local_speech_response(
         .header(header::CONTENT_TYPE, speech_content_type(&speech.format))
         .body(Body::from(bytes))
         .expect("valid speech response")
+}
+
+fn local_response_stream_response(response_id: &str, model: &str) -> Response {
+    let created = serde_json::json!({
+        "type":"response.created",
+        "response": {
+            "id": response_id,
+            "object": "response",
+            "model": model
+        }
+    })
+    .to_string();
+    let delta = serde_json::json!({
+        "type":"response.output_text.delta",
+        "delta":"hello"
+    })
+    .to_string();
+    let completed = serde_json::json!({
+        "type":"response.completed",
+        "response": {
+            "id": response_id
+        }
+    })
+    .to_string();
+    let body = format!(
+        "{}{}{}",
+        SseFrame::data(&created),
+        SseFrame::data(&delta),
+        SseFrame::data(&completed)
+    );
+    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
 }
 
 fn speech_content_type(format: &str) -> &'static str {

@@ -1660,6 +1660,9 @@ fn provider_invocation_from_request(
         ProviderRequest::Responses(body) => {
             invocation_with_body!("responses.create", [], body, false)
         }
+        ProviderRequest::ResponsesStream(body) => {
+            invocation_with_body!("responses.create", [], body, true)
+        }
         ProviderRequest::ResponsesInputTokens(body) => {
             invocation_with_body!("responses.input_tokens.count", [], body, false)
         }
@@ -2358,6 +2361,7 @@ fn parse_http_health_url(health_url: &str) -> Result<(SocketAddr, String), Exten
 #[cfg(test)]
 mod tests {
     use super::provider_invocation_from_request;
+    use sdkwork_api_contract_openai::responses::CreateResponseRequest;
     use sdkwork_api_contract_openai::uploads::CompleteUploadRequest;
     use sdkwork_api_provider_core::ProviderRequest;
 
@@ -2378,5 +2382,24 @@ mod tests {
             invocation.body["part_ids"],
             serde_json::json!(["part_1", "part_2"])
         );
+    }
+
+    #[test]
+    fn responses_stream_invocation_marks_stream_expectation() {
+        let request = CreateResponseRequest {
+            model: "gpt-4.1".to_owned(),
+            input: serde_json::Value::String("hello".to_owned()),
+            stream: Some(true),
+        };
+
+        let invocation = provider_invocation_from_request(
+            ProviderRequest::ResponsesStream(&request),
+            "sk-native",
+            "https://example.com/v1",
+        )
+        .expect("provider invocation");
+
+        assert_eq!(invocation.operation, "responses.create");
+        assert!(invocation.expects_stream);
     }
 }
