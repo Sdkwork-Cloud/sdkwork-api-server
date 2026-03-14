@@ -68,6 +68,7 @@ export interface RoutingSimulationResult {
   candidate_ids: string[];
   matched_policy_id?: string;
   strategy?: string;
+  selection_seed?: number;
   selection_reason?: string;
   assessments: RoutingCandidateAssessment[];
 }

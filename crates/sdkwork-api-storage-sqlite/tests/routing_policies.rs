@@ -1,4 +1,4 @@
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
 #[tokio::test]
@@ -8,6 +8,7 @@ async fn sqlite_store_persists_routing_policies_with_provider_order() {
 
     let policy = RoutingPolicy::new("policy-gpt-4-1", "chat_completion", "gpt-4.1")
         .with_priority(100)
+        .with_strategy(RoutingStrategy::WeightedRandom)
         .with_ordered_provider_ids(vec![
             "provider-openrouter".to_owned(),
             "provider-openai-official".to_owned(),
@@ -18,4 +19,5 @@ async fn sqlite_store_persists_routing_policies_with_provider_order() {
 
     let policies = store.list_routing_policies().await.unwrap();
     assert_eq!(policies, vec![policy]);
+    assert_eq!(policies[0].strategy, RoutingStrategy::WeightedRandom);
 }

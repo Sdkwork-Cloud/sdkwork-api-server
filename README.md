@@ -58,6 +58,7 @@ Backend:
   - connector and native dynamic runtime health
   - instance config hints such as `weight`, `cost`, and `latency_ms`
   - explainable candidate scoring surfaced through admin simulation responses
+  - seeded `weighted_random` selection for reproducible traffic-shaping simulation
 - Built-in extension host with pluggable extension manifests for:
   - `sdkwork.provider.openai.official`
   - `sdkwork.provider.openrouter`
@@ -137,8 +138,8 @@ Known gaps:
 - native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, binary stream passthrough for audio speech plus file and video content, and optional package-runtime lifecycle hooks; hot reload and scheduled health supervision are not implemented yet
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
-- routing policies now support deterministic runtime-aware selection with policy order, provider availability, runtime health, and instance-level cost or latency hints
-- weighted random balancing, geo affinity, quota-aware admission, and SLO-aware routing are not implemented yet
+- routing policies now support explicit `deterministic_priority` and `weighted_random` strategies, with runtime-aware candidate assessment, policy order, provider availability, runtime health, and instance-level cost or latency hints
+- geo affinity, quota-aware admission, and SLO-aware routing are not implemented yet
 - SQLite and PostgreSQL are active persistence drivers; MySQL and libsql remain extension boundaries
 
 ## Minimal Upstream Relay Setup
@@ -260,7 +261,7 @@ pnpm --dir console exec vite build
 - `ProxyProvider.extension_id` is now the runtime execution identity used to resolve a concrete extension package; `adapter_kind` remains useful as compatibility and protocol metadata.
 - `ProviderChannelBinding` now allows one provider to bind to multiple channel ecosystems without losing a primary channel for compatibility.
 - `ModelCatalogEntry` now carries capability and streaming metadata instead of only `external_name + provider_id`.
-- `RoutingPolicy` is now a first-class control-plane aggregate that can steer both admin simulation and real gateway relay using priority, model pattern matching, ordered providers, and optional default provider fallback.
+- `RoutingPolicy` is now a first-class control-plane aggregate that can steer both admin simulation and real gateway relay using priority, explicit routing strategy, model pattern matching, ordered providers, and optional default provider fallback.
 - The backend is split into domain, application, interface, storage, provider, secret, and runtime crates to preserve controller/service/repository layering without forcing separate deployable processes for every boundary.
 - Standalone and embedded runtime modes share the same Rust crates; Tauri integration consumes the same admin and gateway capabilities through the runtime host boundary.
 - Stateful gateway execution now uses the catalog, routing, credential, and provider layers together to relay OpenAI-compatible upstream requests while still preserving local stub fallbacks for incomplete configuration.

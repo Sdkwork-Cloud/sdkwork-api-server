@@ -1,6 +1,6 @@
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_credential::UpstreamCredential;
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_secret_core::encrypt;
 use sdkwork_api_storage_postgres::{run_migrations, PostgresAdminStore};
 
@@ -70,6 +70,7 @@ async fn postgres_store_persists_routing_policies_when_url_is_provided() {
 
     let policy = RoutingPolicy::new("policy-gpt-4-1", "chat_completion", "gpt-4.1")
         .with_priority(100)
+        .with_strategy(RoutingStrategy::WeightedRandom)
         .with_ordered_provider_ids(vec![
             "provider-openrouter".to_owned(),
             "provider-openai-official".to_owned(),
@@ -96,4 +97,5 @@ async fn postgres_store_persists_routing_policies_when_url_is_provided() {
         stored.default_provider_id.as_deref(),
         Some("provider-openai-official")
     );
+    assert_eq!(stored.strategy, RoutingStrategy::WeightedRandom);
 }

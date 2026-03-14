@@ -1,5 +1,6 @@
 use sdkwork_api_domain_routing::{
     RoutingCandidateAssessment, RoutingCandidateHealth, RoutingDecision, RoutingPolicy,
+    RoutingStrategy,
 };
 
 #[test]
@@ -14,6 +15,7 @@ fn decision_retains_candidate_ids() {
 fn decision_can_include_strategy_reason_and_assessments() {
     let decision = RoutingDecision::new("provider-a", vec!["provider-a".into()])
         .with_strategy("runtime_aware_deterministic")
+        .with_selection_seed(42)
         .with_selection_reason("selected the top-ranked healthy candidate")
         .with_assessments(vec![RoutingCandidateAssessment::new("provider-a")
             .with_available(true)
@@ -32,6 +34,7 @@ fn decision_can_include_strategy_reason_and_assessments() {
         decision.selection_reason.as_deref(),
         Some("selected the top-ranked healthy candidate")
     );
+    assert_eq!(decision.selection_seed, Some(42));
     assert_eq!(decision.assessments.len(), 1);
     assert_eq!(
         decision.assessments[0].health,
@@ -43,6 +46,7 @@ fn decision_can_include_strategy_reason_and_assessments() {
 #[test]
 fn policy_matches_exact_and_wildcard_model_patterns() {
     let exact = RoutingPolicy::new("policy-exact", "chat_completion", "gpt-4.1");
+    assert_eq!(exact.strategy, RoutingStrategy::DeterministicPriority);
     assert!(exact.matches("chat_completion", "gpt-4.1"));
     assert!(!exact.matches("chat_completion", "gpt-4.1-mini"));
     assert!(!exact.matches("responses", "gpt-4.1"));
@@ -77,4 +81,12 @@ fn policy_ranks_providers_using_explicit_order_and_default() {
             "provider-azure".to_owned(),
         ]
     );
+}
+
+#[test]
+fn policy_can_switch_to_weighted_random_strategy() {
+    let policy = RoutingPolicy::new("policy-weighted", "chat_completion", "gpt-4.1")
+        .with_strategy(RoutingStrategy::WeightedRandom);
+
+    assert_eq!(policy.strategy, RoutingStrategy::WeightedRandom);
 }

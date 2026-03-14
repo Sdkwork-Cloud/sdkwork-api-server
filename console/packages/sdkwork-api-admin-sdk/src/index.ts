@@ -77,9 +77,13 @@ export function listLedgerEntries(): Promise<LedgerEntry[]> {
   return getJson<LedgerEntry[]>('/billing/ledger');
 }
 
-export function simulateRoute(capability: string, model: string): Promise<RoutingSimulationResult> {
-  return postJson<{ capability: string; model: string }, RoutingSimulationResult>(
+export function simulateRoute(
+  capability: string,
+  model: string,
+  selectionSeed?: number,
+): Promise<RoutingSimulationResult> {
+  return postJson<{ capability: string; model: string; selection_seed?: number }, RoutingSimulationResult>(
     '/routing/simulations',
-    { capability, model },
+    { capability, model, selection_seed: selectionSeed },
   );
 }

@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{ensure, Result};
 use sdkwork_api_app_extension::{list_extension_runtime_statuses, ExtensionRuntimeStatusRecord};
 use sdkwork_api_domain_catalog::ProxyProvider;
 use sdkwork_api_domain_routing::{
     select_policy, RoutingCandidateAssessment, RoutingCandidateHealth, RoutingDecision,
-    RoutingPolicy,
+    RoutingPolicy, RoutingStrategy,
 };
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
 use sdkwork_api_storage_core::AdminStore;
@@ -20,6 +21,17 @@ pub fn service_name() -> &'static str {
     "routing-service"
 }
 
+pub struct CreateRoutingPolicyInput<'a> {
+    pub policy_id: &'a str,
+    pub capability: &'a str,
+    pub model_pattern: &'a str,
+    pub enabled: bool,
+    pub priority: i32,
+    pub strategy: Option<RoutingStrategy>,
+    pub ordered_provider_ids: &'a [String],
+    pub default_provider_id: Option<&'a str>,
+}
+
 pub fn simulate_route(_capability: &str, _model: &str) -> Result<RoutingDecision> {
     Ok(RoutingDecision::new(
         "provider-openai-official",
@@ -31,31 +43,31 @@ pub fn simulate_route(_capability: &str, _model: &str) -> Result<RoutingDecision
     ))
 }
 
-pub fn create_routing_policy(
-    policy_id: &str,
-    capability: &str,
-    model_pattern: &str,
-    enabled: bool,
-    priority: i32,
-    ordered_provider_ids: &[String],
-    default_provider_id: Option<&str>,
-) -> Result<RoutingPolicy> {
-    ensure!(!policy_id.trim().is_empty(), "policy_id must not be empty");
+pub fn create_routing_policy(input: CreateRoutingPolicyInput<'_>) -> Result<RoutingPolicy> {
     ensure!(
-        !capability.trim().is_empty(),
+        !input.policy_id.trim().is_empty(),
+        "policy_id must not be empty"
+    );
+    ensure!(
+        !input.capability.trim().is_empty(),
         "capability must not be empty"
     );
     ensure!(
-        !model_pattern.trim().is_empty(),
+        !input.model_pattern.trim().is_empty(),
         "model_pattern must not be empty"
     );
 
-    let policy = RoutingPolicy::new(policy_id, capability, model_pattern)
-        .with_enabled(enabled)
-        .with_priority(priority)
-        .with_ordered_provider_ids(ordered_provider_ids.to_vec());
+    let policy = RoutingPolicy::new(input.policy_id, input.capability, input.model_pattern)
+        .with_enabled(input.enabled)
+        .with_priority(input.priority)
+        .with_strategy(
+            input
+                .strategy
+                .unwrap_or(RoutingStrategy::DeterministicPriority),
+        )
+        .with_ordered_provider_ids(input.ordered_provider_ids.to_vec());
 
-    Ok(match default_provider_id {
+    Ok(match input.default_provider_id {
         Some(default_provider_id) if !default_provider_id.trim().is_empty() => {
             policy.with_default_provider_id(default_provider_id)
         }
@@ -78,6 +90,24 @@ pub async fn simulate_route_with_store(
     store: &dyn AdminStore,
     capability: &str,
     model: &str,
+) -> Result<RoutingDecision> {
+    simulate_route_with_store_inner(store, capability, model, None).await
+}
+
+pub async fn simulate_route_with_store_seeded(
+    store: &dyn AdminStore,
+    capability: &str,
+    model: &str,
+    selection_seed: u64,
+) -> Result<RoutingDecision> {
+    simulate_route_with_store_inner(store, capability, model, Some(selection_seed)).await
+}
+
+async fn simulate_route_with_store_inner(
+    store: &dyn AdminStore,
+    capability: &str,
+    model: &str,
+    selection_seed: Option<u64>,
 ) -> Result<RoutingDecision> {
     let mut model_candidate_ids: Vec<String> = store
         .list_models()
@@ -151,39 +181,177 @@ pub async fn simulate_route_with_store(
         .collect::<Vec<_>>();
     assessments.sort_by(compare_assessments);
 
+    let routing_strategy = matched_policy
+        .map(|policy| policy.strategy)
+        .unwrap_or(RoutingStrategy::DeterministicPriority);
+    let (selected_index, decision_strategy, decision_selection_seed, selection_reason) =
+        select_candidate(&mut assessments, routing_strategy, selection_seed);
     let selected = assessments
-        .first()
+        .get(selected_index)
         .map(|assessment| assessment.provider_id.clone())
         .unwrap_or_else(|| candidate_ids[0].clone());
-    let selected_assessment = assessments
-        .first()
-        .expect("routing assessments should not be empty");
-    let selection_reason = if selected_assessment.reasons.is_empty() {
-        format!(
-            "selected {} as the top-ranked candidate",
-            selected_assessment.provider_id
-        )
-    } else {
-        format!(
-            "selected {} because {}",
-            selected_assessment.provider_id,
-            selected_assessment.reasons.join(", ")
-        )
-    };
 
     let ranked_candidate_ids = assessments
         .iter()
         .map(|assessment| assessment.provider_id.clone())
         .collect::<Vec<_>>();
 
-    let decision = RoutingDecision::new(selected, ranked_candidate_ids)
-        .with_strategy(STRATEGY_RUNTIME_AWARE)
+    let mut decision = RoutingDecision::new(selected, ranked_candidate_ids)
+        .with_strategy(decision_strategy)
         .with_selection_reason(selection_reason)
         .with_assessments(assessments);
+    if let Some(selection_seed) = decision_selection_seed {
+        decision = decision.with_selection_seed(selection_seed);
+    }
     Ok(match matched_policy {
         Some(policy) => decision.with_matched_policy_id(policy.policy_id.clone()),
         None => decision,
     })
+}
+
+fn select_candidate(
+    assessments: &mut [RoutingCandidateAssessment],
+    routing_strategy: RoutingStrategy,
+    provided_selection_seed: Option<u64>,
+) -> (usize, &'static str, Option<u64>, String) {
+    match routing_strategy {
+        RoutingStrategy::DeterministicPriority => {
+            let selected_index = 0;
+            let selection_reason = assessments
+                .get(selected_index)
+                .map(selected_assessment_reason)
+                .unwrap_or_else(|| "selected the first available candidate".to_owned());
+            (
+                selected_index,
+                STRATEGY_RUNTIME_AWARE,
+                None,
+                selection_reason,
+            )
+        }
+        RoutingStrategy::WeightedRandom => {
+            let selection_seed = provided_selection_seed.unwrap_or_else(generate_selection_seed);
+            let (selected_index, selection_reason) =
+                select_weighted_candidate(assessments, selection_seed);
+            (
+                selected_index,
+                RoutingStrategy::WeightedRandom.as_str(),
+                Some(selection_seed),
+                selection_reason,
+            )
+        }
+    }
+}
+
+fn select_weighted_candidate(
+    assessments: &mut [RoutingCandidateAssessment],
+    selection_seed: u64,
+) -> (usize, String) {
+    let has_healthy_available_candidate = assessments.iter().any(|assessment| {
+        assessment.available && assessment.health == RoutingCandidateHealth::Healthy
+    });
+
+    let mut eligible = Vec::new();
+    for (index, assessment) in assessments.iter_mut().enumerate() {
+        let resolved_weight = resolved_weight(assessment.weight);
+        if !assessment.available {
+            assessment
+                .reasons
+                .push("excluded from weighted selection because candidate is unavailable".into());
+            continue;
+        }
+        if has_healthy_available_candidate && assessment.health == RoutingCandidateHealth::Unhealthy
+        {
+            assessment.reasons.push(
+                "excluded from weighted selection because a healthier candidate is available"
+                    .into(),
+            );
+            continue;
+        }
+        if resolved_weight == 0 {
+            assessment
+                .reasons
+                .push("excluded from weighted selection because resolved weight is 0".into());
+            continue;
+        }
+
+        assessment.reasons.push(format!(
+            "eligible for weighted selection with resolved weight = {resolved_weight}"
+        ));
+        eligible.push((index, resolved_weight));
+    }
+
+    if eligible.is_empty() {
+        let selected_index = 0;
+        let selection_reason = assessments
+            .get_mut(selected_index)
+            .map(|assessment| {
+                assessment.reasons.push(
+                    "weighted routing fell back to the top-ranked candidate because no candidate was eligible".into(),
+                );
+                format!(
+                    "selected {} because weighted routing had no eligible candidate",
+                    assessment.provider_id
+                )
+            })
+            .unwrap_or_else(|| {
+                "weighted routing had no eligible candidate and no assessed candidates".to_owned()
+            });
+        return (selected_index, selection_reason);
+    }
+
+    let total_weight = eligible.iter().map(|(_, weight)| *weight).sum::<u64>();
+    let bucket = selection_seed % total_weight;
+    let mut cumulative_weight = 0_u64;
+    let mut selected_index = eligible[0].0;
+    for (index, weight) in eligible {
+        cumulative_weight += weight;
+        if bucket < cumulative_weight {
+            selected_index = index;
+            break;
+        }
+    }
+
+    let selected_provider_id = assessments
+        .get(selected_index)
+        .map(|assessment| assessment.provider_id.clone())
+        .unwrap_or_default();
+    if let Some(selected_assessment) = assessments.get_mut(selected_index) {
+        selected_assessment.reasons.push(format!(
+            "selected by weighted seed {selection_seed} across total eligible weight {total_weight}"
+        ));
+    }
+
+    (
+        selected_index,
+        format!(
+            "selected {selected_provider_id} by weighted seed {selection_seed} across total eligible weight {total_weight}"
+        ),
+    )
+}
+
+fn selected_assessment_reason(assessment: &RoutingCandidateAssessment) -> String {
+    if assessment.reasons.is_empty() {
+        format!(
+            "selected {} as the top-ranked candidate",
+            assessment.provider_id
+        )
+    } else {
+        format!(
+            "selected {} because {}",
+            assessment.provider_id,
+            assessment.reasons.join(", ")
+        )
+    }
+}
+
+fn generate_selection_seed() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| {
+            let nanos = duration.as_nanos();
+            (nanos ^ u128::from(std::process::id())) as u64
+        })
+        .unwrap_or_else(|_| u64::from(std::process::id()))
 }
 
 fn assess_candidate(

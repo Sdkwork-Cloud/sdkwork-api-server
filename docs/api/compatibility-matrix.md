@@ -57,7 +57,7 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | `/admin/extensions/installations` | `native` | Stores extension installation state and config payload |
 | `/admin/extensions/instances` | `native` | Stores mounted extension instances with runtime config |
 | `/admin/extensions/runtime-statuses` | `native` | Lists normalized runtime status for active connector and native dynamic runtimes currently tracked by the host |
-| `/admin/routing/simulations` | `native` | Catalog-backed routing decision preview with candidate assessment, runtime health, and selection reasons |
+| `/admin/routing/simulations` | `native` | Catalog-backed routing decision preview with candidate assessment, runtime health, selection reasons, and reproducible `selection_seed` for weighted policies |
 | `/admin/usage/records` | `native` | Lists gateway-recorded usage |
 | `/admin/billing/ledger` | `native` | Lists gateway-booked billing entries |
 

@@ -15,11 +15,11 @@ export function RouteSimulationPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void simulateRoute('chat_completion', 'gpt-4.1')
+    void simulateRoute('chat_completion', 'gpt-4.1', 11)
       .then((result) => {
         if (!cancelled) {
           setSimulation(result);
-          setStatus('Current simulation resolved from catalog-backed routing.');
+          setStatus('Current simulation resolved from catalog-backed routing with a fixed seed.');
         }
       })
       .catch(() => {
@@ -55,6 +55,10 @@ export function RouteSimulationPage() {
         <article className="metric-card">
           <span className="metric-label">Strategy</span>
           <strong>{simulation.strategy ?? 'static_fallback'}</strong>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">Selection Seed</span>
+          <strong>{simulation.selection_seed ?? 'n/a'}</strong>
         </article>
       </div>
 

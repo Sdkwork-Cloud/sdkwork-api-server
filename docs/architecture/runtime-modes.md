@@ -48,7 +48,7 @@ The current repository includes:
 - signed admin JWT authentication for the control plane, with the signing secret now provided by runtime config instead of a hardcoded development constant
 - gateway request tenancy derived from persisted gateway API keys instead of hardcoded tenant or project placeholders
 - persisted routing policies shared by admin simulations and real gateway provider dispatch
-- routing decisions now join persisted policy order with runtime status and instance-level config hints for deterministic health-aware selection
+- routing decisions now join persisted policy order with runtime status and instance-level config hints for deterministic health-aware selection or seeded weighted-random balancing
 - a built-in extension host with manifest registration for OpenAI, OpenRouter, and Ollama provider extensions
 - filesystem extension discovery through `sdkwork-extension.toml` package manifests loaded from configured search paths
 - persisted extension installation and instance records for configuration-driven mounting
@@ -132,6 +132,6 @@ Routing remains intentionally conservative in this batch:
 - policy precedence is deterministic by `priority DESC` then `policy_id ASC`
 - model matching supports exact and glob-style `*` patterns
 - provider selection now considers availability, runtime health, and instance-level `cost`, `latency_ms`, and `weight` hints in addition to ordered preference plus optional default provider
-- weighted random traffic shaping, persisted health telemetry, and regional policy dimensions remain future work
+- persisted health telemetry, quota or SLO-aware admission, and regional policy dimensions remain future work
 
 The runtime host is still intentionally lightweight, but the core gateway, admin, routing, credential, and provider relay slices now run against the same Rust workspace and can be assembled in-process for embedded mode.

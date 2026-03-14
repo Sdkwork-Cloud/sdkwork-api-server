@@ -27,7 +27,8 @@ use sdkwork_api_app_identity::{
     CreatedGatewayApiKey,
 };
 use sdkwork_api_app_routing::{
-    create_routing_policy, list_routing_policies, persist_routing_policy, simulate_route_with_store,
+    create_routing_policy, list_routing_policies, persist_routing_policy,
+    simulate_route_with_store, CreateRoutingPolicyInput,
 };
 use sdkwork_api_app_tenant::{list_projects, list_tenants, persist_project, persist_tenant};
 use sdkwork_api_app_usage::list_usage_records;
@@ -37,7 +38,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -258,6 +259,8 @@ struct CreateRoutingPolicyRequest {
     #[serde(default)]
     priority: i32,
     #[serde(default)]
+    strategy: Option<RoutingStrategy>,
+    #[serde(default)]
     ordered_provider_ids: Vec<String>,
     #[serde(default)]
     default_provider_id: Option<String>,
@@ -267,6 +270,8 @@ struct CreateRoutingPolicyRequest {
 struct RoutingSimulationRequest {
     capability: String,
     model: String,
+    #[serde(default)]
+    selection_seed: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -277,6 +282,8 @@ struct RoutingSimulationResponse {
     matched_policy_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     strategy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selection_seed: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     selection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -716,15 +723,28 @@ async fn simulate_routing_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<RoutingSimulationRequest>,
 ) -> Result<Json<RoutingSimulationResponse>, StatusCode> {
-    let decision =
-        simulate_route_with_store(state.store.as_ref(), &request.capability, &request.model)
+    let decision = match request.selection_seed {
+        Some(selection_seed) => {
+            sdkwork_api_app_routing::simulate_route_with_store_seeded(
+                state.store.as_ref(),
+                &request.capability,
+                &request.model,
+                selection_seed,
+            )
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
+        None => {
+            simulate_route_with_store(state.store.as_ref(), &request.capability, &request.model)
+                .await
+        }
+    }
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(RoutingSimulationResponse {
         selected_provider_id: decision.selected_provider_id,
         candidate_ids: decision.candidate_ids,
         matched_policy_id: decision.matched_policy_id,
         strategy: decision.strategy,
+        selection_seed: decision.selection_seed,
         selection_reason: decision.selection_reason,
         assessments: decision.assessments,
     }))
@@ -745,15 +765,16 @@ async fn create_routing_policy_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateRoutingPolicyRequest>,
 ) -> Result<(StatusCode, Json<RoutingPolicy>), StatusCode> {
-    let policy = create_routing_policy(
-        &request.policy_id,
-        &request.capability,
-        &request.model_pattern,
-        request.enabled,
-        request.priority,
-        &request.ordered_provider_ids,
-        request.default_provider_id.as_deref(),
-    )
+    let policy = create_routing_policy(CreateRoutingPolicyInput {
+        policy_id: &request.policy_id,
+        capability: &request.capability,
+        model_pattern: &request.model_pattern,
+        enabled: request.enabled,
+        priority: request.priority,
+        strategy: request.strategy,
+        ordered_provider_ids: &request.ordered_provider_ids,
+        default_provider_id: request.default_provider_id.as_deref(),
+    })
     .map_err(|_| StatusCode::BAD_REQUEST)?;
     let policy = persist_routing_policy(state.store.as_ref(), &policy)
         .await

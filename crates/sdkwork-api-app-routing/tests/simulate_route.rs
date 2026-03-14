@@ -3,9 +3,12 @@ use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sdkwork_api_app_routing::{persist_routing_policy, simulate_route, simulate_route_with_store};
+use sdkwork_api_app_routing::{
+    persist_routing_policy, simulate_route, simulate_route_with_store,
+    simulate_route_with_store_seeded,
+};
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_extension_host::{
     ensure_connector_runtime_started, load_native_dynamic_provider_adapter,
@@ -340,6 +343,115 @@ async fn route_simulation_demotes_disabled_provider_instance() {
     assert_eq!(decision.assessments[0].provider_id, "provider-available");
     assert_eq!(decision.assessments[1].provider_id, "provider-disabled");
     assert!(!decision.assessments[1].available);
+}
+
+#[serial(routing_runtime)]
+#[tokio::test]
+async fn route_simulation_can_use_seeded_weighted_random_strategy() {
+    shutdown_all_connector_runtimes().unwrap();
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-light",
+                "openai",
+                "openai",
+                "https://light.example/v1",
+                "Light Provider",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-heavy",
+                "openai",
+                "openai",
+                "https://heavy.example/v1",
+                "Heavy Provider",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-light"))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-heavy"))
+        .await
+        .unwrap();
+    store
+        .insert_extension_installation(
+            &ExtensionInstallation::new(
+                "builtin-openai",
+                "sdkwork.provider.openai.official",
+                ExtensionRuntime::Builtin,
+            )
+            .with_enabled(true),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-light",
+                "builtin-openai",
+                "sdkwork.provider.openai.official",
+            )
+            .with_enabled(true)
+            .with_config(serde_json::json!({
+                "routing": {
+                    "weight": 10
+                }
+            })),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-heavy",
+                "builtin-openai",
+                "sdkwork.provider.openai.official",
+            )
+            .with_enabled(true)
+            .with_config(serde_json::json!({
+                "routing": {
+                    "weight": 90
+                }
+            })),
+        )
+        .await
+        .unwrap();
+
+    let policy = RoutingPolicy::new("policy-weighted", "chat_completion", "gpt-4.1")
+        .with_priority(100)
+        .with_strategy(RoutingStrategy::WeightedRandom)
+        .with_ordered_provider_ids(vec![
+            "provider-light".to_owned(),
+            "provider-heavy".to_owned(),
+        ]);
+    persist_routing_policy(&store, &policy).await.unwrap();
+
+    let decision = simulate_route_with_store_seeded(&store, "chat_completion", "gpt-4.1", 15)
+        .await
+        .unwrap();
+
+    assert_eq!(decision.selected_provider_id, "provider-heavy");
+    assert_eq!(decision.strategy.as_deref(), Some("weighted_random"));
+    assert_eq!(decision.selection_seed, Some(15));
 }
 
 #[cfg(windows)]

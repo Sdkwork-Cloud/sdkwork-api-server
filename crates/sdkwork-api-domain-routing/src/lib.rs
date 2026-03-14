@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +9,35 @@ pub enum RoutingCandidateHealth {
     Healthy,
     Unhealthy,
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutingStrategy {
+    #[default]
+    DeterministicPriority,
+    WeightedRandom,
+}
+
+impl RoutingStrategy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::DeterministicPriority => "deterministic_priority",
+            Self::WeightedRandom => "weighted_random",
+        }
+    }
+}
+
+impl FromStr for RoutingStrategy {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "deterministic_priority" => Ok(Self::DeterministicPriority),
+            "weighted_random" => Ok(Self::WeightedRandom),
+            _ => Err(format!("unsupported routing strategy: {value}")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -85,6 +115,8 @@ pub struct RoutingDecision {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strategy: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_seed: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assessments: Vec<RoutingCandidateAssessment>,
@@ -97,6 +129,7 @@ impl RoutingDecision {
             candidate_ids,
             matched_policy_id: None,
             strategy: None,
+            selection_seed: None,
             selection_reason: None,
             assessments: Vec::new(),
         }
@@ -109,6 +142,11 @@ impl RoutingDecision {
 
     pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
         self.strategy = Some(strategy.into());
+        self
+    }
+
+    pub fn with_selection_seed(mut self, selection_seed: u64) -> Self {
+        self.selection_seed = Some(selection_seed);
         self
     }
 
@@ -133,6 +171,8 @@ pub struct RoutingPolicy {
     #[serde(default)]
     pub priority: i32,
     #[serde(default)]
+    pub strategy: RoutingStrategy,
+    #[serde(default)]
     pub ordered_provider_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_provider_id: Option<String>,
@@ -150,6 +190,7 @@ impl RoutingPolicy {
             model_pattern: model_pattern.into(),
             enabled: true,
             priority: 0,
+            strategy: RoutingStrategy::DeterministicPriority,
             ordered_provider_ids: Vec::new(),
             default_provider_id: None,
         }
@@ -162,6 +203,11 @@ impl RoutingPolicy {
 
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.priority = priority;
+        self
+    }
+
+    pub fn with_strategy(mut self, strategy: RoutingStrategy) -> Self {
+        self.strategy = strategy;
         self
     }
 

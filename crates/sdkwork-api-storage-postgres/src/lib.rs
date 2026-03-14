@@ -6,7 +6,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -220,8 +220,14 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
             model_pattern TEXT NOT NULL,
             enabled BOOLEAN NOT NULL DEFAULT TRUE,
             priority INTEGER NOT NULL DEFAULT 0,
+            strategy TEXT NOT NULL DEFAULT 'deterministic_priority',
             default_provider_id TEXT
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS strategy TEXT NOT NULL DEFAULT 'deterministic_priority'",
     )
     .execute(&pool)
     .await?;
@@ -607,14 +613,15 @@ impl PostgresAdminStore {
 
     pub async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {
         sqlx::query(
-            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, default_provider_id) VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, default_provider_id = excluded.default_provider_id",
+            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id) VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, strategy = excluded.strategy, default_provider_id = excluded.default_provider_id",
         )
         .bind(&policy.policy_id)
         .bind(&policy.capability)
         .bind(&policy.model_pattern)
         .bind(policy.enabled)
         .bind(policy.priority)
+        .bind(policy.strategy.as_str())
         .bind(&policy.default_provider_id)
         .execute(&self.pool)
         .await?;
@@ -640,8 +647,8 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
-        let rows = sqlx::query_as::<_, (String, String, String, bool, i32, Option<String>)>(
-            "SELECT policy_id, capability, model_pattern, enabled, priority, default_provider_id
+        let rows = sqlx::query_as::<_, (String, String, String, bool, i32, String, Option<String>)>(
+            "SELECT policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id
              FROM routing_policies
              ORDER BY priority DESC, policy_id",
         )
@@ -649,11 +656,24 @@ impl PostgresAdminStore {
         .await?;
 
         let mut policies = Vec::with_capacity(rows.len());
-        for (policy_id, capability, model_pattern, enabled, priority, default_provider_id) in rows {
+        for (
+            policy_id,
+            capability,
+            model_pattern,
+            enabled,
+            priority,
+            strategy,
+            default_provider_id,
+        ) in rows
+        {
             policies.push(
                 RoutingPolicy::new(policy_id.clone(), capability, model_pattern)
                     .with_enabled(enabled)
                     .with_priority(priority)
+                    .with_strategy(
+                        RoutingStrategy::from_str(&strategy)
+                            .unwrap_or(RoutingStrategy::DeterministicPriority),
+                    )
                     .with_ordered_provider_ids(
                         load_routing_policy_provider_ids(&self.pool, &policy_id).await?,
                     )

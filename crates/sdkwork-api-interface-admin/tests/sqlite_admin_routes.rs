@@ -370,7 +370,7 @@ async fn create_and_list_routing_policies() {
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
+                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"strategy\":\"weighted_random\",\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
                 ))
                 .unwrap(),
         )
@@ -381,6 +381,7 @@ async fn create_and_list_routing_policies() {
     let created_json = read_json(create).await;
     assert_eq!(created_json["policy_id"], "policy-gpt-4-1");
     assert_eq!(created_json["priority"], 100);
+    assert_eq!(created_json["strategy"], "weighted_random");
 
     let list = app
         .oneshot(
@@ -405,6 +406,7 @@ async fn create_and_list_routing_policies() {
         list_json[0]["default_provider_id"],
         "provider-openai-official"
     );
+    assert_eq!(list_json[0]["strategy"], "weighted_random");
 }
 
 #[serial(extension_env)]
@@ -457,7 +459,7 @@ async fn routing_simulation_reports_policy_selected_provider() {
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
+                    "{\"policy_id\":\"policy-gpt-4-1\",\"capability\":\"chat_completion\",\"model_pattern\":\"gpt-4.1\",\"enabled\":true,\"priority\":100,\"strategy\":\"weighted_random\",\"ordered_provider_ids\":[\"provider-openrouter\",\"provider-openai-official\"],\"default_provider_id\":\"provider-openai-official\"}",
                 ))
                 .unwrap(),
         )
@@ -473,7 +475,7 @@ async fn routing_simulation_reports_policy_selected_provider() {
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"capability\":\"chat_completion\",\"model\":\"gpt-4.1\"}",
+                    "{\"capability\":\"chat_completion\",\"model\":\"gpt-4.1\",\"selection_seed\":11}",
                 ))
                 .unwrap(),
         )
@@ -487,7 +489,8 @@ async fn routing_simulation_reports_policy_selected_provider() {
         "provider-openrouter"
     );
     assert_eq!(simulation_json["matched_policy_id"], "policy-gpt-4-1");
-    assert_eq!(simulation_json["strategy"], "runtime_aware_deterministic");
+    assert_eq!(simulation_json["strategy"], "weighted_random");
+    assert_eq!(simulation_json["selection_seed"], 11);
     assert!(simulation_json["selection_reason"].as_str().is_some());
     assert_eq!(
         simulation_json["assessments"][0]["provider_id"],

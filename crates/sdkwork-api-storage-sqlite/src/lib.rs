@@ -8,7 +8,7 @@ use sdkwork_api_domain_catalog::{
 };
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
-use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_domain_routing::{RoutingPolicy, RoutingStrategy};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
@@ -169,10 +169,18 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             model_pattern TEXT NOT NULL,
             enabled INTEGER NOT NULL DEFAULT 1,
             priority INTEGER NOT NULL DEFAULT 0,
+            strategy TEXT NOT NULL DEFAULT 'deterministic_priority',
             default_provider_id TEXT
         )",
     )
     .execute(&pool)
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "routing_policies",
+        "strategy",
+        "strategy TEXT NOT NULL DEFAULT 'deterministic_priority'",
+    )
     .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS routing_policy_providers (
@@ -668,14 +676,15 @@ impl SqliteAdminStore {
 
     pub async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {
         sqlx::query(
-            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, default_provider_id) VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, default_provider_id = excluded.default_provider_id",
+            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, strategy = excluded.strategy, default_provider_id = excluded.default_provider_id",
         )
         .bind(&policy.policy_id)
         .bind(&policy.capability)
         .bind(&policy.model_pattern)
         .bind(if policy.enabled { 1_i64 } else { 0_i64 })
         .bind(i64::from(policy.priority))
+        .bind(policy.strategy.as_str())
         .bind(&policy.default_provider_id)
         .execute(&self.pool)
         .await?;
@@ -701,8 +710,8 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
-        let rows = sqlx::query_as::<_, (String, String, String, i64, i64, Option<String>)>(
-            "SELECT policy_id, capability, model_pattern, enabled, priority, default_provider_id
+        let rows = sqlx::query_as::<_, (String, String, String, i64, i64, String, Option<String>)>(
+            "SELECT policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id
              FROM routing_policies
              ORDER BY priority DESC, policy_id",
         )
@@ -710,11 +719,24 @@ impl SqliteAdminStore {
         .await?;
 
         let mut policies = Vec::with_capacity(rows.len());
-        for (policy_id, capability, model_pattern, enabled, priority, default_provider_id) in rows {
+        for (
+            policy_id,
+            capability,
+            model_pattern,
+            enabled,
+            priority,
+            strategy,
+            default_provider_id,
+        ) in rows
+        {
             policies.push(
                 RoutingPolicy::new(policy_id.clone(), capability, model_pattern)
                     .with_enabled(enabled != 0)
                     .with_priority(i32::try_from(priority)?)
+                    .with_strategy(
+                        RoutingStrategy::from_str(&strategy)
+                            .unwrap_or(RoutingStrategy::DeterministicPriority),
+                    )
                     .with_ordered_provider_ids(
                         load_routing_policy_provider_ids(&self.pool, &policy_id).await?,
                     )
