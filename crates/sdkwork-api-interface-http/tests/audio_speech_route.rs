@@ -3,6 +3,7 @@ use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::routing::post;
 use axum::Router;
+use serde_json::Value;
 use serial_test::serial;
 use sqlx::SqlitePool;
 use std::sync::{Arc, Mutex};
@@ -96,11 +97,55 @@ async fn stateless_audio_speech_route_relays_to_openai_compatible_provider() {
     );
 }
 
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateless_audio_speech_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::new(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/speech")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4o-mini-tts\",\"voice\":\"nova\",\"input\":\"relay me\",\"response_format\":\"mp3\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream audio speech"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
 async fn read_bytes(response: axum::response::Response) -> Vec<u8> {
     axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap()
         .to_vec()
+}
+
+async fn read_json(response: axum::response::Response) -> Value {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
 }
 
 async fn memory_pool() -> SqlitePool {

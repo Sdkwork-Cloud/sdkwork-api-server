@@ -746,6 +746,39 @@ async fn stateless_eval_run_extended_routes_relay_to_openai_compatible_provider(
 }
 
 #[tokio::test]
+async fn stateless_eval_run_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::new(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/evals/eval_1/runs/run_1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream eval run delete"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
+#[tokio::test]
 async fn stateful_eval_run_extended_routes_relay_to_openai_compatible_provider() {
     let upstream_state = UpstreamCaptureState::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

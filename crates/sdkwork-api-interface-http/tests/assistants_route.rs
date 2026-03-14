@@ -214,6 +214,40 @@ async fn stateless_assistants_route_relays_to_openai_compatible_provider() {
     assert_eq!(delete_json["deleted"], true);
 }
 
+#[tokio::test]
+async fn stateless_assistants_route_returns_openai_error_envelope_on_upstream_failure() {
+    let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
+        sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
+            sdkwork_api_interface_http::StatelessGatewayUpstream::new(
+                "openai",
+                "http://127.0.0.1:1",
+                "sk-stateless-openai",
+            ),
+        ),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/assistants")
+                .header("content-type", "application/json")
+                .body(Body::from("{\"name\":\"Support\",\"model\":\"gpt-4.1\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "failed to relay upstream assistant"
+    );
+    assert_eq!(json["error"]["type"], "server_error");
+    assert_eq!(json["error"]["code"], "bad_gateway");
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await

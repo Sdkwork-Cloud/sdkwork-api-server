@@ -1425,11 +1425,7 @@ async fn chat_completions_list_handler(request_context: StatelessGatewayRequest)
                 .expect("chat completions"),
         )
         .into_response(),
-        Err(_) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            "failed to relay upstream chat completion list",
-        )
-            .into_response(),
+        Err(_) => bad_gateway_openai_response("failed to relay upstream chat completion list"),
     }
 }
 
@@ -1446,11 +1442,9 @@ async fn chat_completion_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream chat completion retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -1479,11 +1473,7 @@ async fn chat_completion_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream chat completion update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream chat completion update");
         }
     }
 
@@ -1512,11 +1502,7 @@ async fn chat_completion_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream chat completion delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream chat completion delete");
         }
     }
 
@@ -1544,11 +1530,9 @@ async fn chat_completion_messages_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream chat completion messages",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -1573,11 +1557,7 @@ async fn conversations_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation");
         }
     }
 
@@ -1593,11 +1573,7 @@ async fn conversations_list_handler(request_context: StatelessGatewayRequest) ->
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation list");
         }
     }
 
@@ -1621,11 +1597,7 @@ async fn conversation_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation retrieve");
         }
     }
 
@@ -1654,11 +1626,7 @@ async fn conversation_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation update");
         }
     }
 
@@ -1687,11 +1655,7 @@ async fn conversation_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation delete");
         }
     }
 
@@ -1720,11 +1684,7 @@ async fn conversation_items_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation items",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation items");
         }
     }
 
@@ -1752,11 +1712,7 @@ async fn conversation_items_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation items list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation items list");
         }
     }
 
@@ -1784,11 +1740,9 @@ async fn conversation_item_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream conversation item retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -1817,11 +1771,9 @@ async fn conversation_item_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream conversation item delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -1845,11 +1797,7 @@ async fn threads_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread");
         }
     }
 
@@ -1870,11 +1818,7 @@ async fn thread_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread retrieve");
         }
     }
 
@@ -1903,11 +1847,7 @@ async fn thread_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread update");
         }
     }
 
@@ -1932,11 +1872,7 @@ async fn thread_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread delete");
         }
     }
 
@@ -1965,11 +1901,7 @@ async fn thread_messages_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message");
         }
     }
 
@@ -2000,11 +1932,7 @@ async fn thread_messages_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread messages list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread messages list");
         }
     }
 
@@ -2032,11 +1960,7 @@ async fn thread_message_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message retrieve");
         }
     }
 
@@ -2066,11 +1990,7 @@ async fn thread_message_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message update");
         }
     }
 
@@ -2099,11 +2019,7 @@ async fn thread_message_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message delete");
         }
     }
 
@@ -2129,11 +2045,7 @@ async fn thread_and_run_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread and run",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread and run");
         }
     }
 
@@ -2162,11 +2074,7 @@ async fn thread_runs_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run");
         }
     }
 
@@ -2196,11 +2104,7 @@ async fn thread_runs_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread runs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread runs list");
         }
     }
 
@@ -2228,11 +2132,7 @@ async fn thread_run_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run retrieve");
         }
     }
 
@@ -2262,11 +2162,7 @@ async fn thread_run_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run update");
         }
     }
 
@@ -2295,11 +2191,7 @@ async fn thread_run_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run cancel");
         }
     }
 
@@ -2329,11 +2221,9 @@ async fn thread_run_submit_tool_outputs_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream thread run submit tool outputs",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -2368,11 +2258,7 @@ async fn thread_run_steps_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run steps list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run steps list");
         }
     }
 
@@ -2401,11 +2287,9 @@ async fn thread_run_step_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream thread run step retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -2472,11 +2356,7 @@ async fn response_input_tokens_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response input tokens",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response input tokens");
         }
     }
 
@@ -2504,11 +2384,7 @@ async fn response_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response retrieve");
         }
     }
 
@@ -2536,11 +2412,7 @@ async fn response_input_items_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response input items",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response input items");
         }
     }
 
@@ -2568,11 +2440,7 @@ async fn response_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response delete");
         }
     }
 
@@ -2600,11 +2468,7 @@ async fn response_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response cancel");
         }
     }
 
@@ -2632,11 +2496,7 @@ async fn response_compact_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response compact",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response compact");
         }
     }
 
@@ -2668,11 +2528,7 @@ async fn completions_handler(
             .expect("completion"),
         )
         .into_response(),
-        Err(_) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            "failed to relay upstream completion",
-        )
-            .into_response(),
+        Err(_) => bad_gateway_openai_response("failed to relay upstream completion"),
     }
 }
 
@@ -2707,11 +2563,7 @@ async fn moderations_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream moderation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream moderation");
         }
     }
 
@@ -2739,11 +2591,7 @@ async fn image_generations_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream image generation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream image generation");
         }
     }
 
@@ -2773,11 +2621,7 @@ async fn image_edits_handler(
                 Ok(Some(response)) => return Json(response).into_response(),
                 Ok(None) => {}
                 Err(_) => {
-                    return (
-                        axum::http::StatusCode::BAD_GATEWAY,
-                        "failed to relay upstream image edit",
-                    )
-                        .into_response();
+                    return bad_gateway_openai_response("failed to relay upstream image edit");
                 }
             }
 
@@ -2810,11 +2654,7 @@ async fn image_variations_handler(
                 Ok(Some(response)) => return Json(response).into_response(),
                 Ok(None) => {}
                 Err(_) => {
-                    return (
-                        axum::http::StatusCode::BAD_GATEWAY,
-                        "failed to relay upstream image variation",
-                    )
-                        .into_response();
+                    return bad_gateway_openai_response("failed to relay upstream image variation");
                 }
             }
 
@@ -2845,11 +2685,7 @@ async fn transcriptions_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream transcription",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream transcription");
         }
     }
 
@@ -2877,11 +2713,7 @@ async fn translations_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream translation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream translation");
         }
     }
 
@@ -2906,11 +2738,7 @@ async fn audio_speech_handler(
         Ok(Some(response)) => return upstream_passthrough_response(response),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream audio speech",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream audio speech");
         }
     }
 
@@ -2926,11 +2754,7 @@ async fn audio_voices_handler(request_context: StatelessGatewayRequest) -> Respo
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream audio voices list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream audio voices list");
         }
     }
 
@@ -2954,11 +2778,7 @@ async fn audio_voice_consents_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream audio voice consent",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream audio voice consent");
         }
     }
 
@@ -2982,11 +2802,7 @@ async fn files_handler(request_context: StatelessGatewayRequest, multipart: Mult
                 Ok(Some(response)) => return Json(response).into_response(),
                 Ok(None) => {}
                 Err(_) => {
-                    return (
-                        axum::http::StatusCode::BAD_GATEWAY,
-                        "failed to relay upstream file",
-                    )
-                        .into_response();
+                    return bad_gateway_openai_response("failed to relay upstream file");
                 }
             }
 
@@ -3009,11 +2825,7 @@ async fn files_list_handler(request_context: StatelessGatewayRequest) -> Respons
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream files list");
         }
     }
 
@@ -3031,11 +2843,7 @@ async fn file_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file retrieve");
         }
     }
 
@@ -3060,11 +2868,7 @@ async fn file_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file delete");
         }
     }
 
@@ -3089,11 +2893,7 @@ async fn file_content_handler(
         Ok(Some(response)) => return upstream_passthrough_response(response),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file content");
         }
     }
 
@@ -3114,11 +2914,7 @@ async fn containers_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container");
         }
     }
 
@@ -3138,11 +2934,7 @@ async fn containers_list_handler(request_context: StatelessGatewayRequest) -> Re
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream containers list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream containers list");
         }
     }
 
@@ -3169,11 +2961,7 @@ async fn container_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container retrieve");
         }
     }
 
@@ -3201,11 +2989,7 @@ async fn container_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container delete");
         }
     }
 
@@ -3234,11 +3018,7 @@ async fn container_files_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file");
         }
     }
 
@@ -3267,11 +3047,7 @@ async fn container_files_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container files list");
         }
     }
 
@@ -3299,11 +3075,7 @@ async fn container_file_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file retrieve");
         }
     }
 
@@ -3332,11 +3104,7 @@ async fn container_file_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file delete");
         }
     }
 
@@ -3365,11 +3133,7 @@ async fn container_file_content_handler(
         Ok(Some(response)) => return upstream_passthrough_response(response),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file content");
         }
     }
 
@@ -3389,11 +3153,7 @@ async fn videos_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video");
         }
     }
 
@@ -3414,11 +3174,7 @@ async fn videos_list_handler(request_context: StatelessGatewayRequest) -> Respon
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream videos list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream videos list");
         }
     }
 
@@ -3439,11 +3195,7 @@ async fn video_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video retrieve");
         }
     }
 
@@ -3468,11 +3220,7 @@ async fn video_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video delete");
         }
     }
 
@@ -3500,11 +3248,7 @@ async fn video_content_handler(
         Ok(Some(response)) => return upstream_passthrough_response(response),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video content");
         }
     }
 
@@ -3529,11 +3273,7 @@ async fn video_remix_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video remix",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video remix");
         }
     }
 
@@ -3562,11 +3302,7 @@ async fn video_characters_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video characters list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video characters list");
         }
     }
 
@@ -3594,11 +3330,9 @@ async fn video_character_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream video character retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -3628,11 +3362,7 @@ async fn video_character_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video character update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video character update");
         }
     }
 
@@ -3663,11 +3393,7 @@ async fn video_extend_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video extend",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video extend");
         }
     }
 
@@ -3696,11 +3422,7 @@ async fn video_character_create_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video character create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video character create");
         }
     }
 
@@ -3728,11 +3450,9 @@ async fn video_character_retrieve_canonical_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream video character retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -3757,11 +3477,7 @@ async fn video_edits_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video edits",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video edits");
         }
     }
 
@@ -3789,11 +3505,7 @@ async fn video_extensions_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video extensions",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video extensions");
         }
     }
 
@@ -3816,11 +3528,7 @@ async fn uploads_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload");
         }
     }
 
@@ -3851,11 +3559,7 @@ async fn upload_parts_handler(
                 Ok(Some(response)) => return Json(response).into_response(),
                 Ok(None) => {}
                 Err(_) => {
-                    return (
-                        axum::http::StatusCode::BAD_GATEWAY,
-                        "failed to relay upstream upload part",
-                    )
-                        .into_response();
+                    return bad_gateway_openai_response("failed to relay upstream upload part");
                 }
             }
 
@@ -3885,11 +3589,7 @@ async fn upload_complete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload complete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload complete");
         }
     }
 
@@ -3914,11 +3614,7 @@ async fn upload_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload cancel");
         }
     }
 
@@ -3943,11 +3639,7 @@ async fn fine_tuning_jobs_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job");
         }
     }
 
@@ -3968,11 +3660,7 @@ async fn fine_tuning_jobs_list_handler(request_context: StatelessGatewayRequest)
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning jobs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning jobs list");
         }
     }
 
@@ -3996,11 +3684,9 @@ async fn fine_tuning_job_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning job retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4028,11 +3714,7 @@ async fn fine_tuning_job_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job cancel");
         }
     }
 
@@ -4060,11 +3742,7 @@ async fn fine_tuning_job_events_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job events",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job events");
         }
     }
 
@@ -4092,11 +3770,9 @@ async fn fine_tuning_job_checkpoints_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning job checkpoints",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4124,11 +3800,7 @@ async fn fine_tuning_job_pause_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job pause",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job pause");
         }
     }
 
@@ -4156,11 +3828,7 @@ async fn fine_tuning_job_resume_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job resume",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job resume");
         }
     }
 
@@ -4189,11 +3857,9 @@ async fn fine_tuning_checkpoint_permissions_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permissions create",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4221,11 +3887,9 @@ async fn fine_tuning_checkpoint_permissions_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permissions list",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4256,11 +3920,9 @@ async fn fine_tuning_checkpoint_permission_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permission delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4285,11 +3947,7 @@ async fn assistants_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant");
         }
     }
 
@@ -4310,11 +3968,7 @@ async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Re
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistants list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistants list");
         }
     }
 
@@ -4338,11 +3992,7 @@ async fn assistant_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant retrieve");
         }
     }
 
@@ -4371,11 +4021,7 @@ async fn assistant_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant update");
         }
     }
 
@@ -4404,11 +4050,7 @@ async fn assistant_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant delete");
         }
     }
 
@@ -4432,11 +4074,7 @@ async fn webhooks_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook");
         }
     }
 
@@ -4457,11 +4095,7 @@ async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Resp
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhooks list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhooks list");
         }
     }
 
@@ -4485,11 +4119,7 @@ async fn webhook_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook retrieve");
         }
     }
 
@@ -4518,11 +4148,7 @@ async fn webhook_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook update");
         }
     }
 
@@ -4554,11 +4180,7 @@ async fn webhook_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook delete");
         }
     }
 
@@ -4586,11 +4208,7 @@ async fn realtime_sessions_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream realtime session",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream realtime session");
         }
     }
 
@@ -4613,11 +4231,7 @@ async fn evals_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval");
         }
     }
 
@@ -4637,11 +4251,7 @@ async fn evals_list_handler(request_context: StatelessGatewayRequest) -> Respons
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream evals list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream evals list");
         }
     }
 
@@ -4659,11 +4269,7 @@ async fn eval_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval retrieve");
         }
     }
 
@@ -4692,11 +4298,7 @@ async fn eval_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval update");
         }
     }
 
@@ -4722,11 +4324,7 @@ async fn eval_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval delete");
         }
     }
 
@@ -4751,11 +4349,7 @@ async fn eval_runs_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval runs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval runs list");
         }
     }
 
@@ -4784,11 +4378,7 @@ async fn eval_runs_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run create");
         }
     }
 
@@ -4817,11 +4407,7 @@ async fn eval_run_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run retrieve");
         }
     }
 
@@ -4850,11 +4436,7 @@ async fn eval_run_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run delete");
         }
     }
 
@@ -4883,11 +4465,7 @@ async fn eval_run_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run cancel");
         }
     }
 
@@ -4916,11 +4494,9 @@ async fn eval_run_output_items_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream eval run output items list",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4949,11 +4525,9 @@ async fn eval_run_output_item_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream eval run output item retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -4978,11 +4552,7 @@ async fn batches_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch");
         }
     }
 
@@ -5003,11 +4573,7 @@ async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Respo
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batches list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batches list");
         }
     }
 
@@ -5031,11 +4597,7 @@ async fn batch_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch retrieve");
         }
     }
 
@@ -5060,11 +4622,7 @@ async fn batch_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch cancel");
         }
     }
 
@@ -5084,11 +4642,7 @@ async fn vector_stores_list_handler(request_context: StatelessGatewayRequest) ->
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector stores list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector stores list");
         }
     }
 
@@ -5109,11 +4663,7 @@ async fn vector_stores_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store");
         }
     }
 
@@ -5141,11 +4691,7 @@ async fn vector_store_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store retrieve");
         }
     }
 
@@ -5174,11 +4720,7 @@ async fn vector_store_update_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store update");
         }
     }
 
@@ -5207,11 +4749,7 @@ async fn vector_store_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store delete");
         }
     }
 
@@ -5240,11 +4778,7 @@ async fn vector_store_search_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store search",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store search");
         }
     }
 
@@ -5274,11 +4808,7 @@ async fn vector_store_files_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store file",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store file");
         }
     }
 
@@ -5307,11 +4837,7 @@ async fn vector_store_files_list_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store files list");
         }
     }
 
@@ -5339,11 +4865,9 @@ async fn vector_store_file_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5372,11 +4896,9 @@ async fn vector_store_file_delete_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5406,11 +4928,7 @@ async fn vector_store_file_batches_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store file batch",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store file batch");
         }
     }
 
@@ -5439,11 +4957,9 @@ async fn vector_store_file_batch_retrieve_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5472,11 +4988,9 @@ async fn vector_store_file_batch_cancel_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch cancel",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5505,11 +5019,9 @@ async fn vector_store_file_batch_files_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch files",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5692,11 +5204,7 @@ async fn chat_completions_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream chat completion list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream chat completion list");
         }
     }
 
@@ -5764,11 +5272,9 @@ async fn chat_completion_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream chat completion retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -5842,11 +5348,7 @@ async fn chat_completion_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream chat completion update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream chat completion update");
         }
     }
 
@@ -5919,11 +5421,7 @@ async fn chat_completion_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream chat completion delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream chat completion delete");
         }
     }
 
@@ -5995,11 +5493,9 @@ async fn chat_completion_messages_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream chat completion messages",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -6071,11 +5567,7 @@ async fn conversations_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation");
         }
     }
 
@@ -6141,11 +5633,7 @@ async fn conversations_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation list");
         }
     }
 
@@ -6213,11 +5701,7 @@ async fn conversation_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation retrieve");
         }
     }
 
@@ -6291,11 +5775,7 @@ async fn conversation_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation update");
         }
     }
 
@@ -6368,11 +5848,7 @@ async fn conversation_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation delete");
         }
     }
 
@@ -6446,11 +5922,7 @@ async fn conversation_items_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation items",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation items");
         }
     }
 
@@ -6522,11 +5994,7 @@ async fn conversation_items_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream conversation items list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream conversation items list");
         }
     }
 
@@ -6599,11 +6067,9 @@ async fn conversation_item_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream conversation item retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -6677,11 +6143,9 @@ async fn conversation_item_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream conversation item delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -6754,11 +6218,7 @@ async fn threads_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread");
         }
     }
 
@@ -6823,11 +6283,7 @@ async fn thread_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread retrieve");
         }
     }
 
@@ -6901,11 +6357,7 @@ async fn thread_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread update");
         }
     }
 
@@ -6977,11 +6429,7 @@ async fn thread_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread delete");
         }
     }
 
@@ -7055,11 +6503,7 @@ async fn thread_messages_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message");
         }
     }
 
@@ -7134,11 +6578,7 @@ async fn thread_messages_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message list");
         }
     }
 
@@ -7211,11 +6651,7 @@ async fn thread_message_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message retrieve");
         }
     }
 
@@ -7291,11 +6727,7 @@ async fn thread_message_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message update");
         }
     }
 
@@ -7369,11 +6801,7 @@ async fn thread_message_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread message delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread message delete");
         }
     }
 
@@ -7446,11 +6874,7 @@ async fn thread_and_run_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread and run",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread and run");
         }
     }
 
@@ -7524,11 +6948,7 @@ async fn thread_runs_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run");
         }
     }
 
@@ -7602,11 +7022,7 @@ async fn thread_runs_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread runs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread runs list");
         }
     }
 
@@ -7679,11 +7095,7 @@ async fn thread_run_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run retrieve");
         }
     }
 
@@ -7759,11 +7171,7 @@ async fn thread_run_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run update");
         }
     }
 
@@ -7837,11 +7245,7 @@ async fn thread_run_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run cancel");
         }
     }
 
@@ -7917,11 +7321,7 @@ async fn thread_run_submit_tool_outputs_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run tool outputs",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run tool outputs");
         }
     }
 
@@ -8001,11 +7401,7 @@ async fn thread_run_steps_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream thread run steps",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream thread run steps");
         }
     }
 
@@ -8080,11 +7476,9 @@ async fn thread_run_step_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream thread run step retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -8349,11 +7743,7 @@ async fn response_input_tokens_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response input tokens",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response input tokens");
         }
     }
 
@@ -8425,11 +7815,7 @@ async fn response_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response retrieve");
         }
     }
 
@@ -8501,11 +7887,7 @@ async fn response_input_items_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response input items",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response input items");
         }
     }
 
@@ -8577,11 +7959,7 @@ async fn response_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response delete");
         }
     }
 
@@ -8653,11 +8031,7 @@ async fn response_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response cancel");
         }
     }
 
@@ -8729,11 +8103,7 @@ async fn response_compact_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream response compact",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream response compact");
         }
     }
 
@@ -8817,11 +8187,7 @@ async fn completions_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream completion",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream completion");
         }
     }
 
@@ -8977,11 +8343,7 @@ async fn moderations_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream moderation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream moderation");
         }
     }
 
@@ -9053,11 +8415,7 @@ async fn image_generations_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream image generation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream image generation");
         }
     }
 
@@ -9135,11 +8493,7 @@ async fn image_edits_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream image edit",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream image edit");
         }
     }
 
@@ -9217,11 +8571,7 @@ async fn image_variations_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream image variation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream image variation");
         }
     }
 
@@ -9293,11 +8643,7 @@ async fn transcriptions_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream transcription",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream transcription");
         }
     }
 
@@ -9369,11 +8715,7 @@ async fn translations_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream translation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream translation");
         }
     }
 
@@ -9445,11 +8787,7 @@ async fn audio_speech_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream speech",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream speech");
         }
     }
 
@@ -9515,11 +8853,7 @@ async fn audio_voices_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream audio voices list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream audio voices list");
         }
     }
 
@@ -9587,11 +8921,7 @@ async fn audio_voice_consents_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream audio voice consent",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream audio voice consent");
         }
     }
 
@@ -9668,11 +8998,7 @@ async fn files_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file");
         }
     }
 
@@ -9742,11 +9068,7 @@ async fn files_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream files list");
         }
     }
 
@@ -9811,11 +9133,7 @@ async fn file_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file retrieve");
         }
     }
 
@@ -9887,11 +9205,7 @@ async fn file_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file delete");
         }
     }
 
@@ -9963,11 +9277,7 @@ async fn file_content_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream file content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream file content");
         }
     }
 
@@ -10035,11 +9345,7 @@ async fn containers_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container create");
         }
     }
 
@@ -10109,11 +9415,7 @@ async fn containers_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream containers list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream containers list");
         }
     }
 
@@ -10184,11 +9486,7 @@ async fn container_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container retrieve");
         }
     }
 
@@ -10260,11 +9558,7 @@ async fn container_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container delete");
         }
     }
 
@@ -10338,11 +9632,7 @@ async fn container_files_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file create");
         }
     }
 
@@ -10415,11 +9705,7 @@ async fn container_files_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container files list");
         }
     }
 
@@ -10492,11 +9778,7 @@ async fn container_file_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file retrieve");
         }
     }
 
@@ -10570,11 +9852,7 @@ async fn container_file_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file delete");
         }
     }
 
@@ -10648,11 +9926,7 @@ async fn container_file_content_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream container file content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream container file content");
         }
     }
 
@@ -10721,11 +9995,7 @@ async fn videos_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video create");
         }
     }
 
@@ -10796,11 +10066,7 @@ async fn videos_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream videos list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream videos list");
         }
     }
 
@@ -10868,11 +10134,7 @@ async fn video_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video retrieve");
         }
     }
 
@@ -10944,11 +10206,7 @@ async fn video_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video delete");
         }
     }
 
@@ -11020,11 +10278,7 @@ async fn video_content_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video content",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video content");
         }
     }
 
@@ -11094,11 +10348,7 @@ async fn video_remix_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video remix",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video remix");
         }
     }
 
@@ -11171,11 +10421,7 @@ async fn video_characters_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video characters list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video characters list");
         }
     }
 
@@ -11248,11 +10494,9 @@ async fn video_character_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream video character retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -11328,11 +10572,7 @@ async fn video_character_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video character update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video character update");
         }
     }
 
@@ -11408,11 +10648,7 @@ async fn video_extend_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video extend",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video extend");
         }
     }
 
@@ -11485,11 +10721,7 @@ async fn video_character_create_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video character create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video character create");
         }
     }
 
@@ -11561,11 +10793,9 @@ async fn video_character_retrieve_canonical_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream video character retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -11637,11 +10867,7 @@ async fn video_edits_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video edits",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video edits");
         }
     }
 
@@ -11713,11 +10939,7 @@ async fn video_extensions_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream video extensions",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream video extensions");
         }
     }
 
@@ -11789,11 +11011,7 @@ async fn uploads_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload");
         }
     }
 
@@ -11871,11 +11089,7 @@ async fn upload_parts_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload part",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload part");
         }
     }
 
@@ -11950,11 +11164,7 @@ async fn upload_complete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload completion",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload completion");
         }
     }
 
@@ -12026,11 +11236,7 @@ async fn upload_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream upload cancellation",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream upload cancellation");
         }
     }
 
@@ -12102,11 +11308,7 @@ async fn fine_tuning_jobs_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job");
         }
     }
 
@@ -12176,11 +11378,7 @@ async fn fine_tuning_jobs_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning jobs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning jobs list");
         }
     }
 
@@ -12248,11 +11446,9 @@ async fn fine_tuning_job_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning job retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -12324,11 +11520,7 @@ async fn fine_tuning_job_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job cancel");
         }
     }
 
@@ -12400,11 +11592,7 @@ async fn fine_tuning_job_events_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job events",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job events");
         }
     }
 
@@ -12476,11 +11664,9 @@ async fn fine_tuning_job_checkpoints_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning job checkpoints",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -12552,11 +11738,7 @@ async fn fine_tuning_job_pause_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job pause",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job pause");
         }
     }
 
@@ -12628,11 +11810,7 @@ async fn fine_tuning_job_resume_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream fine tuning job resume",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream fine tuning job resume");
         }
     }
 
@@ -12706,11 +11884,9 @@ async fn fine_tuning_checkpoint_permissions_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permissions create",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -12782,11 +11958,9 @@ async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permissions list",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -12859,11 +12033,9 @@ async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream fine tuning checkpoint permission delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -12935,11 +12107,7 @@ async fn assistants_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant");
         }
     }
 
@@ -13010,11 +12178,7 @@ async fn assistants_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistants list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistants list");
         }
     }
 
@@ -13082,11 +12246,7 @@ async fn assistant_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant retrieve");
         }
     }
 
@@ -13161,11 +12321,7 @@ async fn assistant_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant update");
         }
     }
 
@@ -13239,11 +12395,7 @@ async fn assistant_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream assistant delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream assistant delete");
         }
     }
 
@@ -13315,11 +12467,7 @@ async fn webhooks_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook");
         }
     }
 
@@ -13390,11 +12538,7 @@ async fn webhooks_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhooks list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhooks list");
         }
     }
 
@@ -13462,11 +12606,7 @@ async fn webhook_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook retrieve");
         }
     }
 
@@ -13541,11 +12681,7 @@ async fn webhook_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook update");
         }
     }
 
@@ -13622,11 +12758,7 @@ async fn webhook_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream webhook delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream webhook delete");
         }
     }
 
@@ -13698,11 +12830,7 @@ async fn realtime_sessions_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream realtime session",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream realtime session");
         }
     }
 
@@ -13774,11 +12902,7 @@ async fn evals_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval");
         }
     }
 
@@ -13827,11 +12951,7 @@ async fn evals_list_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream evals list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream evals list");
         }
     }
 
@@ -13856,11 +12976,7 @@ async fn eval_retrieve_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval retrieve");
         }
     }
 
@@ -13894,11 +13010,7 @@ async fn eval_update_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval update");
         }
     }
 
@@ -13931,11 +13043,7 @@ async fn eval_delete_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval delete");
         }
     }
 
@@ -13967,11 +13075,7 @@ async fn eval_runs_list_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval runs list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval runs list");
         }
     }
 
@@ -14005,11 +13109,7 @@ async fn eval_runs_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run create",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run create");
         }
     }
 
@@ -14043,11 +13143,7 @@ async fn eval_run_retrieve_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run retrieve");
         }
     }
 
@@ -14081,11 +13177,7 @@ async fn eval_run_delete_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run delete");
         }
     }
 
@@ -14119,11 +13211,7 @@ async fn eval_run_cancel_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream eval run cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream eval run cancel");
         }
     }
 
@@ -14157,11 +13245,9 @@ async fn eval_run_output_items_list_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream eval run output items list",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -14196,11 +13282,9 @@ async fn eval_run_output_item_retrieve_with_state_handler(
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream eval run output item retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -14255,11 +13339,7 @@ async fn batches_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch");
         }
     }
 
@@ -14330,11 +13410,7 @@ async fn batches_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batches list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batches list");
         }
     }
 
@@ -14402,11 +13478,7 @@ async fn batch_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch retrieve");
         }
     }
 
@@ -14478,11 +13550,7 @@ async fn batch_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream batch cancel",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream batch cancel");
         }
     }
 
@@ -14554,11 +13622,7 @@ async fn vector_stores_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store");
         }
     }
 
@@ -14628,11 +13692,7 @@ async fn vector_stores_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector stores list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector stores list");
         }
     }
 
@@ -14700,11 +13760,7 @@ async fn vector_store_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store retrieve",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store retrieve");
         }
     }
 
@@ -14778,11 +13834,7 @@ async fn vector_store_update_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store update",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store update");
         }
     }
 
@@ -14855,11 +13907,7 @@ async fn vector_store_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store delete",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store delete");
         }
     }
 
@@ -14933,11 +13981,7 @@ async fn vector_store_search_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store search",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store search");
         }
     }
 
@@ -15012,11 +14056,7 @@ async fn vector_store_files_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store file",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store file");
         }
     }
 
@@ -15089,11 +14129,7 @@ async fn vector_store_files_list_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store files list",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store files list");
         }
     }
 
@@ -15166,11 +14202,9 @@ async fn vector_store_file_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -15244,11 +14278,9 @@ async fn vector_store_file_delete_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file delete",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -15323,11 +14355,7 @@ async fn vector_store_file_batches_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
-                "failed to relay upstream vector store file batch",
-            )
-                .into_response();
+            return bad_gateway_openai_response("failed to relay upstream vector store file batch");
         }
     }
 
@@ -15401,11 +14429,9 @@ async fn vector_store_file_batch_retrieve_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch retrieve",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -15479,11 +14505,9 @@ async fn vector_store_file_batch_cancel_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch cancel",
-            )
-                .into_response();
+            );
         }
     }
 
@@ -15557,11 +14581,9 @@ async fn vector_store_file_batch_files_with_state_handler(
         }
         Ok(None) => {}
         Err(_) => {
-            return (
-                axum::http::StatusCode::BAD_GATEWAY,
+            return bad_gateway_openai_response(
                 "failed to relay upstream vector store file batch files",
-            )
-                .into_response();
+            );
         }
     }
 
