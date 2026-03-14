@@ -11,9 +11,9 @@ use tower::ServiceExt;
 
 #[cfg(windows)]
 use sdkwork_api_extension_core::ExtensionRuntime;
-#[cfg(windows)]
 use sdkwork_api_extension_host::{
-    ensure_connector_runtime_started, shutdown_all_connector_runtimes, ExtensionLoadPlan,
+    ensure_connector_runtime_started, load_native_dynamic_provider_adapter,
+    shutdown_all_connector_runtimes, shutdown_all_native_dynamic_runtimes, ExtensionLoadPlan,
 };
 #[cfg(windows)]
 use std::net::TcpListener;
@@ -703,12 +703,53 @@ async fn list_active_connector_runtime_statuses_from_admin_api() {
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(json.as_array().unwrap().len(), 1);
+    assert_eq!(json[0]["runtime"], "connector");
+    assert_eq!(json[0]["extension_id"], "sdkwork.provider.custom-openai");
     assert_eq!(json[0]["instance_id"], "provider-custom-openai");
     assert_eq!(json[0]["running"], true);
     assert_eq!(json[0]["healthy"], true);
 
     shutdown_all_connector_runtimes().unwrap();
     cleanup_dir(&root);
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn list_active_native_dynamic_runtime_statuses_from_admin_api() {
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let library_path = native_dynamic_fixture_library_path();
+    let _adapter =
+        load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1").unwrap();
+
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/extensions/runtime-statuses")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json.as_array().unwrap().len(), 1);
+    assert_eq!(json[0]["runtime"], "native_dynamic");
+    assert_eq!(json[0]["extension_id"], "sdkwork.provider.native.mock");
+    assert_eq!(json[0]["running"], true);
+    assert_eq!(json[0]["healthy"], true);
+    assert_eq!(json[0]["supports_health_check"], true);
+    assert_eq!(json[0]["supports_shutdown"], true);
+    assert_eq!(json[0]["message"], "native mock healthy");
+
+    shutdown_all_native_dynamic_runtimes().unwrap();
 }
 
 fn temp_extension_root(suffix: &str) -> PathBuf {
@@ -813,6 +854,36 @@ while ($true) {{
 }}
 "#
     )
+}
+
+fn native_dynamic_fixture_library_path() -> PathBuf {
+    let current_exe = std::env::current_exe().expect("current exe");
+    let directory = current_exe.parent().expect("exe dir");
+    let prefix = if cfg!(windows) {
+        "sdkwork_api_ext_provider_native_mock"
+    } else {
+        "libsdkwork_api_ext_provider_native_mock"
+    };
+    let extension = if cfg!(windows) {
+        "dll"
+    } else if cfg!(target_os = "macos") {
+        "dylib"
+    } else {
+        "so"
+    };
+
+    std::fs::read_dir(directory)
+        .expect("deps dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.extension().and_then(|value| value.to_str()) == Some(extension)
+                && path
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|stem| stem.starts_with(prefix))
+        })
+        .expect("native dynamic fixture library")
 }
 
 #[cfg(windows)]

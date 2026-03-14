@@ -12,6 +12,10 @@ pub const SDKWORK_EXTENSION_PROVIDER_EXECUTE_JSON_SYMBOL: &[u8] =
     b"sdkwork_extension_provider_execute_json\0";
 pub const SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL: &[u8] =
     b"sdkwork_extension_provider_execute_stream_json\0";
+pub const SDKWORK_EXTENSION_INIT_JSON_SYMBOL: &[u8] = b"sdkwork_extension_init_json\0";
+pub const SDKWORK_EXTENSION_HEALTH_CHECK_JSON_SYMBOL: &[u8] =
+    b"sdkwork_extension_health_check_json\0";
+pub const SDKWORK_EXTENSION_SHUTDOWN_JSON_SYMBOL: &[u8] = b"sdkwork_extension_shutdown_json\0";
 pub const SDKWORK_EXTENSION_FREE_STRING_SYMBOL: &[u8] = b"sdkwork_extension_free_string\0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -110,6 +114,75 @@ impl ProviderStreamInvocationResult {
     pub fn error(message: impl Into<String>) -> Self {
         Self::Error {
             message: message.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtensionLifecycleContext {
+    pub extension_id: String,
+    pub entrypoint: String,
+}
+
+impl ExtensionLifecycleContext {
+    pub fn new(extension_id: impl Into<String>, entrypoint: impl Into<String>) -> Self {
+        Self {
+            extension_id: extension_id.into(),
+            entrypoint: entrypoint.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtensionLifecycleResult {
+    pub success: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+}
+
+impl ExtensionLifecycleResult {
+    pub fn success(message: impl Into<String>) -> Self {
+        Self {
+            success: true,
+            message: Some(message.into()),
+            details: None,
+        }
+    }
+
+    pub fn failure(message: impl Into<String>) -> Self {
+        Self {
+            success: false,
+            message: Some(message.into()),
+            details: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtensionHealthCheckResult {
+    pub healthy: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+}
+
+impl ExtensionHealthCheckResult {
+    pub fn healthy(message: impl Into<String>) -> Self {
+        Self {
+            healthy: true,
+            message: Some(message.into()),
+            details: None,
+        }
+    }
+
+    pub fn unhealthy(message: impl Into<String>) -> Self {
+        Self {
+            healthy: false,
+            message: Some(message.into()),
+            details: None,
         }
     }
 }

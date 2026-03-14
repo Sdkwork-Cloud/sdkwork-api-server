@@ -56,7 +56,7 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | `/admin/extensions/packages` | `native` | Lists discovered extension package manifests from configured search paths with normalized package naming and validation details |
 | `/admin/extensions/installations` | `native` | Stores extension installation state and config payload |
 | `/admin/extensions/instances` | `native` | Stores mounted extension instances with runtime config |
-| `/admin/extensions/runtime-statuses` | `native` | Lists active supervised connector runtimes currently tracked by the host |
+| `/admin/extensions/runtime-statuses` | `native` | Lists normalized runtime status for active connector and native dynamic runtimes currently tracked by the host |
 | `/admin/routing/simulations` | `native` | Catalog-backed routing decision preview |
 | `/admin/usage/records` | `native` | Lists gateway-recorded usage |
 | `/admin/billing/ledger` | `native` | Lists gateway-booked billing entries |
@@ -66,7 +66,7 @@ Admin APIs are SDKWork-owned control-plane surfaces and therefore classify as `n
 | Runtime Mode | Level | Notes |
 |---|---|---|
 | `builtin` | `native` | Active today through `sdkwork-api-extension-host` and built-in provider factories |
-| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, dynamic library symbol resolution, and callback-based stream execution for `/v1/chat/completions`, `/v1/responses`, `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content`; lifecycle hooks remain future work |
+| `native_dynamic` | `native` | Trusted provider packages can now load through the JSON ABI, manifest verification, dynamic library symbol resolution, optional `init` or `health_check` or `shutdown` lifecycle hooks, and callback-based stream execution for `/v1/chat/completions`, `/v1/responses`, `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content` |
 | `connector` | `native` | Managed process lifecycle is active in the host, with HTTP health checks, reusable external endpoint attachment, protocol-mapped relay through the current adapter set, and trust-policy gating for discovered external packages |
 
 ## Current Built-In Extension IDs

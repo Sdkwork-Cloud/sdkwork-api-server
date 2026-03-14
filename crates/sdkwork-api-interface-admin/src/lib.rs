@@ -17,8 +17,8 @@ use sdkwork_api_app_catalog::{
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_credential::{list_credentials, persist_credential_with_secret_and_manager};
 use sdkwork_api_app_extension::{
-    configured_extension_discovery_policy_from_env, list_connector_runtime_statuses,
-    list_discovered_extension_packages, list_extension_installations, list_extension_instances,
+    configured_extension_discovery_policy_from_env, list_discovered_extension_packages,
+    list_extension_installations, list_extension_instances, list_extension_runtime_statuses,
     persist_extension_installation, persist_extension_instance, ExtensionDiscoveryPolicy,
     PersistExtensionInstanceInput,
 };
@@ -699,8 +699,8 @@ async fn create_extension_instance_handler(
 async fn list_extension_runtime_statuses_handler(
     _claims: AuthenticatedAdminClaims,
     _state: State<AdminApiState>,
-) -> Result<Json<Vec<sdkwork_api_app_extension::ConnectorRuntimeStatusRecord>>, StatusCode> {
-    list_connector_runtime_statuses()
+) -> Result<Json<Vec<sdkwork_api_app_extension::ExtensionRuntimeStatusRecord>>, StatusCode> {
+    list_extension_runtime_statuses()
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }

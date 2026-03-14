@@ -51,14 +51,14 @@ The current repository includes:
 - a built-in extension host with manifest registration for OpenAI, OpenRouter, and Ollama provider extensions
 - filesystem extension discovery through `sdkwork-extension.toml` package manifests loaded from configured search paths
 - persisted extension installation and instance records for configuration-driven mounting
-- authenticated admin visibility for discovered extension packages and active connector runtime statuses
+- authenticated admin visibility for discovered extension packages and normalized runtime statuses across connector and native dynamic runtimes
 - discovery-time validation of manifest permissions, bindings, capabilities, entrypoints, and connector health contracts
 - discovery-time trust verification for external extension packages, including publisher identity, ed25519 signature checks, and trusted-signer policy evaluation
 - provider runtime dispatch keyed by `ProxyProvider.extension_id`, with `adapter_kind` kept as a compatibility alias for older records and protocol classification
 - real provider dispatch now consumes persisted extension load state so instance-level `base_url` overrides are honored and disabled installations or instances short-circuit to local fallback
 - discovered provider manifests can now bind to the current protocol adapters so connector-style extensions participate in real relay execution when they declare a supported protocol
 - connector runtime supervision is now active for discovered packages, including host-managed process startup, HTTP health probing, and reuse of already healthy external endpoints
-- native dynamic runtime execution is now active for trusted provider packages through a narrow JSON ABI, with manifest matching and symbol validation at load time
+- native dynamic runtime execution is now active for trusted provider packages through a narrow JSON ABI, with manifest matching, optional lifecycle hooks, health contracts, and symbol validation at load time
 - gateway runtime loading now skips external packages whose trust policy does not allow execution, so blocked connector or native-dynamic packages fall back cleanly instead of entering the execution host
 
 ## Extension Runtime Status
@@ -68,7 +68,7 @@ The extension architecture is intentionally layered.
 | Runtime | Current Status | Notes |
 |---|---|---|
 | `builtin` | Active | First-party provider extensions are registered in-process through `sdkwork-api-extension-host` |
-| `native_dynamic` | Active with JSON and generic stream ABI execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, and executed for JSON-capable provider operations plus `/v1/chat/completions` and `/v1/responses` SSE relay and binary stream passthrough for `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content` |
+| `native_dynamic` | Active with JSON, generic stream ABI, and lifecycle execution | Trusted packages can be loaded in-process through `libloading`, validated against the exported manifest, executed for JSON-capable provider operations plus `/v1/chat/completions` and `/v1/responses` SSE relay and binary stream passthrough for `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content`, and observed through optional `init`, `health_check`, and `shutdown` hooks |
 | `connector` | Active with supervised execution | Manifest discovery and config-driven loading are active; the host can start configured connector processes, probe HTTP health endpoints, reuse healthy external endpoints, and relay through the current protocol adapter set |
 
 ## Configuration Layers
@@ -106,7 +106,7 @@ Configuration-driven loading now uses a stable merge order:
 2. installation-level runtime choice and package config
 3. instance-level overrides such as `base_url`, `credential_ref`, and rollout weights
 
-This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations, chat or responses SSE stream relay, and the current binary stream routes for audio speech plus file and video content through the same ABI boundary. Hot reload and richer lifecycle hooks remain future work.
+This means `connector` extensions are executable through the host runtime contract, while `native_dynamic` extensions are now executable for JSON-capable provider operations, chat or responses SSE stream relay, the current binary stream routes for audio speech plus file and video content, and package-runtime lifecycle or health contracts through the same ABI boundary. Hot reload and scheduled health supervision remain future work.
 
 The runtime now also supports two manifest sources:
 

@@ -3,9 +3,10 @@ use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, Exten
 use sdkwork_api_extension_host::{
     discover_extension_packages,
     list_connector_runtime_statuses as host_connector_runtime_statuses,
+    list_native_dynamic_runtime_statuses as host_native_dynamic_runtime_statuses,
     validate_discovered_extension_package, verify_discovered_extension_package_trust,
     ConnectorRuntimeStatus, DiscoveredExtensionPackage, ExtensionTrustReport,
-    ManifestValidationReport,
+    ManifestValidationReport, NativeDynamicRuntimeStatus,
 };
 use sdkwork_api_storage_core::AdminStore;
 use serde::Serialize;
@@ -35,14 +36,23 @@ pub struct DiscoveredExtensionPackageRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ConnectorRuntimeStatusRecord {
+pub struct ExtensionRuntimeStatusRecord {
+    pub runtime: String,
+    pub extension_id: String,
+    pub display_name: String,
     pub instance_id: String,
-    pub base_url: String,
-    pub health_url: String,
+    pub base_url: Option<String>,
+    pub health_url: Option<String>,
     pub process_id: Option<u32>,
+    pub library_path: Option<String>,
     pub running: bool,
     pub healthy: bool,
+    pub supports_health_check: bool,
+    pub supports_shutdown: bool,
+    pub message: Option<String>,
 }
+
+pub type ConnectorRuntimeStatusRecord = ExtensionRuntimeStatusRecord;
 
 pub async fn list_extension_installations(
     store: &dyn AdminStore,
@@ -84,8 +94,27 @@ pub fn list_discovered_extension_packages(
 pub fn list_connector_runtime_statuses() -> Result<Vec<ConnectorRuntimeStatusRecord>> {
     Ok(host_connector_runtime_statuses()?
         .into_iter()
-        .map(ConnectorRuntimeStatusRecord::from)
+        .map(ExtensionRuntimeStatusRecord::from)
         .collect())
+}
+
+pub fn list_extension_runtime_statuses() -> Result<Vec<ExtensionRuntimeStatusRecord>> {
+    let mut statuses = host_connector_runtime_statuses()?
+        .into_iter()
+        .map(ExtensionRuntimeStatusRecord::from)
+        .collect::<Vec<_>>();
+    statuses.extend(
+        host_native_dynamic_runtime_statuses()?
+            .into_iter()
+            .map(ExtensionRuntimeStatusRecord::from),
+    );
+    statuses.sort_by(|left, right| {
+        left.runtime
+            .cmp(&right.runtime)
+            .then(left.extension_id.cmp(&right.extension_id))
+            .then(left.instance_id.cmp(&right.instance_id))
+    });
+    Ok(statuses)
 }
 
 pub async fn persist_extension_instance(
@@ -149,15 +178,42 @@ impl DiscoveredExtensionPackageRecord {
     }
 }
 
-impl From<ConnectorRuntimeStatus> for ConnectorRuntimeStatusRecord {
+impl From<ConnectorRuntimeStatus> for ExtensionRuntimeStatusRecord {
     fn from(value: ConnectorRuntimeStatus) -> Self {
         Self {
+            runtime: "connector".to_owned(),
+            extension_id: value.extension_id,
+            display_name: value.display_name,
             instance_id: value.instance_id,
-            base_url: value.base_url,
-            health_url: value.health_url,
+            base_url: Some(value.base_url),
+            health_url: Some(value.health_url),
             process_id: value.process_id,
+            library_path: None,
             running: value.running,
             healthy: value.healthy,
+            supports_health_check: true,
+            supports_shutdown: true,
+            message: None,
+        }
+    }
+}
+
+impl From<NativeDynamicRuntimeStatus> for ExtensionRuntimeStatusRecord {
+    fn from(value: NativeDynamicRuntimeStatus) -> Self {
+        Self {
+            runtime: "native_dynamic".to_owned(),
+            extension_id: value.extension_id,
+            display_name: value.display_name,
+            instance_id: String::new(),
+            base_url: None,
+            health_url: None,
+            process_id: None,
+            library_path: Some(value.library_path),
+            running: value.running,
+            healthy: value.healthy,
+            supports_health_check: value.supports_health_check,
+            supports_shutdown: value.supports_shutdown,
+            message: value.message,
         }
     }
 }

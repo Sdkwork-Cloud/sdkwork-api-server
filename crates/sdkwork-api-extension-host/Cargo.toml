@@ -27,6 +27,7 @@ axum.workspace = true
 sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
 base64.workspace = true
 ed25519-dalek.workspace = true
+serial_test.workspace = true
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
 serde_json.workspace = true
 sha2.workspace = true

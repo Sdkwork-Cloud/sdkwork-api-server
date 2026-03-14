@@ -1,11 +1,13 @@
 use sdkwork_api_app_extension::{
-    list_connector_runtime_statuses, list_discovered_extension_packages,
+    list_discovered_extension_packages, list_extension_runtime_statuses,
 };
 use sdkwork_api_extension_host::{
-    ensure_connector_runtime_started, shutdown_all_connector_runtimes, ExtensionDiscoveryPolicy,
-    ExtensionLoadPlan,
+    ensure_connector_runtime_started, load_native_dynamic_provider_adapter,
+    shutdown_all_connector_runtimes, shutdown_all_native_dynamic_runtimes,
+    ExtensionDiscoveryPolicy, ExtensionLoadPlan,
 };
 use serde_json::json;
+use serial_test::serial;
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -74,14 +76,39 @@ fn lists_active_connector_runtime_statuses_from_host_registry() {
     ensure_connector_runtime_started(&load_plan, load_plan.base_url.as_deref().expect("base url"))
         .unwrap();
 
-    let statuses = list_connector_runtime_statuses().unwrap();
+    let statuses = list_extension_runtime_statuses().unwrap();
     assert_eq!(statuses.len(), 1);
+    assert_eq!(statuses[0].runtime, "connector");
+    assert_eq!(statuses[0].extension_id, "sdkwork.provider.custom-openai");
     assert_eq!(statuses[0].instance_id, "provider-custom-openai");
     assert!(statuses[0].running);
     assert!(statuses[0].healthy);
 
     shutdown_all_connector_runtimes().unwrap();
     cleanup_dir(&root);
+}
+
+#[serial(extension_runtime)]
+#[test]
+fn lists_active_native_dynamic_runtime_statuses_from_host_registry() {
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let library_path = native_dynamic_fixture_library_path();
+    let _adapter =
+        load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1").unwrap();
+
+    let statuses = list_extension_runtime_statuses().unwrap();
+    assert_eq!(statuses.len(), 1);
+    assert_eq!(statuses[0].runtime, "native_dynamic");
+    assert_eq!(statuses[0].extension_id, "sdkwork.provider.native.mock");
+    assert!(statuses[0].instance_id.is_empty());
+    assert!(statuses[0].running);
+    assert!(statuses[0].healthy);
+    assert!(statuses[0].supports_health_check);
+    assert!(statuses[0].supports_shutdown);
+    assert_eq!(statuses[0].message.as_deref(), Some("native mock healthy"));
+
+    shutdown_all_native_dynamic_runtimes().unwrap();
 }
 
 fn connector_manifest(extension_id: &str) -> String {
@@ -164,6 +191,36 @@ fn temp_extension_root(suffix: &str) -> PathBuf {
 
 fn cleanup_dir(path: &Path) {
     let _ = fs::remove_dir_all(path);
+}
+
+fn native_dynamic_fixture_library_path() -> PathBuf {
+    let current_exe = std::env::current_exe().expect("current exe");
+    let directory = current_exe.parent().expect("exe dir");
+    let prefix = if cfg!(windows) {
+        "sdkwork_api_ext_provider_native_mock"
+    } else {
+        "libsdkwork_api_ext_provider_native_mock"
+    };
+    let extension = if cfg!(windows) {
+        "dll"
+    } else if cfg!(target_os = "macos") {
+        "dylib"
+    } else {
+        "so"
+    };
+
+    std::fs::read_dir(directory)
+        .expect("deps dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.extension().and_then(|value| value.to_str()) == Some(extension)
+                && path
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|stem| stem.starts_with(prefix))
+        })
+        .expect("native dynamic fixture library")
 }
 
 #[cfg(windows)]

@@ -19,12 +19,14 @@ use futures_util::stream;
 use futures_util::StreamExt;
 use libloading::Library;
 use sdkwork_api_extension_abi::{
-    free_raw_c_string, from_raw_c_str, into_raw_c_string, ProviderInvocation,
+    free_raw_c_string, from_raw_c_str, into_raw_c_string, ExtensionHealthCheckResult,
+    ExtensionLifecycleContext, ExtensionLifecycleResult, ProviderInvocation,
     ProviderInvocationResult, ProviderStreamInvocationResult, ProviderStreamWriter,
     SDKWORK_EXTENSION_ABI_VERSION, SDKWORK_EXTENSION_ABI_VERSION_SYMBOL,
-    SDKWORK_EXTENSION_FREE_STRING_SYMBOL, SDKWORK_EXTENSION_MANIFEST_JSON_SYMBOL,
+    SDKWORK_EXTENSION_FREE_STRING_SYMBOL, SDKWORK_EXTENSION_HEALTH_CHECK_JSON_SYMBOL,
+    SDKWORK_EXTENSION_INIT_JSON_SYMBOL, SDKWORK_EXTENSION_MANIFEST_JSON_SYMBOL,
     SDKWORK_EXTENSION_PROVIDER_EXECUTE_JSON_SYMBOL,
-    SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL,
+    SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL, SDKWORK_EXTENSION_SHUTDOWN_JSON_SYMBOL,
 };
 use sdkwork_api_extension_core::{
     ExtensionInstallation, ExtensionInstance, ExtensionManifest, ExtensionRuntime,
@@ -34,7 +36,7 @@ use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
     ProviderStreamOutput,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::mpsc::{self, UnboundedSender};
@@ -59,6 +61,7 @@ type ManifestJsonFn = unsafe extern "C" fn() -> *const c_char;
 type ExecuteJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
 type ExecuteStreamJsonFn =
     unsafe extern "C" fn(*const c_char, *const ProviderStreamWriter) -> *mut c_char;
+type LifecycleJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
 type FreeStringFn = unsafe extern "C" fn(*mut c_char);
 
 #[derive(Clone)]
@@ -248,6 +251,8 @@ pub struct ExtensionTrustReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectorRuntimeStatus {
     pub instance_id: String,
+    pub extension_id: String,
+    pub display_name: String,
     pub base_url: String,
     pub health_url: String,
     pub process_id: Option<u32>,
@@ -258,6 +263,8 @@ pub struct ConnectorRuntimeStatus {
 #[derive(Debug)]
 struct ManagedConnectorProcess {
     child: Child,
+    extension_id: String,
+    display_name: String,
     base_url: String,
     health_url: String,
 }
@@ -273,12 +280,37 @@ struct ConnectorLaunchConfig {
     startup_poll_interval: Duration,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeDynamicRuntimeStatus {
+    pub extension_id: String,
+    pub display_name: String,
+    pub library_path: String,
+    pub running: bool,
+    pub healthy: bool,
+    pub supports_health_check: bool,
+    pub supports_shutdown: bool,
+    pub message: Option<String>,
+}
+
 struct NativeDynamicRuntime {
     entrypoint: String,
+    manifest: ExtensionManifest,
     _library: Library,
     execute_json: ExecuteJsonFn,
     execute_stream_json: Option<ExecuteStreamJsonFn>,
+    init_json: Option<LifecycleJsonFn>,
+    health_check_json: Option<LifecycleJsonFn>,
+    shutdown_json: Option<LifecycleJsonFn>,
     free_string: FreeStringFn,
+    lifecycle_state: Mutex<NativeDynamicLifecycleState>,
+}
+
+#[derive(Debug)]
+struct NativeDynamicLifecycleState {
+    running: bool,
+    healthy: bool,
+    message: Option<String>,
+    shutdown_invoked: bool,
 }
 
 unsafe impl Send for NativeDynamicRuntime {}
@@ -301,6 +333,177 @@ enum NativeDynamicStreamEvent {
 
 static CONNECTOR_PROCESS_REGISTRY: OnceLock<Mutex<HashMap<String, ManagedConnectorProcess>>> =
     OnceLock::new();
+static NATIVE_DYNAMIC_RUNTIME_REGISTRY: OnceLock<
+    Mutex<HashMap<String, Arc<NativeDynamicRuntime>>>,
+> = OnceLock::new();
+
+impl NativeDynamicRuntime {
+    fn lifecycle_context(&self) -> ExtensionLifecycleContext {
+        ExtensionLifecycleContext::new(self.manifest.id.clone(), self.entrypoint.clone())
+    }
+
+    fn lock_state(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, NativeDynamicLifecycleState>, ExtensionHostError> {
+        self.lifecycle_state.lock().map_err(|_| {
+            ExtensionHostError::NativeDynamicRuntimeStatePoisoned {
+                entrypoint: self.entrypoint.clone(),
+            }
+        })
+    }
+
+    fn initialize(&self) -> Result<(), ExtensionHostError> {
+        let message = if let Some(init_json) = self.init_json {
+            let result: ExtensionLifecycleResult = self.invoke_lifecycle_json(init_json, "init")?;
+            if !result.success {
+                return Err(ExtensionHostError::NativeDynamicLifecycleFailed {
+                    entrypoint: self.entrypoint.clone(),
+                    phase: "init".to_owned(),
+                    message: result
+                        .message
+                        .unwrap_or_else(|| "plugin reported init failure".to_owned()),
+                });
+            }
+            result.message
+        } else {
+            Some("native dynamic runtime loaded".to_owned())
+        };
+
+        let mut state = self.lock_state()?;
+        state.running = true;
+        state.healthy = true;
+        state.message = message;
+        Ok(())
+    }
+
+    fn ensure_running(&self) -> Result<(), ExtensionHostError> {
+        if self.lock_state()?.running {
+            Ok(())
+        } else {
+            Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                entrypoint: self.entrypoint.clone(),
+                message: "native dynamic runtime is not running".to_owned(),
+            })
+        }
+    }
+
+    fn status(&self) -> Result<NativeDynamicRuntimeStatus, ExtensionHostError> {
+        let (running, mut healthy, mut message) = {
+            let state = self.lock_state()?;
+            (state.running, state.healthy, state.message.clone())
+        };
+
+        if running && self.health_check_json.is_some() {
+            match self.health_check() {
+                Ok(result) => {
+                    healthy = result.healthy;
+                    message = result.message.clone();
+                    let mut state = self.lock_state()?;
+                    state.healthy = result.healthy;
+                    state.message = result.message.clone();
+                }
+                Err(error) => {
+                    healthy = false;
+                    message = Some(error.to_string());
+                    let mut state = self.lock_state()?;
+                    state.healthy = false;
+                    state.message = message.clone();
+                }
+            }
+        }
+
+        Ok(NativeDynamicRuntimeStatus {
+            extension_id: self.manifest.id.clone(),
+            display_name: self.manifest.display_name.clone(),
+            library_path: self.entrypoint.clone(),
+            running,
+            healthy,
+            supports_health_check: self.health_check_json.is_some(),
+            supports_shutdown: self.shutdown_json.is_some(),
+            message,
+        })
+    }
+
+    fn health_check(&self) -> Result<ExtensionHealthCheckResult, ExtensionHostError> {
+        let Some(health_check_json) = self.health_check_json else {
+            let state = self.lock_state()?;
+            return Ok(ExtensionHealthCheckResult {
+                healthy: state.healthy,
+                message: state.message.clone(),
+                details: None,
+            });
+        };
+
+        self.invoke_lifecycle_json(health_check_json, "health_check")
+    }
+
+    fn shutdown(&self) -> Result<(), ExtensionHostError> {
+        {
+            let state = self.lock_state()?;
+            if state.shutdown_invoked {
+                return Ok(());
+            }
+        }
+
+        let message = if let Some(shutdown_json) = self.shutdown_json {
+            let result: ExtensionLifecycleResult =
+                self.invoke_lifecycle_json(shutdown_json, "shutdown")?;
+            if !result.success {
+                return Err(ExtensionHostError::NativeDynamicLifecycleFailed {
+                    entrypoint: self.entrypoint.clone(),
+                    phase: "shutdown".to_owned(),
+                    message: result
+                        .message
+                        .unwrap_or_else(|| "plugin reported shutdown failure".to_owned()),
+                });
+            }
+            result.message
+        } else {
+            Some("native dynamic runtime stopped".to_owned())
+        };
+
+        let mut state = self.lock_state()?;
+        state.running = false;
+        state.healthy = false;
+        state.shutdown_invoked = true;
+        state.message = message;
+        Ok(())
+    }
+
+    fn invoke_lifecycle_json<T: DeserializeOwned>(
+        &self,
+        callback: LifecycleJsonFn,
+        phase: &str,
+    ) -> Result<T, ExtensionHostError> {
+        let payload = serde_json::to_string(&self.lifecycle_context()).map_err(|error| {
+            ExtensionHostError::NativeDynamicLifecycleFailed {
+                entrypoint: self.entrypoint.clone(),
+                phase: phase.to_owned(),
+                message: error.to_string(),
+            }
+        })?;
+        let raw_payload = into_raw_c_string(payload);
+        let raw_result = unsafe { callback(raw_payload.cast_const()) };
+        unsafe { free_raw_c_string(raw_payload) };
+
+        let Some(raw_result_json) = (unsafe { from_raw_c_str(raw_result) }) else {
+            return Err(ExtensionHostError::NativeDynamicLifecycleFailed {
+                entrypoint: self.entrypoint.clone(),
+                phase: phase.to_owned(),
+                message: "plugin returned null lifecycle result".to_owned(),
+            });
+        };
+        unsafe { (self.free_string)(raw_result) };
+
+        serde_json::from_str(&raw_result_json).map_err(|error| {
+            ExtensionHostError::NativeDynamicLifecycleFailed {
+                entrypoint: self.entrypoint.clone(),
+                phase: phase.to_owned(),
+                message: error.to_string(),
+            }
+        })
+    }
+}
 
 pub fn discover_extension_packages(
     policy: &ExtensionDiscoveryPolicy,
@@ -465,6 +668,8 @@ pub fn ensure_connector_runtime_started(
     if probe_http_health(&launch_config.health_url)? {
         return Ok(ConnectorRuntimeStatus {
             instance_id: load_plan.instance_id.clone(),
+            extension_id: load_plan.extension_id.clone(),
+            display_name: load_plan.display_name.clone(),
             base_url: base_url.to_owned(),
             health_url: launch_config.health_url,
             process_id: None,
@@ -518,6 +723,8 @@ pub fn ensure_connector_runtime_started(
             load_plan.instance_id.clone(),
             ManagedConnectorProcess {
                 child,
+                extension_id: load_plan.extension_id.clone(),
+                display_name: load_plan.display_name.clone(),
                 base_url: base_url.to_owned(),
                 health_url: launch_config.health_url.clone(),
             },
@@ -533,6 +740,8 @@ pub fn ensure_connector_runtime_started(
 
     Ok(ConnectorRuntimeStatus {
         instance_id: load_plan.instance_id.clone(),
+        extension_id: load_plan.extension_id.clone(),
+        display_name: load_plan.display_name.clone(),
         base_url: base_url.to_owned(),
         health_url: launch_config.health_url,
         process_id,
@@ -571,6 +780,8 @@ pub fn list_connector_runtime_statuses() -> Result<Vec<ConnectorRuntimeStatus>, 
             match process.child.try_wait() {
                 Ok(None) => snapshots.push((
                     instance_id.clone(),
+                    process.extension_id.clone(),
+                    process.display_name.clone(),
                     process.base_url.clone(),
                     process.health_url.clone(),
                     Some(process.child.id()),
@@ -594,19 +805,54 @@ pub fn list_connector_runtime_statuses() -> Result<Vec<ConnectorRuntimeStatus>, 
 
     let mut statuses = snapshots
         .into_iter()
-        .map(|(instance_id, base_url, health_url, process_id)| {
-            Ok(ConnectorRuntimeStatus {
-                instance_id,
-                base_url,
-                healthy: probe_http_health(&health_url)?,
-                health_url,
-                process_id,
-                running: true,
-            })
-        })
+        .map(
+            |(instance_id, extension_id, display_name, base_url, health_url, process_id)| {
+                Ok(ConnectorRuntimeStatus {
+                    instance_id,
+                    extension_id,
+                    display_name,
+                    base_url,
+                    healthy: probe_http_health(&health_url)?,
+                    health_url,
+                    process_id,
+                    running: true,
+                })
+            },
+        )
         .collect::<Result<Vec<_>, ExtensionHostError>>()?;
     statuses.sort_by(|left, right| left.instance_id.cmp(&right.instance_id));
     Ok(statuses)
+}
+
+pub fn list_native_dynamic_runtime_statuses(
+) -> Result<Vec<NativeDynamicRuntimeStatus>, ExtensionHostError> {
+    let runtimes = {
+        let registry = native_dynamic_runtime_registry()?;
+        registry.values().cloned().collect::<Vec<_>>()
+    };
+
+    let mut statuses = runtimes
+        .into_iter()
+        .map(|runtime| runtime.status())
+        .collect::<Result<Vec<_>, ExtensionHostError>>()?;
+    statuses.sort_by(|left, right| left.extension_id.cmp(&right.extension_id));
+    Ok(statuses)
+}
+
+pub fn shutdown_all_native_dynamic_runtimes() -> Result<(), ExtensionHostError> {
+    let runtimes = {
+        let mut registry = native_dynamic_runtime_registry()?;
+        registry
+            .drain()
+            .map(|(_, runtime)| runtime)
+            .collect::<Vec<_>>()
+    };
+
+    for runtime in runtimes {
+        runtime.shutdown()?;
+    }
+
+    Ok(())
 }
 
 pub fn validate_extension_manifest(manifest: &ExtensionManifest) -> ManifestValidationReport {
@@ -968,6 +1214,14 @@ pub enum ExtensionHostError {
         entrypoint: String,
         message: String,
     },
+    NativeDynamicLifecycleFailed {
+        entrypoint: String,
+        phase: String,
+        message: String,
+    },
+    NativeDynamicRuntimeStatePoisoned {
+        entrypoint: String,
+    },
     ConnectorRuntimeUnsupported {
         instance_id: String,
         runtime: ExtensionRuntime,
@@ -1099,6 +1353,20 @@ impl fmt::Display for ExtensionHostError {
                 "native dynamic extension library {} returned invalid response payload: {}",
                 entrypoint, message
             ),
+            Self::NativeDynamicLifecycleFailed {
+                entrypoint,
+                phase,
+                message,
+            } => write!(
+                f,
+                "native dynamic extension library {} failed during {}: {}",
+                entrypoint, phase, message
+            ),
+            Self::NativeDynamicRuntimeStatePoisoned { entrypoint } => write!(
+                f,
+                "native dynamic extension library {} runtime state is poisoned",
+                entrypoint
+            ),
             Self::ConnectorRuntimeUnsupported {
                 instance_id,
                 runtime,
@@ -1204,6 +1472,18 @@ fn load_native_dynamic_runtime(
             &library,
             SDKWORK_EXTENSION_PROVIDER_EXECUTE_STREAM_JSON_SYMBOL,
         );
+        let init_json = try_load_native_dynamic_symbol::<LifecycleJsonFn>(
+            &library,
+            SDKWORK_EXTENSION_INIT_JSON_SYMBOL,
+        );
+        let health_check_json = try_load_native_dynamic_symbol::<LifecycleJsonFn>(
+            &library,
+            SDKWORK_EXTENSION_HEALTH_CHECK_JSON_SYMBOL,
+        );
+        let shutdown_json = try_load_native_dynamic_symbol::<LifecycleJsonFn>(
+            &library,
+            SDKWORK_EXTENSION_SHUTDOWN_JSON_SYMBOL,
+        );
         let free_string = load_native_dynamic_symbol::<FreeStringFn>(
             &library,
             SDKWORK_EXTENSION_FREE_STRING_SYMBOL,
@@ -1224,23 +1504,37 @@ fn load_native_dynamic_runtime(
                 entrypoint: entrypoint.display().to_string(),
             });
         };
-        let manifest = serde_json::from_str(&manifest_json).map_err(|error| {
-            ExtensionHostError::ManifestParseFailed {
-                path: entrypoint.display().to_string(),
-                message: error.to_string(),
-            }
-        })?;
+        let manifest: ExtensionManifest =
+            serde_json::from_str(&manifest_json).map_err(|error| {
+                ExtensionHostError::ManifestParseFailed {
+                    path: entrypoint.display().to_string(),
+                    message: error.to_string(),
+                }
+            })?;
 
-        Ok((
-            Arc::new(NativeDynamicRuntime {
-                entrypoint: entrypoint.display().to_string(),
-                _library: library,
-                execute_json,
-                execute_stream_json,
-                free_string,
+        let runtime = Arc::new(NativeDynamicRuntime {
+            entrypoint: entrypoint.display().to_string(),
+            manifest: manifest.clone(),
+            _library: library,
+            execute_json,
+            execute_stream_json,
+            init_json,
+            health_check_json,
+            shutdown_json,
+            free_string,
+            lifecycle_state: Mutex::new(NativeDynamicLifecycleState {
+                running: true,
+                healthy: true,
+                message: None,
+                shutdown_invoked: false,
             }),
-            manifest,
-        ))
+        });
+        runtime.initialize()?;
+
+        let mut registry = native_dynamic_runtime_registry()?;
+        registry.insert(runtime.entrypoint.clone(), Arc::clone(&runtime));
+
+        Ok((runtime, manifest))
     }
 }
 
@@ -1356,6 +1650,7 @@ fn execute_native_dynamic_invocation(
     runtime: &NativeDynamicRuntime,
     invocation: &ProviderInvocation,
 ) -> Result<ProviderInvocationResult, ExtensionHostError> {
+    runtime.ensure_running()?;
     let payload = serde_json::to_string(invocation).map_err(|error| {
         ExtensionHostError::NativeDynamicInvocationSerializeFailed {
             operation: invocation.operation.clone(),
@@ -1385,6 +1680,7 @@ async fn execute_native_dynamic_stream_invocation(
     runtime: Arc<NativeDynamicRuntime>,
     invocation: &ProviderInvocation,
 ) -> Result<ProviderStreamOutput, ExtensionHostError> {
+    runtime.ensure_running()?;
     let Some(execute_stream_json) = runtime.execute_stream_json else {
         return Err(ExtensionHostError::NativeDynamicInvocationFailed {
             entrypoint: runtime.entrypoint.clone(),
@@ -2139,6 +2435,18 @@ fn connector_process_registry() -> Result<
         .map_err(|_| ExtensionHostError::ConnectorRuntimeStatePoisoned)
 }
 
+fn native_dynamic_runtime_registry() -> Result<
+    std::sync::MutexGuard<'static, HashMap<String, Arc<NativeDynamicRuntime>>>,
+    ExtensionHostError,
+> {
+    NATIVE_DYNAMIC_RUNTIME_REGISTRY
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|_| ExtensionHostError::NativeDynamicRuntimeStatePoisoned {
+            entrypoint: "native_dynamic_runtime_registry".to_owned(),
+        })
+}
+
 fn running_connector_status(
     instance_id: &str,
 ) -> Result<Option<ConnectorRuntimeStatus>, ExtensionHostError> {
@@ -2148,6 +2456,8 @@ fn running_connector_status(
         Some(process) => match process.child.try_wait() {
             Ok(None) => Some(ConnectorRuntimeStatus {
                 instance_id: instance_id.to_owned(),
+                extension_id: process.extension_id.clone(),
+                display_name: process.display_name.clone(),
                 base_url: process.base_url.clone(),
                 health_url: process.health_url.clone(),
                 process_id: Some(process.child.id()),

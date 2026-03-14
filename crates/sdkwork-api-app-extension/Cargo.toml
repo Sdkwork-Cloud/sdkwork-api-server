@@ -13,6 +13,7 @@ sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 
 [dev-dependencies]
+serial_test.workspace = true
 serde_json.workspace = true
 
 [lib]

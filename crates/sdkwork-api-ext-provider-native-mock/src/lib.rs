@@ -1,9 +1,12 @@
 use std::ffi::CString;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::os::raw::c_char;
 use std::sync::OnceLock;
 
 use sdkwork_api_extension_abi::{
-    free_raw_c_string, from_raw_c_str, into_raw_c_string, ProviderInvocation,
+    free_raw_c_string, from_raw_c_str, into_raw_c_string, ExtensionHealthCheckResult,
+    ExtensionLifecycleContext, ExtensionLifecycleResult, ProviderInvocation,
     ProviderInvocationResult, ProviderStreamInvocationResult, ProviderStreamWriter,
     SDKWORK_EXTENSION_ABI_VERSION,
 };
@@ -13,6 +16,7 @@ use sdkwork_api_extension_core::{
 };
 
 pub const FIXTURE_EXTENSION_ID: &str = "sdkwork.provider.native.mock";
+const LIFECYCLE_LOG_ENV: &str = "SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG";
 
 fn manifest_json() -> &'static CString {
     static MANIFEST_JSON: OnceLock<CString> = OnceLock::new();
@@ -72,6 +76,62 @@ pub extern "C" fn sdkwork_extension_abi_version() -> u32 {
 #[no_mangle]
 pub extern "C" fn sdkwork_extension_manifest_json() -> *const c_char {
     manifest_json().as_ptr()
+}
+
+/// # Safety
+///
+/// `payload` must be a valid null-terminated UTF-8 JSON string for the duration
+/// of this call.
+#[no_mangle]
+pub unsafe extern "C" fn sdkwork_extension_init_json(payload: *const c_char) -> *mut c_char {
+    let result = match unsafe { from_raw_c_str(payload) }
+        .and_then(|payload| serde_json::from_str::<ExtensionLifecycleContext>(&payload).ok())
+    {
+        Some(_) => {
+            append_lifecycle_event("init");
+            ExtensionLifecycleResult::success("native mock initialized")
+        }
+        None => ExtensionLifecycleResult::failure("invalid lifecycle payload"),
+    };
+
+    into_raw_c_string(serde_json::to_string(&result).expect("result json"))
+}
+
+/// # Safety
+///
+/// `payload` must be a valid null-terminated UTF-8 JSON string for the duration
+/// of this call.
+#[no_mangle]
+pub unsafe extern "C" fn sdkwork_extension_health_check_json(
+    payload: *const c_char,
+) -> *mut c_char {
+    let result = match unsafe { from_raw_c_str(payload) }
+        .and_then(|payload| serde_json::from_str::<ExtensionLifecycleContext>(&payload).ok())
+    {
+        Some(_) => ExtensionHealthCheckResult::healthy("native mock healthy"),
+        None => ExtensionHealthCheckResult::unhealthy("invalid lifecycle payload"),
+    };
+
+    into_raw_c_string(serde_json::to_string(&result).expect("result json"))
+}
+
+/// # Safety
+///
+/// `payload` must be a valid null-terminated UTF-8 JSON string for the duration
+/// of this call.
+#[no_mangle]
+pub unsafe extern "C" fn sdkwork_extension_shutdown_json(payload: *const c_char) -> *mut c_char {
+    let result = match unsafe { from_raw_c_str(payload) }
+        .and_then(|payload| serde_json::from_str::<ExtensionLifecycleContext>(&payload).ok())
+    {
+        Some(_) => {
+            append_lifecycle_event("shutdown");
+            ExtensionLifecycleResult::success("native mock shut down")
+        }
+        None => ExtensionLifecycleResult::failure("invalid lifecycle payload"),
+    };
+
+    into_raw_c_string(serde_json::to_string(&result).expect("result json"))
 }
 
 /// # Safety
@@ -279,4 +339,14 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
 #[no_mangle]
 pub unsafe extern "C" fn sdkwork_extension_free_string(ptr: *mut c_char) {
     unsafe { free_raw_c_string(ptr) }
+}
+
+fn append_lifecycle_event(event: &str) {
+    let Ok(path) = std::env::var(LIFECYCLE_LOG_ENV) else {
+        return;
+    };
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = writeln!(file, "{event}");
 }

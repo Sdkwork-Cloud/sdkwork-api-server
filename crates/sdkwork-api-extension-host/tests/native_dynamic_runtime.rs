@@ -1,13 +1,60 @@
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
 use sdkwork_api_ext_provider_native_mock::FIXTURE_EXTENSION_ID;
 use sdkwork_api_extension_host::{
-    load_native_dynamic_library_manifest, load_native_dynamic_provider_adapter,
+    list_native_dynamic_runtime_statuses, load_native_dynamic_library_manifest,
+    load_native_dynamic_provider_adapter, shutdown_all_native_dynamic_runtimes,
 };
 use sdkwork_api_provider_core::ProviderRequest;
 use sdkwork_api_provider_core::ProviderStreamOutput;
+use serial_test::serial;
 
+#[serial(native_dynamic_lifecycle)]
+#[tokio::test]
+async fn loading_native_dynamic_runtime_reports_lifecycle_health_status() {
+    shutdown_all_native_dynamic_runtimes().expect("pre-test cleanup");
+    let log_guard = NativeDynamicLifecycleLogGuard::new();
+
+    let library_path = native_dynamic_fixture_library_path();
+    let _adapter = load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1")
+        .expect("native dynamic provider adapter");
+
+    let statuses = list_native_dynamic_runtime_statuses().expect("runtime statuses");
+    assert_eq!(statuses.len(), 1);
+    assert_eq!(statuses[0].extension_id, FIXTURE_EXTENSION_ID);
+    assert_eq!(statuses[0].display_name, "Native Mock");
+    assert!(statuses[0].running);
+    assert!(statuses[0].healthy);
+    assert!(statuses[0].supports_health_check);
+    assert!(statuses[0].supports_shutdown);
+    assert_eq!(statuses[0].message.as_deref(), Some("native mock healthy"));
+
+    let log = std::fs::read_to_string(log_guard.path()).expect("lifecycle log");
+    assert_eq!(log.lines().collect::<Vec<_>>(), vec!["init"]);
+
+    shutdown_all_native_dynamic_runtimes().expect("post-test cleanup");
+}
+
+#[serial(native_dynamic_lifecycle)]
+#[tokio::test]
+async fn shutting_down_native_dynamic_runtimes_invokes_plugin_shutdown_hook() {
+    shutdown_all_native_dynamic_runtimes().expect("pre-test cleanup");
+    let log_guard = NativeDynamicLifecycleLogGuard::new();
+
+    let library_path = native_dynamic_fixture_library_path();
+    let adapter = load_native_dynamic_provider_adapter(&library_path, "https://example.com/v1")
+        .expect("native dynamic provider adapter");
+    drop(adapter);
+
+    shutdown_all_native_dynamic_runtimes().expect("shutdown");
+
+    let log = std::fs::read_to_string(log_guard.path()).expect("lifecycle log");
+    assert_eq!(log.lines().collect::<Vec<_>>(), vec!["init", "shutdown"]);
+}
+
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn loads_native_dynamic_manifest_and_executes_provider_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -36,6 +83,7 @@ async fn loads_native_dynamic_manifest_and_executes_provider_request() {
     assert_eq!(output["id"], "chatcmpl_native_dynamic");
 }
 
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn executes_native_dynamic_chat_stream_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -67,6 +115,7 @@ async fn executes_native_dynamic_chat_stream_request() {
     assert!(body.contains("[DONE]"));
 }
 
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn executes_native_dynamic_responses_stream_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -90,6 +139,7 @@ async fn executes_native_dynamic_responses_stream_request() {
     assert!(body.contains("[DONE]"));
 }
 
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn executes_native_dynamic_audio_speech_stream_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -113,6 +163,7 @@ async fn executes_native_dynamic_audio_speech_stream_request() {
     assert_eq!(bytes, b"NATIVE-AUDIO");
 }
 
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn executes_native_dynamic_file_content_stream_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -130,6 +181,7 @@ async fn executes_native_dynamic_file_content_stream_request() {
     assert_eq!(bytes, b"{\"source\":\"native_dynamic\"}\n");
 }
 
+#[serial(native_dynamic_lifecycle)]
 #[tokio::test]
 async fn executes_native_dynamic_video_content_stream_request() {
     let library_path = native_dynamic_fixture_library_path();
@@ -189,4 +241,39 @@ fn native_dynamic_fixture_library_path() -> PathBuf {
                     .is_some_and(|stem| stem.starts_with(prefix))
         })
         .expect("native dynamic fixture library")
+}
+
+struct NativeDynamicLifecycleLogGuard {
+    path: PathBuf,
+    previous: Option<String>,
+}
+
+impl NativeDynamicLifecycleLogGuard {
+    fn new() -> Self {
+        let mut path = std::env::temp_dir();
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix time")
+            .as_millis();
+        path.push(format!(
+            "sdkwork-native-dynamic-lifecycle-runtime-{millis}.log"
+        ));
+        let previous = std::env::var("SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG").ok();
+        std::env::set_var("SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG", &path);
+        Self { path, previous }
+    }
+
+    fn path(&self) -> &PathBuf {
+        &self.path
+    }
+}
+
+impl Drop for NativeDynamicLifecycleLogGuard {
+    fn drop(&mut self) {
+        match self.previous.as_deref() {
+            Some(value) => std::env::set_var("SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG", value),
+            None => std::env::remove_var("SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG"),
+        }
+        let _ = std::fs::remove_file(&self.path);
+    }
 }

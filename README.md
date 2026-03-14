@@ -58,7 +58,9 @@ Backend:
   - `sdkwork.provider.openrouter`
   - `sdkwork.provider.ollama`
 - Persisted extension installation and instance config through admin APIs
-- Admin visibility for extension package discovery and active connector runtime status
+- Admin visibility for extension package discovery and active extension runtime status across:
+  - `connector`
+  - `native_dynamic`
 - Standardized extension package metadata:
   - runtime ID: `sdkwork.provider.*` / `sdkwork.channel.*`
   - distribution name: `sdkwork-provider-*` / `sdkwork-channel-*`
@@ -86,7 +88,8 @@ Backend:
   - JSON-capable provider operations can execute in-process through the loaded library
   - chat `/v1/chat/completions` and responses `/v1/responses` SSE can now relay through an in-process native dynamic plugin
   - binary stream passthrough is now active for `/v1/audio/speech`, `/v1/files/{file_id}/content`, and `/v1/videos/{video_id}/content`
-  - richer lifecycle hooks remain future work
+  - optional `init`, `health_check`, and `shutdown` lifecycle hooks are now supported
+  - runtime health and lifecycle support are surfaced through `/admin/extensions/runtime-statuses`
 - Provider execution now consumes persisted extension installation and instance state during real dispatch:
   - `enabled = false` on an installation or instance forces local fallback
   - instance `base_url` overrides the provider catalog `base_url`
@@ -126,7 +129,7 @@ Known gaps:
   - trusted-signer verification is enforced for signed packages
   - unsigned connector packages can be allowed or blocked by policy
   - native dynamic packages are intended to run only when explicitly enabled and signed by a trusted publisher
-- native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, and binary stream passthrough for audio speech plus file and video content; hot reload and lifecycle hooks are not implemented yet
+- native dynamic execution now supports JSON-capable provider operations plus chat and responses SSE relay, binary stream passthrough for audio speech plus file and video content, and optional package-runtime lifecycle hooks; hot reload and scheduled health supervision are not implemented yet
 - only stateful gateway execution paths relay upstream responses; the stateless demo router still emits local stub payloads
 - broader API families are now wired as either `relay` or `emulated`; see `docs/api/compatibility-matrix.md` for the execution-truth matrix
 - routing policies now support deterministic priority-based selection with ordered provider fallback and optional defaults

@@ -88,6 +88,8 @@ fn host_starts_discovered_connector_process_and_reports_health() {
         status,
         ConnectorRuntimeStatus {
             instance_id: "provider-custom-openai".to_owned(),
+            extension_id: "sdkwork.provider.custom-openai".to_owned(),
+            display_name: "Custom OpenAI".to_owned(),
             base_url: format!("http://127.0.0.1:{port}"),
             health_url: format!("http://127.0.0.1:{port}/health"),
             process_id: status.process_id,
