@@ -414,19 +414,12 @@ async fn resolve_non_model_provider(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
+    project_id: &str,
     capability: &str,
     route_key: &str,
 ) -> Result<Option<(String, String, String)>> {
-    let decision = select_route_with_store(
-        store,
-        capability,
-        route_key,
-        RoutingDecisionSource::Gateway,
-        Some(tenant_id),
-        None,
-        None,
-    )
-    .await?;
+    let decision =
+        select_gateway_route(store, tenant_id, Some(project_id), capability, route_key).await?;
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
         return Ok(None);
     };
@@ -698,6 +691,7 @@ pub async fn relay_conversation_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         "conversations",
     )
@@ -725,6 +719,7 @@ pub async fn relay_list_conversations_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         "conversations",
     )
@@ -753,6 +748,7 @@ pub async fn relay_get_conversation_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -782,6 +778,7 @@ pub async fn relay_update_conversation_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -810,6 +807,7 @@ pub async fn relay_delete_conversation_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -839,6 +837,7 @@ pub async fn relay_conversation_items_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -863,9 +862,15 @@ pub async fn relay_thread_from_store(
     _project_id: &str,
     request: &CreateThreadRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", "threads")
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        "threads",
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -886,9 +891,15 @@ pub async fn relay_get_thread_from_store(
     _project_id: &str,
     thread_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -910,9 +921,15 @@ pub async fn relay_update_thread_from_store(
     thread_id: &str,
     request: &UpdateThreadRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -933,9 +950,15 @@ pub async fn relay_delete_thread_from_store(
     _project_id: &str,
     thread_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -957,9 +980,15 @@ pub async fn relay_thread_messages_from_store(
     thread_id: &str,
     request: &CreateThreadMessageRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -980,9 +1009,15 @@ pub async fn relay_list_thread_messages_from_store(
     _project_id: &str,
     thread_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1004,9 +1039,15 @@ pub async fn relay_get_thread_message_from_store(
     thread_id: &str,
     message_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1029,9 +1070,15 @@ pub async fn relay_update_thread_message_from_store(
     message_id: &str,
     request: &UpdateThreadMessageRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1053,9 +1100,15 @@ pub async fn relay_delete_thread_message_from_store(
     thread_id: &str,
     message_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1077,9 +1130,15 @@ pub async fn relay_thread_run_from_store(
     thread_id: &str,
     request: &CreateRunRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1100,9 +1159,15 @@ pub async fn relay_list_thread_runs_from_store(
     _project_id: &str,
     thread_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1124,9 +1189,15 @@ pub async fn relay_get_thread_run_from_store(
     thread_id: &str,
     run_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1149,9 +1220,15 @@ pub async fn relay_update_thread_run_from_store(
     run_id: &str,
     request: &UpdateRunRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1173,9 +1250,15 @@ pub async fn relay_cancel_thread_run_from_store(
     thread_id: &str,
     run_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1198,9 +1281,15 @@ pub async fn relay_submit_thread_run_tool_outputs_from_store(
     run_id: &str,
     request: &SubmitToolOutputsRunRequest,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1222,9 +1311,15 @@ pub async fn relay_list_thread_run_steps_from_store(
     thread_id: &str,
     run_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1247,9 +1342,15 @@ pub async fn relay_get_thread_run_step_from_store(
     run_id: &str,
     step_id: &str,
 ) -> Result<Option<Value>> {
-    let Some((adapter_kind, base_url, api_key)) =
-        resolve_non_model_provider(store, secret_manager, tenant_id, "assistants", thread_id)
-            .await?
+    let Some((adapter_kind, base_url, api_key)) = resolve_non_model_provider(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        "assistants",
+        thread_id,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -1274,6 +1375,7 @@ pub async fn relay_thread_and_run_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "assistants",
         "threads/runs",
     )
@@ -1302,6 +1404,7 @@ pub async fn relay_list_conversation_items_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -1331,6 +1434,7 @@ pub async fn relay_get_conversation_item_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
@@ -1360,6 +1464,7 @@ pub async fn relay_delete_conversation_item_from_store(
         store,
         secret_manager,
         tenant_id,
+        _project_id,
         "responses",
         conversation_id,
     )
