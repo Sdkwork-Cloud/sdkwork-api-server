@@ -12,8 +12,8 @@ use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserRecord, GatewayApiKeyRecord, PortalUserRecord};
 use sdkwork_api_domain_routing::{
-    ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingDecisionLog, RoutingDecisionSource,
-    RoutingPolicy, RoutingStrategy,
+    ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingCandidateAssessment,
+    RoutingDecisionLog, RoutingDecisionSource, RoutingPolicy, RoutingStrategy,
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
@@ -375,6 +375,22 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS project_routing_preferences (
+            project_id TEXT PRIMARY KEY NOT NULL,
+            preset_id TEXT NOT NULL DEFAULT '',
+            strategy TEXT NOT NULL DEFAULT 'deterministic_priority',
+            ordered_provider_ids_json TEXT NOT NULL DEFAULT '[]',
+            default_provider_id TEXT,
+            max_cost REAL,
+            max_latency_ms INTEGER,
+            require_healthy INTEGER NOT NULL DEFAULT 0,
+            preferred_region TEXT,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS routing_decision_logs (
             decision_id TEXT PRIMARY KEY NOT NULL,
             decision_source TEXT NOT NULL,
@@ -432,10 +448,20 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
-    ensure_sqlite_column(&pool, "usage_records", "units", "units INTEGER NOT NULL DEFAULT 0")
-        .await?;
-    ensure_sqlite_column(&pool, "usage_records", "amount", "amount REAL NOT NULL DEFAULT 0")
-        .await?;
+    ensure_sqlite_column(
+        &pool,
+        "usage_records",
+        "units",
+        "units INTEGER NOT NULL DEFAULT 0",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "usage_records",
+        "amount",
+        "amount REAL NOT NULL DEFAULT 0",
+    )
+    .await?;
     ensure_sqlite_column(
         &pool,
         "usage_records",
@@ -489,10 +515,42 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             tenant_id TEXT NOT NULL,
             project_id TEXT NOT NULL,
             environment TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            created_at_ms INTEGER NOT NULL DEFAULT 0,
+            last_used_at_ms INTEGER,
+            expires_at_ms INTEGER,
             active INTEGER NOT NULL
         )",
     )
     .execute(&pool)
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "identity_gateway_api_keys",
+        "label",
+        "label TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "identity_gateway_api_keys",
+        "created_at_ms",
+        "created_at_ms INTEGER NOT NULL DEFAULT 0",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "identity_gateway_api_keys",
+        "last_used_at_ms",
+        "last_used_at_ms INTEGER",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "identity_gateway_api_keys",
+        "expires_at_ms",
+        "expires_at_ms INTEGER",
+    )
     .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS extension_installations (
@@ -659,7 +717,20 @@ fn sqlite_path_from_url(url: &str) -> Option<PathBuf> {
         return None;
     }
 
-    Some(PathBuf::from(raw_path))
+    let normalized_path = raw_path
+        .strip_prefix('/')
+        .filter(|candidate| has_windows_drive_prefix(candidate))
+        .unwrap_or(raw_path);
+
+    Some(PathBuf::from(normalized_path))
+}
+
+fn has_windows_drive_prefix(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'/' || bytes[2] == b'\\')
 }
 
 async fn ensure_sqlite_column(
@@ -766,6 +837,14 @@ fn decode_routing_assessments(assessments_json: &str) -> Result<Vec<RoutingCandi
     Ok(serde_json::from_str(assessments_json)?)
 }
 
+fn encode_string_list(values: &[String]) -> Result<String> {
+    Ok(serde_json::to_string(values)?)
+}
+
+fn decode_string_list(values_json: &str) -> Result<Vec<String>> {
+    Ok(serde_json::from_str(values_json)?)
+}
+
 type PortalUserRow = (
     String,
     String,
@@ -780,7 +859,17 @@ type PortalUserRow = (
 
 type AdminUserRow = (String, String, String, String, String, i64, i64);
 
-type CouponRow = (String, String, String, String, i64, i64, String, String, i64);
+type CouponRow = (
+    String,
+    String,
+    String,
+    String,
+    i64,
+    i64,
+    String,
+    String,
+    i64,
+);
 
 type CredentialRow = (
     String,
@@ -862,7 +951,17 @@ fn decode_admin_user_row(row: Option<AdminUserRow>) -> Result<Option<AdminUserRe
 
 fn decode_coupon_row(row: Option<CouponRow>) -> Result<Option<CouponCampaign>> {
     row.map(
-        |(id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)| {
+        |(
+            id,
+            code,
+            discount_label,
+            audience,
+            remaining,
+            active,
+            note,
+            expires_on,
+            created_at_ms,
+        )| {
             Ok(CouponCampaign {
                 id,
                 code,
@@ -1251,13 +1350,12 @@ impl SqliteAdminStore {
         external_name: &str,
         provider_id: &str,
     ) -> Result<bool> {
-        let result = sqlx::query(
-            "DELETE FROM catalog_models WHERE external_name = ? AND provider_id = ?",
-        )
-        .bind(external_name)
-        .bind(provider_id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query("DELETE FROM catalog_models WHERE external_name = ? AND provider_id = ?")
+                .bind(external_name)
+                .bind(provider_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -1354,6 +1452,112 @@ impl SqliteAdminStore {
             );
         }
         Ok(policies)
+    }
+
+    pub async fn insert_project_routing_preferences(
+        &self,
+        preferences: &ProjectRoutingPreferences,
+    ) -> Result<ProjectRoutingPreferences> {
+        sqlx::query(
+            "INSERT INTO project_routing_preferences (
+                project_id,
+                preset_id,
+                strategy,
+                ordered_provider_ids_json,
+                default_provider_id,
+                max_cost,
+                max_latency_ms,
+                require_healthy,
+                preferred_region,
+                updated_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id) DO UPDATE SET
+                preset_id = excluded.preset_id,
+                strategy = excluded.strategy,
+                ordered_provider_ids_json = excluded.ordered_provider_ids_json,
+                default_provider_id = excluded.default_provider_id,
+                max_cost = excluded.max_cost,
+                max_latency_ms = excluded.max_latency_ms,
+                require_healthy = excluded.require_healthy,
+                preferred_region = excluded.preferred_region,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&preferences.project_id)
+        .bind(&preferences.preset_id)
+        .bind(preferences.strategy.as_str())
+        .bind(encode_string_list(&preferences.ordered_provider_ids)?)
+        .bind(&preferences.default_provider_id)
+        .bind(preferences.max_cost)
+        .bind(preferences.max_latency_ms.map(i64::try_from).transpose()?)
+        .bind(if preferences.require_healthy {
+            1_i64
+        } else {
+            0_i64
+        })
+        .bind(&preferences.preferred_region)
+        .bind(i64::try_from(preferences.updated_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(preferences.clone())
+    }
+
+    pub async fn find_project_routing_preferences(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectRoutingPreferences>> {
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                String,
+                Option<String>,
+                Option<f64>,
+                Option<i64>,
+                i64,
+                Option<String>,
+                i64,
+            ),
+        >(
+            "SELECT project_id, preset_id, strategy, ordered_provider_ids_json, default_provider_id, max_cost, max_latency_ms, require_healthy, preferred_region, updated_at_ms
+             FROM project_routing_preferences
+             WHERE project_id = ?",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(
+            |(
+                project_id,
+                preset_id,
+                strategy,
+                ordered_provider_ids_json,
+                default_provider_id,
+                max_cost,
+                max_latency_ms,
+                require_healthy,
+                preferred_region,
+                updated_at_ms,
+            )| {
+                Ok(ProjectRoutingPreferences::new(project_id)
+                    .with_preset_id(preset_id)
+                    .with_strategy(
+                        RoutingStrategy::from_str(&strategy)
+                            .unwrap_or(RoutingStrategy::DeterministicPriority),
+                    )
+                    .with_ordered_provider_ids(decode_string_list(&ordered_provider_ids_json)?)
+                    .with_default_provider_id_option(default_provider_id)
+                    .with_max_cost_option(max_cost)
+                    .with_max_latency_ms_option(max_latency_ms.map(u64::try_from).transpose()?)
+                    .with_require_healthy(require_healthy != 0)
+                    .with_preferred_region_option(preferred_region)
+                    .with_updated_at_ms(u64::try_from(updated_at_ms)?))
+            },
+        )
+        .transpose()
     }
 
     pub async fn insert_routing_decision_log(
@@ -1547,19 +1751,32 @@ impl SqliteAdminStore {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(project_id, model, provider, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms)| -> Result<UsageRecord> {
-                Ok(UsageRecord {
+            .map(
+                |(
                     project_id,
                     model,
                     provider,
-                    units: u64::try_from(units)?,
+                    units,
                     amount,
-                    input_tokens: u64::try_from(input_tokens)?,
-                    output_tokens: u64::try_from(output_tokens)?,
-                    total_tokens: u64::try_from(total_tokens)?,
-                    created_at_ms: u64::try_from(created_at_ms)?,
-                })
-            })
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    created_at_ms,
+                )|
+                 -> Result<UsageRecord> {
+                    Ok(UsageRecord {
+                        project_id,
+                        model,
+                        provider,
+                        units: u64::try_from(units)?,
+                        amount,
+                        input_tokens: u64::try_from(input_tokens)?,
+                        output_tokens: u64::try_from(output_tokens)?,
+                        total_tokens: u64::try_from(total_tokens)?,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                    })
+                },
+            )
             .collect::<Result<Vec<_>>>()?)
     }
 
@@ -1960,13 +2177,17 @@ impl SqliteAdminStore {
         record: &GatewayApiKeyRecord,
     ) -> Result<GatewayApiKeyRecord> {
         sqlx::query(
-            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, active) VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, active = excluded.active",
+            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
         )
         .bind(&record.hashed_key)
         .bind(&record.tenant_id)
         .bind(&record.project_id)
         .bind(&record.environment)
+        .bind(&record.label)
+        .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
+        .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
+        .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
         .bind(if record.active { 1_i64 } else { 0_i64 })
         .execute(&self.pool)
         .await?;
@@ -1974,19 +2195,33 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, i64)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, active FROM identity_gateway_api_keys ORDER BY rowid",
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, i64)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys ORDER BY rowid",
         )
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
             .into_iter()
             .map(
-                |(tenant_id, project_id, environment, hashed_key, active)| GatewayApiKeyRecord {
+                |(
                     tenant_id,
                     project_id,
                     environment,
                     hashed_key,
+                    label,
+                    created_at_ms,
+                    last_used_at_ms,
+                    expires_at_ms,
+                    active,
+                )| GatewayApiKeyRecord {
+                    tenant_id,
+                    project_id,
+                    environment,
+                    hashed_key,
+                    label,
+                    created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
+                    last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
+                    expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
                     active: active != 0,
                 },
             )
@@ -1997,24 +2232,38 @@ impl SqliteAdminStore {
         &self,
         hashed_key: &str,
     ) -> Result<Option<GatewayApiKeyRecord>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, i64)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, active FROM identity_gateway_api_keys WHERE hashed_key = ?",
+        let row = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, i64)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = ?",
         )
         .bind(hashed_key)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(
-            row.map(|(tenant_id, project_id, environment, hashed_key, active)| {
+        Ok(row.map(
+            |(
+                tenant_id,
+                project_id,
+                environment,
+                hashed_key,
+                label,
+                created_at_ms,
+                last_used_at_ms,
+                expires_at_ms,
+                active,
+            )| {
                 GatewayApiKeyRecord {
                     tenant_id,
                     project_id,
                     environment,
                     hashed_key,
+                    label,
+                    created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
+                    last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
+                    expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
                     active: active != 0,
                 }
-            }),
-        )
+            },
+        ))
     }
 
     pub async fn delete_gateway_api_key(&self, hashed_key: &str) -> Result<bool> {
@@ -2747,6 +2996,20 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_routing_policies(self).await
     }
 
+    async fn insert_project_routing_preferences(
+        &self,
+        preferences: &ProjectRoutingPreferences,
+    ) -> Result<ProjectRoutingPreferences> {
+        SqliteAdminStore::insert_project_routing_preferences(self, preferences).await
+    }
+
+    async fn find_project_routing_preferences(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectRoutingPreferences>> {
+        SqliteAdminStore::find_project_routing_preferences(self, project_id).await
+    }
+
     async fn insert_routing_decision_log(
         &self,
         log: &RoutingDecisionLog,
@@ -3057,5 +3320,24 @@ impl AdminStore for SqliteAdminStore {
             updated_at_ms,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::sqlite_path_from_url;
+
+    #[cfg(windows)]
+    #[test]
+    fn parses_windows_drive_file_sqlite_urls_without_a_leading_separator() {
+        let path = sqlite_path_from_url("sqlite:///D:/sdkwork/router/sdkwork-api-server.db")
+            .expect("expected sqlite file path");
+
+        assert_eq!(
+            path,
+            PathBuf::from("D:/sdkwork/router/sdkwork-api-server.db")
+        );
     }
 }

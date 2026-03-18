@@ -250,6 +250,8 @@ export function createApiKey(input: {
   tenant_id: string;
   project_id: string;
   environment: string;
+  label?: string;
+  expires_at_ms?: number | null;
 }): Promise<CreatedGatewayApiKey> {
   return postJson<typeof input, CreatedGatewayApiKey>('/api-keys', input, requiredToken());
 }

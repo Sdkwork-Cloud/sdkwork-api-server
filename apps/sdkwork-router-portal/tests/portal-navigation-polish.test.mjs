@@ -9,15 +9,22 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell exposes route signals in the sidebar', () => {
-  const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
+test('portal shell keeps sidebar navigation compact and product-led', () => {
+  const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
+  const routes = read('packages/sdkwork-router-portal-core/src/routes.ts');
 
-  assert.match(core, /Route signals/);
-  assert.match(core, /Needs action/);
+  assert.match(sidebar, /Active workspace/);
+  assert.match(sidebar, /routeGroups\.map/);
+  assert.match(sidebar, /resolvePortalPath/);
+  assert.match(routes, /Dashboard/);
+  assert.match(routes, /Routing/);
+  assert.match(routes, /API Keys/);
+  assert.doesNotMatch(sidebar, /Route signals/);
 });
 
-test('dashboard exposes a route signal map for module-level status scanning', () => {
+test('dashboard exposes workspace modules instead of a route-signal map', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Route signal map/);
+  assert.match(dashboardPage, /Workspace modules/);
+  assert.doesNotMatch(dashboardPage, /Route signal map/);
 });

@@ -1,0 +1,1 @@
+export { PortalRoutingPage } from './pages';

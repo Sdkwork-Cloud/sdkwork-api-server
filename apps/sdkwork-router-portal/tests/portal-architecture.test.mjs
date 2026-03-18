@@ -16,8 +16,10 @@ const requiredPackages = [
   'sdkwork-router-portal-portal-api',
   'sdkwork-router-portal-auth',
   'sdkwork-router-portal-dashboard',
+  'sdkwork-router-portal-routing',
   'sdkwork-router-portal-api-keys',
   'sdkwork-router-portal-usage',
+  'sdkwork-router-portal-user',
   'sdkwork-router-portal-credits',
   'sdkwork-router-portal-billing',
   'sdkwork-router-portal-account',
@@ -26,8 +28,10 @@ const requiredPackages = [
 const requiredBusinessPackages = [
   'sdkwork-router-portal-auth',
   'sdkwork-router-portal-dashboard',
+  'sdkwork-router-portal-routing',
   'sdkwork-router-portal-api-keys',
   'sdkwork-router-portal-usage',
+  'sdkwork-router-portal-user',
   'sdkwork-router-portal-credits',
   'sdkwork-router-portal-billing',
   'sdkwork-router-portal-account',
@@ -79,11 +83,34 @@ test('shell route manifest includes the portal product sections', () => {
   const routes = read('packages/sdkwork-router-portal-core/src/routes.ts');
 
   assert.match(routes, /dashboard/);
+  assert.match(routes, /routing/);
   assert.match(routes, /api-keys/);
   assert.match(routes, /usage/);
+  assert.match(routes, /user/);
   assert.match(routes, /credits/);
   assert.match(routes, /billing/);
   assert.match(routes, /account/);
+});
+
+test('portal core follows the shell-oriented application structure', () => {
+  const coreRoot = path.join(appRoot, 'packages', 'sdkwork-router-portal-core', 'src');
+
+  for (const relativePath of [
+    path.join('application', 'app', 'PortalProductApp.tsx'),
+    path.join('application', 'layouts', 'MainLayout.tsx'),
+    path.join('application', 'providers', 'AppProviders.tsx'),
+    path.join('application', 'providers', 'ThemeManager.tsx'),
+    path.join('application', 'router', 'AppRoutes.tsx'),
+    path.join('application', 'router', 'routeManifest.ts'),
+    path.join('application', 'router', 'routePaths.ts'),
+    path.join('components', 'AppHeader.tsx'),
+    path.join('components', 'Sidebar.tsx'),
+    path.join('components', 'ConfigCenter.tsx'),
+    path.join('store', 'usePortalShellStore.ts'),
+    path.join('lib', 'portalPreferences.ts'),
+  ]) {
+    assert.equal(existsSync(path.join(coreRoot, relativePath)), true, `missing ${relativePath}`);
+  }
 });
 
 test('root app uses its own theme and does not depend on console/', () => {

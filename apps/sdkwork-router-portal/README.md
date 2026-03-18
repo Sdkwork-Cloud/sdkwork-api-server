@@ -48,13 +48,18 @@ packages/sdkwork-router-portal-<module>/src/
 
 - `sdkwork-router-portal-auth`
 - `sdkwork-router-portal-dashboard`
+- `sdkwork-router-portal-routing`
 - `sdkwork-router-portal-api-keys`
 - `sdkwork-router-portal-usage`
+- `sdkwork-router-portal-user`
 - `sdkwork-router-portal-credits`
 - `sdkwork-router-portal-billing`
 - `sdkwork-router-portal-account`
 
 ## Product Surface
+
+`User` handles profile and password rotation.
+`Account` handles cash balance, credits, billing ledger, and runway posture.
 
 - `Dashboard`
   - workspace identity
@@ -63,6 +68,11 @@ packages/sdkwork-router-portal-<module>/src/
   - token-unit usage
   - recent request list
   - recommended next actions derived from live posture
+- `Routing`
+  - active routing strategy and preset
+  - provider ordering and healthy-path guardrails
+  - preview route simulation
+  - routing decision evidence
 - `API Keys`
   - environment-scoped key issuance
   - plaintext-once handling
@@ -72,7 +82,12 @@ packages/sdkwork-router-portal-<module>/src/
   - request telemetry
   - model and provider distribution
   - per-call token-unit history
+  - input, output, and total token detail
   - filterable workbench for models, providers, and time ranges
+- `User`
+  - profile and password rotation
+  - personal security posture
+  - recovery guidance
 - `Credits`
   - quota posture
   - points-oriented ledger view
@@ -84,8 +99,10 @@ packages/sdkwork-router-portal-<module>/src/
   - upgrade motion
   - recommendation logic based on current usage and remaining quota
 - `Account`
-  - profile and workspace identity
-  - password rotation
+  - cash balance
+  - credits and quota posture
+  - billing ledger
+  - runway posture
 
 ## Data Sources
 
@@ -93,6 +110,7 @@ packages/sdkwork-router-portal-<module>/src/
   - auth session
   - workspace summary
   - dashboard summary
+  - routing summary, preferences, preview, and decision logs
   - usage records and summary
   - billing summary and ledger
   - API keys

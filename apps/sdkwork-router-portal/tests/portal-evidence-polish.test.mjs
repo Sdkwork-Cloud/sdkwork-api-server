@@ -9,17 +9,11 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell exposes a recent-activity evidence rail', () => {
-  const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
-
-  assert.match(core, /Recent activity/);
-  assert.match(core, /Latest evidence/);
-  assert.match(core, /Last request/);
-});
-
-test('dashboard exposes evidence timeline and confidence signals', () => {
+test('dashboard keeps recent activity and recent requests visible in the overview flow', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Evidence timeline/);
-  assert.match(dashboardPage, /Confidence signals/);
+  assert.match(dashboardPage, /Recent activity/);
+  assert.match(dashboardPage, /Recent requests/);
+  assert.doesNotMatch(dashboardPage, /Evidence timeline/);
+  assert.doesNotMatch(dashboardPage, /Confidence signals/);
 });

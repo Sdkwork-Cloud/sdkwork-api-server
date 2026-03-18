@@ -83,6 +83,9 @@ pub struct CreatedGatewayApiKey {
     pub tenant_id: String,
     pub project_id: String,
     pub environment: String,
+    pub label: String,
+    pub created_at_ms: u64,
+    pub expires_at_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,7 +282,9 @@ pub async fn load_admin_user_profile(
         .map_err(AdminIdentityError::from)
 }
 
-pub async fn list_admin_user_profiles(store: &dyn AdminStore) -> AdminResult<Vec<AdminUserProfile>> {
+pub async fn list_admin_user_profiles(
+    store: &dyn AdminStore,
+) -> AdminResult<Vec<AdminUserProfile>> {
     let _ = ensure_default_admin_user(store).await?;
     store
         .list_admin_users()
@@ -296,12 +301,16 @@ pub async fn upsert_admin_user(
     password: Option<&str>,
     active: bool,
 ) -> AdminResult<AdminUserProfile> {
-    validate_identity_profile_input(email, display_name).map_err(AdminIdentityError::InvalidInput)?;
+    validate_identity_profile_input(email, display_name)
+        .map_err(AdminIdentityError::InvalidInput)?;
 
     let normalized_email = normalize_email(email);
     let requested_id = normalize_optional_value(user_id);
     let existing_by_id = match requested_id {
-        Some(id) => store.find_admin_user_by_id(id).await.map_err(AdminIdentityError::from)?,
+        Some(id) => store
+            .find_admin_user_by_id(id)
+            .await
+            .map_err(AdminIdentityError::from)?,
         None => None,
     };
 
@@ -329,21 +338,26 @@ pub async fn upsert_admin_user(
         None => generate_entity_id("admin").map_err(AdminIdentityError::from)?,
     };
 
-    let (password_salt, password_hash) = match password.map(str::trim).filter(|value| !value.is_empty())
-    {
-        Some(next_password) => {
-            validate_password_strength(next_password).map_err(AdminIdentityError::InvalidInput)?;
-            hash_identity_password(next_password, "admin password").map_err(AdminIdentityError::from)?
-        }
-        None => {
-            let Some(existing) = existing_by_id.as_ref() else {
-                return Err(AdminIdentityError::InvalidInput(
-                    "password is required for new admin users".to_owned(),
-                ));
-            };
-            (existing.password_salt.clone(), existing.password_hash.clone())
-        }
-    };
+    let (password_salt, password_hash) =
+        match password.map(str::trim).filter(|value| !value.is_empty()) {
+            Some(next_password) => {
+                validate_password_strength(next_password)
+                    .map_err(AdminIdentityError::InvalidInput)?;
+                hash_identity_password(next_password, "admin password")
+                    .map_err(AdminIdentityError::from)?
+            }
+            None => {
+                let Some(existing) = existing_by_id.as_ref() else {
+                    return Err(AdminIdentityError::InvalidInput(
+                        "password is required for new admin users".to_owned(),
+                    ));
+                };
+                (
+                    existing.password_salt.clone(),
+                    existing.password_hash.clone(),
+                )
+            }
+        };
 
     let created_at_ms = existing_by_id
         .as_ref()
@@ -509,10 +523,28 @@ impl CreateGatewayApiKey {
         project_id: &str,
         environment: &str,
     ) -> Result<CreatedGatewayApiKey> {
+        Self::execute_with_metadata(
+            tenant_id,
+            project_id,
+            environment,
+            &default_gateway_api_key_label(environment),
+            None,
+        )
+    }
+
+    pub fn execute_with_metadata(
+        tenant_id: &str,
+        project_id: &str,
+        environment: &str,
+        label: &str,
+        expires_at_ms: Option<u64>,
+    ) -> Result<CreatedGatewayApiKey> {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| anyhow!("system clock error"))?
             .as_nanos();
+        let created_at_ms = now_epoch_millis()?;
+        let normalized_label = normalize_gateway_api_key_label(label);
         let plaintext = format!("skw_{environment}_{nonce:x}");
         let hashed = hash_gateway_api_key(&plaintext);
         Ok(CreatedGatewayApiKey {
@@ -521,6 +553,9 @@ impl CreateGatewayApiKey {
             tenant_id: tenant_id.to_owned(),
             project_id: project_id.to_owned(),
             environment: environment.to_owned(),
+            label: normalized_label,
+            created_at_ms,
+            expires_at_ms,
         })
     }
 }
@@ -531,9 +566,38 @@ pub async fn persist_gateway_api_key(
     project_id: &str,
     environment: &str,
 ) -> Result<CreatedGatewayApiKey> {
-    let created = CreateGatewayApiKey::execute(tenant_id, project_id, environment)?;
+    persist_gateway_api_key_with_metadata(
+        store,
+        tenant_id,
+        project_id,
+        environment,
+        &default_gateway_api_key_label(environment),
+        None,
+    )
+    .await
+}
+
+pub async fn persist_gateway_api_key_with_metadata(
+    store: &dyn AdminStore,
+    tenant_id: &str,
+    project_id: &str,
+    environment: &str,
+    label: &str,
+    expires_at_ms: Option<u64>,
+) -> Result<CreatedGatewayApiKey> {
+    validate_gateway_api_key_metadata(label, expires_at_ms).map_err(|message| anyhow!(message))?;
+    let created = CreateGatewayApiKey::execute_with_metadata(
+        tenant_id,
+        project_id,
+        environment,
+        label,
+        expires_at_ms,
+    )?;
     let record =
-        GatewayApiKeyRecord::new(tenant_id, project_id, environment, created.hashed.clone());
+        GatewayApiKeyRecord::new(tenant_id, project_id, environment, created.hashed.clone())
+            .with_label(created.label.clone())
+            .with_created_at_ms(created.created_at_ms)
+            .with_expires_at_ms_option(created.expires_at_ms);
     store.insert_gateway_api_key(&record).await?;
     Ok(created)
 }
@@ -556,6 +620,10 @@ pub async fn set_gateway_api_key_active(
         project_id: existing.project_id,
         environment: existing.environment,
         hashed_key: existing.hashed_key,
+        label: existing.label,
+        created_at_ms: existing.created_at_ms,
+        last_used_at_ms: existing.last_used_at_ms,
+        expires_at_ms: existing.expires_at_ms,
         active,
     };
 
@@ -579,6 +647,19 @@ pub async fn resolve_gateway_request_context(
     if !record.active {
         return Ok(None);
     }
+
+    if record
+        .expires_at_ms
+        .is_some_and(|expires_at_ms| expires_at_ms <= now_epoch_millis().unwrap_or(u64::MAX))
+    {
+        return Ok(None);
+    }
+
+    let updated = GatewayApiKeyRecord {
+        last_used_at_ms: Some(now_epoch_millis()?),
+        ..record.clone()
+    };
+    let _ = store.insert_gateway_api_key(&updated).await?;
 
     Ok(Some(GatewayRequestContext {
         tenant_id: record.tenant_id,
@@ -684,7 +765,9 @@ pub async fn load_portal_user_profile(
         .map_err(PortalIdentityError::from)
 }
 
-pub async fn list_portal_user_profiles(store: &dyn AdminStore) -> PortalResult<Vec<PortalUserProfile>> {
+pub async fn list_portal_user_profiles(
+    store: &dyn AdminStore,
+) -> PortalResult<Vec<PortalUserProfile>> {
     let _ = ensure_default_portal_user(store).await?;
     store
         .list_portal_users()
@@ -703,13 +786,17 @@ pub async fn upsert_portal_user(
     workspace_project_id: &str,
     active: bool,
 ) -> PortalResult<PortalUserProfile> {
-    validate_identity_profile_input(email, display_name).map_err(PortalIdentityError::InvalidInput)?;
+    validate_identity_profile_input(email, display_name)
+        .map_err(PortalIdentityError::InvalidInput)?;
     validate_workspace_scope(store, workspace_tenant_id, workspace_project_id).await?;
 
     let normalized_email = normalize_email(email);
     let requested_id = normalize_optional_value(user_id);
     let existing_by_id = match requested_id {
-        Some(id) => store.find_portal_user_by_id(id).await.map_err(PortalIdentityError::from)?,
+        Some(id) => store
+            .find_portal_user_by_id(id)
+            .await
+            .map_err(PortalIdentityError::from)?,
         None => None,
     };
 
@@ -737,21 +824,26 @@ pub async fn upsert_portal_user(
         None => generate_entity_id("user").map_err(PortalIdentityError::from)?,
     };
 
-    let (password_salt, password_hash) = match password.map(str::trim).filter(|value| !value.is_empty())
-    {
-        Some(next_password) => {
-            validate_password_strength(next_password).map_err(PortalIdentityError::InvalidInput)?;
-            hash_identity_password(next_password, "portal password").map_err(PortalIdentityError::from)?
-        }
-        None => {
-            let Some(existing) = existing_by_id.as_ref() else {
-                return Err(PortalIdentityError::InvalidInput(
-                    "password is required for new portal users".to_owned(),
-                ));
-            };
-            (existing.password_salt.clone(), existing.password_hash.clone())
-        }
-    };
+    let (password_salt, password_hash) =
+        match password.map(str::trim).filter(|value| !value.is_empty()) {
+            Some(next_password) => {
+                validate_password_strength(next_password)
+                    .map_err(PortalIdentityError::InvalidInput)?;
+                hash_identity_password(next_password, "portal password")
+                    .map_err(PortalIdentityError::from)?
+            }
+            None => {
+                let Some(existing) = existing_by_id.as_ref() else {
+                    return Err(PortalIdentityError::InvalidInput(
+                        "password is required for new portal users".to_owned(),
+                    ));
+                };
+                (
+                    existing.password_salt.clone(),
+                    existing.password_hash.clone(),
+                )
+            }
+        };
 
     let created_at_ms = existing_by_id
         .as_ref()
@@ -907,19 +999,45 @@ pub async fn load_portal_workspace_summary(
     }))
 }
 
+async fn load_portal_user_record(
+    store: &dyn AdminStore,
+    user_id: &str,
+) -> PortalResult<PortalUserRecord> {
+    store
+        .find_portal_user_by_id(user_id)
+        .await
+        .map_err(PortalIdentityError::from)?
+        .ok_or_else(|| PortalIdentityError::NotFound("portal user not found".to_owned()))
+}
+
+async fn find_portal_scoped_api_key(
+    store: &dyn AdminStore,
+    user_id: &str,
+    hashed_key: &str,
+) -> PortalResult<Option<GatewayApiKeyRecord>> {
+    let user = load_portal_user_record(store, user_id).await?;
+    let Some(record) = store
+        .find_gateway_api_key(hashed_key)
+        .await
+        .map_err(PortalIdentityError::from)?
+    else {
+        return Ok(None);
+    };
+
+    if record.tenant_id != user.workspace_tenant_id
+        || record.project_id != user.workspace_project_id
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(record))
+}
+
 pub async fn list_portal_api_keys(
     store: &dyn AdminStore,
     user_id: &str,
 ) -> PortalResult<Vec<GatewayApiKeyRecord>> {
-    let Some(user) = store
-        .find_portal_user_by_id(user_id)
-        .await
-        .map_err(PortalIdentityError::from)?
-    else {
-        return Err(PortalIdentityError::NotFound(
-            "portal user not found".to_owned(),
-        ));
-    };
+    let user = load_portal_user_record(store, user_id).await?;
 
     let keys = store
         .list_gateway_api_keys()
@@ -933,10 +1051,60 @@ pub async fn list_portal_api_keys(
         .collect())
 }
 
+pub async fn set_portal_api_key_active(
+    store: &dyn AdminStore,
+    user_id: &str,
+    hashed_key: &str,
+    active: bool,
+) -> PortalResult<Option<GatewayApiKeyRecord>> {
+    let Some(existing) = find_portal_scoped_api_key(store, user_id, hashed_key).await? else {
+        return Ok(None);
+    };
+
+    let updated = GatewayApiKeyRecord { active, ..existing };
+    let saved = store
+        .insert_gateway_api_key(&updated)
+        .await
+        .map_err(PortalIdentityError::from)?;
+    Ok(Some(saved))
+}
+
+pub async fn delete_portal_api_key(
+    store: &dyn AdminStore,
+    user_id: &str,
+    hashed_key: &str,
+) -> PortalResult<bool> {
+    let Some(existing) = find_portal_scoped_api_key(store, user_id, hashed_key).await? else {
+        return Ok(false);
+    };
+
+    store
+        .delete_gateway_api_key(&existing.hashed_key)
+        .await
+        .map_err(PortalIdentityError::from)
+}
+
 pub async fn create_portal_api_key(
     store: &dyn AdminStore,
     user_id: &str,
     environment: &str,
+) -> PortalResult<CreatedGatewayApiKey> {
+    create_portal_api_key_with_metadata(
+        store,
+        user_id,
+        environment,
+        &default_gateway_api_key_label(environment),
+        None,
+    )
+    .await
+}
+
+pub async fn create_portal_api_key_with_metadata(
+    store: &dyn AdminStore,
+    user_id: &str,
+    environment: &str,
+    label: &str,
+    expires_at_ms: Option<u64>,
 ) -> PortalResult<CreatedGatewayApiKey> {
     let environment = environment.trim();
     if environment.is_empty() {
@@ -944,22 +1112,17 @@ pub async fn create_portal_api_key(
             "environment is required".to_owned(),
         ));
     }
+    validate_gateway_api_key_metadata(label, expires_at_ms)
+        .map_err(PortalIdentityError::InvalidInput)?;
+    let user = load_portal_user_record(store, user_id).await?;
 
-    let Some(user) = store
-        .find_portal_user_by_id(user_id)
-        .await
-        .map_err(PortalIdentityError::from)?
-    else {
-        return Err(PortalIdentityError::NotFound(
-            "portal user not found".to_owned(),
-        ));
-    };
-
-    persist_gateway_api_key(
+    persist_gateway_api_key_with_metadata(
         store,
         &user.workspace_tenant_id,
         &user.workspace_project_id,
         environment,
+        label,
+        expires_at_ms,
     )
     .await
     .map_err(PortalIdentityError::from)
@@ -1160,7 +1323,8 @@ fn validate_registration_input(
     password: &str,
     display_name: &str,
 ) -> PortalResult<()> {
-    validate_identity_profile_input(email, display_name).map_err(PortalIdentityError::InvalidInput)?;
+    validate_identity_profile_input(email, display_name)
+        .map_err(PortalIdentityError::InvalidInput)?;
     validate_password_strength(password).map_err(PortalIdentityError::InvalidInput)?;
     Ok(())
 }
@@ -1230,6 +1394,37 @@ fn validate_password_strength(password: &str) -> std::result::Result<(), String>
     if password.len() < 8 {
         return Err("password must be at least 8 characters".to_owned());
     }
+    Ok(())
+}
+
+fn default_gateway_api_key_label(environment: &str) -> String {
+    format!("{} gateway key", environment.trim())
+}
+
+fn normalize_gateway_api_key_label(label: &str) -> String {
+    let trimmed = label.trim();
+    if trimmed.is_empty() {
+        "Gateway key".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+fn validate_gateway_api_key_metadata(
+    label: &str,
+    expires_at_ms: Option<u64>,
+) -> std::result::Result<(), String> {
+    if label.trim().is_empty() {
+        return Err("label is required".to_owned());
+    }
+
+    if let Some(expires_at_ms) = expires_at_ms {
+        let now = now_epoch_millis().map_err(|error| error.to_string())?;
+        if expires_at_ms <= now {
+            return Err("expires_at_ms must be in the future".to_owned());
+        }
+    }
+
     Ok(())
 }
 

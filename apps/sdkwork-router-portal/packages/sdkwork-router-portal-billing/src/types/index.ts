@@ -3,6 +3,7 @@ import type {
   ProjectBillingSummary,
   RechargePack,
   SubscriptionPlan,
+  UsageRecord,
 } from 'sdkwork-router-portal-types';
 
 export interface PortalBillingPageProps {
@@ -32,4 +33,5 @@ export interface BillingRecommendation {
 
 export interface BillingPageData {
   summary: ProjectBillingSummary;
+  usage_records: UsageRecord[];
 }

@@ -88,7 +88,16 @@ export function buildWorkspaceCommandPlan(settings) {
   const adminArgs = ['scripts/dev/start-admin.mjs'];
   const portalArgs = ['scripts/dev/start-portal.mjs'];
   const webArgs = ['scripts/dev/start-web.mjs'];
-  webArgs.push('--bind', settings.webBind);
+  webArgs.push(
+    '--bind',
+    settings.webBind,
+    '--admin-target',
+    settings.adminBind,
+    '--portal-target',
+    settings.portalBind,
+    '--gateway-target',
+    settings.gatewayBind,
+  );
 
   if (settings.install) {
     adminArgs.push('--install');

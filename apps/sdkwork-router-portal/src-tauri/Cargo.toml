@@ -1,0 +1,13 @@
+[package]
+name = "sdkwork-router-portal-tauri"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sdkwork-api-runtime-host = { path = "../../../crates/sdkwork-api-runtime-host" }
+tauri = { version = "2.2.5", features = [] }
+
+[build-dependencies]
+tauri-build = { version = "2.0.5", features = [] }
+
+[workspace]

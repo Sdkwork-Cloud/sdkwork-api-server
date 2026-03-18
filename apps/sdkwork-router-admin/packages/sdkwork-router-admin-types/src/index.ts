@@ -5,7 +5,24 @@ export type AdminRouteKey =
   | 'coupons'
   | 'catalog'
   | 'traffic'
-  | 'operations';
+  | 'operations'
+  | 'settings';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeColor =
+  | 'tech-blue'
+  | 'lobster'
+  | 'green-tech'
+  | 'zinc'
+  | 'violet'
+  | 'rose';
+
+export type AdminSidebarItemKey = AdminRouteKey;
+
+export interface AdminThemePreference {
+  mode: ThemeMode;
+  color: ThemeColor;
+}
 
 export type AdminDataSource = 'live';
 
@@ -34,6 +51,7 @@ export interface AdminRouteDefinition {
   label: string;
   eyebrow: string;
   detail: string;
+  group?: string;
 }
 
 export interface ManagedUser {
@@ -95,6 +113,10 @@ export interface GatewayApiKeyRecord {
   project_id: string;
   environment: string;
   hashed_key: string;
+  label: string;
+  created_at_ms: number;
+  last_used_at_ms?: number | null;
+  expires_at_ms?: number | null;
   active: boolean;
 }
 
@@ -104,6 +126,9 @@ export interface CreatedGatewayApiKey {
   tenant_id: string;
   project_id: string;
   environment: string;
+  label: string;
+  created_at_ms: number;
+  expires_at_ms?: number | null;
 }
 
 export interface ChannelRecord {

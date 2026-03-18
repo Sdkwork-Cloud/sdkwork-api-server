@@ -4,6 +4,10 @@ import type {
   LedgerEntry,
   PortalAuthSession,
   PortalDashboardSummary,
+  PortalRoutingDecision,
+  PortalRoutingDecisionLog,
+  PortalRoutingPreferences,
+  PortalRoutingSummary,
   PortalUserProfile,
   PortalWorkspaceSummary,
   ProjectBillingSummary,
@@ -103,6 +107,22 @@ async function postJson<TRequest, TResponse>(
   return readJson<TResponse>(response);
 }
 
+async function deleteEmpty(path: string, token?: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${portalBaseUrl()}${path}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!response.ok) {
+    await readJson(response);
+  }
+}
+
 export function portalErrorMessage(error: unknown): string {
   if (error instanceof PortalApiError) {
     return error.message;
@@ -156,14 +176,34 @@ export function listPortalApiKeys(token?: string): Promise<GatewayApiKeyRecord[]
 }
 
 export function createPortalApiKey(
-  environment: string,
+  input: {
+    environment: string;
+    label: string;
+    expires_at_ms?: number | null;
+  },
   token?: string,
 ): Promise<CreatedGatewayApiKey> {
-  return postJson<{ environment: string }, CreatedGatewayApiKey>(
+  return postJson<typeof input, CreatedGatewayApiKey>(
     '/api-keys',
-    { environment },
+    input,
     requiredPortalToken(token),
   );
+}
+
+export function updatePortalApiKeyStatus(
+  hashedKey: string,
+  active: boolean,
+  token?: string,
+): Promise<GatewayApiKeyRecord> {
+  return postJson<{ active: boolean }, GatewayApiKeyRecord>(
+    `/api-keys/${encodeURIComponent(hashedKey)}/status`,
+    { active },
+    requiredPortalToken(token),
+  );
+}
+
+export function deletePortalApiKey(hashedKey: string, token?: string): Promise<void> {
+  return deleteEmpty(`/api-keys/${encodeURIComponent(hashedKey)}`, requiredPortalToken(token));
 }
 
 export function listPortalUsageRecords(token?: string): Promise<UsageRecord[]> {
@@ -180,4 +220,57 @@ export function getPortalBillingSummary(token?: string): Promise<ProjectBillingS
 
 export function listPortalBillingLedger(token?: string): Promise<LedgerEntry[]> {
   return getJson<LedgerEntry[]>('/billing/ledger', requiredPortalToken(token));
+}
+
+export function getPortalRoutingSummary(token?: string): Promise<PortalRoutingSummary> {
+  return getJson<PortalRoutingSummary>('/routing/summary', requiredPortalToken(token));
+}
+
+export function getPortalRoutingPreferences(token?: string): Promise<PortalRoutingPreferences> {
+  return getJson<PortalRoutingPreferences>('/routing/preferences', requiredPortalToken(token));
+}
+
+export function savePortalRoutingPreferences(
+  input: {
+    preset_id: string;
+    strategy: PortalRoutingPreferences['strategy'];
+    ordered_provider_ids: string[];
+    default_provider_id?: string | null;
+    max_cost?: number | null;
+    max_latency_ms?: number | null;
+    require_healthy: boolean;
+    preferred_region?: string | null;
+  },
+  token?: string,
+): Promise<PortalRoutingPreferences> {
+  return postJson<typeof input, PortalRoutingPreferences>(
+    '/routing/preferences',
+    input,
+    requiredPortalToken(token),
+  );
+}
+
+export function previewPortalRouting(
+  input: {
+    capability: string;
+    model: string;
+    requested_region?: string | null;
+    selection_seed?: number | null;
+  },
+  token?: string,
+): Promise<PortalRoutingDecision> {
+  return postJson<typeof input, PortalRoutingDecision>(
+    '/routing/preview',
+    input,
+    requiredPortalToken(token),
+  );
+}
+
+export function listPortalRoutingDecisionLogs(
+  token?: string,
+): Promise<PortalRoutingDecisionLog[]> {
+  return getJson<PortalRoutingDecisionLog[]>(
+    '/routing/decision-logs',
+    requiredPortalToken(token),
+  );
 }

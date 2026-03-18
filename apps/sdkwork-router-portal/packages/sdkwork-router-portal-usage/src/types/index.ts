@@ -26,6 +26,25 @@ export interface UsageProfileItem {
   detail: string;
 }
 
+export interface UsageTrendPoint {
+  bucket: string;
+  requests: number;
+  units: number;
+  amount: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}
+
+export interface UsageMixPoint {
+  id: string;
+  label: string;
+  requests: number;
+  units: number;
+  amount: number;
+  share: number;
+}
+
 export interface UsageDiagnostic {
   id: string;
   title: string;
@@ -43,5 +62,8 @@ export interface UsageWorkbenchViewModel {
   highlights: UsageHighlight[];
   traffic_profile: UsageProfileItem[];
   spend_watch: UsageProfileItem[];
+  request_volume_series: UsageTrendPoint[];
+  provider_mix: UsageMixPoint[];
+  model_mix: UsageMixPoint[];
   diagnostics: UsageDiagnostic[];
 }

@@ -1,5 +1,21 @@
 export type PortalAnonymousRouteKey = 'login' | 'register';
-export type PortalRouteKey = 'dashboard' | 'api-keys' | 'usage' | 'credits' | 'billing' | 'account';
+export type PortalRouteKey =
+  | 'dashboard'
+  | 'routing'
+  | 'api-keys'
+  | 'usage'
+  | 'user'
+  | 'credits'
+  | 'billing'
+  | 'account';
+export type PortalThemeMode = 'light' | 'dark' | 'system';
+export type PortalThemeColor =
+  | 'tech-blue'
+  | 'lobster'
+  | 'green-tech'
+  | 'zinc'
+  | 'violet'
+  | 'rose';
 export type PortalDataSource = 'live' | 'workspace_seed';
 
 export interface PortalRouteDefinition {
@@ -50,6 +66,10 @@ export interface GatewayApiKeyRecord {
   project_id: string;
   environment: string;
   hashed_key: string;
+  label: string;
+  created_at_ms: number;
+  last_used_at_ms?: number | null;
+  expires_at_ms?: number | null;
   active: boolean;
 }
 
@@ -59,6 +79,9 @@ export interface CreatedGatewayApiKey {
   tenant_id: string;
   project_id: string;
   environment: string;
+  label: string;
+  created_at_ms: number;
+  expires_at_ms?: number | null;
 }
 
 export interface UsageRecord {
@@ -67,6 +90,9 @@ export interface UsageRecord {
   provider: string;
   units: number;
   amount: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
   created_at_ms: number;
 }
 
@@ -103,6 +129,88 @@ export interface PortalDashboardSummary {
   billing_summary: ProjectBillingSummary;
   recent_requests: UsageRecord[];
   api_key_count: number;
+}
+
+export type PortalRoutingStrategy =
+  | 'deterministic_priority'
+  | 'weighted_random'
+  | 'slo_aware'
+  | 'geo_affinity';
+
+export interface PortalRoutingPreferences {
+  project_id: string;
+  preset_id: string;
+  strategy: PortalRoutingStrategy;
+  ordered_provider_ids: string[];
+  default_provider_id?: string | null;
+  max_cost?: number | null;
+  max_latency_ms?: number | null;
+  require_healthy: boolean;
+  preferred_region?: string | null;
+  updated_at_ms: number;
+}
+
+export interface PortalRoutingAssessment {
+  provider_id: string;
+  available: boolean;
+  health: 'healthy' | 'unhealthy' | 'unknown';
+  policy_rank: number;
+  weight?: number | null;
+  cost?: number | null;
+  latency_ms?: number | null;
+  region?: string | null;
+  region_match?: boolean | null;
+  slo_eligible?: boolean | null;
+  slo_violations: string[];
+  reasons: string[];
+}
+
+export interface PortalRoutingDecision {
+  selected_provider_id: string;
+  candidate_ids: string[];
+  matched_policy_id?: string | null;
+  strategy?: string | null;
+  selection_seed?: number | null;
+  selection_reason?: string | null;
+  requested_region?: string | null;
+  slo_applied: boolean;
+  slo_degraded: boolean;
+  assessments: PortalRoutingAssessment[];
+}
+
+export interface PortalRoutingDecisionLog {
+  decision_id: string;
+  decision_source: string;
+  tenant_id?: string | null;
+  project_id?: string | null;
+  capability: string;
+  route_key: string;
+  selected_provider_id: string;
+  matched_policy_id?: string | null;
+  strategy: string;
+  selection_seed?: number | null;
+  selection_reason?: string | null;
+  requested_region?: string | null;
+  slo_applied: boolean;
+  slo_degraded: boolean;
+  created_at_ms: number;
+  assessments: PortalRoutingAssessment[];
+}
+
+export interface PortalRoutingProviderOption {
+  provider_id: string;
+  display_name: string;
+  channel_id: string;
+  preferred: boolean;
+  default_provider: boolean;
+}
+
+export interface PortalRoutingSummary {
+  project_id: string;
+  preferences: PortalRoutingPreferences;
+  latest_model_hint: string;
+  preview: PortalRoutingDecision;
+  provider_options: PortalRoutingProviderOption[];
 }
 
 export interface SubscriptionPlan {

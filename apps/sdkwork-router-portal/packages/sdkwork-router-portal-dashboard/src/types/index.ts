@@ -1,160 +1,109 @@
-import type { PortalDashboardSummary, PortalRouteKey } from 'sdkwork-router-portal-types';
+import type {
+  PortalDashboardSummary,
+  PortalRouteKey,
+  PortalRoutingDecisionLog,
+  PortalRoutingSummary,
+  UsageRecord,
+} from 'sdkwork-router-portal-types';
+
+export type DashboardTone = 'accent' | 'positive' | 'warning' | 'default';
 
 export interface DashboardInsight {
   id: string;
   title: string;
   detail: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
+  tone: DashboardTone;
   route?: PortalRouteKey;
   action_label?: string;
 }
 
-export interface DashboardReadinessItem {
+export interface DashboardMetric {
   id: string;
   label: string;
   value: string;
   detail: string;
 }
 
-export interface DashboardActionItem {
-  id: string;
+export interface DashboardRoutingPosture {
   title: string;
   detail: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-  priority_label: string;
+  strategy_label: string;
+  selected_provider: string;
+  preferred_region: string;
+  evidence_count: string;
+  latest_reason: string;
+  tone: DashboardTone;
   route: PortalRouteKey;
   action_label: string;
 }
 
-export interface DashboardChecklistItem {
+export interface DashboardBreakdownItem {
   id: string;
-  title: string;
-  detail: string;
-  complete: boolean;
-  route: PortalRouteKey;
-  action_label: string;
+  label: string;
+  secondary_label: string;
+  value_label: string;
+  share: number;
 }
 
-export interface DashboardProductionReadiness {
-  score: number;
-  title: string;
-  detail: string;
-  blockers: string[];
-  strengths: string[];
+export interface DashboardSeriesPoint {
+  bucket: string;
+  requests: number;
+  amount: number;
 }
 
-export interface DashboardJourneyGuide {
-  completed_count: number;
-  total_count: number;
-  progress_label: string;
-  current_blocker: string;
-  next_milestone_title: string;
-  next_milestone_detail: string;
-  next_route: PortalRouteKey;
-  next_action_label: string;
+export interface DashboardDistributionPoint {
+  name: string;
+  value: number;
 }
 
-export interface DashboardEvidenceItem {
+export interface DashboardDemandPoint {
+  name: string;
+  requests: number;
+}
+
+export interface DashboardActivityItem {
   id: string;
   title: string;
   detail: string;
   timestamp_label: string;
+  tone: DashboardTone;
+  route?: PortalRouteKey;
+  action_label?: string;
 }
 
-export interface DashboardConfidenceSignal {
-  id: string;
-  title: string;
-  detail: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardModeNarrative {
-  title: string;
-  detail: string;
-  why_now: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardDecisionPathItem {
-  id: string;
-  title: string;
-  detail: string;
-  route: PortalRouteKey;
-  action_label: string;
-}
-
-export interface DashboardRouteSignal {
+export interface DashboardModuleItem {
   route: PortalRouteKey;
   title: string;
   status_label: string;
   detail: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardReviewCadenceItem {
-  id: string;
-  title: string;
-  detail: string;
-  route: PortalRouteKey;
+  tone: DashboardTone;
   action_label: string;
 }
 
-export interface DashboardPlaybookLaneItem {
-  id: string;
-  title: string;
-  detail: string;
-  route: PortalRouteKey;
-  action_label: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardFocusBoardItem {
-  id: string;
-  title: string;
-  detail: string;
-  priority_label: string;
-  route: PortalRouteKey;
-  action_label: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardRiskWatchItem {
-  id: string;
-  title: string;
-  detail: string;
-  status_label: string;
-  route: PortalRouteKey;
-  action_label: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
-}
-
-export interface DashboardDailyBrief {
-  title: string;
-  detail: string;
-  top_focus: DashboardFocusBoardItem;
-  risk_watch: DashboardRiskWatchItem;
+export interface PortalDashboardSnapshotBundle {
+  dashboard: PortalDashboardSummary;
+  routing_summary: PortalRoutingSummary;
+  routing_logs: PortalRoutingDecisionLog[];
+  usage_records: UsageRecord[];
 }
 
 export interface PortalDashboardPageProps {
   onNavigate: (route: PortalRouteKey) => void;
+  initialSnapshot?: PortalDashboardSummary | null;
 }
 
 export interface PortalDashboardPageViewModel {
   snapshot: PortalDashboardSummary;
   insights: DashboardInsight[];
-  readiness: DashboardReadinessItem[];
-  action_queue: DashboardActionItem[];
-  launch_checklist: DashboardChecklistItem[];
-  production_readiness: DashboardProductionReadiness;
-  journey: DashboardJourneyGuide;
-  evidence_timeline: DashboardEvidenceItem[];
-  confidence_signals: DashboardConfidenceSignal[];
-  mode: DashboardModeNarrative;
-  decision_path: DashboardDecisionPathItem[];
-  route_signals: DashboardRouteSignal[];
-  review_cadence: DashboardReviewCadenceItem[];
-  playbook_lane: DashboardPlaybookLaneItem[];
-  focus_board: DashboardFocusBoardItem[];
-  risk_watchlist: DashboardRiskWatchItem[];
-  daily_brief: DashboardDailyBrief;
+  metrics: DashboardMetric[];
+  routing_posture: DashboardRoutingPosture | null;
+  quick_actions: DashboardInsight[];
+  provider_mix: DashboardBreakdownItem[];
+  model_mix: DashboardBreakdownItem[];
+  request_volume_series: DashboardSeriesPoint[];
+  spend_series: DashboardSeriesPoint[];
+  provider_share_series: DashboardDistributionPoint[];
+  model_demand_series: DashboardDemandPoint[];
+  activity_feed: DashboardActivityItem[];
+  modules: DashboardModuleItem[];
 }

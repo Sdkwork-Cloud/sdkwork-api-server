@@ -1,194 +1,194 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { InlineButton, Pill, SectionHero, Surface } from 'sdkwork-router-portal-commons';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  DataTable,
+  EmptyState,
+  formatCurrency,
+  formatUnits,
+  InlineButton,
+  MetricCard,
+  Pill,
+  Surface,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
+import type { LedgerEntry, ProjectBillingSummary } from 'sdkwork-router-portal-types';
 
-import { AccountProfileFacts } from '../components';
-import { changePortalPassword } from '../repository';
-import { buildPortalAccountViewModel, passwordsMatch } from '../services';
+import { AccountBalanceFacts } from '../components';
+import { getPortalBillingSummary, listPortalBillingLedger } from '../repository';
+import { buildPortalAccountViewModel } from '../services';
 import type { PortalAccountPageProps } from '../types';
 
 export function PortalAccountPage({ workspace, onNavigate }: PortalAccountPageProps) {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState(
-    'Rotate your password without leaving the portal boundary.',
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const viewModel = buildPortalAccountViewModel(workspace, newPassword, confirmPassword);
+  const [summary, setSummary] = useState<ProjectBillingSummary | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [status, setStatus] = useState('Loading the financial account posture...');
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!passwordsMatch(newPassword, confirmPassword)) {
-      setStatus('New password confirmation does not match.');
-      return;
-    }
-    if (!viewModel.can_submit_password) {
-      setStatus('New password does not yet satisfy the visible portal security policy.');
-      return;
-    }
+  useEffect(() => {
+    let cancelled = false;
 
-    setSubmitting(true);
-    setStatus('Updating workspace password...');
+    void Promise.all([getPortalBillingSummary(), listPortalBillingLedger()])
+      .then(([nextSummary, nextLedger]) => {
+        if (cancelled) {
+          return;
+        }
 
-    try {
-      await changePortalPassword({
-        current_password: currentPassword,
-        new_password: newPassword,
+        setSummary(nextSummary);
+        setLedger(nextLedger);
+        setStatus('Financial account posture is synced with the latest billing summary and ledger evidence.');
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setStatus(portalErrorMessage(error));
+        }
       });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setStatus('Password updated. Use the new password the next time you sign in.');
-    } catch (error) {
-      setStatus(portalErrorMessage(error));
-    } finally {
-      setSubmitting(false);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const viewModel = useMemo(() => {
+    if (!summary) {
+      return null;
     }
+    return buildPortalAccountViewModel(summary, ledger);
+  }, [ledger, summary]);
+
+  if (!viewModel || !summary) {
+    return (
+      <Surface detail={status} title="Financial account">
+        <EmptyState
+          detail="Financial account posture will appear after the portal loads billing summary and ledger evidence."
+          title="Preparing account"
+        />
+      </Surface>
+    );
   }
 
   return (
     <>
-      <SectionHero
-        detail="Review your portal identity and rotate secrets without touching the admin control plane."
-        eyebrow="Account"
-        title={workspace?.user.display_name ?? 'Portal account'}
-      />
+      <div className="portalx-status-row">
+        <Pill tone="accent">Project: {workspace?.project.name ?? 'Loading'}</Pill>
+        <Pill tone={viewModel.billing_summary.exhausted ? 'warning' : 'positive'}>
+          {viewModel.billing_summary.exhausted ? 'Runway exhausted' : 'Runway visible'}
+        </Pill>
+        <span className="portalx-status">{status}</span>
+        <InlineButton onClick={() => onNavigate('credits')} tone="primary">
+          Open credits
+        </InlineButton>
+        <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+          Review billing
+        </InlineButton>
+      </div>
 
-      <div className="portalx-split-grid portalx-split-grid-wide">
-        <Surface detail="Current workspace identity and ownership boundary." title="Workspace trust center">
-          <div className="portalx-checklist-grid">
-            {viewModel.trust_center.map((item) => (
-              <article className="portalx-checklist-card" key={item.id}>
-                <strong>{item.title}</strong>
-                <span>{item.value}</span>
-                <p>{item.detail}</p>
-              </article>
-            ))}
-          </div>
-          <AccountProfileFacts workspace={workspace} />
-        </Surface>
+      <div className="portalx-metric-grid portalx-metric-grid-dense">
+        {viewModel.cash_balance_cards.map((item) => (
+          <MetricCard detail={item.detail} key={item.id} label={item.label} value={item.value} />
+        ))}
+      </div>
 
-        <Surface detail={status} title="Rotate password">
-          <form className="portalx-form portalx-form-card" onSubmit={handleSubmit}>
-            <label className="portalx-field">
-              <span>Current password</span>
-              <input
-                autoComplete="current-password"
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                required
-                type="password"
-                value={currentPassword}
-              />
-            </label>
-            <label className="portalx-field">
-              <span>New password</span>
-              <input
-                autoComplete="new-password"
-                onChange={(event) => setNewPassword(event.target.value)}
-                required
-                type="password"
-                value={newPassword}
-              />
-            </label>
-            <label className="portalx-field">
-              <span>Confirm new password</span>
-              <input
-                autoComplete="new-password"
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-                type="password"
-                value={confirmPassword}
-              />
-            </label>
-            <div className="portalx-form-actions">
-              <InlineButton tone="primary" type="submit">
-                {submitting ? 'Saving...' : 'Update password'}
-              </InlineButton>
-            </div>
+      <Tabs className="grid gap-6" defaultValue="balance-summary">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="balance-summary">Balance summary</TabsTrigger>
+          <TabsTrigger value="ledger-table">Ledger table</TabsTrigger>
+          <TabsTrigger value="controls">Controls</TabsTrigger>
+        </TabsList>
+
+        <TabsContent className="space-y-6" value="balance-summary">
+          <Surface detail="Keep visible units, booked amount, and ledger count close together so money posture is obvious." title="Cash balance">
+            <AccountBalanceFacts summary={summary} workspace={workspace} />
+          </Surface>
+
+          <Surface
+            detail="Runway, recharge, and ownership boundaries should stay explicit on every financial review."
+            title="Operating guardrails"
+          >
             <div className="portalx-guardrail-list">
-              {viewModel.password_policy.map((item) => (
+              {viewModel.guardrails.map((item) => (
                 <article className="portalx-guardrail-card" key={item.id}>
-                  <div className="portalx-status-row">
-                    <strong>{item.label}</strong>
-                    <Pill tone={item.met ? 'positive' : 'warning'}>
-                      {item.met ? 'Met' : 'Pending'}
-                    </Pill>
-                  </div>
+                  <strong>{item.title}</strong>
+                  <p>{item.detail}</p>
                 </article>
               ))}
             </div>
-          </form>
-        </Surface>
-      </div>
+          </Surface>
+        </TabsContent>
 
-      <div className="portalx-split-grid portalx-split-grid-wide">
-        <Surface
-          detail="A simple checklist that makes account posture visible before the next key, billing, or usage action."
-          title="Security checklist"
-        >
-          <div className="portalx-checklist-grid">
-            {viewModel.security_checklist.map((item) => (
-              <article className="portalx-checklist-card" key={item.id}>
-                <Pill tone={item.complete ? 'positive' : 'warning'}>
-                  {item.complete ? 'Ready' : 'Needs action'}
-                </Pill>
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
-              </article>
-            ))}
-          </div>
-        </Surface>
+        <TabsContent className="space-y-6" value="ledger-table">
+          <Surface detail="The account view should expose the raw ledger table before any higher-level interpretation." title="Ledger table">
+            {ledger.length ? (
+              <DataTable
+                columns={[
+                  { key: 'project', label: 'Project', render: (row) => row.project_id },
+                  { key: 'units', label: 'Units', render: (row) => formatUnits(row.units) },
+                  { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
+                ]}
+                empty="No ledger entries recorded yet."
+                getKey={(row, index) => `${row.project_id}-${row.units}-${index}`}
+                rows={ledger}
+              />
+            ) : (
+              <EmptyState
+                detail="Ledger lines will appear here as quota and billing activity accumulates."
+                title="No ledger entries yet"
+              />
+            )}
+          </Surface>
 
-        <Surface
-          detail="The portal should help users recover safely from common account and access problems without relying on admin intervention."
-          title="Recovery signals"
-        >
-          <div className="portalx-guardrail-list">
-            {viewModel.recovery_signals.map((item) => (
-              <article className="portalx-guardrail-card" key={item.id}>
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
-              </article>
-            ))}
-          </div>
-        </Surface>
-      </div>
-
-      <Surface
-        detail="Account work should fold back into the active workspace journey instead of becoming a dead-end settings page."
-        title="Return to command center"
-      >
-        <div className="portalx-checklist-grid">
-          <article className="portalx-checklist-card">
-            <strong>Return to the live workspace pulse</strong>
-            <p>After trust or password changes, go back to Dashboard to verify the workspace is still ready for the next action.</p>
-            <InlineButton onClick={() => onNavigate('dashboard')} tone="primary">
-              Open dashboard
-            </InlineButton>
-          </article>
-          <article className="portalx-checklist-card">
-            <strong>Audit credentials after a security change</strong>
-            <p>If the account boundary changed because of risk or recovery, verify that API keys and environment ownership still look correct.</p>
-            <InlineButton onClick={() => onNavigate('api-keys')} tone="secondary">
-              Manage keys
-            </InlineButton>
-          </article>
-          <article className="portalx-checklist-card">
-            <strong>Review billing and credits before the next launch</strong>
-            <p>Once identity and password posture are healthy, keep commercial runway aligned so the workspace can actually continue operating.</p>
-            <div className="portalx-form-actions">
-              <InlineButton onClick={() => onNavigate('credits')} tone="ghost">
-                Open credits
-              </InlineButton>
-              <InlineButton onClick={() => onNavigate('billing')} tone="ghost">
-                Review billing
-              </InlineButton>
+          <Surface
+            detail="Ledger evidence should explain why the financial account looks the way it does right now."
+            title="Ledger evidence"
+          >
+            <div className="portalx-guardrail-list">
+              {viewModel.ledger_evidence.map((item) => (
+                <article className="portalx-guardrail-card" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <p>{item.detail}</p>
+                </article>
+              ))}
             </div>
-          </article>
-        </div>
-      </Surface>
+          </Surface>
+        </TabsContent>
+
+        <TabsContent className="space-y-6" value="controls">
+          <Surface
+            detail="The account module should always direct the user back into the operational loop with a specific next move."
+            title="Recommended next financial move"
+          >
+            <div className="portalx-checklist-grid">
+              <article className="portalx-checklist-card">
+                <strong>Protect runway before the next launch window</strong>
+                <p>Use Credits when you want to add headroom or review coupon-driven top-up options.</p>
+                <InlineButton onClick={() => onNavigate('credits')} tone="primary">
+                  Open credits
+                </InlineButton>
+              </article>
+              <article className="portalx-checklist-card">
+                <strong>Review billing for plan changes</strong>
+                <p>Billing remains the lane for bundle selection, subscription shaping, and recovery planning.</p>
+                <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+                  Review billing
+                </InlineButton>
+              </article>
+              <article className="portalx-checklist-card">
+                <strong>Reconnect money posture with routing and traffic</strong>
+                <p>Use Routing and Usage together when commercial posture should inform the next provider or rollout decision.</p>
+                <div className="portalx-form-actions">
+                  <InlineButton onClick={() => onNavigate('routing')} tone="ghost">
+                    Open routing
+                  </InlineButton>
+                  <InlineButton onClick={() => onNavigate('usage')} tone="ghost">
+                    Open usage
+                  </InlineButton>
+                </div>
+              </article>
+            </div>
+          </Surface>
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

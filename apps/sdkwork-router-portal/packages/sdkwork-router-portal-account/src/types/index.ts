@@ -1,40 +1,32 @@
-import type { PortalRouteKey, PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
+import type {
+  LedgerEntry,
+  PortalRouteKey,
+  PortalWorkspaceSummary,
+  ProjectBillingSummary,
+} from 'sdkwork-router-portal-types';
 
 export interface PortalAccountPageProps {
   workspace: PortalWorkspaceSummary | null;
   onNavigate: (route: PortalRouteKey) => void;
 }
 
-export interface AccountInsightItem {
+export interface FinancialMetricItem {
   id: string;
-  title: string;
+  label: string;
   value: string;
   detail: string;
 }
 
-export interface AccountChecklistItem {
+export interface FinancialGuardrailItem {
   id: string;
   title: string;
   detail: string;
-  complete: boolean;
-}
-
-export interface AccountRecoverySignal {
-  id: string;
-  title: string;
-  detail: string;
-}
-
-export interface PasswordPolicyItem {
-  id: string;
-  label: string;
-  met: boolean;
 }
 
 export interface PortalAccountViewModel {
-  trust_center: AccountInsightItem[];
-  security_checklist: AccountChecklistItem[];
-  recovery_signals: AccountRecoverySignal[];
-  password_policy: PasswordPolicyItem[];
-  can_submit_password: boolean;
+  billing_summary: ProjectBillingSummary;
+  ledger: LedgerEntry[];
+  cash_balance_cards: FinancialMetricItem[];
+  ledger_evidence: FinancialGuardrailItem[];
+  guardrails: FinancialGuardrailItem[];
 }

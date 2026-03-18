@@ -9,17 +9,11 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell keeps a persistent launch-journey guide visible', () => {
-  const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
-
-  assert.match(core, /Launch journey/);
-  assert.match(core, /Current blocker/);
-  assert.match(core, /Next milestone/);
-});
-
-test('dashboard exposes journey progress and milestone map', () => {
+test('dashboard keeps routing posture and workspace modules visible as the main handoff surfaces', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Journey progress/);
-  assert.match(dashboardPage, /Milestone map/);
+  assert.match(dashboardPage, /Routing posture/);
+  assert.match(dashboardPage, /Workspace modules/);
+  assert.doesNotMatch(dashboardPage, /Journey progress/);
+  assert.doesNotMatch(dashboardPage, /Milestone map/);
 });

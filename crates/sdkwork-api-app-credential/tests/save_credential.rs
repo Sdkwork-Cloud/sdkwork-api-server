@@ -32,6 +32,15 @@ impl KeyringBackend for MemoryKeyringBackend {
             .get(&(service.to_owned(), username.to_owned()))
             .cloned())
     }
+
+    fn delete_password(&self, service: &str, username: &str) -> anyhow::Result<bool> {
+        Ok(self
+            .entries
+            .lock()
+            .unwrap()
+            .remove(&(service.to_owned(), username.to_owned()))
+            .is_some())
+    }
 }
 
 #[test]

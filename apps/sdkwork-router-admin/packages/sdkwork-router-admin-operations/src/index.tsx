@@ -2,10 +2,16 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 
 import {
+  AdminDialog,
   DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTrigger,
+  FormField,
   InlineButton,
+  PageToolbar,
   Pill,
-  SectionHero,
   StatCard,
   Surface,
 } from 'sdkwork-router-admin-commons';
@@ -34,6 +40,7 @@ export function OperationsPage({
     extension_id: '',
     instance_id: '',
   });
+  const [isReloadDialogOpen, setIsReloadDialogOpen] = useState(false);
   const [lastReloadReport, setLastReloadReport] = useState<RuntimeReloadReport | null>(null);
 
   async function handleReload(event: FormEvent<HTMLFormElement>) {
@@ -43,21 +50,19 @@ export function OperationsPage({
       instance_id: reloadDraft.instance_id.trim() || undefined,
     });
     setLastReloadReport(report);
+    setIsReloadDialogOpen(false);
+  }
+
+  function resetReloadDialog() {
+    setIsReloadDialogOpen(false);
+    setReloadDraft({
+      extension_id: '',
+      instance_id: '',
+    });
   }
 
   return (
     <div className="adminx-page-grid">
-      <SectionHero
-        eyebrow="Runtime"
-        title="Monitor provider health and managed runtime posture."
-        detail="Operations focuses on the runtime side of the router: provider health, extension status, and operational readiness."
-        actions={(
-          <InlineButton tone="primary" onClick={() => void onReloadRuntimes().then(setLastReloadReport)}>
-            Reload runtimes
-          </InlineButton>
-        )}
-      />
-
       <section className="adminx-stat-grid">
         <StatCard
           label="Provider health snapshots"
@@ -81,59 +86,90 @@ export function OperationsPage({
         />
       </section>
 
+      <PageToolbar
+        title="Runtime intervention workbench"
+        detail="Leave monitoring on the canvas, and open a focused dialog only when a targeted reload needs a specific extension or instance scope."
+        actions={(
+          <>
+            <InlineButton
+              tone="primary"
+              onClick={() => void onReloadRuntimes().then(setLastReloadReport)}
+            >
+              Reload runtimes
+            </InlineButton>
+            <Dialog
+              open={isReloadDialogOpen}
+              onOpenChange={(nextOpen) => {
+                if (!nextOpen) {
+                  resetReloadDialog();
+                  return;
+                }
+                setIsReloadDialogOpen(true);
+              }}
+            >
+              <DialogTrigger asChild>
+                <InlineButton onClick={() => setIsReloadDialogOpen(true)}>
+                  Targeted reload
+                </InlineButton>
+              </DialogTrigger>
+              <DialogContent size="medium">
+                <AdminDialog
+                  title="Targeted reload"
+                  detail="Use a narrow runtime reload when you need a smaller blast radius than the full control-plane refresh."
+                >
+                  <form className="adminx-form-grid" onSubmit={(event) => void handleReload(event)}>
+                    <FormField label="Extension id" hint="Leave blank to keep the reload scope open.">
+                      <input
+                        value={reloadDraft.extension_id}
+                        onChange={(event) =>
+                          setReloadDraft((current) => ({
+                            ...current,
+                            extension_id: event.target.value,
+                          }))}
+                        placeholder="optional extension id"
+                      />
+                    </FormField>
+                    <FormField label="Instance id" hint="Use this only when one runtime instance needs intervention.">
+                      <input
+                        value={reloadDraft.instance_id}
+                        onChange={(event) =>
+                          setReloadDraft((current) => ({
+                            ...current,
+                            instance_id: event.target.value,
+                          }))}
+                        placeholder="optional instance id"
+                      />
+                    </FormField>
+                    <DialogFooter>
+                      <InlineButton onClick={resetReloadDialog}>Cancel</InlineButton>
+                      <InlineButton tone="primary" type="submit">
+                        Run targeted reload
+                      </InlineButton>
+                    </DialogFooter>
+                  </form>
+                </AdminDialog>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      >
+        <div className="adminx-form-grid">
+          <div className="adminx-note">
+            <strong>Latest reload report</strong>
+            <p>
+              {lastReloadReport
+                ? `Scope: ${lastReloadReport.scope} | Active runtimes: ${lastReloadReport.active_runtime_count} | Loadable packages: ${lastReloadReport.loadable_package_count} | Reloaded: ${formatTimestamp(lastReloadReport.reloaded_at_ms)}`
+                : 'Last reload report is not available yet.'}
+            </p>
+          </div>
+          <div className="adminx-note">
+            <strong>Runtime reload behavior</strong>
+            <p>Use the targeted dialog for narrow intervention, and use the toolbar reload action when the whole runtime mesh should be refreshed.</p>
+          </div>
+        </div>
+      </PageToolbar>
+
       <div className="adminx-users-grid">
-        <Surface
-          title="Reload runtimes"
-          detail="Run a global reload or target a specific extension or instance without leaving the admin workspace."
-        >
-          <form className="adminx-form-grid" onSubmit={(event) => void handleReload(event)}>
-            <label className="adminx-field">
-              <span>Extension id</span>
-              <input
-                value={reloadDraft.extension_id}
-                onChange={(event) => setReloadDraft((current) => ({ ...current, extension_id: event.target.value }))}
-                placeholder="optional extension id"
-              />
-            </label>
-            <label className="adminx-field">
-              <span>Instance id</span>
-              <input
-                value={reloadDraft.instance_id}
-                onChange={(event) => setReloadDraft((current) => ({ ...current, instance_id: event.target.value }))}
-                placeholder="optional instance id"
-              />
-            </label>
-            <div className="adminx-form-actions">
-              <InlineButton tone="primary" type="submit">
-                Reload runtimes
-              </InlineButton>
-              <InlineButton onClick={() => setReloadDraft({ extension_id: '', instance_id: '' })}>
-                Clear scope
-              </InlineButton>
-            </div>
-          </form>
-
-          {lastReloadReport ? (
-            <div className="adminx-note">
-              <strong>Last reload report</strong>
-              <p>
-                Scope: {lastReloadReport.scope}
-                {' | '}
-                Active runtimes: {lastReloadReport.active_runtime_count}
-                {' | '}
-                Loadable packages: {lastReloadReport.loadable_package_count}
-                {' | '}
-                Reloaded: {formatTimestamp(lastReloadReport.reloaded_at_ms)}
-              </p>
-            </div>
-          ) : (
-            <div className="adminx-note">
-              <strong>Reload behavior</strong>
-              <p>Leave both fields blank to reload all managed runtimes, or target a single extension or instance for a narrower blast radius.</p>
-            </div>
-          )}
-        </Surface>
-
         <Surface
           title="Runtime posture"
           detail="Runtime states are refreshed after every reload so operators can immediately confirm outcome."
@@ -158,6 +194,28 @@ export function OperationsPage({
                 </p>
               </article>
             ))}
+          </div>
+        </Surface>
+
+        <Surface
+          title="Intervention guidance"
+          detail="Focused dialog actions keep runtime monitoring stable while you decide whether to escalate."
+        >
+          <div className="adminx-card-grid">
+            <article className="adminx-mini-card">
+              <div className="adminx-row">
+                <strong>Prefer narrow reloads first</strong>
+                <Pill tone="seed">safe</Pill>
+              </div>
+              <p>Start with extension or instance scope when only one runtime looks degraded.</p>
+            </article>
+            <article className="adminx-mini-card">
+              <div className="adminx-row">
+                <strong>Read health before intervening</strong>
+                <Pill tone="live">observe</Pill>
+              </div>
+              <p>Provider and runtime tables remain primary so the operator can compare signals before taking action.</p>
+            </article>
           </div>
         </Surface>
       </div>

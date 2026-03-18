@@ -1,19 +1,65 @@
 import { listRechargePacks, listSubscriptionPlans } from 'sdkwork-router-portal-commerce';
 import { formatUnits } from 'sdkwork-router-portal-commons';
-import type { ProjectBillingSummary, RechargePack, SubscriptionPlan } from 'sdkwork-router-portal-types';
+import type {
+  ProjectBillingSummary,
+  RechargePack,
+  SubscriptionPlan,
+  UsageRecord,
+} from 'sdkwork-router-portal-types';
 
 import type { BillingRecommendation } from '../types';
 
-function estimateDailyUnits(summary: ProjectBillingSummary): number | null {
+function buildDailyUsageSeries(usageRecords: UsageRecord[]): number[] {
+  const daily = new Map<string, number>();
+
+  for (const record of usageRecords) {
+    if (!record.created_at_ms) {
+      continue;
+    }
+
+    const key = new Date(record.created_at_ms).toISOString().slice(0, 10);
+    daily.set(key, (daily.get(key) ?? 0) + record.units);
+  }
+
+  return [...daily.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .map(([, units]) => units);
+}
+
+function exponentialMovingAverage(values: number[], alpha = 0.45): number | null {
+  if (!values.length) {
+    return null;
+  }
+
+  let smoothed = values[0];
+  for (let index = 1; index < values.length; index += 1) {
+    smoothed = alpha * values[index] + (1 - alpha) * smoothed;
+  }
+
+  return smoothed;
+}
+
+function estimateDailyUnits(
+  summary: ProjectBillingSummary,
+  usageRecords: UsageRecord[],
+): number | null {
+  const smoothedDailyUnits = exponentialMovingAverage(buildDailyUsageSeries(usageRecords));
+  if (smoothedDailyUnits && Number.isFinite(smoothedDailyUnits)) {
+    return Math.max(1, Math.round(smoothedDailyUnits));
+  }
+
   if (summary.used_units <= 0) {
     return null;
   }
 
-  return Math.max(Math.ceil(summary.used_units / 30), 250);
+  return Math.max(1, Math.ceil(summary.used_units / 30));
 }
 
-function buildRunway(summary: ProjectBillingSummary): BillingRecommendation['runway'] {
-  const daily_units = estimateDailyUnits(summary);
+function buildRunway(
+  summary: ProjectBillingSummary,
+  usageRecords: UsageRecord[],
+): BillingRecommendation['runway'] {
+  const daily_units = estimateDailyUnits(summary, usageRecords);
 
   if (summary.exhausted) {
     return {
@@ -47,7 +93,7 @@ function buildRunway(summary: ProjectBillingSummary): BillingRecommendation['run
 
   return {
     label,
-    detail: `Estimated from the current observed burn pace of ${formatUnits(daily_units)} token units per day.`,
+    detail: `Estimated from an exponentially smoothed burn pace of ${formatUnits(daily_units)} token units per day.`,
     projected_days,
     daily_units,
   };
@@ -85,13 +131,21 @@ function buildRecommendedBundle(
   };
 }
 
-export function recommendBillingChange(summary: ProjectBillingSummary): BillingRecommendation {
+export function recommendBillingChange(
+  summary: ProjectBillingSummary,
+  usageRecords: UsageRecord[] = [],
+): BillingRecommendation {
   const plans = listSubscriptionPlans();
   const packs = listRechargePacks();
-  const currentDemand = Math.max(summary.used_units, 1);
-  const recommendedPlan = plans.find((plan) => plan.included_units >= currentDemand) ?? plans[plans.length - 1];
-  const recommendedPack = packs.find((pack) => pack.points >= Math.max(10_000, summary.used_units / 2)) ?? packs[packs.length - 1];
-  const runway = buildRunway(summary);
+  const runway = buildRunway(summary, usageRecords);
+  const projectedMonthlyUnits = runway.daily_units
+    ? runway.daily_units * 30
+    : Math.max(summary.used_units, 1);
+  const recommendedPlan =
+    plans.find((plan) => plan.included_units >= projectedMonthlyUnits) ?? plans[plans.length - 1];
+  const recommendedPack =
+    packs.find((pack) => pack.points >= Math.max(10_000, Math.round(projectedMonthlyUnits / 4))) ??
+    packs[packs.length - 1];
   const bundle = buildRecommendedBundle(summary, recommendedPlan, recommendedPack);
 
   if (summary.exhausted) {
@@ -118,7 +172,7 @@ export function recommendBillingChange(summary: ProjectBillingSummary): BillingR
 
   return {
     title: 'Current workspace is stable',
-    detail: `Based on ${formatUnits(summary.used_units)} used units, ${recommendedPlan.name} is the cleanest next subscription step when traffic grows.`,
+    detail: `Based on a projected monthly demand of ${formatUnits(projectedMonthlyUnits)} units, ${recommendedPlan.name} is the cleanest next subscription step when traffic grows.`,
     plan: recommendedPlan,
     pack: recommendedPack,
     runway,

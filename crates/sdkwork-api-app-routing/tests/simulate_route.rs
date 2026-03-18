@@ -15,7 +15,8 @@ use sdkwork_api_app_routing::{
 };
 use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_routing::{
-    ProviderHealthSnapshot, RoutingDecisionSource, RoutingPolicy, RoutingStrategy,
+    ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingDecisionSource, RoutingPolicy,
+    RoutingStrategy,
 };
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 #[cfg(windows)]
@@ -142,7 +143,7 @@ async fn route_simulation_can_use_policy_without_catalog_model_candidates() {
 
 #[serial(routing_runtime)]
 #[tokio::test]
-async fn route_simulation_prefers_lower_cost_available_provider_from_instance_config() {
+async fn route_simulation_respects_explicit_provider_order_before_lower_cost_hints() {
     shutdown_all_connector_runtimes().unwrap();
     shutdown_all_native_dynamic_runtimes().unwrap();
 
@@ -244,15 +245,12 @@ async fn route_simulation_prefers_lower_cost_available_provider_from_instance_co
         .await
         .unwrap();
 
-    assert_eq!(decision.selected_provider_id, "provider-cheap");
-    assert_eq!(
-        decision.strategy.as_deref(),
-        Some("runtime_aware_deterministic")
-    );
+    assert_eq!(decision.selected_provider_id, "provider-expensive");
+    assert_eq!(decision.strategy.as_deref(), Some("deterministic_priority"));
     assert_eq!(decision.assessments.len(), 2);
-    assert_eq!(decision.assessments[0].provider_id, "provider-cheap");
-    assert_eq!(decision.assessments[0].cost, Some(0.25));
-    assert_eq!(decision.assessments[1].provider_id, "provider-expensive");
+    assert_eq!(decision.assessments[0].provider_id, "provider-expensive");
+    assert_eq!(decision.assessments[1].provider_id, "provider-cheap");
+    assert_eq!(decision.assessments[1].cost, Some(0.25));
 }
 
 #[serial(routing_runtime)]
@@ -1183,6 +1181,94 @@ async fn select_route_with_store_context_persists_requested_region_in_routing_de
     let logs = store.list_routing_decision_logs().await.unwrap();
     assert_eq!(logs.len(), 1);
     assert_eq!(logs[0].requested_region.as_deref(), Some("us-east"));
+}
+
+#[serial(routing_runtime)]
+#[tokio::test]
+async fn select_route_with_store_context_applies_project_routing_preferences_over_global_policy() {
+    shutdown_all_connector_runtimes().unwrap();
+    shutdown_all_native_dynamic_runtimes().unwrap();
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(&ProxyProvider::new(
+            "provider-openrouter",
+            "openai",
+            "openai",
+            "https://openrouter.example/v1",
+            "OpenRouter",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_provider(&ProxyProvider::new(
+            "provider-openai-official",
+            "openai",
+            "openai",
+            "https://openai.example/v1",
+            "OpenAI Official",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-openrouter"))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "gpt-4.1",
+            "provider-openai-official",
+        ))
+        .await
+        .unwrap();
+
+    let global_policy = RoutingPolicy::new("policy-global", "chat_completion", "gpt-4.1")
+        .with_priority(100)
+        .with_ordered_provider_ids(vec![
+            "provider-openai-official".to_owned(),
+            "provider-openrouter".to_owned(),
+        ]);
+    persist_routing_policy(&store, &global_policy)
+        .await
+        .unwrap();
+
+    let preferences = ProjectRoutingPreferences::new("project-1")
+        .with_preset_id("reliability")
+        .with_strategy(RoutingStrategy::SloAware)
+        .with_ordered_provider_ids(vec![
+            "provider-openrouter".to_owned(),
+            "provider-openai-official".to_owned(),
+        ])
+        .with_default_provider_id("provider-openai-official")
+        .with_max_cost(0.30)
+        .with_max_latency_ms(250)
+        .with_require_healthy(true)
+        .with_preferred_region("us-east")
+        .with_updated_at_ms(123);
+    store
+        .insert_project_routing_preferences(&preferences)
+        .await
+        .unwrap();
+
+    let decision = select_route_with_store_context(
+        &store,
+        "chat_completion",
+        "gpt-4.1",
+        RouteSelectionContext::new(RoutingDecisionSource::Gateway)
+            .with_project_id_option(Some("project-1")),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(decision.selected_provider_id, "provider-openrouter");
+    assert_eq!(decision.requested_region.as_deref(), Some("us-east"));
+    assert_eq!(decision.strategy.as_deref(), Some("slo_aware"));
 }
 
 #[serial(routing_runtime)]

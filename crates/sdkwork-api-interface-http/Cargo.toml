@@ -18,6 +18,7 @@ sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
+sdkwork-api-openapi = { path = "../sdkwork-api-openapi" }
 sdkwork-api-provider-core = { path = "../sdkwork-api-provider-core" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }

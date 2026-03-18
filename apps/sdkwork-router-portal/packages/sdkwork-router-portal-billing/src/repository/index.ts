@@ -1,6 +1,18 @@
-import { getPortalBillingSummary } from 'sdkwork-router-portal-portal-api';
-import type { ProjectBillingSummary } from 'sdkwork-router-portal-types';
+import {
+  getPortalBillingSummary,
+  listPortalUsageRecords,
+} from 'sdkwork-router-portal-portal-api';
 
-export function loadBillingSummary(): Promise<ProjectBillingSummary> {
-  return getPortalBillingSummary();
+import type { BillingPageData } from '../types';
+
+export async function loadBillingPageData(): Promise<BillingPageData> {
+  const [summary, usage_records] = await Promise.all([
+    getPortalBillingSummary(),
+    listPortalUsageRecords(),
+  ]);
+
+  return {
+    summary,
+    usage_records,
+  };
 }

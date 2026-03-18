@@ -13,16 +13,9 @@
   },
   "dependencies": {
     "react": "^19.0.0",
+    "react-router-dom": "^7.13.1",
     "sdkwork-router-admin-admin-api": "workspace:*",
-    "sdkwork-router-admin-auth": "workspace:*",
-    "sdkwork-router-admin-catalog": "workspace:*",
-    "sdkwork-router-admin-commons": "workspace:*",
-    "sdkwork-router-admin-coupons": "workspace:*",
-    "sdkwork-router-admin-operations": "workspace:*",
-    "sdkwork-router-admin-overview": "workspace:*",
-    "sdkwork-router-admin-tenants": "workspace:*",
-    "sdkwork-router-admin-traffic": "workspace:*",
     "sdkwork-router-admin-types": "workspace:*",
-    "sdkwork-router-admin-users": "workspace:*"
+    "zustand": "^5.0.8"
   }
 }

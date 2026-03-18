@@ -6,12 +6,23 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host 0.0.0.0 --port 4174 --strictPort"
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "preview": "vite preview --host 0.0.0.0 --port 4174 --strictPort",
+    "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CMAKE_GENERATOR='Visual Studio 17 2022'; tauri dev\"",
+    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CMAKE_GENERATOR='Visual Studio 17 2022'; tauri build\""
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.542.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^7.6.2",
+    "recharts": "^3.1.2",
     "sdkwork-router-portal-account": "workspace:*",
     "sdkwork-router-portal-api-keys": "workspace:*",
     "sdkwork-router-portal-auth": "workspace:*",
@@ -22,13 +33,20 @@
     "sdkwork-router-portal-credits": "workspace:*",
     "sdkwork-router-portal-dashboard": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
+    "sdkwork-router-portal-routing": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*",
-    "sdkwork-router-portal-usage": "workspace:*"
+    "sdkwork-router-portal-user": "workspace:*",
+    "sdkwork-router-portal-usage": "workspace:*",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.2.5",
+    "@tailwindcss/vite": "^4.1.12",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^5.0.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.12",
     "turbo": "^2.5.8",
     "typescript": "^5.8.2",
     "vite": "^7.0.0"

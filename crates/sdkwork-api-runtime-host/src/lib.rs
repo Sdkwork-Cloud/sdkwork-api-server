@@ -1,6 +1,6 @@
 use std::{
     fs,
-    net::{TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     thread,
     time::Duration,
@@ -10,7 +10,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Uri};
-use pingora_core::{server::Server, upstreams::peer::HttpPeer, Error, ErrorType, Result as PingoraResult};
+use pingora_core::{
+    server::Server, upstreams::peer::HttpPeer, Error, ErrorType, Result as PingoraResult,
+};
 use pingora_http::ResponseHeader;
 use pingora_proxy::{http_proxy_service, ProxyHttp, Session};
 
@@ -99,11 +101,15 @@ impl RuntimeHostConfig {
 
 impl EmbeddedRuntime {
     pub async fn start_ephemeral() -> Result<Self> {
-        let bind_addr = reserve_loopback_bind()?;
+        let bind_addr = reserve_bind_addr("127.0.0.1:0")?;
         Self::start(RuntimeHostConfig::local_defaults(bind_addr)).await
     }
 
-    pub async fn start(config: RuntimeHostConfig) -> Result<Self> {
+    pub async fn start(mut config: RuntimeHostConfig) -> Result<Self> {
+        if uses_ephemeral_port(&config.bind_addr) {
+            config.bind_addr = reserve_bind_addr(&config.bind_addr)?;
+        }
+
         let bind_addr = config.bind_addr.clone();
         let base_url = format!("http://{}", bind_addr);
 
@@ -252,7 +258,11 @@ fn normalize_relative_path(site_relative_path: &str) -> Result<PathBuf> {
 }
 
 fn guess_content_type(path: &Path) -> &'static str {
-    match path.extension().and_then(|value| value.to_str()).unwrap_or_default() {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+    {
         "html" => "text/html; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "js" | "mjs" => "text/javascript; charset=utf-8",
@@ -364,10 +374,19 @@ impl ProxyHttp for RuntimeHostProxy {
 }
 
 async fn write_redirect_response(session: &mut Session, location: &str) -> PingoraResult<()> {
-    let mut header = ResponseHeader::build(302, Some(3))?;
+    let header = build_redirect_response_header(location)?;
+    session
+        .write_response_header(Box::new(header), false)
+        .await?;
+    session.write_response_body(Some(Bytes::new()), true).await
+}
+
+fn build_redirect_response_header(location: &str) -> PingoraResult<ResponseHeader> {
+    let mut header = ResponseHeader::build(302, Some(4))?;
     header.insert_header("location", location)?;
     header.insert_header("cache-control", "no-cache")?;
-    session.write_response_header(Box::new(header), true).await
+    header.insert_header("content-length", "0")?;
+    Ok(header)
 }
 
 async fn serve_static_asset(
@@ -417,21 +436,27 @@ fn rewrite_request_path(session: &mut Session, request_path: &str) -> PingoraRes
     } else {
         request_path.to_owned()
     };
-    parts.path_and_query = Some(
-        new_path
-            .parse::<PathAndQuery>()
-            .map_err(|error| Error::because(ErrorType::InternalError, "invalid rewritten path", error))?,
-    );
-    let rewritten_uri = Uri::from_parts(parts)
-        .map_err(|error| Error::because(ErrorType::InternalError, "invalid rewritten uri", error))?;
+    parts.path_and_query = Some(new_path.parse::<PathAndQuery>().map_err(|error| {
+        Error::because(ErrorType::InternalError, "invalid rewritten path", error)
+    })?);
+    let rewritten_uri = Uri::from_parts(parts).map_err(|error| {
+        Error::because(ErrorType::InternalError, "invalid rewritten uri", error)
+    })?;
     session.req_header_mut().set_uri(rewritten_uri);
     Ok(())
 }
 
-fn reserve_loopback_bind() -> Result<String> {
-    let listener = TcpListener::bind("127.0.0.1:0")?;
+fn reserve_bind_addr(bind_addr: &str) -> Result<String> {
+    let listener = TcpListener::bind(bind_addr)?;
     let bind_addr = listener.local_addr()?;
     Ok(bind_addr.to_string())
+}
+
+fn uses_ephemeral_port(bind_addr: &str) -> bool {
+    bind_addr
+        .parse::<SocketAddr>()
+        .map(|address| address.port() == 0)
+        .unwrap_or_else(|_| bind_addr.ends_with(":0"))
 }
 
 fn wait_for_listener(bind_addr: &str) -> Result<()> {
@@ -443,4 +468,19 @@ fn wait_for_listener(bind_addr: &str) -> Result<()> {
     }
 
     bail!("runtime host did not bind to {bind_addr}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_redirect_response_header;
+
+    #[test]
+    fn redirect_headers_set_zero_content_length() {
+        let header = build_redirect_response_header("/portal/").unwrap();
+
+        assert_eq!(header.status.as_u16(), 302);
+        assert_eq!(header.headers.get("location").unwrap(), "/portal/");
+        assert_eq!(header.headers.get("content-length").unwrap(), "0");
+        assert_eq!(header.headers.get("cache-control").unwrap(), "no-cache");
+    }
 }

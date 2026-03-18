@@ -90,25 +90,21 @@ async fn portal_dashboard_and_usage_views_are_project_scoped() {
     .await
     .unwrap();
 
-    sqlx::query(
-        "INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)",
-    )
-    .bind(&project_id)
-    .bind(240_i64)
-    .bind(0.42_f64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)")
+        .bind(&project_id)
+        .bind(240_i64)
+        .bind(0.42_f64)
+        .execute(&pool)
+        .await
+        .unwrap();
 
-    sqlx::query(
-        "INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)",
-    )
-    .bind("project-other")
-    .bind(999_i64)
-    .bind(9.99_f64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)")
+        .bind("project-other")
+        .bind(999_i64)
+        .bind(9.99_f64)
+        .execute(&pool)
+        .await
+        .unwrap();
 
     sqlx::query(
         "INSERT INTO billing_quota_policies (policy_id, project_id, max_units, enabled)
@@ -141,7 +137,10 @@ async fn portal_dashboard_and_usage_views_are_project_scoped() {
     assert_eq!(dashboard_json["usage_summary"]["total_requests"], 1);
     assert_eq!(dashboard_json["billing_summary"]["project_id"], project_id);
     assert_eq!(dashboard_json["billing_summary"]["used_units"], 240);
-    assert_eq!(dashboard_json["recent_requests"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        dashboard_json["recent_requests"].as_array().unwrap().len(),
+        1
+    );
     assert_eq!(dashboard_json["recent_requests"][0]["units"], 240);
 
     let usage_records_response = app

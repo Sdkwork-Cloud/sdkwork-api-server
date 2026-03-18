@@ -9,17 +9,11 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell exposes workspace mode and global quick actions', () => {
-  const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
-
-  assert.match(core, /Workspace mode/);
-  assert.match(core, /Quick actions/);
-  assert.match(core, /Why now/);
-});
-
-test('dashboard exposes a mode narrative and explicit decision path', () => {
+test('dashboard turns abstract mode guidance into provider and model demand views', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Mode narrative/);
-  assert.match(dashboardPage, /Decision path/);
+  assert.match(dashboardPage, /Provider share/);
+  assert.match(dashboardPage, /Model demand/);
+  assert.doesNotMatch(dashboardPage, /Mode narrative/);
+  assert.doesNotMatch(dashboardPage, /Decision path/);
 });

@@ -425,7 +425,10 @@ async fn stateful_chat_route_records_upstream_token_usage() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/chat/completions", post(upstream_chat_handler_with_usage))
+        .route(
+            "/v1/chat/completions",
+            post(upstream_chat_handler_with_usage),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {

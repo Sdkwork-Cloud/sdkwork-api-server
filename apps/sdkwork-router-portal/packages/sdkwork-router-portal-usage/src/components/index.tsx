@@ -1,4 +1,8 @@
-import { MetricCard } from 'sdkwork-router-portal-commons';
+import {
+  FormField,
+  MetricCard,
+  Select,
+} from 'sdkwork-router-portal-commons';
 
 import type { UsageDateRange, UsageFilters, UsageHighlight } from '../types';
 
@@ -21,10 +25,9 @@ export function UsageFiltersPanel({
   onChange: (nextFilters: UsageFilters) => void;
 }) {
   return (
-    <div className="portalx-filter-bar">
-      <label className="portalx-field">
-        <span>Model filter</span>
-        <select
+    <div className="grid gap-4 md:grid-cols-3">
+      <FormField hint="Limit the workspace slice to a single model family." label="Model filter">
+        <Select
           onChange={(event) => onChange({ ...filters, model: event.target.value })}
           value={filters.model}
         >
@@ -34,11 +37,10 @@ export function UsageFiltersPanel({
               {model}
             </option>
           ))}
-        </select>
-      </label>
-      <label className="portalx-field">
-        <span>Provider filter</span>
-        <select
+        </Select>
+      </FormField>
+      <FormField hint="Focus on one routed provider path." label="Provider filter">
+        <Select
           onChange={(event) => onChange({ ...filters, provider: event.target.value })}
           value={filters.provider}
         >
@@ -48,11 +50,10 @@ export function UsageFiltersPanel({
               {provider}
             </option>
           ))}
-        </select>
-      </label>
-      <label className="portalx-field">
-        <span>Time range</span>
-        <select
+        </Select>
+      </FormField>
+      <FormField hint="Switch between launch review and longer billing windows." label="Time range">
+        <Select
           onChange={(event) =>
             onChange({
               ...filters,
@@ -65,8 +66,8 @@ export function UsageFiltersPanel({
               {range.label}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </FormField>
     </div>
   );
 }
@@ -77,7 +78,7 @@ export function UsageHighlights({
   highlights: UsageHighlight[];
 }) {
   return (
-    <div className="portalx-summary-grid">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {highlights.map((highlight) => (
         <MetricCard
           detail={highlight.detail}

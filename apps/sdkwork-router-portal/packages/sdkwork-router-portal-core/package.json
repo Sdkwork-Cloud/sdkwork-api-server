@@ -12,7 +12,9 @@
     }
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
     "react": "^19.0.0",
+    "react-router-dom": "^7.6.2",
     "sdkwork-router-portal-account": "workspace:*",
     "sdkwork-router-portal-api-keys": "workspace:*",
     "sdkwork-router-portal-auth": "workspace:*",
@@ -21,7 +23,10 @@
     "sdkwork-router-portal-credits": "workspace:*",
     "sdkwork-router-portal-dashboard": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
+    "sdkwork-router-portal-routing": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*",
-    "sdkwork-router-portal-usage": "workspace:*"
+    "sdkwork-router-portal-user": "workspace:*",
+    "sdkwork-router-portal-usage": "workspace:*",
+    "zustand": "^5.0.8"
   }
 }

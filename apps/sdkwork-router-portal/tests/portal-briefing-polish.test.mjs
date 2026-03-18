@@ -9,17 +9,19 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell exposes a daily brief for independent operators', () => {
+test('portal shell removes daily-brief storytelling to keep navigation calm', () => {
   const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
 
-  assert.match(core, /Daily brief/);
-  assert.match(core, /Top focus/);
-  assert.match(core, /Risk watch/);
+  assert.doesNotMatch(core, /Daily brief/);
+  assert.doesNotMatch(core, /Top focus/);
+  assert.doesNotMatch(core, /Risk watch/);
 });
 
-test('dashboard exposes focus board and risk watchlist', () => {
+test('dashboard leads with traffic and action surfaces instead of briefing cards', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Focus board/);
-  assert.match(dashboardPage, /Risk watchlist/);
+  assert.match(dashboardPage, /Traffic overview/);
+  assert.match(dashboardPage, /Quick actions/);
+  assert.doesNotMatch(dashboardPage, /Focus board/);
+  assert.doesNotMatch(dashboardPage, /Risk watchlist/);
 });

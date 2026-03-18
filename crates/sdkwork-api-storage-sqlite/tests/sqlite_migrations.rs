@@ -33,7 +33,7 @@ async fn creates_parent_directories_for_file_backed_sqlite_urls() {
     assert!(!database_path.parent().unwrap().exists());
 
     let pool = run_migrations(&database_url).await.unwrap();
-    drop(pool);
+    pool.close().await;
 
     assert!(database_path.parent().unwrap().is_dir());
     assert!(database_path.is_file());

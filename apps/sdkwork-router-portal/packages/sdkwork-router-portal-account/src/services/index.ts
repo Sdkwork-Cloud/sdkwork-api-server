@@ -1,154 +1,117 @@
-import { formatDateTime } from 'sdkwork-router-portal-commons';
-import type { PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
+import {
+  formatCurrency,
+  formatUnits,
+} from 'sdkwork-router-portal-commons';
+import type {
+  LedgerEntry,
+  ProjectBillingSummary,
+} from 'sdkwork-router-portal-types';
 
 import type {
-  AccountChecklistItem,
-  AccountInsightItem,
-  AccountRecoverySignal,
-  PasswordPolicyItem,
+  FinancialGuardrailItem,
+  FinancialMetricItem,
   PortalAccountViewModel,
 } from '../types';
 
-export function passwordsMatch(left: string, right: string): boolean {
-  return left === right;
-}
-
-function hasUppercase(value: string): boolean {
-  return /[A-Z]/.test(value);
-}
-
-function hasLowercase(value: string): boolean {
-  return /[a-z]/.test(value);
-}
-
-function hasNumber(value: string): boolean {
-  return /\d/.test(value);
-}
-
-export function buildPasswordPolicy(
-  nextPassword: string,
-  confirmPassword: string,
-): PasswordPolicyItem[] {
+function buildCashBalanceCards(
+  summary: ProjectBillingSummary,
+  ledger: LedgerEntry[],
+): FinancialMetricItem[] {
   return [
     {
-      id: 'length',
-      label: 'At least 12 characters',
-      met: nextPassword.length >= 12,
+      id: 'cash-balance',
+      label: 'Cash balance',
+      value:
+        summary.remaining_units === null || summary.remaining_units === undefined
+          ? 'Unlimited'
+          : formatUnits(summary.remaining_units),
+      detail: 'Visible units remaining inside the current financial account boundary.',
     },
     {
-      id: 'mixed-case',
-      label: 'Include uppercase and lowercase letters',
-      met: hasUppercase(nextPassword) && hasLowercase(nextPassword),
+      id: 'booked-amount',
+      label: 'Booked amount',
+      value: formatCurrency(summary.booked_amount),
+      detail: 'Commercial spend already recorded against the current project.',
     },
     {
-      id: 'number',
-      label: 'Include at least one number',
-      met: hasNumber(nextPassword),
-    },
-    {
-      id: 'confirm',
-      label: 'Confirmation matches the new password',
-      met: Boolean(nextPassword) && passwordsMatch(nextPassword, confirmPassword),
+      id: 'ledger-lines',
+      label: 'Ledger lines',
+      value: String(ledger.length),
+      detail: 'Every ledger line keeps financial account posture anchored to recorded evidence.',
     },
   ];
 }
 
-function buildTrustCenter(workspace: PortalWorkspaceSummary | null): AccountInsightItem[] {
-  if (!workspace) {
+function buildLedgerEvidence(
+  summary: ProjectBillingSummary,
+  ledger: LedgerEntry[],
+): FinancialGuardrailItem[] {
+  if (!ledger.length) {
     return [
       {
-        id: 'pending',
-        title: 'Workspace boundary',
-        value: 'Loading',
-        detail: 'Trust details will appear once workspace identity finishes loading.',
+        id: 'ledger-empty',
+        title: 'Ledger evidence is waiting for financial activity',
+        detail: 'As credits, usage, and quota events land, the financial account will summarize the cash and unit trail here.',
       },
     ];
   }
 
+  const totalLedgerUnits = ledger.reduce((sum, entry) => sum + entry.units, 0);
+  const largestUnitEntry = [...ledger].sort((left, right) => right.units - left.units)[0];
+  const largestAmountEntry = [...ledger].sort((left, right) => right.amount - left.amount)[0];
+
   return [
     {
-      id: 'identity',
-      title: 'Signed-in identity',
-      value: workspace.user.email,
-      detail: 'This portal session is scoped to the visible workspace owner and remains separate from the admin control plane.',
+      id: 'ledger-coverage',
+      title: 'Ledger coverage matches the visible spend posture',
+      detail: `${ledger.length} ledger line(s) account for ${formatUnits(totalLedgerUnits)} units across ${formatCurrency(summary.booked_amount)} of booked spend.`,
     },
     {
-      id: 'workspace',
-      title: 'Workspace boundary',
-      value: `${workspace.tenant.name} / ${workspace.project.name}`,
-      detail: 'Tenant and project context define the self-service boundary for keys, usage, billing, and account actions.',
+      id: 'largest-unit-entry',
+      title: 'Largest visible unit movement',
+      detail: `${formatUnits(largestUnitEntry.units)} units sit on the heaviest visible ledger line for project ${largestUnitEntry.project_id}.`,
     },
     {
-      id: 'account-state',
-      title: 'Account state',
-      value: workspace.user.active ? 'Active' : 'Inactive',
-      detail: `Portal access was created ${formatDateTime(workspace.user.created_at_ms)} and is currently ${workspace.user.active ? 'available' : 'restricted'}.`,
+      id: 'largest-amount-entry',
+      title: 'Largest booked amount line',
+      detail: `${formatCurrency(largestAmountEntry.amount)} is the highest single visible booked amount in the current ledger scope.`,
     },
   ];
 }
 
-function buildSecurityChecklist(
-  workspace: PortalWorkspaceSummary | null,
-  passwordPolicy: PasswordPolicyItem[],
-): AccountChecklistItem[] {
+function buildGuardrails(summary: ProjectBillingSummary): FinancialGuardrailItem[] {
   return [
     {
-      id: 'workspace-active',
-      title: 'Workspace identity is active',
-      detail: workspace?.user.active
-        ? 'This account can currently authenticate and manage the user-side workspace boundary.'
-        : 'If the account is inactive, restore access before attempting further key or billing actions.',
-      complete: Boolean(workspace?.user.active),
+      id: 'runway',
+      title: summary.exhausted ? 'Financial runway needs immediate action' : 'Financial runway is visible',
+      detail: summary.exhausted
+        ? 'Quota is exhausted, so billing recovery and credits review must happen before the next traffic window.'
+        : summary.remaining_units === null || summary.remaining_units === undefined
+          ? 'The current financial account boundary shows unlimited visible runway.'
+          : `${formatUnits(summary.remaining_units)} units remain before the visible quota boundary is reached.`,
     },
     {
-      id: 'policy',
-      title: 'New password meets portal policy',
-      detail: 'Use length, mixed case, and numeric entropy so password rotation materially improves account posture.',
-      complete: passwordPolicy.every((item) => item.met),
+      id: 'discipline',
+      title: 'Financial account stays separate from personal identity',
+      detail: 'Use User for profile and password posture, and keep recharge, ledger, and booked-amount review inside Account.',
     },
     {
-      id: 'boundary',
-      title: 'Admin and portal access stay separated',
-      detail: 'User-side password rotation should never be treated as operator credential rotation. Keep the trust boundary explicit.',
-      complete: true,
-    },
-  ];
-}
-
-function buildRecoverySignals(workspace: PortalWorkspaceSummary | null): AccountRecoverySignal[] {
-  return [
-    {
-      id: 'password-loss',
-      title: 'Password loss should not block workspace continuity',
-      detail: 'Use the portal account boundary for sign-in recovery, and keep API keys stored in a secret manager so application traffic is not coupled to browser access.',
-    },
-    {
-      id: 'key-leak',
-      title: 'A suspected key leak should trigger credential rotation first',
-      detail: 'If a client secret is exposed, issue a replacement key, update integrations, and only then retire the prior credential from deployment pipelines.',
-    },
-    {
-      id: 'billing-block',
-      title: workspace?.user.active
-        ? 'Quota or billing issues can be resolved without operator UI access'
-        : 'Resolve account availability before expecting self-service recovery to succeed',
-      detail: 'Credits and billing remain inside the portal boundary, so users can recover runway without crossing into admin tooling.',
+      id: 'evidence',
+      title: 'Ledger evidence should drive money decisions',
+      detail: 'Treat top-ups, plan changes, and runway review as evidence-backed actions rather than assumptions.',
     },
   ];
 }
 
 export function buildPortalAccountViewModel(
-  workspace: PortalWorkspaceSummary | null,
-  nextPassword: string,
-  confirmPassword: string,
+  summary: ProjectBillingSummary,
+  ledger: LedgerEntry[],
 ): PortalAccountViewModel {
-  const password_policy = buildPasswordPolicy(nextPassword, confirmPassword);
-
   return {
-    trust_center: buildTrustCenter(workspace),
-    security_checklist: buildSecurityChecklist(workspace, password_policy),
-    recovery_signals: buildRecoverySignals(workspace),
-    password_policy,
-    can_submit_password: password_policy.every((item) => item.met),
+    billing_summary: summary,
+    ledger,
+    cash_balance_cards: buildCashBalanceCards(summary, ledger),
+    ledger_evidence: buildLedgerEvidence(summary, ledger),
+    guardrails: buildGuardrails(summary),
   };
 }

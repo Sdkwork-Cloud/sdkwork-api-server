@@ -48,6 +48,13 @@ curl -X POST http://127.0.0.1:8081/admin/auth/change-password \
 
 ## Route Families
 
+## OpenAPI Inventory
+
+- OpenAPI JSON: `GET /admin/openapi.json`
+- API inventory UI: `GET /admin/docs`
+
+The OpenAPI document is generated from the current `axum` router so the listed paths track the live admin service surface.
+
 | Family | Routes | Purpose |
 |---|---|---|
 | health and metrics | `GET /admin/health`, `GET /metrics` | liveness and Prometheus-style metrics |

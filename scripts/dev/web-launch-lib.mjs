@@ -10,10 +10,13 @@ function requireValue(argv, index, flag) {
 
 export function parseWebArgs(argv) {
   const settings = {
+    adminTarget: '127.0.0.1:8081',
     bind: '0.0.0.0:3001',
     dryRun: false,
+    gatewayTarget: '127.0.0.1:8080',
     help: false,
     install: false,
+    portalTarget: '127.0.0.1:8082',
     preview: false,
     tauri: false,
   };
@@ -23,6 +26,18 @@ export function parseWebArgs(argv) {
     switch (arg) {
       case '--bind':
         settings.bind = requireValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--admin-target':
+        settings.adminTarget = requireValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--portal-target':
+        settings.portalTarget = requireValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--gateway-target':
+        settings.gatewayTarget = requireValue(argv, index, arg);
         index += 1;
         break;
       case '--dry-run':
@@ -56,6 +71,9 @@ Builds the standalone admin and portal apps, then exposes them through the Pingo
 
 Options:
   --bind <bind> Use a specific SDKWORK_WEB_BIND value, default 0.0.0.0:3001
+  --admin-target <host:port>   Upstream target for /api/admin/*, default 127.0.0.1:8081
+  --portal-target <host:port>  Upstream target for /api/portal/*, default 127.0.0.1:8082
+  --gateway-target <host:port> Upstream target for /api/v1/*, default 127.0.0.1:8080
   --install     Run pnpm install before starting
   --preview     Alias for static web-host mode
   --tauri       Build static assets for the admin Tauri host and external Pingora site
@@ -64,15 +82,21 @@ Options:
 `;
 }
 
-export function webHostEnv(bind) {
+export function webHostEnv(bind, targets = {}) {
+  const {
+    adminTarget = '127.0.0.1:8081',
+    portalTarget = '127.0.0.1:8082',
+    gatewayTarget = '127.0.0.1:8080',
+  } = targets;
+
   return {
     ...process.env,
     SDKWORK_WEB_BIND: bind,
     SDKWORK_ADMIN_SITE_DIR: 'apps/sdkwork-router-admin/dist',
     SDKWORK_PORTAL_SITE_DIR: 'apps/sdkwork-router-portal/dist',
-    SDKWORK_ADMIN_PROXY_TARGET: 'http://127.0.0.1:8081',
-    SDKWORK_PORTAL_PROXY_TARGET: 'http://127.0.0.1:8082',
-    SDKWORK_GATEWAY_PROXY_TARGET: 'http://127.0.0.1:8080',
+    SDKWORK_ADMIN_PROXY_TARGET: adminTarget,
+    SDKWORK_PORTAL_PROXY_TARGET: portalTarget,
+    SDKWORK_GATEWAY_PROXY_TARGET: gatewayTarget,
   };
 }
 

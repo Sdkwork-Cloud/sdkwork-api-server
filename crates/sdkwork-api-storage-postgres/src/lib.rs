@@ -8,8 +8,8 @@ use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserRecord, GatewayApiKeyRecord, PortalUserRecord};
 use sdkwork_api_domain_routing::{
-    ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingDecisionLog, RoutingDecisionSource,
-    RoutingPolicy, RoutingStrategy,
+    ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingCandidateAssessment,
+    RoutingDecisionLog, RoutingDecisionSource, RoutingPolicy, RoutingStrategy,
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
@@ -109,6 +109,14 @@ fn decode_routing_assessments(assessments_json: &str) -> Result<Vec<RoutingCandi
     Ok(serde_json::from_str(assessments_json)?)
 }
 
+fn encode_string_list(values: &[String]) -> Result<String> {
+    Ok(serde_json::to_string(values)?)
+}
+
+fn decode_string_list(values_json: &str) -> Result<Vec<String>> {
+    Ok(serde_json::from_str(values_json)?)
+}
+
 type PortalUserRow = (
     String,
     String,
@@ -123,7 +131,17 @@ type PortalUserRow = (
 
 type AdminUserRow = (String, String, String, String, String, bool, i64);
 
-type CouponRow = (String, String, String, String, i64, bool, String, String, i64);
+type CouponRow = (
+    String,
+    String,
+    String,
+    String,
+    i64,
+    bool,
+    String,
+    String,
+    i64,
+);
 
 type CredentialRow = (
     String,
@@ -183,7 +201,17 @@ fn decode_admin_user_row(row: Option<AdminUserRow>) -> Result<Option<AdminUserRe
 
 fn decode_coupon_row(row: Option<CouponRow>) -> Result<Option<CouponCampaign>> {
     row.map(
-        |(id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)| {
+        |(
+            id,
+            code,
+            discount_label,
+            audience,
+            remaining,
+            active,
+            note,
+            expires_on,
+            created_at_ms,
+        )| {
             Ok(CouponCampaign {
                 id,
                 code,
@@ -506,6 +534,22 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS project_routing_preferences (
+            project_id TEXT PRIMARY KEY NOT NULL,
+            preset_id TEXT NOT NULL DEFAULT '',
+            strategy TEXT NOT NULL DEFAULT 'deterministic_priority',
+            ordered_provider_ids_json TEXT NOT NULL DEFAULT '[]',
+            default_provider_id TEXT,
+            max_cost DOUBLE PRECISION,
+            max_latency_ms BIGINT,
+            require_healthy BOOLEAN NOT NULL DEFAULT FALSE,
+            preferred_region TEXT,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS routing_decision_logs (
             decision_id TEXT PRIMARY KEY NOT NULL,
             decision_source TEXT NOT NULL,
@@ -559,9 +603,11 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS units BIGINT NOT NULL DEFAULT 0")
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS units BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query(
         "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS amount DOUBLE PRECISION NOT NULL DEFAULT 0",
     )
@@ -612,8 +658,32 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
             tenant_id TEXT NOT NULL,
             project_id TEXT NOT NULL,
             environment TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            last_used_at_ms BIGINT,
+            expires_at_ms BIGINT,
             active BOOLEAN NOT NULL
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS last_used_at_ms BIGINT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS expires_at_ms BIGINT",
     )
     .execute(&pool)
     .await?;
@@ -1104,13 +1174,12 @@ impl PostgresAdminStore {
         external_name: &str,
         provider_id: &str,
     ) -> Result<bool> {
-        let result = sqlx::query(
-            "DELETE FROM catalog_models WHERE external_name = $1 AND provider_id = $2",
-        )
-        .bind(external_name)
-        .bind(provider_id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query("DELETE FROM catalog_models WHERE external_name = $1 AND provider_id = $2")
+                .bind(external_name)
+                .bind(provider_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -1207,6 +1276,108 @@ impl PostgresAdminStore {
             );
         }
         Ok(policies)
+    }
+
+    pub async fn insert_project_routing_preferences(
+        &self,
+        preferences: &ProjectRoutingPreferences,
+    ) -> Result<ProjectRoutingPreferences> {
+        sqlx::query(
+            "INSERT INTO project_routing_preferences (
+                project_id,
+                preset_id,
+                strategy,
+                ordered_provider_ids_json,
+                default_provider_id,
+                max_cost,
+                max_latency_ms,
+                require_healthy,
+                preferred_region,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT(project_id) DO UPDATE SET
+                preset_id = excluded.preset_id,
+                strategy = excluded.strategy,
+                ordered_provider_ids_json = excluded.ordered_provider_ids_json,
+                default_provider_id = excluded.default_provider_id,
+                max_cost = excluded.max_cost,
+                max_latency_ms = excluded.max_latency_ms,
+                require_healthy = excluded.require_healthy,
+                preferred_region = excluded.preferred_region,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&preferences.project_id)
+        .bind(&preferences.preset_id)
+        .bind(preferences.strategy.as_str())
+        .bind(encode_string_list(&preferences.ordered_provider_ids)?)
+        .bind(&preferences.default_provider_id)
+        .bind(preferences.max_cost)
+        .bind(preferences.max_latency_ms.map(i64::try_from).transpose()?)
+        .bind(preferences.require_healthy)
+        .bind(&preferences.preferred_region)
+        .bind(i64::try_from(preferences.updated_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(preferences.clone())
+    }
+
+    pub async fn find_project_routing_preferences(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectRoutingPreferences>> {
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                String,
+                Option<String>,
+                Option<f64>,
+                Option<i64>,
+                bool,
+                Option<String>,
+                i64,
+            ),
+        >(
+            "SELECT project_id, preset_id, strategy, ordered_provider_ids_json, default_provider_id, max_cost, max_latency_ms, require_healthy, preferred_region, updated_at_ms
+             FROM project_routing_preferences
+             WHERE project_id = $1",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(
+            |(
+                project_id,
+                preset_id,
+                strategy,
+                ordered_provider_ids_json,
+                default_provider_id,
+                max_cost,
+                max_latency_ms,
+                require_healthy,
+                preferred_region,
+                updated_at_ms,
+            )| {
+                Ok(ProjectRoutingPreferences::new(project_id)
+                    .with_preset_id(preset_id)
+                    .with_strategy(
+                        RoutingStrategy::from_str(&strategy)
+                            .unwrap_or(RoutingStrategy::DeterministicPriority),
+                    )
+                    .with_ordered_provider_ids(decode_string_list(&ordered_provider_ids_json)?)
+                    .with_default_provider_id_option(default_provider_id)
+                    .with_max_cost_option(max_cost)
+                    .with_max_latency_ms_option(max_latency_ms.map(u64::try_from).transpose()?)
+                    .with_require_healthy(require_healthy)
+                    .with_preferred_region_option(preferred_region)
+                    .with_updated_at_ms(u64::try_from(updated_at_ms)?))
+            },
+        )
+        .transpose()
     }
 
     pub async fn insert_routing_decision_log(
@@ -1409,19 +1580,32 @@ impl PostgresAdminStore {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(project_id, model, provider, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms)| -> Result<UsageRecord> {
-                Ok(UsageRecord {
+            .map(
+                |(
                     project_id,
                     model,
                     provider,
-                    units: u64::try_from(units)?,
+                    units,
                     amount,
-                    input_tokens: u64::try_from(input_tokens)?,
-                    output_tokens: u64::try_from(output_tokens)?,
-                    total_tokens: u64::try_from(total_tokens)?,
-                    created_at_ms: u64::try_from(created_at_ms)?,
-                })
-            })
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    created_at_ms,
+                )|
+                 -> Result<UsageRecord> {
+                    Ok(UsageRecord {
+                        project_id,
+                        model,
+                        provider,
+                        units: u64::try_from(units)?,
+                        amount,
+                        input_tokens: u64::try_from(input_tokens)?,
+                        output_tokens: u64::try_from(output_tokens)?,
+                        total_tokens: u64::try_from(total_tokens)?,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                    })
+                },
+            )
             .collect::<Result<Vec<_>>>()?)
     }
 
@@ -1822,13 +2006,17 @@ impl PostgresAdminStore {
         record: &GatewayApiKeyRecord,
     ) -> Result<GatewayApiKeyRecord> {
         sqlx::query(
-            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, active) VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, active = excluded.active",
+            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
         )
         .bind(&record.hashed_key)
         .bind(&record.tenant_id)
         .bind(&record.project_id)
         .bind(&record.environment)
+        .bind(&record.label)
+        .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
+        .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
+        .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
         .bind(record.active)
         .execute(&self.pool)
         .await?;
@@ -1836,19 +2024,33 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, active FROM identity_gateway_api_keys",
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys",
         )
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
             .into_iter()
             .map(
-                |(tenant_id, project_id, environment, hashed_key, active)| GatewayApiKeyRecord {
+                |(
                     tenant_id,
                     project_id,
                     environment,
                     hashed_key,
+                    label,
+                    created_at_ms,
+                    last_used_at_ms,
+                    expires_at_ms,
+                    active,
+                )| GatewayApiKeyRecord {
+                    tenant_id,
+                    project_id,
+                    environment,
+                    hashed_key,
+                    label,
+                    created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
+                    last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
+                    expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
                     active,
                 },
             )
@@ -1859,24 +2061,38 @@ impl PostgresAdminStore {
         &self,
         hashed_key: &str,
     ) -> Result<Option<GatewayApiKeyRecord>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, active FROM identity_gateway_api_keys WHERE hashed_key = $1",
+        let row = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = $1",
         )
         .bind(hashed_key)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(
-            row.map(|(tenant_id, project_id, environment, hashed_key, active)| {
+        Ok(row.map(
+            |(
+                tenant_id,
+                project_id,
+                environment,
+                hashed_key,
+                label,
+                created_at_ms,
+                last_used_at_ms,
+                expires_at_ms,
+                active,
+            )| {
                 GatewayApiKeyRecord {
                     tenant_id,
                     project_id,
                     environment,
                     hashed_key,
+                    label,
+                    created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
+                    last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
+                    expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
                     active,
                 }
-            }),
-        )
+            },
+        ))
     }
 
     pub async fn delete_gateway_api_key(&self, hashed_key: &str) -> Result<bool> {
@@ -2618,6 +2834,20 @@ impl AdminStore for PostgresAdminStore {
 
     async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>> {
         PostgresAdminStore::list_routing_policies(self).await
+    }
+
+    async fn insert_project_routing_preferences(
+        &self,
+        preferences: &ProjectRoutingPreferences,
+    ) -> Result<ProjectRoutingPreferences> {
+        PostgresAdminStore::insert_project_routing_preferences(self, preferences).await
+    }
+
+    async fn find_project_routing_preferences(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectRoutingPreferences>> {
+        PostgresAdminStore::find_project_routing_preferences(self, project_id).await
     }
 
     async fn insert_routing_decision_log(

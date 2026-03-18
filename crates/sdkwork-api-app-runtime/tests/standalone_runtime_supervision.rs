@@ -609,7 +609,7 @@ require_signed_native_dynamic_extensions: false
 runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
-            extension_root.display(),
+            config_path_value(extension_root),
             enable_native_dynamic,
         ),
     )
@@ -663,7 +663,7 @@ enable_native_dynamic_extensions: false
 runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
-            secret_local_file.display(),
+            config_path_value(secret_local_file),
         ),
     )
     .unwrap();
@@ -994,7 +994,25 @@ fn sqlite_url_for_path(path: &Path) -> String {
 }
 
 fn sqlite_path_from_url(url: &str) -> Option<PathBuf> {
-    url.strip_prefix("sqlite://").map(PathBuf::from)
+    let raw_path = url.strip_prefix("sqlite://")?;
+    let normalized_path = raw_path
+        .strip_prefix('/')
+        .filter(|candidate| has_windows_drive_prefix(candidate))
+        .unwrap_or(raw_path);
+
+    Some(PathBuf::from(normalized_path))
+}
+
+fn config_path_value(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+fn has_windows_drive_prefix(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'/' || bytes[2] == b'\\')
 }
 
 fn native_dynamic_manifest(library_path: &Path) -> ExtensionManifest {

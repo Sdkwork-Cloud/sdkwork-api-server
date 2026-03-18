@@ -22,6 +22,8 @@
     "sdkwork-router-admin-coupons": "workspace:*",
     "sdkwork-router-admin-operations": "workspace:*",
     "sdkwork-router-admin-overview": "workspace:*",
+    "sdkwork-router-admin-settings": "workspace:*",
+    "sdkwork-router-admin-shell": "workspace:*",
     "sdkwork-router-admin-tenants": "workspace:*",
     "sdkwork-router-admin-traffic": "workspace:*",
     "sdkwork-router-admin-types": "workspace:*",

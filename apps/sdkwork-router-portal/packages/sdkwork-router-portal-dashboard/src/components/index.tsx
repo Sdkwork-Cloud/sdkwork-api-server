@@ -1,7 +1,7 @@
-import { InlineButton, Pill } from 'sdkwork-router-portal-commons';
+import { EmptyState, InlineButton, Pill } from 'sdkwork-router-portal-commons';
 import type { PortalRouteKey } from 'sdkwork-router-portal-types';
 
-import type { DashboardInsight, DashboardReadinessItem } from '../types';
+import type { DashboardBreakdownItem, DashboardInsight } from '../types';
 
 export function DashboardInsights({
   insights,
@@ -17,14 +17,7 @@ export function DashboardInsights({
           <Pill tone={insight.tone}>{insight.title}</Pill>
           <p>{insight.detail}</p>
           {insight.route && insight.action_label ? (
-            <InlineButton
-              onClick={() => {
-                if (insight.route) {
-                  onNavigate(insight.route);
-                }
-              }}
-              tone="ghost"
-            >
+            <InlineButton onClick={() => onNavigate(insight.route!)} tone="ghost">
               {insight.action_label}
             </InlineButton>
           ) : null}
@@ -34,18 +27,33 @@ export function DashboardInsights({
   );
 }
 
-export function DashboardReadiness({
+export function DashboardBreakdownList({
   items,
+  emptyTitle,
+  emptyDetail,
 }: {
-  items: DashboardReadinessItem[];
+  items: DashboardBreakdownItem[];
+  emptyTitle: string;
+  emptyDetail: string;
 }) {
+  if (!items.length) {
+    return <EmptyState detail={emptyDetail} title={emptyTitle} />;
+  }
+
   return (
-    <div className="portalx-summary-grid">
+    <div className="portalx-dashboard-breakdown-list">
       {items.map((item) => (
-        <article className="portalx-summary-card" key={item.id}>
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
-          <p>{item.detail}</p>
+        <article className="portalx-dashboard-breakdown-row" key={item.id}>
+          <div className="portalx-dashboard-breakdown-meta">
+            <div>
+              <strong>{item.label}</strong>
+              <span>{item.secondary_label}</span>
+            </div>
+            <strong>{item.value_label}</strong>
+          </div>
+          <div className="portalx-dashboard-breakdown-track">
+            <span className="portalx-dashboard-breakdown-fill" style={{ width: `${Math.min(item.share, 100)}%` }} />
+          </div>
         </article>
       ))}
     </div>

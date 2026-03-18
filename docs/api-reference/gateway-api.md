@@ -8,6 +8,8 @@ The gateway service exposes the OpenAI-compatible data plane under `/v1/*`.
 - primary auth: `Authorization: Bearer skw_live_...`
 - health: `GET /health`
 - metrics: `GET /metrics`
+- OpenAPI JSON: `GET /openapi.json`
+- API inventory UI: `GET /docs`
 
 Minimal first request:
 
@@ -17,6 +19,8 @@ curl http://127.0.0.1:8080/v1/models \
 ```
 
 In standalone service mode, expect stateful gateway behavior backed by the admin store. The stateless gateway runtime is available as a library/runtime shape and remains documented through the compatibility matrix.
+
+OpenAPI is generated from the current `axum` route implementation, so the JSON document and the browser page stay aligned with the live router surface.
 
 ## Route Families
 

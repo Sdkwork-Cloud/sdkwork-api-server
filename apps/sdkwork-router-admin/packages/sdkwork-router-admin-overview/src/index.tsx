@@ -1,4 +1,4 @@
-import { InlineButton, Pill, SectionHero, StatCard, Surface } from 'sdkwork-router-admin-commons';
+import { Pill, StatCard, Surface } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, AdminRouteKey } from 'sdkwork-router-admin-types';
 
 function topPortalUsers(snapshot: AdminPageProps['snapshot']) {
@@ -46,27 +46,13 @@ function hottestProjects(snapshot: AdminPageProps['snapshot']) {
 
 export function OverviewPage({
   snapshot,
-  onNavigate,
+  onNavigate: _onNavigate,
 }: AdminPageProps & { onNavigate: (route: AdminRouteKey) => void }) {
   const rankedUsers = topPortalUsers(snapshot);
   const rankedProjects = hottestProjects(snapshot);
 
   return (
     <div className="adminx-page-grid">
-      <SectionHero
-        eyebrow="Overview"
-        title="Run daily router operations from one command surface."
-        detail="Track platform posture, inspect risk, and jump directly into the management module that needs attention."
-        actions={
-          <>
-            <InlineButton tone="primary" onClick={() => onNavigate('users')}>
-              Review users
-            </InlineButton>
-            <InlineButton onClick={() => onNavigate('operations')}>Check runtime</InlineButton>
-          </>
-        }
-      />
-
       <section className="adminx-stat-grid">
         {snapshot.overviewMetrics.map((metric) => (
           <StatCard
@@ -94,25 +80,6 @@ export function OverviewPage({
               <p>{alert.detail}</p>
             </article>
           ))}
-        </div>
-      </Surface>
-
-      <Surface title="Data-source posture" detail="The independent admin shell now runs on live control-plane data across the core operating surfaces.">
-        <div className="adminx-card-grid">
-          <article className="adminx-mini-card">
-            <div className="adminx-row">
-              <strong>Live admin API</strong>
-              <Pill tone="live">live</Pill>
-            </div>
-            <p>Tenants, projects, keys, channels, providers, credentials, models, usage, billing, and runtime status.</p>
-          </article>
-          <article className="adminx-mini-card">
-            <div className="adminx-row">
-              <strong>Live campaign and identity operations</strong>
-              <Pill tone="live">live</Pill>
-            </div>
-            <p>Coupons, operator identities, portal identities, credential rotation, and catalog retirement actions are all persisted through the admin control plane.</p>
-          </article>
         </div>
       </Surface>
 

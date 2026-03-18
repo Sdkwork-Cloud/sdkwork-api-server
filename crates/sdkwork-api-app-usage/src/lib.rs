@@ -30,11 +30,9 @@ pub fn record_usage_with_tokens(
     output_tokens: u64,
     total_tokens: u64,
 ) -> Result<UsageRecord> {
-    Ok(
-        UsageRecord::new(project_id, model, provider)
-            .with_metering(units, amount, current_time_ms()?)
-            .with_token_usage(input_tokens, output_tokens, total_tokens),
-    )
+    Ok(UsageRecord::new(project_id, model, provider)
+        .with_metering(units, amount, current_time_ms()?)
+        .with_token_usage(input_tokens, output_tokens, total_tokens))
 }
 
 pub async fn persist_usage_record(

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use axum::{
     body::Body,
@@ -12,7 +12,7 @@ use axum::{
     http::Request,
     http::StatusCode,
     middleware::Next,
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -247,6 +247,10 @@ use sdkwork_api_contract_openai::videos::{
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
+use sdkwork_api_openapi::{
+    build_openapi_document, extract_routes_from_function, render_docs_html, HttpMethod,
+    OpenApiServiceSpec, RouteEntry,
+};
 use sdkwork_api_provider_core::{ProviderRequest, ProviderStreamOutput};
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -255,6 +259,109 @@ use sqlx::SqlitePool;
 
 const DEFAULT_STATELESS_TENANT_ID: &str = "sdkwork-stateless";
 const DEFAULT_STATELESS_PROJECT_ID: &str = "sdkwork-stateless-default";
+const GATEWAY_OPENAPI_SPEC: OpenApiServiceSpec<'static> = OpenApiServiceSpec {
+    title: "SDKWORK Gateway API",
+    version: env!("CARGO_PKG_VERSION"),
+    description: "OpenAPI 3.1 inventory generated from the current gateway router implementation.",
+    openapi_path: "/openapi.json",
+    docs_path: "/docs",
+};
+
+fn gateway_route_inventory() -> &'static [RouteEntry] {
+    static ROUTES: OnceLock<Vec<RouteEntry>> = OnceLock::new();
+    ROUTES
+        .get_or_init(|| {
+            extract_routes_from_function(include_str!("lib.rs"), "gateway_router_with_state")
+                .expect("gateway route inventory")
+        })
+        .as_slice()
+}
+
+fn gateway_openapi_document() -> &'static Value {
+    static DOCUMENT: OnceLock<Value> = OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        build_openapi_document(
+            &GATEWAY_OPENAPI_SPEC,
+            gateway_route_inventory(),
+            gateway_tag_for_path,
+            gateway_route_requires_bearer_auth,
+            gateway_operation_summary,
+        )
+    })
+}
+
+fn gateway_docs_html() -> &'static str {
+    static HTML: OnceLock<String> = OnceLock::new();
+    HTML.get_or_init(|| render_docs_html(&GATEWAY_OPENAPI_SPEC))
+        .as_str()
+}
+
+async fn gateway_openapi_handler() -> Json<Value> {
+    Json(gateway_openapi_document().clone())
+}
+
+async fn gateway_docs_handler() -> Html<String> {
+    Html(gateway_docs_html().to_owned())
+}
+
+fn gateway_tag_for_path(path: &str) -> String {
+    match path {
+        "/metrics" | "/health" => "system".to_owned(),
+        "/docs" | "/openapi.json" => "docs".to_owned(),
+        _ if path.starts_with("/v1/") => path
+            .trim_start_matches("/v1/")
+            .split('/')
+            .find(|segment| !segment.is_empty() && !segment.starts_with('{'))
+            .unwrap_or("gateway")
+            .to_owned(),
+        _ => "gateway".to_owned(),
+    }
+}
+
+fn gateway_route_requires_bearer_auth(path: &str, _method: HttpMethod) -> bool {
+    path.starts_with("/v1/")
+}
+
+fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
+    match path {
+        "/metrics" => "Prometheus metrics".to_owned(),
+        "/health" => "Health check".to_owned(),
+        "/openapi.json" => "OpenAPI document".to_owned(),
+        "/docs" => "Interactive API inventory".to_owned(),
+        _ => format!(
+            "{} {}",
+            method.display_name(),
+            humanize_route_path(path, Some("v1"))
+        ),
+    }
+}
+
+fn humanize_route_path(path: &str, ignored_prefix: Option<&str>) -> String {
+    let parts = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .filter(|segment| Some(*segment) != ignored_prefix)
+        .map(|segment| {
+            if segment.starts_with('{') && segment.ends_with('}') {
+                format!(
+                    "by {}",
+                    segment
+                        .trim_matches(|ch| ch == '{' || ch == '}')
+                        .replace(['_', '-'], " ")
+                )
+            } else {
+                segment.replace(['_', '-'], " ")
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        "root".to_owned()
+    } else {
+        parts.join(" / ")
+    }
+}
 
 pub struct GatewayApiState {
     live_store: Reloadable<Arc<dyn AdminStore>>,
@@ -515,6 +622,8 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
     let service_name: Arc<str> = Arc::from("gateway");
     let metrics = Arc::new(HttpMetricsRegistry::new("gateway"));
     Router::new()
+        .route("/openapi.json", get(gateway_openapi_handler))
+        .route("/docs", get(gateway_docs_handler))
         .route(
             "/metrics",
             get({
@@ -893,6 +1002,8 @@ pub fn gateway_router_with_state(state: GatewayApiState) -> Router {
     let service_name: Arc<str> = Arc::from("gateway");
     let metrics = Arc::new(HttpMetricsRegistry::new("gateway"));
     Router::new()
+        .route("/openapi.json", get(gateway_openapi_handler))
+        .route("/docs", get(gateway_docs_handler))
         .route(
             "/metrics",
             get({

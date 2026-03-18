@@ -119,6 +119,7 @@ function buildGuardrails(keys: GatewayApiKeyRecord[]): ApiKeyGuardrail[] {
   const missingEnvironments = buildEnvironmentStrategy(keys)
     .filter((item) => item.status !== 'Covered')
     .map((item) => item.environment);
+  const keysMissingExpiry = keys.filter((key) => !key.expires_at_ms);
 
   const guardrails: ApiKeyGuardrail[] = [];
 
@@ -144,6 +145,15 @@ function buildGuardrails(keys: GatewayApiKeyRecord[]): ApiKeyGuardrail[] {
       title: 'Close environment coverage before launch expands',
       detail: `The current posture still needs ${missingEnvironments.join(', ')} coverage before the full promotion path is protected.`,
       tone: 'accent',
+    });
+  }
+
+  if (keysMissingExpiry.length) {
+    guardrails.push({
+      id: 'expiry-hygiene',
+      title: 'Move long-lived keys onto explicit expiry windows',
+      detail: `${keysMissingExpiry.length} key(s) currently have no expiry. Add bounded lifetimes so forgotten credentials do not become silent long-tail risk.`,
+      tone: 'warning',
     });
   }
 

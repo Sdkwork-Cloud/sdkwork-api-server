@@ -239,6 +239,7 @@ impl RoutingDecision {
 pub enum RoutingDecisionSource {
     Gateway,
     AdminSimulation,
+    PortalSimulation,
 }
 
 impl RoutingDecisionSource {
@@ -246,6 +247,7 @@ impl RoutingDecisionSource {
         match self {
             Self::Gateway => "gateway",
             Self::AdminSimulation => "admin_simulation",
+            Self::PortalSimulation => "portal_simulation",
         }
     }
 }
@@ -257,6 +259,7 @@ impl FromStr for RoutingDecisionSource {
         match value {
             "gateway" => Ok(Self::Gateway),
             "admin_simulation" => Ok(Self::AdminSimulation),
+            "portal_simulation" => Ok(Self::PortalSimulation),
             _ => Err(format!("unsupported routing decision source: {value}")),
         }
     }
@@ -596,6 +599,111 @@ impl RoutingPolicy {
             }
         }
         declared
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProjectRoutingPreferences {
+    pub project_id: String,
+    #[serde(default)]
+    pub preset_id: String,
+    #[serde(default)]
+    pub strategy: RoutingStrategy,
+    #[serde(default)]
+    pub ordered_provider_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_provider_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_cost: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_latency_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub require_healthy: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preferred_region: Option<String>,
+    #[serde(default)]
+    pub updated_at_ms: u64,
+}
+
+impl ProjectRoutingPreferences {
+    pub fn new(project_id: impl Into<String>) -> Self {
+        Self {
+            project_id: project_id.into(),
+            preset_id: String::new(),
+            strategy: RoutingStrategy::DeterministicPriority,
+            ordered_provider_ids: Vec::new(),
+            default_provider_id: None,
+            max_cost: None,
+            max_latency_ms: None,
+            require_healthy: false,
+            preferred_region: None,
+            updated_at_ms: 0,
+        }
+    }
+
+    pub fn with_preset_id(mut self, preset_id: impl Into<String>) -> Self {
+        self.preset_id = preset_id.into();
+        self
+    }
+
+    pub fn with_strategy(mut self, strategy: RoutingStrategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
+
+    pub fn with_ordered_provider_ids(mut self, ordered_provider_ids: Vec<String>) -> Self {
+        self.ordered_provider_ids = dedup_preserving_order(ordered_provider_ids);
+        self
+    }
+
+    pub fn with_default_provider_id(mut self, default_provider_id: impl Into<String>) -> Self {
+        self.default_provider_id = Some(default_provider_id.into());
+        self
+    }
+
+    pub fn with_default_provider_id_option(mut self, default_provider_id: Option<String>) -> Self {
+        self.default_provider_id = default_provider_id;
+        self
+    }
+
+    pub fn with_max_cost(mut self, max_cost: f64) -> Self {
+        self.max_cost = Some(max_cost);
+        self
+    }
+
+    pub fn with_max_cost_option(mut self, max_cost: Option<f64>) -> Self {
+        self.max_cost = max_cost;
+        self
+    }
+
+    pub fn with_max_latency_ms(mut self, max_latency_ms: u64) -> Self {
+        self.max_latency_ms = Some(max_latency_ms);
+        self
+    }
+
+    pub fn with_max_latency_ms_option(mut self, max_latency_ms: Option<u64>) -> Self {
+        self.max_latency_ms = max_latency_ms;
+        self
+    }
+
+    pub fn with_require_healthy(mut self, require_healthy: bool) -> Self {
+        self.require_healthy = require_healthy;
+        self
+    }
+
+    pub fn with_preferred_region(mut self, preferred_region: impl Into<String>) -> Self {
+        self.preferred_region = Some(preferred_region.into());
+        self
+    }
+
+    pub fn with_preferred_region_option(mut self, preferred_region: Option<String>) -> Self {
+        self.preferred_region = preferred_region;
+        self
+    }
+
+    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
+        self.updated_at_ms = updated_at_ms;
+        self
     }
 }
 

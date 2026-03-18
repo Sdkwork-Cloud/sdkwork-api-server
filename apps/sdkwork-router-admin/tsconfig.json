@@ -25,6 +25,8 @@
       "sdkwork-router-admin-coupons": ["packages/sdkwork-router-admin-coupons/src/index.tsx"],
       "sdkwork-router-admin-operations": ["packages/sdkwork-router-admin-operations/src/index.tsx"],
       "sdkwork-router-admin-overview": ["packages/sdkwork-router-admin-overview/src/index.tsx"],
+      "sdkwork-router-admin-settings": ["packages/sdkwork-router-admin-settings/src/index.tsx"],
+      "sdkwork-router-admin-shell": ["packages/sdkwork-router-admin-shell/src/index.ts"],
       "sdkwork-router-admin-tenants": ["packages/sdkwork-router-admin-tenants/src/index.tsx"],
       "sdkwork-router-admin-traffic": ["packages/sdkwork-router-admin-traffic/src/index.tsx"],
       "sdkwork-router-admin-types": ["packages/sdkwork-router-admin-types/src/index.ts"],

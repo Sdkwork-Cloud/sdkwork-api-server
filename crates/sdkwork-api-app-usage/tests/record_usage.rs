@@ -37,9 +37,16 @@ async fn persisted_usage_can_be_listed() {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     let store = SqliteAdminStore::new(pool);
 
-    persist_usage_record(&store, "project-1", "gpt-4.1", "provider-openai-official", 128, 0.64)
-        .await
-        .unwrap();
+    persist_usage_record(
+        &store,
+        "project-1",
+        "gpt-4.1",
+        "provider-openai-official",
+        128,
+        0.64,
+    )
+    .await
+    .unwrap();
 
     let records = list_usage_records(&store).await.unwrap();
     assert_eq!(records.len(), 1);

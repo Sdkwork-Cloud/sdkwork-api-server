@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "SDKWork Router Admin",
         "width": 1440,
-        "height": 960
+        "height": 960,
+        "resizable": true,
+        "decorations": false
       }
     ]
   }

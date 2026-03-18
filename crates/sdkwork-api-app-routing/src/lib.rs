@@ -9,15 +9,15 @@ use sdkwork_api_app_extension::{
 };
 use sdkwork_api_domain_catalog::ProxyProvider;
 use sdkwork_api_domain_routing::{
-    select_policy, ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingCandidateHealth,
-    RoutingDecision, RoutingDecisionLog, RoutingDecisionSource, RoutingPolicy, RoutingStrategy,
+    select_policy, ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingCandidateAssessment,
+    RoutingCandidateHealth, RoutingDecision, RoutingDecisionLog, RoutingDecisionSource,
+    RoutingPolicy, RoutingStrategy,
 };
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
 use sdkwork_api_storage_core::AdminStore;
 use serde_json::Value;
 
 const DEFAULT_WEIGHT: u64 = 100;
-const STRATEGY_RUNTIME_AWARE: &str = "runtime_aware_deterministic";
 const STRATEGY_STATIC_FALLBACK: &str = "static_fallback";
 
 pub fn service_name() -> &'static str {
@@ -164,12 +164,30 @@ pub async fn simulate_route_with_store_context(
     requested_region: Option<&str>,
     selection_seed: Option<u64>,
 ) -> Result<RoutingDecision> {
+    simulate_route_with_store_selection_context(
+        store,
+        capability,
+        model,
+        RouteSelectionContext::new(RoutingDecisionSource::AdminSimulation)
+            .with_requested_region_option(requested_region)
+            .with_selection_seed_option(selection_seed),
+    )
+    .await
+}
+
+pub async fn simulate_route_with_store_selection_context(
+    store: &dyn AdminStore,
+    capability: &str,
+    model: &str,
+    context: RouteSelectionContext<'_>,
+) -> Result<RoutingDecision> {
     simulate_route_with_store_inner(
         store,
         capability,
         model,
-        normalize_region_option(requested_region),
-        selection_seed,
+        context.project_id,
+        normalize_region_option(context.requested_region),
+        context.selection_seed,
     )
     .await
 }
@@ -201,14 +219,8 @@ pub async fn select_route_with_store_context(
     route_key: &str,
     context: RouteSelectionContext<'_>,
 ) -> Result<RoutingDecision> {
-    let decision = simulate_route_with_store_context(
-        store,
-        capability,
-        route_key,
-        context.requested_region,
-        context.selection_seed,
-    )
-    .await?;
+    let decision =
+        simulate_route_with_store_selection_context(store, capability, route_key, context).await?;
     let created_at_ms = current_time_millis();
     let log = RoutingDecisionLog::new(
         generate_decision_id(created_at_ms),
@@ -238,9 +250,17 @@ async fn simulate_route_with_store_inner(
     store: &dyn AdminStore,
     capability: &str,
     model: &str,
+    project_id: Option<&str>,
     requested_region: Option<String>,
     selection_seed: Option<u64>,
 ) -> Result<RoutingDecision> {
+    let project_preferences = match project_id {
+        Some(project_id) => store.find_project_routing_preferences(project_id).await?,
+        None => None,
+    };
+    let requested_region = requested_region
+        .or_else(|| preferred_region_from_preferences(project_preferences.as_ref()));
+
     let mut model_candidate_ids: Vec<String> = store
         .list_models()
         .await?
@@ -254,6 +274,12 @@ async fn simulate_route_with_store_inner(
 
     let policies = store.list_routing_policies().await?;
     let matched_policy = select_policy(&policies, capability, model);
+    let effective_policy = effective_routing_policy(
+        matched_policy,
+        project_preferences.as_ref(),
+        capability,
+        model,
+    );
 
     let providers = store.list_providers().await?;
     let provider_map = providers
@@ -262,7 +288,7 @@ async fn simulate_route_with_store_inner(
         .collect::<HashMap<_, _>>();
 
     let candidate_ids = if model_candidate_ids.is_empty() {
-        if let Some(policy) = matched_policy {
+        if let Some(policy) = effective_policy.as_ref() {
             let available_provider_ids = provider_map.keys().cloned().collect::<Vec<_>>();
             let candidate_ids = policy
                 .declared_provider_ids()
@@ -281,7 +307,7 @@ async fn simulate_route_with_store_inner(
                 .with_requested_region_option(requested_region.clone()));
         }
     } else {
-        match matched_policy {
+        match effective_policy.as_ref() {
             Some(policy) => policy.rank_candidates(&model_candidate_ids),
             None => model_candidate_ids,
         }
@@ -320,7 +346,7 @@ async fn simulate_route_with_store_inner(
 
     let selection = select_candidate(
         &mut assessments,
-        matched_policy,
+        effective_policy.as_ref(),
         requested_region.as_deref(),
         selection_seed,
     );
@@ -349,6 +375,72 @@ async fn simulate_route_with_store_inner(
     })
 }
 
+fn preferred_region_from_preferences(
+    preferences: Option<&ProjectRoutingPreferences>,
+) -> Option<String> {
+    preferences.and_then(|preferences| preferences.preferred_region.clone())
+}
+
+fn effective_routing_policy(
+    matched_policy: Option<&RoutingPolicy>,
+    preferences: Option<&ProjectRoutingPreferences>,
+    capability: &str,
+    model: &str,
+) -> Option<RoutingPolicy> {
+    let Some(preferences) = preferences else {
+        return matched_policy.cloned();
+    };
+
+    let base_policy = matched_policy
+        .cloned()
+        .unwrap_or_else(|| RoutingPolicy::new("project-routing-preferences", capability, model));
+    let base_ordered_provider_ids = base_policy.ordered_provider_ids.clone();
+    let base_default_provider_id = base_policy.default_provider_id.clone();
+    let base_max_cost = base_policy.max_cost;
+    let base_max_latency_ms = base_policy.max_latency_ms;
+    let base_require_healthy = base_policy.require_healthy;
+
+    Some(
+        base_policy
+            .with_strategy(preferences.strategy)
+            .with_ordered_provider_ids(if preferences.ordered_provider_ids.is_empty() {
+                base_ordered_provider_ids
+            } else {
+                preferences.ordered_provider_ids.clone()
+            })
+            .with_default_provider_id_option(
+                preferences
+                    .default_provider_id
+                    .clone()
+                    .or(base_default_provider_id),
+            )
+            .with_max_cost_option(combine_optional_f64(base_max_cost, preferences.max_cost))
+            .with_max_latency_ms_option(combine_optional_u64(
+                base_max_latency_ms,
+                preferences.max_latency_ms,
+            ))
+            .with_require_healthy(base_require_healthy || preferences.require_healthy),
+    )
+}
+
+fn combine_optional_f64(base: Option<f64>, overlay: Option<f64>) -> Option<f64> {
+    match (base, overlay) {
+        (Some(base), Some(overlay)) => Some(base.min(overlay)),
+        (Some(base), None) => Some(base),
+        (None, Some(overlay)) => Some(overlay),
+        (None, None) => None,
+    }
+}
+
+fn combine_optional_u64(base: Option<u64>, overlay: Option<u64>) -> Option<u64> {
+    match (base, overlay) {
+        (Some(base), Some(overlay)) => Some(base.min(overlay)),
+        (Some(base), None) => Some(base),
+        (None, Some(overlay)) => Some(overlay),
+        (None, None) => None,
+    }
+}
+
 struct CandidateSelection {
     selected_index: usize,
     strategy: String,
@@ -371,12 +463,21 @@ fn select_candidate(
         RoutingStrategy::DeterministicPriority => {
             let selected_index = 0;
             let selection_reason = assessments
-                .get(selected_index)
-                .map(selected_assessment_reason)
-                .unwrap_or_else(|| "selected the first available candidate".to_owned());
+                .get_mut(selected_index)
+                .map(|assessment| {
+                    assessment.reasons.push(
+                        "selected as the first healthy available provider in configured priority order"
+                            .to_owned(),
+                    );
+                    selected_assessment_reason(assessment)
+                })
+                .unwrap_or_else(|| {
+                    "selected the first healthy available candidate in configured priority order"
+                        .to_owned()
+                });
             CandidateSelection {
                 selected_index,
-                strategy: STRATEGY_RUNTIME_AWARE.to_owned(),
+                strategy: RoutingStrategy::DeterministicPriority.as_str().to_owned(),
                 selection_seed: None,
                 selection_reason,
                 slo_applied: false,
@@ -940,6 +1041,7 @@ fn compare_assessments(
         .available
         .cmp(&left.available)
         .then_with(|| health_rank(&right.health).cmp(&health_rank(&left.health)))
+        .then_with(|| left.policy_rank.cmp(&right.policy_rank))
         .then_with(|| compare_option_f64_asc(left.cost, right.cost))
         .then_with(|| compare_option_u64_asc(left.latency_ms, right.latency_ms))
         .then_with(|| {
@@ -948,7 +1050,6 @@ fn compare_assessments(
                 Some(resolved_weight(right.weight)),
             )
         })
-        .then_with(|| left.policy_rank.cmp(&right.policy_rank))
         .then_with(|| left.provider_id.cmp(&right.provider_id))
 }
 

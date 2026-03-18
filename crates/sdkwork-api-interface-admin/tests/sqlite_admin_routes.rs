@@ -349,7 +349,10 @@ async fn list_and_manage_portal_users_from_admin_api() {
     assert_eq!(initial_json.as_array().unwrap().len(), 1);
     assert_eq!(initial_json[0]["email"], "portal@sdkwork.local");
     assert_eq!(initial_json[0]["workspace_tenant_id"], "tenant_local_demo");
-    assert_eq!(initial_json[0]["workspace_project_id"], "project_local_demo");
+    assert_eq!(
+        initial_json[0]["workspace_project_id"],
+        "project_local_demo"
+    );
 
     let created = app
         .clone()
@@ -1019,18 +1022,12 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
     let token = login_token(app.clone()).await;
 
     for request in [
-        (
-            "/admin/tenants",
-            r#"{"id":"tenant-acme","name":"Acme"}"#,
-        ),
+        ("/admin/tenants", r#"{"id":"tenant-acme","name":"Acme"}"#),
         (
             "/admin/projects",
             r#"{"tenant_id":"tenant-acme","id":"project-acme","name":"Acme Production"}"#,
         ),
-        (
-            "/admin/channels",
-            r#"{"id":"openai","name":"OpenAI"}"#,
-        ),
+        ("/admin/channels", r#"{"id":"openai","name":"OpenAI"}"#),
         (
             "/admin/providers",
             r#"{"id":"provider-openai-official","channel_id":"openai","display_name":"OpenAI Official","adapter_kind":"openai","base_url":"https://api.openai.com","channel_bindings":[{"channel_id":"openai","is_primary":true}]}"#,
@@ -1054,9 +1051,9 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
                     .header("content-type", "application/json")
                     .body(Body::from(request.1))
                     .unwrap(),
-        )
-        .await
-        .unwrap();
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
     }
 
@@ -1077,15 +1074,16 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
         .unwrap();
     assert_eq!(created_api_key.status(), StatusCode::CREATED);
     let created_api_key_json = read_json(created_api_key).await;
-    let plaintext_key = created_api_key_json["plaintext"].as_str().unwrap().to_owned();
+    let plaintext_key = created_api_key_json["plaintext"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let hashed_key = created_api_key_json["hashed"].as_str().unwrap().to_owned();
 
-    let request_context = sdkwork_api_app_identity::resolve_gateway_request_context(
-        &store,
-        &plaintext_key,
-    )
-    .await
-    .unwrap();
+    let request_context =
+        sdkwork_api_app_identity::resolve_gateway_request_context(&store, &plaintext_key)
+            .await
+            .unwrap();
     assert!(request_context.is_some());
 
     let revoked = app
@@ -1106,12 +1104,10 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
     let revoked_json = read_json(revoked).await;
     assert_eq!(revoked_json["active"], false);
 
-    let revoked_request_context = sdkwork_api_app_identity::resolve_gateway_request_context(
-        &store,
-        &plaintext_key,
-    )
-    .await
-    .unwrap();
+    let revoked_request_context =
+        sdkwork_api_app_identity::resolve_gateway_request_context(&store, &plaintext_key)
+            .await
+            .unwrap();
     assert!(revoked_request_context.is_none());
 
     let restored = app
@@ -1132,16 +1128,17 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
     let restored_json = read_json(restored).await;
     assert_eq!(restored_json["active"], true);
 
-    let restored_request_context = sdkwork_api_app_identity::resolve_gateway_request_context(
-        &store,
-        &plaintext_key,
-    )
-    .await
-    .unwrap();
+    let restored_request_context =
+        sdkwork_api_app_identity::resolve_gateway_request_context(&store, &plaintext_key)
+            .await
+            .unwrap();
     assert!(restored_request_context.is_some());
 
     for request in [
-        ("/admin/providers/provider-openai-official", "/admin/providers"),
+        (
+            "/admin/providers/provider-openai-official",
+            "/admin/providers",
+        ),
         ("/admin/channels/openai", "/admin/channels"),
         ("/admin/projects/project-acme", "/admin/projects"),
         ("/admin/tenants/tenant-acme", "/admin/tenants"),
@@ -1260,12 +1257,10 @@ async fn delete_gateway_api_key_from_admin_api() {
     let plaintext_key = created_json["plaintext"].as_str().unwrap().to_owned();
     let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
 
-    let request_context = sdkwork_api_app_identity::resolve_gateway_request_context(
-        &store,
-        &plaintext_key,
-    )
-    .await
-    .unwrap();
+    let request_context =
+        sdkwork_api_app_identity::resolve_gateway_request_context(&store, &plaintext_key)
+            .await
+            .unwrap();
     assert!(request_context.is_some());
 
     let deleted = app
@@ -1283,12 +1278,10 @@ async fn delete_gateway_api_key_from_admin_api() {
 
     assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
 
-    let request_context_after_delete = sdkwork_api_app_identity::resolve_gateway_request_context(
-        &store,
-        &plaintext_key,
-    )
-    .await
-    .unwrap();
+    let request_context_after_delete =
+        sdkwork_api_app_identity::resolve_gateway_request_context(&store, &plaintext_key)
+            .await
+            .unwrap();
     assert!(request_context_after_delete.is_none());
 
     let api_keys = app
@@ -1375,7 +1368,7 @@ async fn routing_simulation_uses_catalog_models() {
         simulation_json["candidate_ids"].as_array().unwrap().len(),
         2
     );
-    assert_eq!(simulation_json["strategy"], "runtime_aware_deterministic");
+    assert_eq!(simulation_json["strategy"], "deterministic_priority");
     assert!(simulation_json["selection_reason"].as_str().is_some());
     assert_eq!(simulation_json["assessments"].as_array().unwrap().len(), 2);
 }
@@ -2976,8 +2969,12 @@ compatibility = "native"
 operation = "videos.content"
 compatibility = "native"
 "#,
-        entrypoint.to_string_lossy()
+        config_path_value(entrypoint)
     )
+}
+
+fn config_path_value(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 struct NativeDynamicLifecycleLogGuard {

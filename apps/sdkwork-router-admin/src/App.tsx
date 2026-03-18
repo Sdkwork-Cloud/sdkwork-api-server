@@ -1,7 +1,5 @@
-import './theme.css';
-
-import { AdminWorkbenchApp } from 'sdkwork-router-admin-core';
+import { AppRoot } from 'sdkwork-router-admin-shell';
 
 export function App() {
-  return <AdminWorkbenchApp />;
+  return <AppRoot />;
 }

@@ -123,8 +123,43 @@ test('buildWorkspaceCommandPlan forwards backend and console flags to child scri
     'scripts/dev/start-web.mjs',
     '--bind',
     '0.0.0.0:13001',
+    '--admin-target',
+    '0.0.0.0:18081',
+    '--portal-target',
+    '0.0.0.0:18082',
+    '--gateway-target',
+    '0.0.0.0:18080',
     '--install',
     '--tauri',
+    '--dry-run',
+  ]);
+});
+
+test('buildWorkspaceCommandPlan forwards backend binds to preview web host', () => {
+  const plan = buildWorkspaceCommandPlan({
+    databaseUrl: 'sqlite:///tmp/sdkwork-router-e2e/sdkwork-api-server.db',
+    gatewayBind: '127.0.0.1:18080',
+    adminBind: '127.0.0.1:18081',
+    portalBind: '127.0.0.1:18082',
+    webBind: '127.0.0.1:13001',
+    install: false,
+    preview: true,
+    tauri: false,
+    dryRun: true,
+    help: false,
+  });
+
+  assert.deepEqual(plan.web.args, [
+    'scripts/dev/start-web.mjs',
+    '--bind',
+    '127.0.0.1:13001',
+    '--admin-target',
+    '127.0.0.1:18081',
+    '--portal-target',
+    '127.0.0.1:18082',
+    '--gateway-target',
+    '127.0.0.1:18080',
+    '--preview',
     '--dry-run',
   ]);
 });

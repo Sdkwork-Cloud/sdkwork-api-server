@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "react": "^19.0.0",
+    "recharts": "^3.1.2",
     "sdkwork-router-portal-commons": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*"

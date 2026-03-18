@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SDKWork Router Portal",
+  "version": "0.1.0",
+  "identifier": "com.sdkwork.router.portal",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173/portal/"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "SDKWork Router Portal",
+        "width": 1440,
+        "height": 960,
+        "resizable": true,
+        "decorations": false
+      }
+    ]
+  }
+}

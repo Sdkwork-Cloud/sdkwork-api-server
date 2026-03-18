@@ -2775,6 +2775,7 @@ dependencies = [
  "sdkwork-api-extension-core",
  "sdkwork-api-extension-host",
  "sdkwork-api-observability",
+ "sdkwork-api-openapi",
  "sdkwork-api-secret-core",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
@@ -2808,6 +2809,7 @@ dependencies = [
  "sdkwork-api-extension-core",
  "sdkwork-api-interface-admin",
  "sdkwork-api-observability",
+ "sdkwork-api-openapi",
  "sdkwork-api-provider-core",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
@@ -2828,9 +2830,12 @@ dependencies = [
  "axum",
  "sdkwork-api-app-billing",
  "sdkwork-api-app-identity",
+ "sdkwork-api-app-routing",
  "sdkwork-api-app-usage",
  "sdkwork-api-domain-billing",
+ "sdkwork-api-domain-catalog",
  "sdkwork-api-domain-identity",
+ "sdkwork-api-domain-routing",
  "sdkwork-api-domain-usage",
  "sdkwork-api-observability",
  "sdkwork-api-storage-core",
@@ -2855,6 +2860,13 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sdkwork-api-openapi"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

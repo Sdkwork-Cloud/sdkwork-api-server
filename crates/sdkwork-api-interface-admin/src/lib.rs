@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::{
@@ -9,6 +9,7 @@ use axum::{
     http::header,
     http::request::Parts,
     http::StatusCode,
+    response::Html,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -17,9 +18,10 @@ use sdkwork_api_app_billing::{
     summarize_billing_from_store,
 };
 use sdkwork_api_app_catalog::{
-    delete_channel as delete_catalog_channel, delete_model_variant, delete_provider as delete_catalog_provider,
-    list_channels, list_model_entries, list_providers, persist_channel, persist_model_with_metadata,
-    persist_provider_with_bindings_and_extension_id, PersistProviderWithBindingsRequest,
+    delete_channel as delete_catalog_channel, delete_model_variant,
+    delete_provider as delete_catalog_provider, list_channels, list_model_entries, list_providers,
+    persist_channel, persist_model_with_metadata, persist_provider_with_bindings_and_extension_id,
+    PersistProviderWithBindingsRequest,
 };
 use sdkwork_api_app_coupon::{delete_coupon, list_coupons, persist_coupon};
 use sdkwork_api_app_credential::CredentialSecretManager;
@@ -41,10 +43,9 @@ use sdkwork_api_app_identity::{
     change_admin_password, delete_admin_user, delete_gateway_api_key, delete_portal_user,
     list_admin_user_profiles, list_gateway_api_keys, list_portal_user_profiles,
     load_admin_user_profile, login_admin_user, persist_gateway_api_key, reset_admin_user_password,
-    reset_portal_user_password,
-    set_admin_user_active, set_gateway_api_key_active, set_portal_user_active, upsert_admin_user,
-    upsert_portal_user, verify_jwt, AdminIdentityError, Claims, CreatedGatewayApiKey,
-    PortalIdentityError,
+    reset_portal_user_password, set_admin_user_active, set_gateway_api_key_active,
+    set_portal_user_active, upsert_admin_user, upsert_portal_user, verify_jwt, AdminIdentityError,
+    Claims, CreatedGatewayApiKey, PortalIdentityError,
 };
 use sdkwork_api_app_routing::{
     create_routing_policy, list_routing_decision_logs, list_routing_policies,
@@ -79,12 +80,123 @@ use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::{UsageRecord, UsageSummary};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
+use sdkwork_api_openapi::{
+    build_openapi_document, extract_routes_from_function, render_docs_html, HttpMethod,
+    OpenApiServiceSpec, RouteEntry,
+};
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::SqlitePool;
 
 const DEFAULT_ADMIN_JWT_SIGNING_SECRET: &str = "local-dev-admin-jwt-secret";
+const ADMIN_OPENAPI_SPEC: OpenApiServiceSpec<'static> = OpenApiServiceSpec {
+    title: "SDKWORK Admin API",
+    version: env!("CARGO_PKG_VERSION"),
+    description: "OpenAPI 3.1 inventory generated from the current admin router implementation.",
+    openapi_path: "/admin/openapi.json",
+    docs_path: "/admin/docs",
+};
+
+fn admin_route_inventory() -> &'static [RouteEntry] {
+    static ROUTES: OnceLock<Vec<RouteEntry>> = OnceLock::new();
+    ROUTES
+        .get_or_init(|| {
+            extract_routes_from_function(include_str!("lib.rs"), "admin_router_with_state")
+                .expect("admin route inventory")
+        })
+        .as_slice()
+}
+
+fn admin_openapi_document() -> &'static Value {
+    static DOCUMENT: OnceLock<Value> = OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        build_openapi_document(
+            &ADMIN_OPENAPI_SPEC,
+            admin_route_inventory(),
+            admin_tag_for_path,
+            admin_route_requires_bearer_auth,
+            admin_operation_summary,
+        )
+    })
+}
+
+fn admin_docs_html() -> &'static str {
+    static HTML: OnceLock<String> = OnceLock::new();
+    HTML.get_or_init(|| render_docs_html(&ADMIN_OPENAPI_SPEC))
+        .as_str()
+}
+
+async fn admin_openapi_handler() -> Json<Value> {
+    Json(admin_openapi_document().clone())
+}
+
+async fn admin_docs_handler() -> Html<String> {
+    Html(admin_docs_html().to_owned())
+}
+
+fn admin_tag_for_path(path: &str) -> String {
+    match path {
+        "/metrics" | "/admin/health" => "system".to_owned(),
+        "/admin/docs" | "/admin/openapi.json" => "docs".to_owned(),
+        _ if path.starts_with("/admin/") => path
+            .trim_start_matches("/admin/")
+            .split('/')
+            .find(|segment| !segment.is_empty() && !segment.starts_with('{'))
+            .unwrap_or("admin")
+            .to_owned(),
+        _ => "admin".to_owned(),
+    }
+}
+
+fn admin_route_requires_bearer_auth(path: &str, _method: HttpMethod) -> bool {
+    !matches!(
+        path,
+        "/metrics" | "/admin/health" | "/admin/openapi.json" | "/admin/docs" | "/admin/auth/login"
+    )
+}
+
+fn admin_operation_summary(path: &str, method: HttpMethod) -> String {
+    match path {
+        "/metrics" => "Prometheus metrics".to_owned(),
+        "/admin/health" => "Health check".to_owned(),
+        "/admin/openapi.json" => "OpenAPI document".to_owned(),
+        "/admin/docs" => "Interactive API inventory".to_owned(),
+        _ => format!(
+            "{} {}",
+            method.display_name(),
+            humanize_admin_route_path(path)
+        ),
+    }
+}
+
+fn humanize_admin_route_path(path: &str) -> String {
+    let parts = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .filter(|segment| *segment != "admin")
+        .map(|segment| {
+            if segment.starts_with('{') && segment.ends_with('}') {
+                format!(
+                    "by {}",
+                    segment
+                        .trim_matches(|ch| ch == '{' || ch == '}')
+                        .replace(['_', '-'], " ")
+                )
+            } else {
+                segment.replace(['_', '-'], " ")
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        "root".to_owned()
+    } else {
+        parts.join(" / ")
+    }
+}
 
 pub struct AdminApiState {
     live_store: Reloadable<Arc<dyn AdminStore>>,
@@ -370,6 +482,10 @@ struct CreateApiKeyRequest {
     tenant_id: String,
     project_id: String,
     environment: String,
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    expires_at_ms: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -622,6 +738,8 @@ pub fn admin_router() -> Router {
     let service_name: Arc<str> = Arc::from("admin");
     let metrics = Arc::new(HttpMetricsRegistry::new("admin"));
     Router::new()
+        .route("/admin/openapi.json", get(admin_openapi_handler))
+        .route("/admin/docs", get(admin_docs_handler))
         .route(
             "/metrics",
             get({
@@ -775,6 +893,8 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
     let service_name: Arc<str> = Arc::from("admin");
     let metrics = Arc::new(HttpMetricsRegistry::new("admin"));
     Router::new()
+        .route("/admin/openapi.json", get(admin_openapi_handler))
+        .route("/admin/docs", get(admin_docs_handler))
         .route(
             "/metrics",
             get({
@@ -843,7 +963,10 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
             "/admin/projects",
             get(list_projects_handler).post(create_project_handler),
         )
-        .route("/admin/projects/{project_id}", delete(delete_project_handler))
+        .route(
+            "/admin/projects/{project_id}",
+            delete(delete_project_handler),
+        )
         .route(
             "/admin/api-keys",
             get(list_api_keys_handler).post(create_api_key_handler),
@@ -852,17 +975,26 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
             "/admin/api-keys/{hashed_key}/status",
             post(update_api_key_status_handler),
         )
-        .route("/admin/api-keys/{hashed_key}", delete(delete_api_key_handler))
+        .route(
+            "/admin/api-keys/{hashed_key}",
+            delete(delete_api_key_handler),
+        )
         .route(
             "/admin/channels",
             get(list_channels_handler).post(create_channel_handler),
         )
-        .route("/admin/channels/{channel_id}", delete(delete_channel_handler))
+        .route(
+            "/admin/channels/{channel_id}",
+            delete(delete_channel_handler),
+        )
         .route(
             "/admin/providers",
             get(list_providers_handler).post(create_provider_handler),
         )
-        .route("/admin/providers/{provider_id}", delete(delete_provider_handler))
+        .route(
+            "/admin/providers/{provider_id}",
+            delete(delete_provider_handler),
+        )
         .route(
             "/admin/credentials",
             get(list_credentials_handler).post(create_credential_handler),
@@ -1215,9 +1347,7 @@ fn admin_error_response(error: AdminIdentityError) -> (StatusCode, Json<ErrorRes
     (status, Json(body))
 }
 
-fn portal_admin_error_response(
-    error: PortalIdentityError,
-) -> (StatusCode, Json<ErrorResponse>) {
+fn portal_admin_error_response(error: PortalIdentityError) -> (StatusCode, Json<ErrorResponse>) {
     let status = match error {
         PortalIdentityError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         PortalIdentityError::DuplicateEmail => StatusCode::CONFLICT,
@@ -1444,7 +1574,7 @@ async fn create_tenant_handler(
 ) -> Result<(StatusCode, Json<Tenant>), StatusCode> {
     let tenant = persist_tenant(state.store.as_ref(), &request.id, &request.name)
         .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((StatusCode::CREATED, Json(tenant)))
 }
 
@@ -1534,14 +1664,27 @@ async fn create_api_key_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateApiKeyRequest>,
 ) -> Result<(StatusCode, Json<CreatedGatewayApiKey>), StatusCode> {
-    let created = persist_gateway_api_key(
-        state.store.as_ref(),
-        &request.tenant_id,
-        &request.project_id,
-        &request.environment,
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let created = if request.label.is_some() || request.expires_at_ms.is_some() {
+        sdkwork_api_app_identity::persist_gateway_api_key_with_metadata(
+            state.store.as_ref(),
+            &request.tenant_id,
+            &request.project_id,
+            &request.environment,
+            request.label.as_deref().unwrap_or(&request.environment),
+            request.expires_at_ms,
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    } else {
+        persist_gateway_api_key(
+            state.store.as_ref(),
+            &request.tenant_id,
+            &request.project_id,
+            &request.environment,
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    };
     Ok((StatusCode::CREATED, Json(created)))
 }
 

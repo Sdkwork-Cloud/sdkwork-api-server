@@ -43,6 +43,7 @@ members = [
     "crates/sdkwork-api-storage-sqlite",
     "crates/sdkwork-api-interface-admin",
     "crates/sdkwork-api-interface-http",
+    "crates/sdkwork-api-openapi",
     "crates/sdkwork-api-interface-portal",
     "services/admin-api-service",
     "services/gateway-service",

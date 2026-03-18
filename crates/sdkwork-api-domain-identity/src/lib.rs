@@ -41,6 +41,12 @@ pub struct GatewayApiKeyRecord {
     pub project_id: String,
     pub environment: String,
     pub hashed_key: String,
+    pub label: String,
+    pub created_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_used_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at_ms: Option<u64>,
     pub active: bool,
 }
 
@@ -56,8 +62,42 @@ impl GatewayApiKeyRecord {
             project_id: project_id.into(),
             environment: environment.into(),
             hashed_key: hashed_key.into(),
+            label: String::new(),
+            created_at_ms: 0,
+            last_used_at_ms: None,
+            expires_at_ms: None,
             active: true,
         }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = label.into();
+        self
+    }
+
+    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
+        self.created_at_ms = created_at_ms;
+        self
+    }
+
+    pub fn with_last_used_at_ms(mut self, last_used_at_ms: u64) -> Self {
+        self.last_used_at_ms = Some(last_used_at_ms);
+        self
+    }
+
+    pub fn with_last_used_at_ms_option(mut self, last_used_at_ms: Option<u64>) -> Self {
+        self.last_used_at_ms = last_used_at_ms;
+        self
+    }
+
+    pub fn with_expires_at_ms(mut self, expires_at_ms: u64) -> Self {
+        self.expires_at_ms = Some(expires_at_ms);
+        self
+    }
+
+    pub fn with_expires_at_ms_option(mut self, expires_at_ms: Option<u64>) -> Self {
+        self.expires_at_ms = expires_at_ms;
+        self
     }
 }
 

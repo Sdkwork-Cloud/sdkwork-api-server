@@ -14,7 +14,7 @@ fn decision_retains_candidate_ids() {
 #[test]
 fn decision_can_include_strategy_reason_and_assessments() {
     let decision = RoutingDecision::new("provider-a", vec!["provider-a".into()])
-        .with_strategy("runtime_aware_deterministic")
+        .with_strategy("deterministic_priority")
         .with_selection_seed(42)
         .with_selection_reason("selected the top-ranked healthy candidate")
         .with_assessments(vec![RoutingCandidateAssessment::new("provider-a")
@@ -26,10 +26,7 @@ fn decision_can_include_strategy_reason_and_assessments() {
             .with_latency_ms(120)
             .with_reason("healthy runtime")]);
 
-    assert_eq!(
-        decision.strategy.as_deref(),
-        Some("runtime_aware_deterministic")
-    );
+    assert_eq!(decision.strategy.as_deref(), Some("deterministic_priority"));
     assert_eq!(
         decision.selection_reason.as_deref(),
         Some("selected the top-ranked healthy candidate")

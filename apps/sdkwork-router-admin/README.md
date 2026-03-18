@@ -7,7 +7,7 @@
 - independent engineering project under `apps/`
 - product-grade super-admin UI for daily router operations
 - follows `ARCHITECT.md` package ownership and composition rules
-- ships as a standalone React workspace with its own theme, routing shell, and package graph
+- ships as a standalone React workspace with its own `claw-studio`-aligned theme, routing shell, and package graph
 - operates on live admin-control-plane data for day-to-day management, audit, and runtime posture
 
 ## Workspace Layout
@@ -27,6 +27,7 @@ apps/sdkwork-router-admin/
 - `sdkwork-router-admin-types`
 - `sdkwork-router-admin-commons`
 - `sdkwork-router-admin-core`
+- `sdkwork-router-admin-shell`
 - `sdkwork-router-admin-admin-api`
 
 ### Business
@@ -39,6 +40,7 @@ apps/sdkwork-router-admin/
 - `sdkwork-router-admin-catalog`
 - `sdkwork-router-admin-traffic`
 - `sdkwork-router-admin-operations`
+- `sdkwork-router-admin-settings`
 
 ## Data Sources
 
@@ -68,6 +70,15 @@ apps/sdkwork-router-admin/
 - `Catalog`: channel, proxy provider, provider credential, and model CRUD with credential coverage and secret rotation workflow
 - `Traffic`: multi-filter request query console, CSV export, usage records, billing rollups, request-log visibility, user traffic leaderboard, and project hotspots
 - `Operations`: provider health, runtime posture, and runtime reload controls
+- `Settings`: theme mode, theme color, sidebar visibility, and shell posture controls
+
+## Shell Model
+
+- `react-router-dom` browser routes under `/admin/`
+- claw-studio style shell with top header, left sidebar, and right content region
+- click-to-collapse and resize-capable sidebar
+- persistent theme mode and accent theme selection
+- login kept outside the authenticated shell
 
 ## Commands
 

@@ -46,7 +46,11 @@ if (settings.help) {
   process.exit(0);
 }
 
-const env = webHostEnv(settings.bind);
+const env = webHostEnv(settings.bind, {
+  adminTarget: settings.adminTarget,
+  portalTarget: settings.portalTarget,
+  gatewayTarget: settings.gatewayTarget,
+});
 for (const line of webAccessLines(settings.bind)) {
   console.log(line);
 }

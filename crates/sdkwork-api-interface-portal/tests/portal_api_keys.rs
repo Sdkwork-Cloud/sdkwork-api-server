@@ -1,5 +1,7 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use sdkwork_api_app_identity::{hash_gateway_api_key, resolve_gateway_request_context};
+use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -76,7 +78,9 @@ async fn portal_workspace_and_api_key_self_service_are_scoped() {
                 .uri("/portal/api-keys")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .body(Body::from("{\"environment\":\"live\"}"))
+                .body(Body::from(
+                    "{\"environment\":\"live\",\"label\":\"Production rollout\",\"expires_at_ms\":1900000000000}",
+                ))
                 .unwrap(),
         )
         .await
@@ -88,6 +92,9 @@ async fn portal_workspace_and_api_key_self_service_are_scoped() {
         .as_str()
         .unwrap()
         .starts_with("skw_live_"));
+    assert_eq!(create_key_json["label"], "Production rollout");
+    assert_eq!(create_key_json["expires_at_ms"], 1900000000000_u64);
+    assert!(create_key_json["created_at_ms"].as_u64().unwrap() > 0);
 
     let list_keys_response = app
         .oneshot(
@@ -105,6 +112,10 @@ async fn portal_workspace_and_api_key_self_service_are_scoped() {
     let list_keys_json = read_json(list_keys_response).await;
     assert_eq!(list_keys_json.as_array().unwrap().len(), 1);
     assert_eq!(list_keys_json[0]["environment"], "live");
+    assert_eq!(list_keys_json[0]["label"], "Production rollout");
+    assert_eq!(list_keys_json[0]["expires_at_ms"], 1900000000000_u64);
+    assert!(list_keys_json[0]["created_at_ms"].as_u64().unwrap() > 0);
+    assert!(list_keys_json[0]["last_used_at_ms"].is_null());
     assert!(list_keys_json[0].get("plaintext").is_none());
 }
 
@@ -139,4 +150,130 @@ async fn portal_routes_require_authentication() {
         .unwrap();
 
     assert_eq!(api_keys_response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn portal_api_key_status_and_delete_are_project_scoped() {
+    let pool = memory_pool().await;
+    let store = std::sync::Arc::new(sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool));
+    let app = sdkwork_api_interface_portal::portal_router_with_store(store.clone());
+    let token = portal_token(app.clone()).await;
+
+    let create_key_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"environment\":\"live\",\"label\":\"Production rollout\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_key_response.status(), StatusCode::CREATED);
+    let created_json = read_json(create_key_response).await;
+    let plaintext = created_json["plaintext"].as_str().unwrap().to_owned();
+    let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
+
+    let foreign_plaintext = "foreign-plaintext";
+    store
+        .insert_gateway_api_key(
+            &GatewayApiKeyRecord::new(
+                "tenant-other",
+                "project-other",
+                "live",
+                hash_gateway_api_key(foreign_plaintext),
+            )
+            .with_label("Other project key")
+            .with_created_at_ms(1_700_000_000_000),
+        )
+        .await
+        .unwrap();
+
+    let revoke_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/portal/api-keys/{hashed_key}/status"))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"active\":false}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(revoke_response.status(), StatusCode::OK);
+    let revoke_json = read_json(revoke_response).await;
+    assert_eq!(revoke_json["active"], false);
+
+    let request_context = resolve_gateway_request_context(store.as_ref(), &plaintext)
+        .await
+        .unwrap();
+    assert!(request_context.is_none());
+
+    let restore_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/portal/api-keys/{hashed_key}/status"))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"active\":true}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(restore_response.status(), StatusCode::OK);
+    assert_eq!(read_json(restore_response).await["active"], true);
+
+    let restored_context = resolve_gateway_request_context(store.as_ref(), &plaintext)
+        .await
+        .unwrap();
+    assert!(restored_context.is_some());
+
+    let foreign_revoke_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/portal/api-keys/{}/status",
+                    hash_gateway_api_key(foreign_plaintext)
+                ))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"active\":false}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(foreign_revoke_response.status(), StatusCode::NOT_FOUND);
+
+    let delete_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/portal/api-keys/{hashed_key}"))
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
+
+    let deleted_context = resolve_gateway_request_context(store.as_ref(), &plaintext)
+        .await
+        .unwrap();
+    assert!(deleted_context.is_none());
 }

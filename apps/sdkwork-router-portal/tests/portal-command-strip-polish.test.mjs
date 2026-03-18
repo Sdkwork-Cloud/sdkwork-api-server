@@ -9,11 +9,15 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('portal shell exposes a mission strip across authenticated routes', () => {
-  const core = read('packages/sdkwork-router-portal-core/src/index.tsx');
+test('portal shell replaces the mission strip with compact workspace navigation', () => {
+  const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
+  const profileDock = read('packages/sdkwork-router-portal-core/src/components/SidebarProfileDock.tsx');
+  const shellStatus = read('packages/sdkwork-router-portal-core/src/components/ShellStatus.tsx');
 
-  assert.match(core, /Mission strip/);
-  assert.match(core, /Primary mission/);
-  assert.match(core, /Immediate next move/);
-  assert.match(core, /Lead risk/);
+  assert.match(sidebar, /Active workspace/);
+  assert.match(shellStatus, /Workspace status/);
+  assert.match(sidebar, /SidebarProfileDock/);
+  assert.match(profileDock, /Sign out/);
+  assert.doesNotMatch(sidebar, /Mission strip/);
+  assert.doesNotMatch(shellStatus, /Primary mission/);
 });

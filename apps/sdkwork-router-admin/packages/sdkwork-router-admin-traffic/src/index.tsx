@@ -3,8 +3,8 @@ import { useDeferredValue, useState } from 'react';
 import {
   DataTable,
   InlineButton,
+  PageToolbar,
   Pill,
-  SectionHero,
   StatCard,
   Surface,
 } from 'sdkwork-router-admin-commons';
@@ -289,20 +289,6 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
 
   return (
     <div className="adminx-page-grid">
-      <SectionHero
-        eyebrow="Audit"
-        title="Query request traffic, token consumption, and routing decisions."
-        detail="Traffic is the operator request console for the standalone admin app. Use multi-dimensional filters to isolate project behavior, inspect portal-user scope, and export the exact filtered result set for incident review or finance follow-up."
-        actions={(
-          <>
-            <InlineButton tone="primary" onClick={exportUsageCsv}>
-              Export usage CSV
-            </InlineButton>
-            <InlineButton onClick={exportRoutingCsv}>Export routing CSV</InlineButton>
-          </>
-        )}
-      />
-
       <section className="adminx-stat-grid">
         <StatCard
           label="Filtered requests"
@@ -330,6 +316,19 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
           detail="Routing logs matching the current provider/search/time scope."
         />
       </section>
+
+      <PageToolbar
+        title="Traffic query workbench"
+        detail="Inspect usage and routing evidence, keep filters on the canvas, and export the exact result set you are reviewing."
+        actions={(
+          <>
+            <InlineButton tone="primary" onClick={exportUsageCsv}>
+              Export usage CSV
+            </InlineButton>
+            <InlineButton onClick={exportRoutingCsv}>Export routing CSV</InlineButton>
+          </>
+        )}
+      />
 
       <Surface
         title="Request query console"

@@ -5,7 +5,9 @@ use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserRecord, GatewayApiKeyRecord, PortalUserRecord};
-use sdkwork_api_domain_routing::{ProviderHealthSnapshot, RoutingDecisionLog, RoutingPolicy};
+use sdkwork_api_domain_routing::{
+    ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingDecisionLog, RoutingPolicy,
+};
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance};
@@ -280,6 +282,14 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy>;
     async fn list_routing_policies(&self) -> Result<Vec<RoutingPolicy>>;
+    async fn insert_project_routing_preferences(
+        &self,
+        preferences: &ProjectRoutingPreferences,
+    ) -> Result<ProjectRoutingPreferences>;
+    async fn find_project_routing_preferences(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectRoutingPreferences>>;
     async fn insert_routing_decision_log(
         &self,
         log: &RoutingDecisionLog,
