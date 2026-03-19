@@ -9,11 +9,11 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('dashboard turns abstract mode guidance into provider and model demand views', () => {
+test('dashboard turns abstract mode guidance into provider and model distribution views', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Provider share/);
-  assert.match(dashboardPage, /Model demand/);
+  assert.match(dashboardPage, /Provider distribution/);
+  assert.match(dashboardPage, /Model distribution/);
   assert.doesNotMatch(dashboardPage, /Mode narrative/);
   assert.doesNotMatch(dashboardPage, /Decision path/);
 });

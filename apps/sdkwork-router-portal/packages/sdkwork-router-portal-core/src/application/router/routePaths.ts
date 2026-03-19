@@ -3,6 +3,7 @@ import type { PortalAnonymousRouteKey, PortalRouteKey } from 'sdkwork-router-por
 export const PORTAL_ROUTE_PATHS: Record<PortalAnonymousRouteKey | PortalRouteKey, string> = {
   login: '/login',
   register: '/register',
+  'forgot-password': '/forgot-password',
   dashboard: '/dashboard',
   routing: '/routing',
   'api-keys': '/api-keys',

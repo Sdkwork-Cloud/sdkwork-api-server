@@ -22,6 +22,7 @@ import {
   PORTAL_MIN_SIDEBAR_WIDTH,
 } from '../lib/portalPreferences';
 import { portalRoutes } from '../routes';
+import { usePortalAuthStore } from '../store/usePortalAuthStore';
 import { usePortalShellStore } from '../store/usePortalShellStore';
 import { SidebarProfileDock } from './SidebarProfileDock';
 
@@ -62,10 +63,11 @@ export function Sidebar({
   onOpenConfigCenter,
   workspace,
 }: {
-  onLogout: () => void;
+  onLogout?: () => void;
   onOpenConfigCenter: () => void;
-  workspace: PortalWorkspaceSummary | null;
+  workspace?: PortalWorkspaceSummary | null;
 }) {
+  const storedWorkspace = usePortalAuthStore((state) => state.workspace);
   const {
     hiddenSidebarItems,
     isSidebarCollapsed,
@@ -79,8 +81,9 @@ export function Sidebar({
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
 
+  const resolvedWorkspace = workspace ?? storedWorkspace;
   const resolvedSidebarWidth = clampSidebarWidth(sidebarWidth);
-  const userInitials = getUserInitials(workspace);
+  const userInitials = getUserInitials(resolvedWorkspace);
 
   useEffect(() => {
     if (resolvedSidebarWidth !== sidebarWidth) {
@@ -146,29 +149,7 @@ export function Sidebar({
       onMouseLeave={() => setIsHovered(false)}
       style={{ width: currentWidth }}
     >
-      <aside className="flex h-full w-full flex-col overflow-visible border-r border-[color:var(--portal-sidebar-border)] [background:var(--portal-sidebar-background)] text-[var(--portal-sidebar-text)] shadow-[18px_0_50px_rgba(9,9,11,0.18)]">
-        <div className={`grid gap-3 border-b border-[color:var(--portal-sidebar-border)] ${isSidebarCollapsed ? 'px-3 py-4' : 'px-4 py-5'}`}>
-          <div className="grid gap-1">
-            {!isSidebarCollapsed ? (
-              <>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--portal-sidebar-muted)]">
-                  Active workspace
-                </span>
-                <strong className="truncate text-base font-semibold tracking-tight text-[var(--portal-sidebar-text)]">
-                  {workspace?.project.name ?? 'Loading workspace'}
-                </strong>
-                <span className="truncate text-xs text-[var(--portal-sidebar-muted)]">
-                  {workspace?.user.email ?? 'Restoring session'}
-                </span>
-              </>
-            ) : (
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--portal-sidebar-border)] bg-[var(--portal-sidebar-surface)] text-sm font-semibold text-[var(--portal-sidebar-text)]">
-                {userInitials}
-              </div>
-            )}
-          </div>
-        </div>
-
+      <aside className="flex h-full w-full flex-col overflow-visible border-r border-zinc-900/90 bg-[linear-gradient(180deg,_#13151a_0%,_#0b0c10_100%)] text-zinc-300 shadow-[18px_0_50px_rgba(9,9,11,0.16)]">
         <nav className={`scrollbar-hide flex-1 space-y-5 overflow-x-hidden overflow-y-auto ${isSidebarCollapsed ? 'px-2 py-4' : 'px-3 py-5'}`}>
           {routeGroups.map((group) => {
             const visibleRoutes = group.items
@@ -182,11 +163,11 @@ export function Sidebar({
             return (
               <div key={group.title}>
                 {!isSidebarCollapsed ? (
-                  <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--portal-sidebar-muted)]">
+                  <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
                     {group.title}
                   </div>
                 ) : (
-                  <div className="mx-2 my-4 h-px bg-[var(--portal-sidebar-border)]" />
+                  <div className="mx-2 my-4 h-px bg-white/6" />
                 )}
 
                 <div className="space-y-1">
@@ -204,8 +185,8 @@ export function Sidebar({
                             isSidebarCollapsed ? 'mx-auto h-11 w-11 justify-center' : 'justify-between px-3 py-2.5'
                           } ${
                             isActive
-                              ? 'bg-[var(--portal-sidebar-active)] font-medium text-[var(--portal-sidebar-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-                              : 'text-[var(--portal-sidebar-muted)] hover:bg-[var(--portal-sidebar-hover)] hover:text-[var(--portal-sidebar-text)]'
+                              ? 'bg-white/[0.08] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                              : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
                           }`
                         }
                         key={route.key}
@@ -220,14 +201,11 @@ export function Sidebar({
                             <div className="flex items-center gap-3">
                               <Icon
                                 className={`h-4 w-4 shrink-0 transition-colors ${
-                                  isActive ? 'text-primary-300' : 'text-[var(--portal-sidebar-muted)] group-hover:text-[var(--portal-sidebar-text)]'
+                                  isActive ? 'text-primary-400' : 'text-zinc-500 group-hover:text-zinc-300'
                                 }`}
                               />
                               {!isSidebarCollapsed ? (
-                                <div className="grid gap-0.5">
-                                  <span className="text-[14px] tracking-tight">{route.label}</span>
-                                  <small className="text-[11px] text-[var(--portal-sidebar-muted)]">{route.eyebrow}</small>
-                                </div>
+                                <span className="text-[14px] tracking-tight">{route.label}</span>
                               ) : null}
                             </div>
                           </>
@@ -241,20 +219,22 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="border-t border-[color:var(--portal-sidebar-border)] px-3 pb-4 pt-3 [background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.04))]">
+        <div className="flex flex-col gap-1 border-t border-white/5 p-3">
           <SidebarProfileDock
             isSidebarCollapsed={isSidebarCollapsed}
             onLogout={onLogout}
             onOpenConfigCenter={onOpenConfigCenter}
             userInitials={userInitials}
-            workspace={workspace}
+            workspace={resolvedWorkspace}
           />
         </div>
       </aside>
 
       <button
-        className={`absolute right-1 top-5 z-30 flex h-8 w-8 items-center justify-center rounded-full [background:var(--portal-surface-contrast)] text-[var(--portal-text-on-contrast)] shadow-[0_10px_24px_rgba(9,9,11,0.26)] transition-all duration-200 ${
-          showEdgeControls ? 'opacity-100 hover:scale-105 hover:brightness-110' : 'pointer-events-none opacity-0'
+        className={`absolute right-1 top-5 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-200 shadow-[0_10px_24px_rgba(9,9,11,0.26)] transition-all duration-200 dark:bg-zinc-900 ${
+          showEdgeControls
+            ? 'opacity-100 hover:scale-105 hover:bg-zinc-900'
+            : 'pointer-events-none opacity-0'
         }`}
         onClick={toggleSidebar}
         title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}

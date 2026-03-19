@@ -24,34 +24,42 @@ test('portal shell adopts a claw-style router and shell composition', () => {
   assert.match(layout, /<Sidebar/);
   assert.match(layout, /<AppHeader/);
   assert.match(layout, /ConfigCenter/);
-  assert.match(layout, /ShellStatus/);
-  assert.match(header, /portal-surface-contrast|portal-glass-background/);
+  assert.doesNotMatch(layout, /ShellStatus/);
+  assert.match(header, /bg-white\/72 backdrop-blur-xl dark:bg-zinc-950\/78/);
   assert.match(header, /SDKWork Router/);
-  assert.match(header, /Portal Workspace/);
+  assert.doesNotMatch(header, /Portal Workspace/);
 });
 
-test('portal header behaves like a desktop titlebar with brand left and window controls right', () => {
+test('portal header behaves like a claw-style desktop titlebar without a centered workspace strip', () => {
+  const layout = read('packages/sdkwork-router-portal-core/src/application/layouts/MainLayout.tsx');
   const header = read('packages/sdkwork-router-portal-core/src/components/AppHeader.tsx');
   const windowControls = read('packages/sdkwork-router-portal-core/src/components/WindowControls.tsx');
 
+  assert.match(layout, /<AppHeader \/>/);
   assert.match(header, /data-tauri-drag-region/);
   assert.match(header, /WindowControls/);
+  assert.match(header, /data-slot="app-header-leading"/);
+  assert.match(header, /data-slot="app-header-trailing"/);
+  assert.doesNotMatch(header, /data-slot="app-header-center"/);
+  assert.doesNotMatch(header, /Current workspace|Workspace context/);
+  assert.doesNotMatch(header, /workspace\?\.project\.name|workspace\?\.tenant\.name|storedWorkspace/);
   assert.doesNotMatch(header, /onOpenConfigCenter/);
-  assert.doesNotMatch(header, /workspace:/);
+  assert.doesNotMatch(header, /workspace:\s*['"]/);
   assert.doesNotMatch(header, /Workspace shell/);
   assert.doesNotMatch(header, /Config center/);
-  assert.doesNotMatch(header, /Active workspace/);
   assert.doesNotMatch(header, /Palette/);
   assert.doesNotMatch(header, /Settings2/);
   assert.match(windowControls, /minimizeWindow/);
   assert.match(windowControls, /maximizeWindow/);
   assert.match(windowControls, /closeWindow/);
+  assert.match(windowControls, /hover:bg-zinc-950\/\[0\.06\]|hover:bg-white\/\[0\.1\]/);
 });
 
-test('portal shell sidebar supports collapse, expand, and resize parity', () => {
+test('portal shell sidebar supports collapse, expand, resize, and claw width parity', () => {
   const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
   const store = read('packages/sdkwork-router-portal-core/src/store/usePortalShellStore.ts');
   const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
+  const preferences = read('packages/sdkwork-router-portal-core/src/lib/portalPreferences.ts');
 
   assert.match(store, /isSidebarCollapsed/);
   assert.match(store, /sidebarWidth/);
@@ -60,6 +68,10 @@ test('portal shell sidebar supports collapse, expand, and resize parity', () => 
   assert.match(sidebar, /PanelLeftOpen|ChevronsRight|SidebarRight/);
   assert.match(sidebar, /cursor-col-resize/);
   assert.match(sidebar, /toggleSidebar/);
+  assert.doesNotMatch(sidebar, /Active workspace/);
+  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72/);
+  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 220/);
+  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 252/);
   assert.match(configCenter, /hiddenSidebarItems/);
   assert.match(configCenter, /themeColor/);
 });

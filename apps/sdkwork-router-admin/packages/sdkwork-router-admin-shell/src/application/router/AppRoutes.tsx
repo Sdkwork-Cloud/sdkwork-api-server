@@ -3,7 +3,9 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 
 import { AdminLoginPage } from 'sdkwork-router-admin-auth';
 import {
+  ADMIN_ROUTE_PATHS,
   adminRoutePathByKey,
+  isAdminAuthPath,
   useAdminWorkbench,
 } from 'sdkwork-router-admin-core';
 import { CatalogPage } from 'sdkwork-router-admin-catalog';
@@ -27,7 +29,9 @@ function PageFrame({
 }) {
   return (
     <div key={routeKey} className="adminx-page-frame">
-      {children}
+      <div className="adminx-page-frame-shell">
+        <div className="adminx-page-frame-scroll">{children}</div>
+      </div>
     </div>
   );
 }
@@ -42,6 +46,29 @@ function LoadingScreen() {
   );
 }
 
+function resolveRedirectTarget(rawTarget: string | null) {
+  if (!rawTarget || !rawTarget.startsWith('/')) {
+    return ROUTE_PATHS.OVERVIEW;
+  }
+
+  if (rawTarget === ROUTE_PATHS.ROOT || isAdminAuthPath(rawTarget)) {
+    return ROUTE_PATHS.OVERVIEW;
+  }
+
+  return rawTarget;
+}
+
+function withRedirect(pathname: string, rawTarget: string | null) {
+  const redirectTarget = resolveRedirectTarget(rawTarget);
+  if (redirectTarget === ROUTE_PATHS.OVERVIEW) {
+    return pathname;
+  }
+
+  const params = new URLSearchParams();
+  params.set('redirect', redirectTarget);
+  return `${pathname}?${params.toString()}`;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { authResolved, sessionUser } = useAdminWorkbench();
@@ -51,7 +78,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!sessionUser) {
-    return <Navigate to={ROUTE_PATHS.LOGIN} replace state={{ from: location }} />;
+    return (
+      <Navigate
+        to={withRedirect(ROUTE_PATHS.LOGIN, `${location.pathname}${location.search}`)}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;
@@ -93,21 +125,39 @@ export function AppRoutes() {
     navigate(adminRoutePathByKey[routeKey]);
   };
 
+  const authRouteElement = !authResolved ? (
+    <LoadingScreen />
+  ) : (
+    <AdminLoginPage
+      status={status}
+      loading={loading}
+      isAuthenticated={Boolean(sessionUser)}
+      onLogin={handleLogin}
+    />
+  );
+
   return (
     <Routes>
       <Route
-        path={ROUTE_PATHS.LOGIN}
+        path={ROUTE_PATHS.AUTH}
         element={
-          !authResolved ? (
-            <LoadingScreen />
-          ) : sessionUser ? (
-            <Navigate to={ROUTE_PATHS.OVERVIEW} replace />
-          ) : (
-            <PageFrame routeKey={location.pathname}>
-              <AdminLoginPage status={status} loading={loading} onLogin={handleLogin} />
-            </PageFrame>
-          )
+          <Navigate
+            to={withRedirect(ROUTE_PATHS.LOGIN, new URLSearchParams(location.search).get('redirect'))}
+            replace
+          />
         }
+      />
+      <Route
+        path={ROUTE_PATHS.LOGIN}
+        element={authRouteElement}
+      />
+      <Route
+        path={ROUTE_PATHS.REGISTER}
+        element={authRouteElement}
+      />
+      <Route
+        path={ROUTE_PATHS.FORGOT_PASSWORD}
+        element={authRouteElement}
       />
       <Route
         path={ROUTE_PATHS.OVERVIEW}
@@ -224,7 +274,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to={ROUTE_PATHS.OVERVIEW} replace />} />
+      <Route path={ADMIN_ROUTE_PATHS.ROOT} element={<Navigate to={ROUTE_PATHS.OVERVIEW} replace />} />
       <Route
         path="*"
         element={<Navigate to={sessionUser ? ROUTE_PATHS.OVERVIEW : ROUTE_PATHS.LOGIN} replace />}

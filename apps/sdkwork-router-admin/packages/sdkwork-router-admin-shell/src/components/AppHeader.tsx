@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Minus, Palette, RefreshCw, Square, X } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
+import { Minus, RefreshCw, Search, Square, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import {
@@ -112,6 +112,26 @@ export function AppHeader() {
   const routeKey = adminRouteKeyFromPathname(location.pathname);
   const activeRoute = adminRoutes.find((route) => route.key === routeKey);
   const isDesktop = isTauriDesktop();
+  const activeRouteLabel = activeRoute?.label ?? 'Operator Workspace';
+  const activeRouteEyebrow = activeRoute?.eyebrow ?? 'Control Plane';
+  const activeRouteDetail =
+    activeRoute?.detail
+    ?? `Right-side operator canvas aligned to claw-studio in ${themeMode} mode.`;
+  const workspaceMeta = `${activeRouteEyebrow} / ${themeMode} / ${themeColor}`;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        navigate(ROUTE_PATHS.SETTINGS);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [navigate]);
 
   return (
     <div className={`adminx-shell-header-wrap ${isDesktop ? 'is-desktop' : ''}`.trim()}>
@@ -124,22 +144,23 @@ export function AppHeader() {
           <div className="adminx-shell-brand">
             <BrandMark />
             <div className="adminx-shell-brand-copy">
-              <span>SDKWork Router Admin</span>
-              <strong>{activeRoute?.label ?? 'Super Admin Workspace'}</strong>
+              <span>Control plane</span>
+              <strong>SDKWork Router Admin</strong>
             </div>
           </div>
 
           <div
             className="adminx-shell-header-search"
+            data-slot="app-header-search"
             data-tauri-drag-region="false"
           >
             <HeaderActionButton
-              title="Open shell settings"
+              title="Open workspace search"
               onClick={() => navigate(ROUTE_PATHS.SETTINGS)}
             >
-              <Palette className="adminx-shell-meta-icon" />
-              <span className="adminx-shell-header-search-label">Appearance</span>
-              <span className="adminx-shell-header-search-shortcut">{themeColor}</span>
+              <Search className="adminx-shell-meta-icon" />
+              <span className="adminx-shell-header-search-label">Search</span>
+              <span className="adminx-shell-header-search-shortcut">Ctrl K</span>
             </HeaderActionButton>
           </div>
         </div>
@@ -151,16 +172,9 @@ export function AppHeader() {
         >
           <span className="adminx-shell-header-workspace">Workspace</span>
           <div className="adminx-shell-header-center-panel">
-            <div className="adminx-shell-header-workspace-pill">
-              <strong>{activeRoute?.eyebrow ?? 'Control Plane'}</strong>
-              <span>
-                {activeRoute?.detail
-                  ?? `Right-side operator canvas aligned to claw-studio in ${themeMode} mode.`}
-              </span>
-            </div>
-            <div className="adminx-shell-header-center-meta">
-              <span className="adminx-shell-header-center-chip">{themeMode}</span>
-              <span className="adminx-shell-header-center-chip">{themeColor}</span>
+            <div className="adminx-shell-header-workspace-pill" title={activeRouteDetail}>
+              <strong>{activeRouteLabel}</strong>
+              <span>{workspaceMeta}</span>
             </div>
           </div>
         </div>

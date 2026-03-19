@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   EmptyState,
   InlineButton,
-  MetricCard,
   Pill,
   Surface,
   Tabs,
@@ -323,45 +322,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
   const orderedProviders = reorderProviders(viewModel.provider_options, form.ordered_provider_ids);
 
   return (
-    <>
-      <div className="portalx-status-row">
-        <Pill tone="accent">Model: {viewModel.summary.latest_model_hint}</Pill>
-        <Pill tone="positive">Provider: {viewModel.preview.selected_provider_id}</Pill>
-        <Pill tone={viewModel.preview.slo_degraded ? 'warning' : 'default'}>
-          Strategy: {buildRoutingStrategyLabel(viewModel.preview.strategy ?? viewModel.summary.preferences.strategy)}
-        </Pill>
-        <InlineButton onClick={handlePreview} tone="secondary">
-          {previewing ? 'Previewing...' : 'Preview route'}
-        </InlineButton>
-        <InlineButton onClick={handleSave} tone="primary">
-          {saving ? 'Saving...' : 'Save posture'}
-        </InlineButton>
-      </div>
-
-      <div className="portalx-summary-grid">
-        <MetricCard
-          detail="The current strategy label translated into product language instead of raw enum values."
-          label="Active posture"
-          value={buildRoutingStrategyLabel(form.strategy)}
-        />
-        <MetricCard
-          detail="The provider that the latest preview selected for the current model."
-          label="Selected provider"
-          value={viewModel.preview.selected_provider_id}
-        />
-        <MetricCard
-          detail="The requested model currently loaded into the preview workbench."
-          label="Preview model"
-          value={previewForm.model || viewModel.summary.latest_model_hint}
-        />
-        <MetricCard
-          detail="Recent preview and live evidence stays close to the route editor."
-          label="Evidence entries"
-          value={String(decisionLogs.length)}
-        />
-      </div>
-
-      <Tabs defaultValue="overview">
+    <Tabs className="grid gap-6" defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="policy">Policy editor</TabsTrigger>
@@ -369,8 +330,44 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="portalx-split-grid portalx-split-grid-wide">
+          <div className="grid gap-6">
+            <Surface detail={status} title="Current posture">
+              <div className="portalx-summary-grid">
+                <article className="portalx-summary-card">
+                  <span>Active posture</span>
+                  <strong>{buildRoutingStrategyLabel(form.strategy)}</strong>
+                  <p>The current strategy label translated into product language instead of raw enum values.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Selected provider</span>
+                  <strong>{viewModel.preview.selected_provider_id}</strong>
+                  <p>The provider that the latest preview selected for the current model.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Preview model</span>
+                  <strong>{previewForm.model || viewModel.summary.latest_model_hint}</strong>
+                  <p>The requested model currently loaded into the preview workbench.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Evidence entries</span>
+                  <strong>{decisionLogs.length}</strong>
+                  <p>Recent preview and live evidence stays close to the route editor.</p>
+                </article>
+              </div>
+            </Surface>
+
+            <div className="portalx-split-grid portalx-split-grid-wide">
             <Surface
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <InlineButton onClick={handlePreview} tone="secondary">
+                    {previewing ? 'Previewing...' : 'Preview route'}
+                  </InlineButton>
+                  <InlineButton onClick={handleSave} tone="primary">
+                    {saving ? 'Saving...' : 'Save posture'}
+                  </InlineButton>
+                </div>
+              }
               detail="Predictable order, traffic distribution, reliability guardrails, and regional preference translate backend strategy names into routing posture that a customer can actually choose from."
               title="Routing posture presets"
             >
@@ -391,6 +388,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 }))}
               />
             </Surface>
+          </div>
           </div>
         </TabsContent>
 
@@ -453,7 +451,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                     <option value="ap-southeast">ap-southeast</option>
                   </select>
                 </label>
-                <label className="portalx-status-row">
+                <label className="flex items-center gap-3 text-sm font-medium text-[var(--portal-text-secondary)]">
                   <input
                     checked={form.require_healthy}
                     onChange={(event) => setForm({ ...form, require_healthy: event.target.checked })}
@@ -464,12 +462,11 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
               </div>
               <div className="portalx-summary-grid">
                 {viewModel.guardrails.map((guardrail) => (
-                  <MetricCard
-                    detail={guardrail.detail}
-                    key={guardrail.id}
-                    label={guardrail.label}
-                    value={guardrail.value}
-                  />
+                  <article className="portalx-summary-card" key={guardrail.id}>
+                    <span>{guardrail.label}</span>
+                    <strong>{guardrail.value}</strong>
+                    <p>{guardrail.detail}</p>
+                  </article>
                 ))}
               </div>
             </Surface>
@@ -567,6 +564,5 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
           </Surface>
         </TabsContent>
       </Tabs>
-    </>
   );
 }

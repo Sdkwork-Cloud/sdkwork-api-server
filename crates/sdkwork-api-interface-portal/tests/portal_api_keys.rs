@@ -277,3 +277,56 @@ async fn portal_api_key_status_and_delete_are_project_scoped() {
         .unwrap();
     assert!(deleted_context.is_none());
 }
+
+#[tokio::test]
+async fn portal_api_keys_support_custom_plaintext_creation_without_exposing_it_in_lists() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+    let token = portal_token(app.clone()).await;
+    let custom_plaintext = "skw_live_custom_portal_secret";
+
+    let create_key_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"environment\":\"live\",\"label\":\"Custom live key\",\"notes\":\"Operator-managed migration key\",\"api_key\":\"{custom_plaintext}\",\"expires_at_ms\":1900000000000}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_key_response.status(), StatusCode::CREATED);
+    let created_json = read_json(create_key_response).await;
+    assert_eq!(created_json["plaintext"], custom_plaintext);
+    assert_eq!(created_json["label"], "Custom live key");
+    assert_eq!(created_json["environment"], "live");
+    assert_eq!(created_json["notes"], "Operator-managed migration key");
+
+    let list_keys_response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/portal/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(list_keys_response.status(), StatusCode::OK);
+    let list_keys_json = read_json(list_keys_response).await;
+    assert_eq!(list_keys_json.as_array().unwrap().len(), 1);
+    assert_eq!(list_keys_json[0]["label"], "Custom live key");
+    assert_eq!(list_keys_json[0]["environment"], "live");
+    assert_eq!(list_keys_json[0]["notes"], "Operator-managed migration key");
+    assert_eq!(list_keys_json[0]["expires_at_ms"], 1900000000000_u64);
+    assert!(list_keys_json[0]["hashed_key"].as_str().unwrap().len() > 10);
+    assert!(list_keys_json[0].get("plaintext").is_none());
+}

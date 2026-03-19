@@ -1,1 +1,1 @@
-export { PortalLoginPage, PortalRegisterPage } from './pages';
+export { AuthPage } from './pages';

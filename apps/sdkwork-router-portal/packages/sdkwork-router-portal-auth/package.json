@@ -12,7 +12,9 @@
     }
   },
   "dependencies": {
+    "lucide-react": "^0.525.0",
     "react": "^19.0.0",
+    "react-router-dom": "^7.6.2",
     "sdkwork-router-portal-commons": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*"

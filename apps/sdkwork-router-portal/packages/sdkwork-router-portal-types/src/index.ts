@@ -1,4 +1,4 @@
-export type PortalAnonymousRouteKey = 'login' | 'register';
+export type PortalAnonymousRouteKey = 'login' | 'register' | 'forgot-password';
 export type PortalRouteKey =
   | 'dashboard'
   | 'routing'
@@ -67,6 +67,7 @@ export interface GatewayApiKeyRecord {
   environment: string;
   hashed_key: string;
   label: string;
+  notes?: string | null;
   created_at_ms: number;
   last_used_at_ms?: number | null;
   expires_at_ms?: number | null;
@@ -80,6 +81,7 @@ export interface CreatedGatewayApiKey {
   project_id: string;
   environment: string;
   label: string;
+  notes?: string | null;
   created_at_ms: number;
   expires_at_ms?: number | null;
 }

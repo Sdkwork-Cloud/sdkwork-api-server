@@ -17,7 +17,7 @@ test('portal route pages expose contextual handoffs to the next user action', ()
   const userPage = read('packages/sdkwork-router-portal-user/src/pages/index.tsx');
   const accountPage = read('packages/sdkwork-router-portal-account/src/pages/index.tsx');
 
-  assert.match(apiKeysPage, /Recommended next move/);
+  assert.match(apiKeysPage, /Open usage/);
   assert.match(usagePage, /Connected actions/);
   assert.match(creditsPage, /Recharge decision/);
   assert.match(billingPage, /Activation path/);

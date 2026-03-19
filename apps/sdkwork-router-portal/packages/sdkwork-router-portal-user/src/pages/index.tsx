@@ -7,11 +7,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   FormField,
   InlineButton,
   Input,
-  MetricCard,
   Pill,
   Surface,
   Tabs,
@@ -70,83 +68,65 @@ export function PortalUserPage({ workspace, onNavigate }: PortalUserPageProps) {
 
   return (
     <>
-      <div className="portalx-status-row">
-        <Pill tone={workspace?.user.active ? 'positive' : 'warning'}>{workspace?.user.active ? 'Access active' : 'Access review'}</Pill>
-        <span className="portal-shell-status-copy text-sm">{status}</span>
-        <InlineButton onClick={() => onNavigate('account')} tone="secondary">
-          Open account
-        </InlineButton>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <button className="inline-flex h-10 items-center justify-center rounded-2xl bg-primary-600 px-4 text-sm font-medium text-white shadow-[0_16px_30px_rgb(var(--portal-accent-rgb)_/_0.22)] transition hover:bg-primary-500" type="button">
-              Password rotation
-            </button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Password rotation</DialogTitle>
-              <DialogDescription>
-                Update personal credentials in a focused dialog instead of keeping the full password form expanded on the page.
-              </DialogDescription>
-            </DialogHeader>
-            <form className="grid gap-4" onSubmit={handleSubmit}>
-              <FormField label="Current password">
-                <Input
-                  autoComplete="current-password"
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  required
-                  type="password"
-                  value={currentPassword}
-                />
-              </FormField>
-              <FormField label="New password">
-                <Input
-                  autoComplete="new-password"
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  required
-                  type="password"
-                  value={newPassword}
-                />
-              </FormField>
-              <FormField label="Confirm new password">
-                <Input
-                  autoComplete="new-password"
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  required
-                  type="password"
-                  value={confirmPassword}
-                />
-              </FormField>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Password rotation</DialogTitle>
+            <DialogDescription>
+              Update personal credentials in a focused dialog instead of keeping the full password form expanded on the page.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={handleSubmit}>
+            <FormField label="Current password">
+              <Input
+                autoComplete="current-password"
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                required
+                type="password"
+                value={currentPassword}
+              />
+            </FormField>
+            <FormField label="New password">
+              <Input
+                autoComplete="new-password"
+                onChange={(event) => setNewPassword(event.target.value)}
+                required
+                type="password"
+                value={newPassword}
+              />
+            </FormField>
+            <FormField label="Confirm new password">
+              <Input
+                autoComplete="new-password"
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                type="password"
+                value={confirmPassword}
+              />
+            </FormField>
 
-              <div className="portal-shell-info-card grid gap-3">
-                {viewModel.password_policy.map((item) => (
-                  <div className="flex items-center justify-between gap-3" key={item.id}>
-                    <span className="portal-shell-info-copy text-sm">{item.label}</span>
-                    <Pill tone={item.met ? 'positive' : 'warning'}>{item.met ? 'Met' : 'Pending'}</Pill>
-                  </div>
-                ))}
-              </div>
+            <div className="portal-shell-info-card grid gap-3">
+              {viewModel.password_policy.map((item) => (
+                <div className="flex items-center justify-between gap-3" key={item.id}>
+                  <span className="portal-shell-info-copy text-sm">{item.label}</span>
+                  <Pill tone={item.met ? 'positive' : 'warning'}>{item.met ? 'Met' : 'Pending'}</Pill>
+                </div>
+              ))}
+            </div>
 
-              <DialogFooter>
-                <InlineButton onClick={() => setDialogOpen(false)} tone="ghost" type="button">
-                  Cancel
-                </InlineButton>
-                <InlineButton tone="primary" type="submit">
-                  {submitting ? 'Saving...' : 'Update password'}
-                </InlineButton>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <DialogFooter>
+              <InlineButton onClick={() => setDialogOpen(false)} tone="ghost" type="button">
+                Cancel
+              </InlineButton>
+              <InlineButton tone="primary" type="submit">
+                {submitting ? 'Saving...' : 'Update password'}
+              </InlineButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {viewModel.profile_facts.map((item) => (
-          <MetricCard detail={item.detail} key={item.id} label={item.title} value={item.value} />
-        ))}
-      </div>
-
-      <Tabs defaultValue="profile">
+      <Tabs className="grid gap-6" defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security center</TabsTrigger>
@@ -154,18 +134,55 @@ export function PortalUserPage({ workspace, onNavigate }: PortalUserPageProps) {
         </TabsList>
 
         <TabsContent value="profile">
-          <Surface detail="The signed-in person and the workspace boundary they currently control." title="Profile facts">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="grid gap-3">
+          <Surface
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <InlineButton onClick={() => onNavigate('account')} tone="secondary">
+                  Open account
+                </InlineButton>
+                <InlineButton onClick={() => setDialogOpen(true)} tone="primary">
+                  Password rotation
+                </InlineButton>
+              </div>
+            }
+            detail={status}
+            title="Profile facts"
+          >
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {viewModel.profile_facts.map((item) => (
-                  <article className="portal-shell-info-card" key={item.id}>
-                    <strong className="portal-shell-info-title">{item.title}</strong>
-                    <p className="mt-2 text-lg font-semibold text-[var(--portal-text-primary)]">{item.value}</p>
-                    <p className="portal-shell-info-copy mt-2 text-sm">{item.detail}</p>
+                  <article className="portalx-summary-card" key={item.id}>
+                    <span>{item.title}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
                   </article>
                 ))}
               </div>
-              <UserProfileFacts workspace={workspace} />
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <article className="portal-shell-info-card">
+                  <strong className="portal-shell-info-title">Identity reference</strong>
+                  <p className="portal-shell-info-copy mt-2 text-sm">
+                    Personal profile details stay nearby without consuming a separate top-of-page
+                    summary strip.
+                  </p>
+                  <div className="mt-4">
+                    <UserProfileFacts workspace={workspace} />
+                  </div>
+                </article>
+                <div className="grid gap-3">
+                  {viewModel.personal_security_checklist.map((item) => (
+                    <article className="portal-shell-info-card" key={item.id}>
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="portal-shell-info-title">{item.title}</strong>
+                        <Pill tone={item.complete ? 'positive' : 'warning'}>
+                          {item.complete ? 'Ready' : 'Needs action'}
+                        </Pill>
+                      </div>
+                      <p className="portal-shell-info-copy mt-2 text-sm">{item.detail}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
             </div>
           </Surface>
         </TabsContent>

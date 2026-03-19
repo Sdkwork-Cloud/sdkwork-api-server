@@ -12,8 +12,10 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "lucide-react": "^0.546.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^7.13.1",
     "sdkwork-router-admin-admin-api": "workspace:*",
     "sdkwork-router-admin-auth": "workspace:*",
     "sdkwork-router-admin-catalog": "workspace:*",

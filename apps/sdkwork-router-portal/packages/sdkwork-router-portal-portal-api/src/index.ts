@@ -179,6 +179,8 @@ export function createPortalApiKey(
   input: {
     environment: string;
     label: string;
+    api_key?: string | null;
+    notes?: string | null;
     expires_at_ms?: number | null;
   },
   token?: string,

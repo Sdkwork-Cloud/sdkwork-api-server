@@ -208,7 +208,7 @@ export function Sidebar() {
       onMouseEnter={() => setIsSidebarHovered(true)}
       onMouseLeave={() => setIsSidebarHovered(false)}
     >
-      <div className="adminx-shell-sidebar-inner">
+      <div className="adminx-shell-sidebar-inner adminx-shell-sidebar-surface">
         <nav className="adminx-shell-sidebar-nav">
           {groupedRoutes.map(([group, routes]) => (
             <div key={group} className="adminx-shell-sidebar-group">

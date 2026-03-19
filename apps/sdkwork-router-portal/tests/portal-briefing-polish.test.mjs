@@ -17,11 +17,11 @@ test('portal shell removes daily-brief storytelling to keep navigation calm', ()
   assert.doesNotMatch(core, /Risk watch/);
 });
 
-test('dashboard leads with traffic and action surfaces instead of briefing cards', () => {
+test('dashboard leads with claw-style summary cards and analytics workbench surfaces', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Traffic overview/);
-  assert.match(dashboardPage, /Quick actions/);
+  assert.match(dashboardPage, /Traffic posture/);
+  assert.match(dashboardPage, /Analytics workbench/);
   assert.doesNotMatch(dashboardPage, /Focus board/);
   assert.doesNotMatch(dashboardPage, /Risk watchlist/);
 });

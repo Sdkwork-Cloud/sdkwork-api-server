@@ -1,28 +1,15 @@
 import { useState, type ReactNode } from 'react';
-import type { PortalRouteKey, PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
+import type { PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
 
 import { AppHeader } from '../../components/AppHeader';
 import { ConfigCenter } from '../../components/ConfigCenter';
-import { ShellStatus } from '../../components/ShellStatus';
 import { Sidebar } from '../../components/Sidebar';
 
 export function MainLayout({
-  activeRoute,
   children,
-  onLogout,
-  pulseDetail,
-  pulseStatus,
-  pulseTitle,
-  pulseTone,
   workspace,
 }: {
-  activeRoute: PortalRouteKey;
   children: ReactNode;
-  onLogout: () => void;
-  pulseDetail: string;
-  pulseStatus: string;
-  pulseTitle: string;
-  pulseTone: 'accent' | 'positive' | 'warning';
   workspace: PortalWorkspaceSummary | null;
 }) {
   const [configCenterOpen, setConfigCenterOpen] = useState(false);
@@ -37,22 +24,10 @@ export function MainLayout({
       <AppHeader />
 
       <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
-        <Sidebar
-          onLogout={onLogout}
-          onOpenConfigCenter={() => setConfigCenterOpen(true)}
-          workspace={workspace}
-        />
+        <Sidebar onOpenConfigCenter={() => setConfigCenterOpen(true)} workspace={workspace} />
 
         <main className="scrollbar-hide relative z-10 min-w-0 flex-1 overflow-auto bg-[var(--portal-content-background)]">
-          <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col gap-6 px-4 py-5 md:px-6">
-            <ShellStatus
-              activeRoute={activeRoute}
-              pulseDetail={pulseDetail}
-              pulseStatus={pulseStatus}
-              pulseTitle={pulseTitle}
-              pulseTone={pulseTone}
-              workspace={workspace}
-            />
+          <div className="flex min-h-full w-full flex-col gap-6 px-4 py-5 md:px-6 xl:px-8">
             {children}
           </div>
         </main>

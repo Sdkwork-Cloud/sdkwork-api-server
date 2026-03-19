@@ -11,7 +11,6 @@ import {
   formatCurrency,
   formatUnits,
   InlineButton,
-  MetricCard,
   Pill,
   Surface,
   Tabs,
@@ -141,44 +140,6 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <div className="portalx-status-row">
-        <Pill tone={summary.exhausted ? 'warning' : 'positive'}>
-          Live quota: {summary.exhausted ? 'exhausted' : 'healthy'}
-        </Pill>
-        <Pill tone="seed">Commerce catalog</Pill>
-        <span className="portalx-status">{status}</span>
-        <InlineButton onClick={() => setCheckoutOpen(true)} tone="primary">
-          Checkout preview
-        </InlineButton>
-        <InlineButton onClick={() => onNavigate('usage')} tone="secondary">
-          Open usage
-        </InlineButton>
-      </div>
-
-      <div className="portalx-metric-grid portalx-metric-grid-dense">
-        <MetricCard
-          detail="Visible units remaining inside the current project quota."
-          label="Remaining units"
-          value={remainingUnitsLabel}
-        />
-        <MetricCard
-          detail="Total token units already consumed by this project."
-          label="Used units"
-          value={formatUnits(summary.used_units)}
-        />
-        <MetricCard
-          detail="Smoothed daily burn estimate derived from recent usage telemetry."
-          label="Projected daily burn"
-          value={recommendation.runway.daily_units ? `${formatUnits(recommendation.runway.daily_units)} / day` : 'Needs data'}
-        />
-        <MetricCard
-          detail="Booked amount currently visible in the live billing summary."
-          label="Booked amount"
-          value={formatCurrency(summary.booked_amount)}
-        />
-      </div>
-
       <Tabs className="grid gap-6" defaultValue="decision-support">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="decision-support">Decision support</TabsTrigger>
@@ -187,8 +148,49 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
         </TabsList>
 
         <TabsContent className="space-y-6" value="decision-support">
-          <Surface detail={checkoutStatus} title="Decision support">
-            <BillingRecommendationCard recommendation={recommendation} />
+          <Surface
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <InlineButton onClick={() => setCheckoutOpen(true)} tone="primary">
+                  Checkout preview
+                </InlineButton>
+                <InlineButton onClick={() => onNavigate('usage')} tone="secondary">
+                  Open usage
+                </InlineButton>
+              </div>
+            }
+            detail={status}
+            title="Decision support"
+          >
+            <div className="grid gap-6">
+              <BillingRecommendationCard recommendation={recommendation} />
+              <div className="portalx-summary-grid">
+                <article className="portalx-summary-card">
+                  <span>Remaining units</span>
+                  <strong>{remainingUnitsLabel}</strong>
+                  <p>Visible units remaining inside the current project quota.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Used units</span>
+                  <strong>{formatUnits(summary.used_units)}</strong>
+                  <p>Total token units already consumed by this project.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Projected daily burn</span>
+                  <strong>
+                    {recommendation.runway.daily_units
+                      ? `${formatUnits(recommendation.runway.daily_units)} / day`
+                      : 'Needs data'}
+                  </strong>
+                  <p>Smoothed daily burn estimate derived from recent usage telemetry.</p>
+                </article>
+                <article className="portalx-summary-card">
+                  <span>Booked amount</span>
+                  <strong>{formatCurrency(summary.booked_amount)}</strong>
+                  <p>Booked amount currently visible in the live billing summary.</p>
+                </article>
+              </div>
+            </div>
           </Surface>
 
           <div className="grid gap-6 xl:grid-cols-2">

@@ -659,6 +659,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
             project_id TEXT NOT NULL,
             environment TEXT NOT NULL,
             label TEXT NOT NULL DEFAULT '',
+            notes TEXT,
             created_at_ms BIGINT NOT NULL DEFAULT 0,
             last_used_at_ms BIGINT,
             expires_at_ms BIGINT,
@@ -672,6 +673,9 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
+    sqlx::query("ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS notes TEXT")
+        .execute(&pool)
+        .await?;
     sqlx::query(
         "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
     )
@@ -2006,14 +2010,15 @@ impl PostgresAdminStore {
         record: &GatewayApiKeyRecord,
     ) -> Result<GatewayApiKeyRecord> {
         sqlx::query(
-            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
+            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, notes = excluded.notes, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
         )
         .bind(&record.hashed_key)
         .bind(&record.tenant_id)
         .bind(&record.project_id)
         .bind(&record.environment)
         .bind(&record.label)
+        .bind(&record.notes)
         .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
         .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
         .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
@@ -2024,8 +2029,8 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys",
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -2038,6 +2043,7 @@ impl PostgresAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms,
                     last_used_at_ms,
                     expires_at_ms,
@@ -2048,6 +2054,7 @@ impl PostgresAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
                     last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
                     expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
@@ -2061,8 +2068,8 @@ impl PostgresAdminStore {
         &self,
         hashed_key: &str,
     ) -> Result<Option<GatewayApiKeyRecord>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = $1",
+        let row = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = $1",
         )
         .bind(hashed_key)
         .fetch_optional(&self.pool)
@@ -2075,6 +2082,7 @@ impl PostgresAdminStore {
                 environment,
                 hashed_key,
                 label,
+                notes,
                 created_at_ms,
                 last_used_at_ms,
                 expires_at_ms,
@@ -2086,6 +2094,7 @@ impl PostgresAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
                     last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
                     expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),

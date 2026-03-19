@@ -18,6 +18,8 @@ import type {
   DashboardModuleItem,
   DashboardRoutingPosture,
   DashboardSeriesPoint,
+  DashboardSpendTrendPoint,
+  DashboardTrafficTrendPoint,
   DashboardTone,
   PortalDashboardPageViewModel,
 } from '../types';
@@ -380,36 +382,77 @@ function seriesBucketLabel(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+function seriesBucketKey(timestamp: number): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(timestamp));
+}
+
+function buildTrafficTrendPoints(
+  snapshot: PortalDashboardSummary,
+  usageRecords: UsageRecord[],
+): DashboardTrafficTrendPoint[] {
+  const records = usageRecords.length ? usageRecords : snapshot.recent_requests;
+  const grouped = new Map<string, DashboardTrafficTrendPoint>();
+
+  for (const record of records) {
+    const label = seriesBucketLabel(record.created_at_ms);
+    const bucketKey = seriesBucketKey(record.created_at_ms);
+    const current = grouped.get(bucketKey) ?? {
+      label,
+      bucket_key: bucketKey,
+      request_count: 0,
+      amount: 0,
+      total_tokens: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+    };
+    current.request_count += 1;
+    current.amount += record.amount;
+    current.total_tokens += record.total_tokens;
+    current.input_tokens += record.input_tokens;
+    current.output_tokens += record.output_tokens;
+    grouped.set(bucketKey, current);
+  }
+
+  return [...grouped.values()]
+    .sort((left, right) => left.bucket_key.localeCompare(right.bucket_key))
+    .slice(-7);
+}
+
 function buildRequestVolumeSeries(
   snapshot: PortalDashboardSummary,
   usageRecords: UsageRecord[],
 ): DashboardSeriesPoint[] {
-  const records = usageRecords.length ? usageRecords : snapshot.recent_requests;
-  const grouped = new Map<string, DashboardSeriesPoint>();
+  return buildTrafficTrendPoints(snapshot, usageRecords).map((point) => ({
+    bucket: point.label,
+    requests: point.request_count,
+    amount: Number(point.amount.toFixed(2)),
+  }));
+}
 
-  for (const record of records) {
-    const bucket = seriesBucketLabel(record.created_at_ms);
-    const current = grouped.get(bucket) ?? {
-      bucket,
-      requests: 0,
-      amount: 0,
-    };
-    current.requests += 1;
-    current.amount += record.amount;
-    grouped.set(bucket, current);
-  }
-
-  return [...grouped.values()].slice(-7);
+function buildSpendTrendPoints(
+  snapshot: PortalDashboardSummary,
+  usageRecords: UsageRecord[],
+): DashboardSpendTrendPoint[] {
+  return buildTrafficTrendPoints(snapshot, usageRecords).map((point) => ({
+    label: point.label,
+    bucket_key: point.bucket_key,
+    amount: Number(point.amount.toFixed(2)),
+    requests: point.request_count,
+  }));
 }
 
 function buildSpendSeries(
   snapshot: PortalDashboardSummary,
   usageRecords: UsageRecord[],
 ): DashboardSeriesPoint[] {
-  return buildRequestVolumeSeries(snapshot, usageRecords).map((point) => ({
-    bucket: point.bucket,
+  return buildSpendTrendPoints(snapshot, usageRecords).map((point) => ({
+    bucket: point.label,
     requests: point.requests,
-    amount: Number(point.amount.toFixed(2)),
+    amount: point.amount,
   }));
 }
 
@@ -549,6 +592,9 @@ export function buildPortalDashboardViewModel(
   routingLogs: PortalRoutingDecisionLog[] = [],
   usageRecords: UsageRecord[] = [],
 ): PortalDashboardPageViewModel {
+  const traffic_trend_points = buildTrafficTrendPoints(snapshot, usageRecords);
+  const spend_trend_points = buildSpendTrendPoints(snapshot, usageRecords);
+
   return {
     snapshot,
     insights: buildInsights(snapshot, routingSummary),
@@ -559,6 +605,8 @@ export function buildPortalDashboardViewModel(
     model_mix: buildModelMix(snapshot),
     request_volume_series: buildRequestVolumeSeries(snapshot, usageRecords),
     spend_series: buildSpendSeries(snapshot, usageRecords),
+    traffic_trend_points,
+    spend_trend_points,
     provider_share_series: buildProviderShareSeries(snapshot),
     model_demand_series: buildModelDemandSeries(snapshot),
     activity_feed: buildActivityFeed(snapshot, routingLogs),

@@ -140,6 +140,10 @@ struct CreateApiKeyRequest {
     environment: String,
     label: String,
     #[serde(default)]
+    api_key: Option<String>,
+    #[serde(default)]
+    notes: Option<String>,
+    #[serde(default)]
     expires_at_ms: Option<u64>,
 }
 
@@ -472,6 +476,8 @@ async fn create_api_key_handler(
         &request.environment,
         &request.label,
         request.expires_at_ms,
+        request.api_key.as_deref(),
+        request.notes.as_deref(),
     )
     .await
     .map(|created| (StatusCode::CREATED, Json(created)))

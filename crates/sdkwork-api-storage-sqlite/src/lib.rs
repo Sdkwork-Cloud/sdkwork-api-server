@@ -531,6 +531,7 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
         "label TEXT NOT NULL DEFAULT ''",
     )
     .await?;
+    ensure_sqlite_column(&pool, "identity_gateway_api_keys", "notes", "notes TEXT").await?;
     ensure_sqlite_column(
         &pool,
         "identity_gateway_api_keys",
@@ -2177,14 +2178,15 @@ impl SqliteAdminStore {
         record: &GatewayApiKeyRecord,
     ) -> Result<GatewayApiKeyRecord> {
         sqlx::query(
-            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
+            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, notes = excluded.notes, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
         )
         .bind(&record.hashed_key)
         .bind(&record.tenant_id)
         .bind(&record.project_id)
         .bind(&record.environment)
         .bind(&record.label)
+        .bind(&record.notes)
         .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
         .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
         .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
@@ -2195,8 +2197,8 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, i64)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys ORDER BY rowid",
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, i64)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys ORDER BY rowid",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -2209,6 +2211,7 @@ impl SqliteAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms,
                     last_used_at_ms,
                     expires_at_ms,
@@ -2219,6 +2222,7 @@ impl SqliteAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
                     last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
                     expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),
@@ -2232,8 +2236,8 @@ impl SqliteAdminStore {
         &self,
         hashed_key: &str,
     ) -> Result<Option<GatewayApiKeyRecord>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, String, i64, Option<i64>, Option<i64>, i64)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = ?",
+        let row = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, i64)>(
+            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = ?",
         )
         .bind(hashed_key)
         .fetch_optional(&self.pool)
@@ -2246,6 +2250,7 @@ impl SqliteAdminStore {
                 environment,
                 hashed_key,
                 label,
+                notes,
                 created_at_ms,
                 last_used_at_ms,
                 expires_at_ms,
@@ -2257,6 +2262,7 @@ impl SqliteAdminStore {
                     environment,
                     hashed_key,
                     label,
+                    notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
                     last_used_at_ms: last_used_at_ms.and_then(|value| u64::try_from(value).ok()),
                     expires_at_ms: expires_at_ms.and_then(|value| u64::try_from(value).ok()),

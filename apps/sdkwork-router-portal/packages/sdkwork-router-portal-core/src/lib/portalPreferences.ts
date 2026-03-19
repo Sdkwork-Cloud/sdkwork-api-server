@@ -2,9 +2,9 @@ import type { PortalThemeColor, PortalThemeMode } from 'sdkwork-router-portal-ty
 
 export const PORTAL_PREFERENCES_STORAGE_KEY = 'sdkwork-router-portal.preferences.v1';
 
-export const PORTAL_COLLAPSED_SIDEBAR_WIDTH = 76;
+export const PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72;
 export const PORTAL_DEFAULT_SIDEBAR_WIDTH = 252;
-export const PORTAL_MIN_SIDEBAR_WIDTH = 224;
+export const PORTAL_MIN_SIDEBAR_WIDTH = 220;
 export const PORTAL_MAX_SIDEBAR_WIDTH = 360;
 
 export const PORTAL_THEME_MODE_OPTIONS: Array<{ id: PortalThemeMode; label: string }> = [

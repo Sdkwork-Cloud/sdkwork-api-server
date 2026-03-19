@@ -9,14 +9,20 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('form-heavy portal pages use tabs and dialogs instead of always-expanded forms', () => {
+test('form-heavy portal pages use focused tabs and dialogs instead of always-expanded forms', () => {
   const apiKeysPage = read('packages/sdkwork-router-portal-api-keys/src/pages/index.tsx');
+  const apiKeyDialogs = read(
+    'packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyDialogs.tsx',
+  );
   const routingPage = read('packages/sdkwork-router-portal-routing/src/pages/index.tsx');
   const userPage = read('packages/sdkwork-router-portal-user/src/pages/index.tsx');
 
-  assert.match(apiKeysPage, /<Dialog/);
-  assert.match(apiKeysPage, /<Tabs/);
-  assert.match(apiKeysPage, /Credential inventory/);
+  assert.match(apiKeysPage, /PortalApiKeyManagerToolbar/);
+  assert.match(apiKeysPage, /PortalApiKeyDialogs/);
+  assert.match(apiKeyDialogs, /<Dialog/);
+  assert.match(apiKeyDialogs, /Create API key/);
+  assert.match(apiKeyDialogs, /Lifecycle policy/);
+  assert.match(apiKeyDialogs, /How to use this key/);
 
   assert.match(routingPage, /<Tabs/);
   assert.match(routingPage, /Policy editor/);

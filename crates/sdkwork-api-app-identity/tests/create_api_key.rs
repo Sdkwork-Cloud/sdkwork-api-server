@@ -34,6 +34,8 @@ async fn persisted_gateway_api_keys_can_be_listed_with_governance_metadata() {
         "live",
         "Production rollout",
         Some(1_900_000_000_000),
+        None,
+        Some("Gateway launch credential"),
     )
     .await
     .unwrap();
@@ -43,6 +45,7 @@ async fn persisted_gateway_api_keys_can_be_listed_with_governance_metadata() {
     assert_eq!(keys.len(), 1);
     assert_eq!(keys[0].hashed_key, created.hashed);
     assert_eq!(keys[0].label, "Production rollout");
+    assert_eq!(keys[0].notes.as_deref(), Some("Gateway launch credential"));
     assert_eq!(keys[0].created_at_ms, created.created_at_ms);
     assert_eq!(keys[0].expires_at_ms, Some(1_900_000_000_000));
     assert_eq!(keys[0].last_used_at_ms, None);
@@ -60,6 +63,8 @@ async fn resolving_gateway_context_updates_last_used_and_rejects_expired_keys() 
         "project-1",
         "live",
         "Production rollout",
+        None,
+        None,
         None,
     )
     .await
@@ -93,4 +98,29 @@ async fn resolving_gateway_context_updates_last_used_and_rejects_expired_keys() 
         .await
         .unwrap();
     assert!(expired_request_context.is_none());
+}
+
+#[test]
+fn custom_plaintext_key_can_be_preserved_during_creation() {
+    let created = CreateGatewayApiKey::execute_with_optional_plaintext(
+        "tenant-1",
+        "project-1",
+        "live",
+        "Custom rollout",
+        Some(1_900_000_000_000),
+        Some("skw_live_custom_portal_secret"),
+        Some("Operator supplied migration key"),
+    )
+    .unwrap();
+
+    assert_eq!(created.plaintext, "skw_live_custom_portal_secret");
+    assert_eq!(
+        created.hashed,
+        hash_gateway_api_key("skw_live_custom_portal_secret")
+    );
+    assert_eq!(created.label, "Custom rollout");
+    assert_eq!(
+        created.notes.as_deref(),
+        Some("Operator supplied migration key")
+    );
 }

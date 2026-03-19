@@ -5,10 +5,18 @@ import type {
   ApiKeyEnvironmentSummary,
   ApiKeyGuardrail,
   ApiKeyRotationStep,
+  PortalApiKeyCreateFormState,
+  PortalApiKeyEnvironmentOption,
+  PortalApiKeyFilterState,
+  PortalApiKeyUsagePreview,
   PortalApiKeysPageViewModel,
 } from '../types';
 
-const environmentOrder = ['test', 'staging', 'live'];
+const environmentOrder = ['live', 'staging', 'test'];
+
+function sortKeys(keys: GatewayApiKeyRecord[]): GatewayApiKeyRecord[] {
+  return [...keys].sort((left, right) => right.created_at_ms - left.created_at_ms);
+}
 
 function summarizeKeysByEnvironment(keys: GatewayApiKeyRecord[]): ApiKeyEnvironmentSummary[] {
   const grouped = new Map<string, ApiKeyEnvironmentSummary>();
@@ -37,10 +45,11 @@ function buildEnvironmentStrategy(keys: GatewayApiKeyRecord[]): ApiKeyEnvironmen
     grouped.set(summary.environment, summary);
   }
 
-  const recommendedEnvironment = environmentOrder.find((environment) => {
-    const summary = grouped.get(environment);
-    return !summary || summary.active === 0;
-  }) ?? null;
+  const recommendedEnvironment =
+    environmentOrder.find((environment) => {
+      const summary = grouped.get(environment);
+      return !summary || summary.active === 0;
+    }) ?? null;
 
   return environmentOrder.map((environment) => {
     const summary = grouped.get(environment);
@@ -89,7 +98,9 @@ function buildRotationChecklist(
   return [
     {
       id: 'copy-secret',
-      title: createdKey ? 'Copy and store the plaintext secret now' : 'Copy plaintext secrets immediately after issuance',
+      title: createdKey
+        ? 'Copy and store the plaintext secret now'
+        : 'Copy plaintext secrets immediately after issuance',
       detail: createdKey
         ? `The newest ${createdKey.environment} secret is visible only once on this screen. Move it into your secret manager before navigating away.`
         : 'The portal never returns plaintext secrets in list APIs, so each new key should be captured at creation time.',
@@ -102,9 +113,10 @@ function buildRotationChecklist(
     {
       id: 'separate-boundaries',
       title: 'Keep environments isolated',
-      detail: liveKeys.length > 1
-        ? 'Production already has multiple active keys visible, so document ownership before rotating or replacing one.'
-        : 'Use separate keys for test, staging, and live so an incident or leak in one environment does not widen the blast radius.',
+      detail:
+        liveKeys.length > 1
+          ? 'Production already has multiple active keys visible, so document ownership before rotating or replacing one.'
+          : 'Use separate keys for test, staging, and live so an incident or leak in one environment does not widen the blast radius.',
     },
     {
       id: 'retire-old-secret',
@@ -167,13 +179,135 @@ function buildGuardrails(keys: GatewayApiKeyRecord[]): ApiKeyGuardrail[] {
   return guardrails;
 }
 
+export function buildPortalApiKeyEnvironmentOptions(
+  keys: GatewayApiKeyRecord[],
+): PortalApiKeyEnvironmentOption[] {
+  const dynamicOptions = summarizeKeysByEnvironment(keys)
+    .map((summary) => summary.environment)
+    .filter((environment) => !environmentOrder.includes(environment))
+    .sort((left, right) => left.localeCompare(right));
+
+  return [
+    {
+      value: 'all',
+      label: 'All environments',
+      detail: 'View every environment boundary in the active workspace.',
+    },
+    ...environmentOrder.map((environment) => ({
+      value: environment,
+      label: environment,
+      detail: `Recommended ${environment} environment boundary.`,
+    })),
+    ...dynamicOptions.map((environment) => ({
+      value: environment,
+      label: environment,
+      detail: 'Custom environment discovered in this workspace.',
+    })),
+  ];
+}
+
+export function filterPortalApiKeys(
+  keys: GatewayApiKeyRecord[],
+  filters: PortalApiKeyFilterState,
+): GatewayApiKeyRecord[] {
+  const normalizedQuery = filters.searchQuery.trim().toLowerCase();
+
+  return sortKeys(keys).filter((key) => {
+    const matchesEnvironment =
+      filters.environment === 'all' || key.environment === filters.environment;
+    const matchesQuery =
+      normalizedQuery.length === 0 ||
+      key.label.toLowerCase().includes(normalizedQuery) ||
+      (key.notes ?? '').toLowerCase().includes(normalizedQuery) ||
+      key.environment.toLowerCase().includes(normalizedQuery) ||
+      key.hashed_key.toLowerCase().includes(normalizedQuery);
+
+    return matchesEnvironment && matchesQuery;
+  });
+}
+
+export function createEmptyPortalApiKeyFormState(): PortalApiKeyCreateFormState {
+  return {
+    label: '',
+    keyMode: 'system-generated',
+    customKey: '',
+    environment: 'live',
+    customEnvironment: '',
+    expiresAt: '',
+    notes: '',
+  };
+}
+
+export function resolvePortalApiKeyPlaintext(
+  formState: PortalApiKeyCreateFormState,
+): string | null {
+  if (formState.keyMode !== 'custom') {
+    return null;
+  }
+
+  const customKey = formState.customKey.trim();
+  return customKey.length ? customKey : null;
+}
+
+export function resolvePortalApiKeyEnvironment(
+  formState: PortalApiKeyCreateFormState,
+): string | null {
+  if (formState.environment === 'custom') {
+    const customEnvironment = formState.customEnvironment.trim();
+    return customEnvironment.length ? customEnvironment : null;
+  }
+
+  return formState.environment;
+}
+
+export function resolvePortalApiKeyExpiresAt(
+  formState: PortalApiKeyCreateFormState,
+): number | null {
+  const trimmed = formState.expiresAt.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Date.parse(`${trimmed}T23:59:59.000Z`);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+export function resolvePortalApiKeyNotes(
+  formState: PortalApiKeyCreateFormState,
+): string | null {
+  const notes = formState.notes.trim();
+  return notes.length ? notes : null;
+}
+
+export function buildPortalApiKeyUsagePreview(
+  key: GatewayApiKeyRecord,
+  createdKey: CreatedGatewayApiKey | null,
+): PortalApiKeyUsagePreview {
+  const hasPlaintext = createdKey?.hashed === key.hashed_key;
+  const plaintext = hasPlaintext ? createdKey?.plaintext ?? null : null;
+
+  return {
+    title: plaintext ? 'How to use this key' : 'Usage method',
+    detail: plaintext
+      ? 'The newest plaintext secret is still available in this session, so you can validate the request shape before closing the page.'
+      : 'This key is already stored in write-only mode. If you need the plaintext again, rotate it by creating a replacement credential.',
+    authorizationHeader: plaintext ? `Authorization: Bearer ${plaintext}` : null,
+    curlExample: plaintext
+      ? `curl http://127.0.0.1:8080/v1/models \\\n  -H "Authorization: Bearer ${plaintext}"`
+      : null,
+  };
+}
+
 export function buildPortalApiKeysViewModel(
   keys: GatewayApiKeyRecord[],
   createdKey: CreatedGatewayApiKey | null,
+  filters: PortalApiKeyFilterState,
 ): PortalApiKeysPageViewModel {
   return {
-    keys,
+    keys: sortKeys(keys),
+    filtered_keys: filterPortalApiKeys(keys, filters),
     environment_summaries: summarizeKeysByEnvironment(keys),
+    environment_options: buildPortalApiKeyEnvironmentOptions(keys),
     environment_strategy: buildEnvironmentStrategy(keys),
     rotation_checklist: buildRotationChecklist(keys, createdKey),
     guardrails: buildGuardrails(keys),

@@ -20,6 +20,7 @@ interface PortalShellState {
   toggleSidebarItem: (itemId: PortalRouteKey) => void;
   setThemeMode: (themeMode: PortalThemeMode) => void;
   setThemeColor: (themeColor: PortalThemeColor) => void;
+  resetShellPreferences: () => void;
 }
 
 const PORTAL_THEME_COLOR_IDS: PortalThemeColor[] = [
@@ -31,14 +32,18 @@ const PORTAL_THEME_COLOR_IDS: PortalThemeColor[] = [
   'rose',
 ];
 
+const defaultShellState = {
+  isSidebarCollapsed: false,
+  sidebarWidth: PORTAL_DEFAULT_SIDEBAR_WIDTH,
+  hiddenSidebarItems: [] as PortalRouteKey[],
+  themeMode: 'system' as PortalThemeMode,
+  themeColor: 'lobster' as PortalThemeColor,
+};
+
 export const usePortalShellStore = create<PortalShellState>()(
   persist(
     (set) => ({
-      isSidebarCollapsed: false,
-      sidebarWidth: PORTAL_DEFAULT_SIDEBAR_WIDTH,
-      hiddenSidebarItems: [],
-      themeMode: 'system',
-      themeColor: 'lobster',
+      ...defaultShellState,
       toggleSidebar: () =>
         set((state) => ({
           isSidebarCollapsed: !state.isSidebarCollapsed,
@@ -56,6 +61,7 @@ export const usePortalShellStore = create<PortalShellState>()(
         })),
       setThemeMode: (themeMode) => set({ themeMode }),
       setThemeColor: (themeColor) => set({ themeColor }),
+      resetShellPreferences: () => set(defaultShellState),
     }),
     {
       name: PORTAL_PREFERENCES_STORAGE_KEY,

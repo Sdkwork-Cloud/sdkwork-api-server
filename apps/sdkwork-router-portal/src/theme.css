@@ -26,6 +26,11 @@
   --theme-primary-800: #1e40af;
   --theme-primary-900: #1e3a8a;
   --theme-primary-950: #172554;
+  --scrollbar-size: 10px;
+  --scrollbar-track: color-mix(in srgb, var(--theme-primary-200) 10%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--theme-primary-500) 18%, #71717a 82%);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--theme-primary-500) 30%, #52525b 70%);
+  --scrollbar-thumb-border: rgba(255, 255, 255, 0.72);
   font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--portal-text-primary, #102138);
   background: var(
@@ -131,6 +136,13 @@
   box-sizing: border-box;
 }
 
+.dark {
+  --scrollbar-track: color-mix(in srgb, var(--theme-primary-800) 16%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--theme-primary-400) 26%, #71717a 74%);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--theme-primary-300) 34%, #a1a1aa 66%);
+  --scrollbar-thumb-border: rgba(24, 24, 27, 0.8);
+}
+
 html,
 body,
 #root {
@@ -150,6 +162,44 @@ select {
 
 button {
   cursor: pointer;
+}
+
+@layer base {
+  html,
+  body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-thumb-border);
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @layer utilities {
@@ -1850,6 +1900,7 @@ button {
 }
 
 :root.dark {
+  color-scheme: dark;
   --portal-shell-background:
     radial-gradient(circle at top left, rgb(var(--portal-accent-rgb) / 0.18), transparent 24%),
     radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb) / 0.14), transparent 28%),

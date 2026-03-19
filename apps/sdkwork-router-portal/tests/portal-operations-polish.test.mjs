@@ -9,27 +9,31 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('api keys page exposes environment strategy and key-handling guidance', () => {
+test('api keys page exposes lifecycle, environment, and key-handling guidance', () => {
   const apiKeysPage = read('packages/sdkwork-router-portal-api-keys/src/pages/index.tsx');
+  const dialogs = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyDialogs.tsx');
+  const table = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyTable.tsx');
   const portalApi = read('packages/sdkwork-router-portal-portal-api/src/index.ts');
   const repository = read('packages/sdkwork-router-portal-api-keys/src/repository/index.ts');
   const portalTypes = read('packages/sdkwork-router-portal-types/src/index.ts');
 
-  assert.match(apiKeysPage, /Environment strategy/);
-  assert.match(apiKeysPage, /Rotation checklist/);
-  assert.match(apiKeysPage, /Key handling guardrails/);
-  assert.match(apiKeysPage, /Key label/);
-  assert.match(apiKeysPage, /Expires at/);
-  assert.match(apiKeysPage, /Last used/);
-  assert.match(apiKeysPage, /Revoke/);
-  assert.match(apiKeysPage, /Restore/);
-  assert.match(apiKeysPage, /Delete/);
+  assert.match(apiKeysPage, /Credential inventory/);
+  assert.match(apiKeysPage, /One-time plaintext available/);
+  assert.match(dialogs, /Recommended key setup/);
+  assert.match(dialogs, /Key label/);
+  assert.match(dialogs, /Custom environment/);
+  assert.match(dialogs, /Lifecycle policy/);
+  assert.match(dialogs, /How to use this key/);
+  assert.match(table, /Last authenticated use/);
+  assert.match(table, /Usage method/);
+  assert.match(table, /Delete/);
+  assert.match(table, /Disable|Enable/);
   assert.match(portalApi, /label: string/);
   assert.match(portalApi, /expires_at_ms\?: number \| null/);
   assert.match(portalApi, /updatePortalApiKeyStatus/);
   assert.match(portalApi, /deletePortalApiKey/);
-  assert.match(repository, /updatePortalApiKeyStatus/);
-  assert.match(repository, /deletePortalApiKey/);
+  assert.match(repository, /setPortalApiKeyActive/);
+  assert.match(repository, /removePortalApiKey/);
   assert.match(portalTypes, /label: string/);
   assert.match(portalTypes, /created_at_ms: number/);
   assert.match(portalTypes, /last_used_at_ms\?: number \| null/);

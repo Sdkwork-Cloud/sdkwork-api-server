@@ -5,8 +5,6 @@ import {
   formatCurrency,
   formatUnits,
   InlineButton,
-  MetricCard,
-  Pill,
   Surface,
   Tabs,
   TabsContent,
@@ -70,26 +68,6 @@ export function PortalAccountPage({ workspace, onNavigate }: PortalAccountPagePr
 
   return (
     <>
-      <div className="portalx-status-row">
-        <Pill tone="accent">Project: {workspace?.project.name ?? 'Loading'}</Pill>
-        <Pill tone={viewModel.billing_summary.exhausted ? 'warning' : 'positive'}>
-          {viewModel.billing_summary.exhausted ? 'Runway exhausted' : 'Runway visible'}
-        </Pill>
-        <span className="portalx-status">{status}</span>
-        <InlineButton onClick={() => onNavigate('credits')} tone="primary">
-          Open credits
-        </InlineButton>
-        <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
-          Review billing
-        </InlineButton>
-      </div>
-
-      <div className="portalx-metric-grid portalx-metric-grid-dense">
-        {viewModel.cash_balance_cards.map((item) => (
-          <MetricCard detail={item.detail} key={item.id} label={item.label} value={item.value} />
-        ))}
-      </div>
-
       <Tabs className="grid gap-6" defaultValue="balance-summary">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="balance-summary">Balance summary</TabsTrigger>
@@ -98,8 +76,62 @@ export function PortalAccountPage({ workspace, onNavigate }: PortalAccountPagePr
         </TabsList>
 
         <TabsContent className="space-y-6" value="balance-summary">
-          <Surface detail="Keep visible units, booked amount, and ledger count close together so money posture is obvious." title="Cash balance">
-            <AccountBalanceFacts summary={summary} workspace={workspace} />
+          <Surface
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <InlineButton onClick={() => onNavigate('credits')} tone="primary">
+                  Open credits
+                </InlineButton>
+                <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+                  Review billing
+                </InlineButton>
+              </div>
+            }
+            detail={status}
+            title="Cash balance"
+          >
+            <div className="grid gap-6">
+              <div className="portalx-summary-grid">
+                {viewModel.cash_balance_cards.map((item) => (
+                  <article className="portalx-summary-card" key={item.id}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <article className="portal-shell-info-card">
+                  <strong className="portal-shell-info-title">Financial account</strong>
+                  <p className="portal-shell-info-copy mt-2 text-sm">
+                    Project runway, tenant ownership, and booked spend stay visible without a
+                    decorative page-top status strip.
+                  </p>
+                  <div className="mt-4">
+                    <AccountBalanceFacts summary={summary} workspace={workspace} />
+                  </div>
+                </article>
+
+                <article className="portal-shell-info-card">
+                  <strong className="portal-shell-info-title">Workspace handoff</strong>
+                  <p className="portal-shell-info-copy mt-2 text-sm">
+                    Move directly into credits or billing once the current cash posture is clear.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <InlineButton onClick={() => onNavigate('credits')} tone="primary">
+                      Open credits
+                    </InlineButton>
+                    <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+                      Review billing
+                    </InlineButton>
+                    <InlineButton onClick={() => onNavigate('usage')} tone="ghost">
+                      Open usage
+                    </InlineButton>
+                  </div>
+                </article>
+              </div>
+            </div>
           </Surface>
 
           <Surface

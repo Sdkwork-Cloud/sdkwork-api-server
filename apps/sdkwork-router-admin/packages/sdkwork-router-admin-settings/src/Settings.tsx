@@ -142,6 +142,37 @@ export function SettingsPage() {
           <div className="admin-shell-settings-nav-summary-status" title={status}>
             {status}
           </div>
+
+          <div className="admin-shell-settings-nav-shell-preview" aria-hidden="true">
+            <div
+              className={`admin-shell-settings-nav-shell-preview-rail ${
+                isSidebarCollapsed ? 'is-collapsed' : ''
+              }`.trim()}
+            >
+              <span />
+              <span />
+              <span />
+              <div className="admin-shell-settings-nav-shell-preview-profile">
+                <span className="admin-shell-settings-nav-shell-preview-avatar" />
+                {!isSidebarCollapsed ? (
+                  <div className="admin-shell-settings-nav-shell-preview-copy">
+                    <span />
+                    <span />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="admin-shell-settings-nav-shell-preview-canvas">
+              <span className="admin-shell-settings-nav-shell-preview-header" />
+              <div className="admin-shell-settings-nav-shell-preview-grid">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+          </div>
         </div>
 
         <label className="admin-shell-settings-search">
@@ -202,6 +233,25 @@ export function SettingsPage() {
               <span className="admin-shell-settings-panel-pill">
                 {isSidebarCollapsed ? 'collapsed rail' : `${sidebarWidth}px rail`}
               </span>
+            </div>
+          </div>
+
+          <div className="admin-shell-settings-stage-metrics">
+            <div>
+              <span>Stage</span>
+              <strong>{activeSettingsTab.label}</strong>
+            </div>
+            <div>
+              <span>Theme mode</span>
+              <strong>{themeMode}</strong>
+            </div>
+            <div>
+              <span>Rail posture</span>
+              <strong>{isSidebarCollapsed ? 'collapsed' : 'expanded'}</strong>
+            </div>
+            <div>
+              <span>Content surface</span>
+              <strong>Right canvas</strong>
             </div>
           </div>
 

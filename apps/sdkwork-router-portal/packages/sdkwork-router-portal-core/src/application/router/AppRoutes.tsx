@@ -1,7 +1,13 @@
-import { lazy, Suspense, type ReactNode } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import type {
-  PortalAuthSession,
   PortalDashboardSummary,
   PortalRouteKey,
   PortalWorkspaceSummary,
@@ -17,11 +23,8 @@ const PortalAccountPage = lazy(async () => ({
 const PortalApiKeysPage = lazy(async () => ({
   default: (await import('sdkwork-router-portal-api-keys')).PortalApiKeysPage,
 }));
-const PortalLoginPage = lazy(async () => ({
-  default: (await import('sdkwork-router-portal-auth')).PortalLoginPage,
-}));
-const PortalRegisterPage = lazy(async () => ({
-  default: (await import('sdkwork-router-portal-auth')).PortalRegisterPage,
+const PortalAuthPage = lazy(async () => ({
+  default: (await import('sdkwork-router-portal-auth')).AuthPage,
 }));
 const PortalBillingPage = lazy(async () => ({
   default: (await import('sdkwork-router-portal-billing')).PortalBillingPage,
@@ -45,7 +48,7 @@ const PortalUsagePage = lazy(async () => ({
 function PortalBootScreen({ status }: { status: string }) {
   return (
     <section className="grid min-h-screen place-items-center px-6 py-10">
-        <div className="grid w-[min(560px,100%)] gap-4 rounded-[32px] border border-[color:var(--portal-contrast-border)] [background:var(--portal-surface-contrast)] p-8 shadow-[var(--portal-shadow-strong)]">
+      <div className="grid w-[min(560px,100%)] gap-4 rounded-[32px] border border-[color:var(--portal-contrast-border)] [background:var(--portal-surface-contrast)] p-8 shadow-[var(--portal-shadow-strong)]">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--portal-text-muted-on-contrast)]">
           Portal Bootstrap
         </p>
@@ -58,15 +61,32 @@ function PortalBootScreen({ status }: { status: string }) {
   );
 }
 
-function AuthLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="relative flex min-h-screen overflow-hidden [background:var(--portal-shell-background)] font-sans text-[var(--portal-text-primary)] transition-colors duration-300">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgb(var(--portal-accent-rgb)_/_0.16),transparent_68%)]" />
-      </div>
-      <main className="relative z-10 flex-1 overflow-auto">{children}</main>
-    </div>
-  );
+function resolveRedirectTarget(rawTarget: string | null): string {
+  if (!rawTarget || !rawTarget.startsWith('/')) {
+    return PORTAL_ROUTE_PATHS.dashboard;
+  }
+
+  if (
+    rawTarget === '/auth' ||
+    rawTarget === PORTAL_ROUTE_PATHS.login ||
+    rawTarget === PORTAL_ROUTE_PATHS.register ||
+    rawTarget === PORTAL_ROUTE_PATHS['forgot-password']
+  ) {
+    return PORTAL_ROUTE_PATHS.dashboard;
+  }
+
+  return rawTarget;
+}
+
+function buildAuthHref(pathname: string, redirectTarget?: string): string {
+  const params = new URLSearchParams();
+
+  if (redirectTarget && redirectTarget !== PORTAL_ROUTE_PATHS.dashboard) {
+    params.set('redirect', redirectTarget);
+  }
+
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 export function AppRoutes({
@@ -74,27 +94,23 @@ export function AppRoutes({
   bootStatus,
   bootstrapped,
   dashboardSnapshot,
-  onAuthenticated,
-  onLogout,
-  pulseDetail,
-  pulseStatus,
-  pulseTitle,
-  pulseTone,
+  register,
+  signIn,
   workspace,
 }: {
   authenticated: boolean;
   bootStatus: string;
   bootstrapped: boolean;
   dashboardSnapshot: PortalDashboardSummary | null;
-  onAuthenticated: (session: PortalAuthSession) => void;
-  onLogout: () => void;
-  pulseDetail: string;
-  pulseStatus: string;
-  pulseTitle: string;
-  pulseTone: 'accent' | 'positive' | 'warning';
+  register: (payload: { name: string; email: string; password: string }) => Promise<unknown>;
+  signIn: (credentials: { email: string; password: string }) => Promise<unknown>;
   workspace: PortalWorkspaceSummary | null;
 }) {
+  const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
+  const requestedTarget = `${location.pathname}${location.search}`;
 
   function navigateToRoute(routeKey: Parameters<typeof resolvePortalPath>[0]) {
     navigate(resolvePortalPath(routeKey));
@@ -103,7 +119,12 @@ export function AppRoutes({
   function renderProtectedRoute(routeKey: PortalRouteKey) {
     switch (routeKey) {
       case 'dashboard':
-        return <PortalDashboardPage initialSnapshot={dashboardSnapshot} onNavigate={navigateToRoute} />;
+        return (
+          <PortalDashboardPage
+            initialSnapshot={dashboardSnapshot}
+            onNavigate={navigateToRoute}
+          />
+        );
       case 'routing':
         return <PortalRoutingPage onNavigate={navigateToRoute} />;
       case 'api-keys':
@@ -131,22 +152,32 @@ export function AppRoutes({
     <Suspense fallback={<PortalBootScreen status="Loading portal workspace..." />}>
       <Routes>
         <Route
-          element={(
+          element={
             <Navigate
               replace
               to={authenticated ? PORTAL_ROUTE_PATHS.dashboard : PORTAL_ROUTE_PATHS.login}
             />
-          )}
+          }
           path=""
         />
         <Route
           element={
+            <Navigate
+              replace
+              to={buildAuthHref(
+                PORTAL_ROUTE_PATHS.login,
+                searchParams.get('redirect') ?? undefined,
+              )}
+            />
+          }
+          path="auth"
+        />
+        <Route
+          element={
             authenticated ? (
-              <Navigate replace to={PORTAL_ROUTE_PATHS.dashboard} />
+              <Navigate replace to={redirectTarget} />
             ) : (
-              <AuthLayout>
-                <PortalLoginPage onAuthenticated={onAuthenticated} onNavigate={navigateToRoute} />
-              </AuthLayout>
+              <PortalAuthPage register={register} signIn={signIn} />
             )
           }
           path={toRouteElementPath(PORTAL_ROUTE_PATHS.login)}
@@ -154,14 +185,22 @@ export function AppRoutes({
         <Route
           element={
             authenticated ? (
-              <Navigate replace to={PORTAL_ROUTE_PATHS.dashboard} />
+              <Navigate replace to={redirectTarget} />
             ) : (
-              <AuthLayout>
-                <PortalRegisterPage onAuthenticated={onAuthenticated} onNavigate={navigateToRoute} />
-              </AuthLayout>
+              <PortalAuthPage register={register} signIn={signIn} />
             )
           }
           path={toRouteElementPath(PORTAL_ROUTE_PATHS.register)}
+        />
+        <Route
+          element={
+            authenticated ? (
+              <Navigate replace to={redirectTarget} />
+            ) : (
+              <PortalAuthPage register={register} signIn={signIn} />
+            )
+          }
+          path={toRouteElementPath(PORTAL_ROUTE_PATHS['forgot-password'])}
         />
         {(
           [
@@ -178,19 +217,14 @@ export function AppRoutes({
           <Route
             element={
               authenticated ? (
-                <MainLayout
-                  activeRoute={routeKey}
-                  onLogout={onLogout}
-                  pulseDetail={pulseDetail}
-                  pulseStatus={pulseStatus}
-                  pulseTitle={pulseTitle}
-                  pulseTone={pulseTone}
-                  workspace={workspace}
-                >
+                <MainLayout workspace={workspace}>
                   {renderProtectedRoute(routeKey)}
                 </MainLayout>
               ) : (
-                <Navigate replace to={PORTAL_ROUTE_PATHS.login} />
+                <Navigate
+                  replace
+                  to={buildAuthHref(PORTAL_ROUTE_PATHS.login, requestedTarget)}
+                />
               )
             }
             key={routeKey}
@@ -198,12 +232,12 @@ export function AppRoutes({
           />
         ))}
         <Route
-          element={(
+          element={
             <Navigate
               replace
               to={authenticated ? PORTAL_ROUTE_PATHS.dashboard : PORTAL_ROUTE_PATHS.login}
             />
-          )}
+          }
           path="*"
         />
       </Routes>

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import type { PortalAnonymousRouteKey, PortalAuthSession } from 'sdkwork-router-portal-types';
 
 export interface AuthShellStoryItem {
   title: string;
@@ -12,9 +11,11 @@ export interface AuthShellPreviewItem {
   detail: string;
 }
 
+export type PortalAuthMode = 'login' | 'register' | 'forgot-password';
+
 export interface PortalAuthPageProps {
-  onAuthenticated: (session: PortalAuthSession) => void;
-  onNavigate: (route: PortalAnonymousRouteKey) => void;
+  signIn: (credentials: { email: string; password: string }) => Promise<unknown>;
+  register: (payload: { name: string; email: string; password: string }) => Promise<unknown>;
 }
 
 export interface AuthShellProps {

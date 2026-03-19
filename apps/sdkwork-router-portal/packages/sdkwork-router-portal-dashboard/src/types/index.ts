@@ -51,6 +51,23 @@ export interface DashboardSeriesPoint {
   amount: number;
 }
 
+export interface DashboardTrafficTrendPoint {
+  label: string;
+  bucket_key: string;
+  request_count: number;
+  amount: number;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface DashboardSpendTrendPoint {
+  label: string;
+  bucket_key: string;
+  amount: number;
+  requests: number;
+}
+
 export interface DashboardDistributionPoint {
   name: string;
   value: number;
@@ -102,6 +119,8 @@ export interface PortalDashboardPageViewModel {
   model_mix: DashboardBreakdownItem[];
   request_volume_series: DashboardSeriesPoint[];
   spend_series: DashboardSeriesPoint[];
+  traffic_trend_points: DashboardTrafficTrendPoint[];
+  spend_trend_points: DashboardSpendTrendPoint[];
   provider_share_series: DashboardDistributionPoint[];
   model_demand_series: DashboardDemandPoint[];
   activity_feed: DashboardActivityItem[];

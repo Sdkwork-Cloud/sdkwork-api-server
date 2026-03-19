@@ -42,6 +42,8 @@ pub struct GatewayApiKeyRecord {
     pub environment: String,
     pub hashed_key: String,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
     pub created_at_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_used_at_ms: Option<u64>,
@@ -63,6 +65,7 @@ impl GatewayApiKeyRecord {
             environment: environment.into(),
             hashed_key: hashed_key.into(),
             label: String::new(),
+            notes: None,
             created_at_ms: 0,
             last_used_at_ms: None,
             expires_at_ms: None,
@@ -72,6 +75,16 @@ impl GatewayApiKeyRecord {
 
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = label.into();
+        self
+    }
+
+    pub fn with_notes(mut self, notes: impl Into<String>) -> Self {
+        self.notes = Some(notes.into());
+        self
+    }
+
+    pub fn with_notes_option(mut self, notes: Option<String>) -> Self {
+        self.notes = notes;
         self
     }
 

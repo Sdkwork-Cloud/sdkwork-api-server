@@ -22,13 +22,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   EmptyState,
   formatCurrency,
   formatDateTime,
   formatUnits,
   InlineButton,
-  MetricCard,
   Pill,
   Surface,
   Tabs,
@@ -109,84 +107,41 @@ export function PortalUsagePage({ onNavigate }: PortalUsagePageProps) {
     [filters, records, summary],
   );
 
-  const activeFilters = [
-    filters.model ? `Model: ${filters.model}` : 'All models',
-    filters.provider ? `Provider: ${filters.provider}` : 'All providers',
-    `Window: ${filters.date_range}`,
-  ];
-
   const totalTokens = viewModel.filtered_records.reduce((sum, record) => sum + record.total_tokens, 0);
   const totalInputTokens = viewModel.filtered_records.reduce((sum, record) => sum + record.input_tokens, 0);
   const totalOutputTokens = viewModel.filtered_records.reduce((sum, record) => sum + record.output_tokens, 0);
 
   return (
     <>
-      <div className="portalx-status-row">
-        <Pill tone="accent">Live request telemetry</Pill>
-        {activeFilters.map((item) => (
-          <Pill key={item} tone="default">
-            {item}
-          </Pill>
-        ))}
-        <span className="portalx-status">{status}</span>
-        <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="secondary">Refine view</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Refine usage view</DialogTitle>
-              <DialogDescription>
-                Narrow the request slice by model, provider, and time window without keeping filters permanently expanded on the page.
-              </DialogDescription>
-            </DialogHeader>
-            <UsageFiltersPanel
-              filters={filters}
-              modelOptions={viewModel.model_options}
-              onChange={setFilters}
-              providerOptions={viewModel.provider_options}
-            />
-            <DialogFooter>
-              <Button
-                onClick={() => setFilters({ model: '', provider: '', date_range: '30d' })}
-                type="button"
-                variant="ghost"
-              >
-                Reset filters
-              </Button>
-              <Button onClick={() => setFilterDialogOpen(false)} type="button">
-                Apply view
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        <InlineButton onClick={() => onNavigate('billing')} tone="primary">
-          Review billing
-        </InlineButton>
-      </div>
-
-      <div className="portalx-metric-grid portalx-metric-grid-dense">
-        <MetricCard
-          detail="Total requests associated with this portal workspace."
-          label="Request Count"
-          value={formatUnits(summary.total_requests)}
-        />
-        <MetricCard
-          detail="Metered token units inside the current filtered slice."
-          label="Token Units"
-          value={formatUnits(viewModel.total_units)}
-        />
-        <MetricCard
-          detail="Raw input plus output token count from live usage records."
-          label="Total Tokens"
-          value={formatUnits(totalTokens)}
-        />
-        <MetricCard
-          detail="Booked amount associated with the current filtered request slice."
-          label="Booked Spend"
-          value={formatCurrency(viewModel.total_amount)}
-        />
-      </div>
+      <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refine usage view</DialogTitle>
+            <DialogDescription>
+              Narrow the request slice by model, provider, and time window without keeping
+              filters permanently expanded on the page.
+            </DialogDescription>
+          </DialogHeader>
+          <UsageFiltersPanel
+            filters={filters}
+            modelOptions={viewModel.model_options}
+            onChange={setFilters}
+            providerOptions={viewModel.provider_options}
+          />
+          <DialogFooter>
+            <Button
+              onClick={() => setFilters({ model: '', provider: '', date_range: '30d' })}
+              type="button"
+              variant="ghost"
+            >
+              Reset filters
+            </Button>
+            <Button onClick={() => setFilterDialogOpen(false)} type="button">
+              Apply view
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs className="grid gap-6" defaultValue="overview">
         <TabsList className="w-full justify-start overflow-x-auto">
@@ -196,11 +151,19 @@ export function PortalUsagePage({ onNavigate }: PortalUsagePageProps) {
         </TabsList>
 
         <TabsContent className="space-y-6" value="overview">
-          <UsageHighlights highlights={viewModel.highlights} />
-
           <div className="grid gap-6 xl:grid-cols-2">
             <Surface
-              detail="Visible request count grouped by recent activity buckets."
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => setFilterDialogOpen(true)} variant="secondary">
+                    Refine view
+                  </Button>
+                  <InlineButton onClick={() => onNavigate('billing')} tone="primary">
+                    Review billing
+                  </InlineButton>
+                </div>
+              }
+              detail={status}
               title="Request volume"
             >
               {viewModel.request_volume_series.length ? (
@@ -275,6 +238,8 @@ export function PortalUsagePage({ onNavigate }: PortalUsagePageProps) {
               )}
             </Surface>
           </div>
+
+          <UsageHighlights highlights={viewModel.highlights} />
 
           <div className="portalx-split-grid portalx-split-grid-wide">
             <Surface

@@ -84,7 +84,10 @@ test('core store exposes theme and sidebar shell state', () => {
   assert.match(store, /hiddenSidebarItems/);
   assert.match(core, /useAdminAppStore/);
   assert.match(routePaths, /SETTINGS/);
+  assert.match(routePaths, /AUTH/);
   assert.match(routePaths, /LOGIN/);
+  assert.match(routePaths, /REGISTER/);
+  assert.match(routePaths, /FORGOT_PASSWORD/);
 });
 
 test('shell package owns router, theme manager, header, sidebar, and settings page integration', () => {
@@ -125,6 +128,9 @@ test('shell package owns router, theme manager, header, sidebar, and settings pa
   assert.match(header, /ShellStatus/);
   assert.match(shellStatus, /status/i);
   assert.match(routes, /AdminLoginPage/);
+  assert.match(routes, /ROUTE_PATHS\.AUTH/);
+  assert.match(routes, /ROUTE_PATHS\.REGISTER/);
+  assert.match(routes, /ROUTE_PATHS\.FORGOT_PASSWORD/);
   assert.match(routes, /SettingsPage/);
   assert.match(styles, /admin-shell-settings/);
 });

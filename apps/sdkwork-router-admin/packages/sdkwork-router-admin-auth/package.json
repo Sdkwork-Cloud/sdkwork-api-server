@@ -12,7 +12,10 @@
     }
   },
   "dependencies": {
+    "lucide-react": "^0.546.0",
     "react": "^19.0.0",
-    "sdkwork-router-admin-commons": "workspace:*"
+    "react-router-dom": "^7.13.1",
+    "sdkwork-router-admin-commons": "workspace:*",
+    "sdkwork-router-admin-core": "workspace:*"
   }
 }

@@ -1672,6 +1672,8 @@ async fn create_api_key_handler(
             &request.environment,
             request.label.as_deref().unwrap_or(&request.environment),
             request.expires_at_ms,
+            None,
+            None,
         )
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

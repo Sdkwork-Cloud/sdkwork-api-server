@@ -84,6 +84,7 @@ pub struct CreatedGatewayApiKey {
     pub project_id: String,
     pub environment: String,
     pub label: String,
+    pub notes: Option<String>,
     pub created_at_ms: u64,
     pub expires_at_ms: Option<u64>,
 }
@@ -539,13 +540,38 @@ impl CreateGatewayApiKey {
         label: &str,
         expires_at_ms: Option<u64>,
     ) -> Result<CreatedGatewayApiKey> {
+        Self::execute_with_optional_plaintext(
+            tenant_id,
+            project_id,
+            environment,
+            label,
+            expires_at_ms,
+            None,
+            None,
+        )
+    }
+
+    pub fn execute_with_optional_plaintext(
+        tenant_id: &str,
+        project_id: &str,
+        environment: &str,
+        label: &str,
+        expires_at_ms: Option<u64>,
+        plaintext_key: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<CreatedGatewayApiKey> {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| anyhow!("system clock error"))?
             .as_nanos();
         let created_at_ms = now_epoch_millis()?;
         let normalized_label = normalize_gateway_api_key_label(label);
-        let plaintext = format!("skw_{environment}_{nonce:x}");
+        let normalized_notes = normalize_gateway_api_key_notes(notes);
+        let plaintext = plaintext_key
+            .map(normalize_gateway_api_key_plaintext)
+            .transpose()
+            .map_err(|message| anyhow!(message))?
+            .unwrap_or_else(|| format!("skw_{environment}_{nonce:x}"));
         let hashed = hash_gateway_api_key(&plaintext);
         Ok(CreatedGatewayApiKey {
             plaintext,
@@ -554,6 +580,7 @@ impl CreateGatewayApiKey {
             project_id: project_id.to_owned(),
             environment: environment.to_owned(),
             label: normalized_label,
+            notes: normalized_notes,
             created_at_ms,
             expires_at_ms,
         })
@@ -573,6 +600,8 @@ pub async fn persist_gateway_api_key(
         environment,
         &default_gateway_api_key_label(environment),
         None,
+        None,
+        None,
     )
     .await
 }
@@ -584,18 +613,24 @@ pub async fn persist_gateway_api_key_with_metadata(
     environment: &str,
     label: &str,
     expires_at_ms: Option<u64>,
+    plaintext_key: Option<&str>,
+    notes: Option<&str>,
 ) -> Result<CreatedGatewayApiKey> {
-    validate_gateway_api_key_metadata(label, expires_at_ms).map_err(|message| anyhow!(message))?;
-    let created = CreateGatewayApiKey::execute_with_metadata(
+    validate_gateway_api_key_metadata(label, notes, expires_at_ms)
+        .map_err(|message| anyhow!(message))?;
+    let created = CreateGatewayApiKey::execute_with_optional_plaintext(
         tenant_id,
         project_id,
         environment,
         label,
         expires_at_ms,
+        plaintext_key,
+        notes,
     )?;
     let record =
         GatewayApiKeyRecord::new(tenant_id, project_id, environment, created.hashed.clone())
             .with_label(created.label.clone())
+            .with_notes_option(created.notes.clone())
             .with_created_at_ms(created.created_at_ms)
             .with_expires_at_ms_option(created.expires_at_ms);
     store.insert_gateway_api_key(&record).await?;
@@ -615,17 +650,7 @@ pub async fn set_gateway_api_key_active(
         return Ok(None);
     };
 
-    let updated = GatewayApiKeyRecord {
-        tenant_id: existing.tenant_id,
-        project_id: existing.project_id,
-        environment: existing.environment,
-        hashed_key: existing.hashed_key,
-        label: existing.label,
-        created_at_ms: existing.created_at_ms,
-        last_used_at_ms: existing.last_used_at_ms,
-        expires_at_ms: existing.expires_at_ms,
-        active,
-    };
+    let updated = GatewayApiKeyRecord { active, ..existing };
 
     let saved = store.insert_gateway_api_key(&updated).await?;
     Ok(Some(saved))
@@ -1095,6 +1120,8 @@ pub async fn create_portal_api_key(
         environment,
         &default_gateway_api_key_label(environment),
         None,
+        None,
+        None,
     )
     .await
 }
@@ -1105,6 +1132,8 @@ pub async fn create_portal_api_key_with_metadata(
     environment: &str,
     label: &str,
     expires_at_ms: Option<u64>,
+    plaintext_key: Option<&str>,
+    notes: Option<&str>,
 ) -> PortalResult<CreatedGatewayApiKey> {
     let environment = environment.trim();
     if environment.is_empty() {
@@ -1112,7 +1141,7 @@ pub async fn create_portal_api_key_with_metadata(
             "environment is required".to_owned(),
         ));
     }
-    validate_gateway_api_key_metadata(label, expires_at_ms)
+    validate_gateway_api_key_metadata(label, notes, expires_at_ms)
         .map_err(PortalIdentityError::InvalidInput)?;
     let user = load_portal_user_record(store, user_id).await?;
 
@@ -1123,6 +1152,8 @@ pub async fn create_portal_api_key_with_metadata(
         environment,
         label,
         expires_at_ms,
+        plaintext_key,
+        notes,
     )
     .await
     .map_err(PortalIdentityError::from)
@@ -1410,13 +1441,32 @@ fn normalize_gateway_api_key_label(label: &str) -> String {
     }
 }
 
+fn normalize_gateway_api_key_plaintext(value: &str) -> std::result::Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err("api_key is required when custom key mode is selected".to_owned());
+    }
+
+    Ok(trimmed.to_owned())
+}
+
+fn normalize_gateway_api_key_notes(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
 fn validate_gateway_api_key_metadata(
     label: &str,
+    notes: Option<&str>,
     expires_at_ms: Option<u64>,
 ) -> std::result::Result<(), String> {
     if label.trim().is_empty() {
         return Err("label is required".to_owned());
     }
+
+    let _ = normalize_gateway_api_key_notes(notes);
 
     if let Some(expires_at_ms) = expires_at_ms {
         let now = now_epoch_millis().map_err(|error| error.to_string())?;

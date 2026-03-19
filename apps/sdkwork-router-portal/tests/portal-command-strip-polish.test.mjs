@@ -14,9 +14,12 @@ test('portal shell replaces the mission strip with compact workspace navigation'
   const profileDock = read('packages/sdkwork-router-portal-core/src/components/SidebarProfileDock.tsx');
   const shellStatus = read('packages/sdkwork-router-portal-core/src/components/ShellStatus.tsx');
 
-  assert.match(sidebar, /Active workspace/);
+  assert.doesNotMatch(sidebar, /Active workspace/);
   assert.match(shellStatus, /Workspace status/);
   assert.match(sidebar, /SidebarProfileDock/);
+  assert.match(sidebar, /routeGroups\.map/);
+  assert.match(profileDock, /Active workspace/);
+  assert.match(profileDock, /Settings/);
   assert.match(profileDock, /Sign out/);
   assert.doesNotMatch(sidebar, /Mission strip/);
   assert.doesNotMatch(shellStatus, /Primary mission/);

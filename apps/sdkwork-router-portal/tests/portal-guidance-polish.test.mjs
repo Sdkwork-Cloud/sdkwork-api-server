@@ -9,11 +9,11 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('dashboard keeps routing posture and workspace modules visible as the main handoff surfaces', () => {
+test('dashboard keeps next actions and module posture visible as the main handoff surfaces', () => {
   const dashboardPage = read('packages/sdkwork-router-portal-dashboard/src/pages/index.tsx');
 
-  assert.match(dashboardPage, /Routing posture/);
-  assert.match(dashboardPage, /Workspace modules/);
+  assert.match(dashboardPage, /Next actions/);
+  assert.match(dashboardPage, /Module posture/);
   assert.doesNotMatch(dashboardPage, /Journey progress/);
   assert.doesNotMatch(dashboardPage, /Milestone map/);
 });

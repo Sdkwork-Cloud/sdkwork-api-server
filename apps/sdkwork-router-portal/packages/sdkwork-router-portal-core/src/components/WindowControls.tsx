@@ -4,12 +4,9 @@ import { closeWindow, maximizeWindow, minimizeWindow } from '../lib/desktop';
 
 export function WindowControls() {
   return (
-    <div
-      className="flex h-full items-stretch border-l border-[color:var(--portal-titlebar-border)]"
-      data-tauri-drag-region="false"
-    >
+    <div className="flex h-full items-stretch" data-tauri-drag-region="false">
       <button
-        className="flex h-full w-11 items-center justify-center text-[var(--portal-text-muted-on-contrast)] transition-colors hover:[background:var(--portal-window-control-hover)] hover:text-[var(--portal-text-on-contrast)]"
+        className="flex h-full w-11 items-center justify-center text-zinc-500 transition-colors hover:bg-zinc-950/[0.06] hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.1] dark:hover:text-white"
         data-tauri-drag-region="false"
         onClick={() => {
           void minimizeWindow();
@@ -20,7 +17,7 @@ export function WindowControls() {
         <Minus className="h-4 w-4" />
       </button>
       <button
-        className="flex h-full w-11 items-center justify-center text-[var(--portal-text-muted-on-contrast)] transition-colors hover:[background:var(--portal-window-control-hover)] hover:text-[var(--portal-text-on-contrast)]"
+        className="flex h-full w-11 items-center justify-center text-zinc-500 transition-colors hover:bg-zinc-950/[0.06] hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.1] dark:hover:text-white"
         data-tauri-drag-region="false"
         onClick={() => {
           void maximizeWindow();
@@ -31,7 +28,7 @@ export function WindowControls() {
         <Square className="h-3.5 w-3.5" />
       </button>
       <button
-        className="flex h-full w-11 items-center justify-center text-[var(--portal-text-muted-on-contrast)] transition-colors hover:[background:var(--portal-window-control-danger-hover)] hover:text-white"
+        className="flex h-full w-11 items-center justify-center text-zinc-500 transition-colors hover:bg-rose-500 hover:text-white dark:text-zinc-300"
         data-tauri-drag-region="false"
         onClick={() => {
           void closeWindow();

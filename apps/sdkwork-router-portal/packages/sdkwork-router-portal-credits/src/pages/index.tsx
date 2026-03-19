@@ -16,7 +16,6 @@ import {
   formatUnits,
   InlineButton,
   Input,
-  MetricCard,
   Pill,
   Surface,
   Tabs,
@@ -136,44 +135,6 @@ export function PortalCreditsPage({ onNavigate }: PortalCreditsPageProps) {
           </form>
         </DialogContent>
       </Dialog>
-
-      <div className="portalx-status-row">
-        <Pill tone={summary.exhausted ? 'warning' : 'accent'}>
-          Quota {summary.exhausted ? 'exhausted' : 'available'}
-        </Pill>
-        <Pill tone="seed">Coupon catalog</Pill>
-        <span className="portalx-status">{status}</span>
-        <InlineButton onClick={() => setRedeemDialogOpen(true)} tone="primary">
-          Redeem credits
-        </InlineButton>
-        <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
-          Review billing
-        </InlineButton>
-      </div>
-
-      <div className="portalx-metric-grid portalx-metric-grid-dense">
-        <MetricCard
-          detail="Remaining token units within the current quota boundary."
-          label="Available points"
-          value={formatUnits(remainingUnits)}
-        />
-        <MetricCard
-          detail="Consumed token units recorded for this project."
-          label="Used points"
-          value={formatUnits(summary.used_units)}
-        />
-        <MetricCard
-          detail="Ledger entries currently visible in the billing read model."
-          label="Ledger entries"
-          value={formatUnits(summary.entry_count)}
-        />
-        <MetricCard
-          detail="Booked amount associated with usage to date."
-          label="Booked amount"
-          value={formatCurrency(summary.booked_amount)}
-        />
-      </div>
-
       <Tabs className="grid gap-6" defaultValue="overview">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -183,22 +144,59 @@ export function PortalCreditsPage({ onNavigate }: PortalCreditsPageProps) {
 
         <TabsContent className="space-y-6" value="overview">
           <div className="portalx-split-grid portalx-split-grid-wide">
-            <Surface detail={recommendedOffer.rationale} title="Recommended offer">
-              <CouponImpactCard preview={recommendedOffer.preview} />
-              <ul className="portalx-fact-list">
-                <li>
-                  <strong>Coupon code</strong>
-                  <span>{recommendedOffer.offer.code}</span>
-                </li>
-                <li>
-                  <strong>Benefit</strong>
-                  <span>{recommendedOffer.offer.benefit}</span>
-                </li>
-                <li>
-                  <strong>Best for</strong>
-                  <span>{recommendedOffer.offer.description}</span>
-                </li>
-              </ul>
+            <Surface
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <InlineButton onClick={() => setRedeemDialogOpen(true)} tone="primary">
+                    Redeem credits
+                  </InlineButton>
+                  <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+                    Review billing
+                  </InlineButton>
+                </div>
+              }
+              detail={status}
+              title="Recommended offer"
+            >
+              <div className="grid gap-6">
+                <CouponImpactCard preview={recommendedOffer.preview} />
+                <div className="portalx-summary-grid">
+                  <article className="portalx-summary-card">
+                    <span>Available points</span>
+                    <strong>{formatUnits(remainingUnits)}</strong>
+                    <p>Remaining token units within the current quota boundary.</p>
+                  </article>
+                  <article className="portalx-summary-card">
+                    <span>Used points</span>
+                    <strong>{formatUnits(summary.used_units)}</strong>
+                    <p>Consumed token units recorded for this project.</p>
+                  </article>
+                  <article className="portalx-summary-card">
+                    <span>Ledger entries</span>
+                    <strong>{formatUnits(summary.entry_count)}</strong>
+                    <p>Ledger entries currently visible in the billing read model.</p>
+                  </article>
+                  <article className="portalx-summary-card">
+                    <span>Booked amount</span>
+                    <strong>{formatCurrency(summary.booked_amount)}</strong>
+                    <p>Booked amount associated with usage to date.</p>
+                  </article>
+                </div>
+                <ul className="portalx-fact-list">
+                  <li>
+                    <strong>Coupon code</strong>
+                    <span>{recommendedOffer.offer.code}</span>
+                  </li>
+                  <li>
+                    <strong>Benefit</strong>
+                    <span>{recommendedOffer.offer.benefit}</span>
+                  </li>
+                  <li>
+                    <strong>Best for</strong>
+                    <span>{recommendedOffer.offer.description}</span>
+                  </li>
+                </ul>
+              </div>
             </Surface>
 
             <Surface
