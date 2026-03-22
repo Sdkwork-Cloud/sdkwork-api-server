@@ -2794,7 +2794,9 @@ dependencies = [
  "anyhow",
  "axum",
  "base64",
+ "bytes",
  "ed25519-dalek",
+ "futures-util",
  "reqwest",
  "sdkwork-api-app-billing",
  "sdkwork-api-app-credential",
@@ -2819,6 +2821,7 @@ dependencies = [
  "sha2",
  "sqlx",
  "tokio",
+ "tokio-stream",
  "toml",
  "tower",
 ]

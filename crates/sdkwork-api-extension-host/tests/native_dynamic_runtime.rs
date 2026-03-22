@@ -71,9 +71,11 @@ async fn loads_native_dynamic_manifest_and_executes_provider_request() {
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: None,
+        extra: serde_json::Map::new(),
     };
     let output = adapter
         .execute("sk-native", ProviderRequest::ChatCompletions(&request))
@@ -96,9 +98,11 @@ async fn executes_native_dynamic_chat_stream_request() {
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: Some(true),
+        extra: serde_json::Map::new(),
     };
 
     let output = adapter
@@ -217,9 +221,11 @@ async fn shutting_down_native_dynamic_runtimes_waits_for_in_flight_json_invocati
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: None,
+        extra: serde_json::Map::new(),
     };
 
     let invocation = std::thread::spawn(move || {
@@ -280,9 +286,11 @@ async fn shutting_down_native_dynamic_runtimes_waits_for_in_flight_stream_invoca
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: Some(true),
+        extra: serde_json::Map::new(),
     };
 
     let output = adapter
@@ -340,9 +348,11 @@ async fn shutting_down_native_dynamic_runtimes_rolls_back_after_drain_timeout() 
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: None,
+        extra: serde_json::Map::new(),
     };
 
     let first_invocation = std::thread::spawn(move || {
@@ -383,9 +393,11 @@ async fn shutting_down_native_dynamic_runtimes_rolls_back_after_drain_timeout() 
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: serde_json::Value::String("hello again".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: None,
+        extra: serde_json::Map::new(),
     };
 
     let second_invocation = std::thread::spawn(move || {

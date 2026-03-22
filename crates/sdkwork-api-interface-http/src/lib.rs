@@ -1,3 +1,7 @@
+mod compat_anthropic;
+mod compat_gemini;
+mod compat_streaming;
+
 use std::sync::{Arc, OnceLock};
 
 use axum::{
@@ -17,6 +21,17 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use compat_anthropic::{
+    anthropic_bad_gateway_response, anthropic_count_tokens_request,
+    anthropic_invalid_request_response, anthropic_request_to_chat_completion,
+    anthropic_stream_from_openai, openai_chat_response_to_anthropic,
+    openai_count_tokens_to_anthropic,
+};
+use compat_gemini::{
+    gemini_bad_gateway_response, gemini_count_tokens_request, gemini_invalid_request_response,
+    gemini_request_to_chat_completion, gemini_stream_from_openai, openai_chat_response_to_gemini,
+    openai_count_tokens_to_gemini,
+};
 use sdkwork_api_app_billing::{check_quota, persist_ledger_entry, QuotaCheckResult};
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::cancel_batch;
@@ -308,8 +323,9 @@ fn gateway_tag_for_path(path: &str) -> String {
     match path {
         "/metrics" | "/health" => "system".to_owned(),
         "/docs" | "/openapi.json" => "docs".to_owned(),
-        _ if path.starts_with("/v1/") => path
+        _ if path.starts_with("/v1/") || path.starts_with("/v1beta/") => path
             .trim_start_matches("/v1/")
+            .trim_start_matches("/v1beta/")
             .split('/')
             .find(|segment| !segment.is_empty() && !segment.starts_with('{'))
             .unwrap_or("gateway")
@@ -319,7 +335,7 @@ fn gateway_tag_for_path(path: &str) -> String {
 }
 
 fn gateway_route_requires_bearer_auth(path: &str, _method: HttpMethod) -> bool {
-    path.starts_with("/v1/")
+    path.starts_with("/v1/") || path.starts_with("/v1beta/")
 }
 
 fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
@@ -331,7 +347,16 @@ fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
         _ => format!(
             "{} {}",
             method.display_name(),
-            humanize_route_path(path, Some("v1"))
+            humanize_route_path(
+                path,
+                if path.starts_with("/v1beta/") {
+                    Some("v1beta")
+                } else if path.starts_with("/v1/") {
+                    Some("v1")
+                } else {
+                    None
+                },
+            )
         ),
     }
 }
@@ -469,6 +494,74 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
 
         Ok(Self(context))
     }
+}
+
+#[derive(Clone, Debug)]
+struct CompatAuthenticatedGatewayRequest(IdentityGatewayRequestContext);
+
+impl CompatAuthenticatedGatewayRequest {
+    fn tenant_id(&self) -> &str {
+        self.0.tenant_id()
+    }
+
+    fn project_id(&self) -> &str {
+        self.0.project_id()
+    }
+}
+
+impl FromRequestParts<GatewayApiState> for CompatAuthenticatedGatewayRequest {
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &GatewayApiState,
+    ) -> Result<Self, Self::Rejection> {
+        let Some(token) = extract_compat_gateway_token(parts) else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+
+        let Some(context) = resolve_gateway_request_context(state.store.as_ref(), &token)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+
+        Ok(Self(context))
+    }
+}
+
+fn extract_compat_gateway_token(parts: &Parts) -> Option<String> {
+    extract_bearer_token(&parts.headers)
+        .or_else(|| header_value(parts.headers.get("x-api-key")))
+        .or_else(|| header_value(parts.headers.get("x-goog-api-key")))
+        .or_else(|| query_parameter(parts.uri.query(), "key"))
+}
+
+fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    let header_value = header_value(headers.get(header::AUTHORIZATION))?;
+    header_value
+        .strip_prefix("Bearer ")
+        .or_else(|| header_value.strip_prefix("bearer "))
+        .map(ToOwned::to_owned)
+}
+
+fn header_value(value: Option<&axum::http::HeaderValue>) -> Option<String> {
+    value
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned)
+}
+
+fn query_parameter(query: Option<&str>, key: &str) -> Option<String> {
+    let query = query?;
+    query.split('&').find_map(|pair| {
+        let (name, value) = pair.split_once('=')?;
+        if name == key {
+            Some(value.to_owned())
+        } else {
+            None
+        }
+    })
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -643,6 +736,12 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
             }),
         )
         .route("/health", get(|| async { "ok" }))
+        .route("/v1/messages", post(anthropic_messages_handler))
+        .route(
+            "/v1/messages/count_tokens",
+            post(anthropic_count_tokens_handler),
+        )
+        .route("/v1beta/models/{*tail}", post(gemini_models_compat_handler))
         .route("/v1/models", get(list_models_handler))
         .route(
             "/v1/models/{model_id}",
@@ -1023,6 +1122,15 @@ pub fn gateway_router_with_state(state: GatewayApiState) -> Router {
             }),
         )
         .route("/health", get(|| async { "ok" }))
+        .route("/v1/messages", post(anthropic_messages_with_state_handler))
+        .route(
+            "/v1/messages/count_tokens",
+            post(anthropic_count_tokens_with_state_handler),
+        )
+        .route(
+            "/v1beta/models/{*tail}",
+            post(gemini_models_compat_with_state_handler),
+        )
         .route("/v1/models", get(list_models_from_store_handler))
         .route(
             "/v1/models/{model_id}",
@@ -5325,6 +5433,669 @@ async fn chat_completions_with_state_handler(
         )
         .into_response()
     }
+}
+
+async fn anthropic_messages_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_request_to_chat_completion(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+
+    if request.stream.unwrap_or(false) {
+        match relay_stateless_stream_request(
+            &request_context,
+            ProviderRequest::ChatCompletionsStream(&request),
+        )
+        .await
+        {
+            Ok(Some(response)) => {
+                return upstream_passthrough_response(anthropic_stream_from_openai(response));
+            }
+            Ok(None) => return local_anthropic_stream_response(&request.model),
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+    }
+
+    match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletions(&request))
+        .await
+    {
+        Ok(Some(response)) => Json(openai_chat_response_to_anthropic(&response)).into_response(),
+        Ok(None) => Json(openai_chat_response_to_anthropic(
+            &serde_json::to_value(
+                create_chat_completion(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request.model,
+                )
+                .expect("chat completion"),
+            )
+            .expect("chat completion value"),
+        ))
+        .into_response(),
+        Err(_) => anthropic_bad_gateway_response("failed to relay upstream anthropic message"),
+    }
+}
+
+async fn anthropic_count_tokens_handler(
+    request_context: StatelessGatewayRequest,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_count_tokens_request(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesInputTokens(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => Json(openai_count_tokens_to_anthropic(&response)).into_response(),
+        Ok(None) => Json(openai_count_tokens_to_anthropic(
+            &serde_json::to_value(
+                count_response_input_tokens(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request.model,
+                )
+                .expect("response input tokens"),
+            )
+            .expect("response input token value"),
+        ))
+        .into_response(),
+        Err(_) => anthropic_bad_gateway_response(
+            "failed to relay upstream anthropic count tokens request",
+        ),
+    }
+}
+
+async fn anthropic_messages_with_state_handler(
+    request_context: CompatAuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_request_to_chat_completion(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+
+    match enforce_project_quota(state.store.as_ref(), request_context.project_id(), 100).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to evaluate quota",
+            )
+                .into_response();
+        }
+    }
+
+    if request.stream.unwrap_or(false) {
+        match relay_chat_completion_stream_from_store(
+            state.store.as_ref(),
+            &state.secret_manager,
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request,
+        )
+        .await
+        {
+            Ok(Some(response)) => {
+                if record_gateway_usage_for_project(
+                    state.store.as_ref(),
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    "chat_completion",
+                    &request.model,
+                    100,
+                    0.10,
+                )
+                .await
+                .is_err()
+                {
+                    return (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to record usage",
+                    )
+                        .into_response();
+                }
+
+                return upstream_passthrough_response(anthropic_stream_from_openai(response));
+            }
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+
+        if record_gateway_usage_for_project(
+            state.store.as_ref(),
+            request_context.tenant_id(),
+            request_context.project_id(),
+            "chat_completion",
+            &request.model,
+            100,
+            0.10,
+        )
+        .await
+        .is_err()
+        {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to record usage",
+            )
+                .into_response();
+        }
+
+        return local_anthropic_stream_response(&request.model);
+    }
+
+    match relay_chat_completion_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            let token_usage = extract_token_usage_metrics(&response);
+            if record_gateway_usage_for_project_with_route_key_and_tokens(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "chat_completion",
+                &request.model,
+                &request.model,
+                100,
+                0.10,
+                token_usage,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(openai_chat_response_to_anthropic(&response)).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return anthropic_bad_gateway_response("failed to relay upstream anthropic message");
+        }
+    }
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "chat_completion",
+        &request.model,
+        100,
+        0.10,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(openai_chat_response_to_anthropic(
+        &serde_json::to_value(
+            create_chat_completion(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            )
+            .expect("chat completion"),
+        )
+        .expect("chat completion value"),
+    ))
+    .into_response()
+}
+
+async fn anthropic_count_tokens_with_state_handler(
+    request_context: CompatAuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_count_tokens_request(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+
+    match relay_count_response_input_tokens_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => Json(openai_count_tokens_to_anthropic(&response)).into_response(),
+        Ok(None) => Json(openai_count_tokens_to_anthropic(
+            &serde_json::to_value(
+                count_response_input_tokens(
+                    request_context.tenant_id(),
+                    request_context.project_id(),
+                    &request.model,
+                )
+                .expect("response input tokens"),
+            )
+            .expect("response input token value"),
+        ))
+        .into_response(),
+        Err(_) => anthropic_bad_gateway_response(
+            "failed to relay upstream anthropic count tokens request",
+        ),
+    }
+}
+
+async fn gemini_models_compat_handler(
+    request_context: StatelessGatewayRequest,
+    Path(tail): Path<String>,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let Some((model, action)) = parse_gemini_compat_tail(&tail) else {
+        return gemini_invalid_request_response("unsupported gemini compatibility route");
+    };
+
+    match action {
+        GeminiCompatAction::GenerateContent => {
+            let request = match gemini_request_to_chat_completion(&model, &payload) {
+                Ok(request) => request,
+                Err(error) => return gemini_invalid_request_response(error.to_string()),
+            };
+
+            match relay_stateless_json_request(
+                &request_context,
+                ProviderRequest::ChatCompletions(&request),
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    Json(openai_chat_response_to_gemini(&response)).into_response()
+                }
+                Ok(None) => Json(openai_chat_response_to_gemini(
+                    &serde_json::to_value(
+                        create_chat_completion(
+                            request_context.tenant_id(),
+                            request_context.project_id(),
+                            &request.model,
+                        )
+                        .expect("chat completion"),
+                    )
+                    .expect("chat completion value"),
+                ))
+                .into_response(),
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini generateContent request",
+                ),
+            }
+        }
+        GeminiCompatAction::StreamGenerateContent => {
+            let mut request = match gemini_request_to_chat_completion(&model, &payload) {
+                Ok(request) => request,
+                Err(error) => return gemini_invalid_request_response(error.to_string()),
+            };
+            request.stream = Some(true);
+
+            match relay_stateless_stream_request(
+                &request_context,
+                ProviderRequest::ChatCompletionsStream(&request),
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    upstream_passthrough_response(gemini_stream_from_openai(response))
+                }
+                Ok(None) => local_gemini_stream_response(),
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini streamGenerateContent request",
+                ),
+            }
+        }
+        GeminiCompatAction::CountTokens => {
+            let request = gemini_count_tokens_request(&model, &payload);
+            match relay_stateless_json_request(
+                &request_context,
+                ProviderRequest::ResponsesInputTokens(&request),
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    Json(openai_count_tokens_to_gemini(&response)).into_response()
+                }
+                Ok(None) => Json(openai_count_tokens_to_gemini(
+                    &serde_json::to_value(
+                        count_response_input_tokens(
+                            request_context.tenant_id(),
+                            request_context.project_id(),
+                            &request.model,
+                        )
+                        .expect("response input tokens"),
+                    )
+                    .expect("response input token value"),
+                ))
+                .into_response(),
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini countTokens request",
+                ),
+            }
+        }
+    }
+}
+
+async fn gemini_models_compat_with_state_handler(
+    request_context: CompatAuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(tail): Path<String>,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let Some((model, action)) = parse_gemini_compat_tail(&tail) else {
+        return gemini_invalid_request_response("unsupported gemini compatibility route");
+    };
+
+    match action {
+        GeminiCompatAction::GenerateContent => {
+            let request = match gemini_request_to_chat_completion(&model, &payload) {
+                Ok(request) => request,
+                Err(error) => return gemini_invalid_request_response(error.to_string()),
+            };
+
+            match enforce_project_quota(state.store.as_ref(), request_context.project_id(), 100)
+                .await
+            {
+                Ok(Some(response)) => return response,
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to evaluate quota",
+                    )
+                        .into_response();
+                }
+            }
+
+            match relay_chat_completion_from_store(
+                state.store.as_ref(),
+                &state.secret_manager,
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    let token_usage = extract_token_usage_metrics(&response);
+                    if record_gateway_usage_for_project_with_route_key_and_tokens(
+                        state.store.as_ref(),
+                        request_context.tenant_id(),
+                        request_context.project_id(),
+                        "chat_completion",
+                        &request.model,
+                        &request.model,
+                        100,
+                        0.10,
+                        token_usage,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return (
+                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to record usage",
+                        )
+                            .into_response();
+                    }
+
+                    Json(openai_chat_response_to_gemini(&response)).into_response()
+                }
+                Ok(None) => {
+                    if record_gateway_usage_for_project(
+                        state.store.as_ref(),
+                        request_context.tenant_id(),
+                        request_context.project_id(),
+                        "chat_completion",
+                        &request.model,
+                        100,
+                        0.10,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return (
+                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to record usage",
+                        )
+                            .into_response();
+                    }
+
+                    Json(openai_chat_response_to_gemini(
+                        &serde_json::to_value(
+                            create_chat_completion(
+                                request_context.tenant_id(),
+                                request_context.project_id(),
+                                &request.model,
+                            )
+                            .expect("chat completion"),
+                        )
+                        .expect("chat completion value"),
+                    ))
+                    .into_response()
+                }
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini generateContent request",
+                ),
+            }
+        }
+        GeminiCompatAction::StreamGenerateContent => {
+            let mut request = match gemini_request_to_chat_completion(&model, &payload) {
+                Ok(request) => request,
+                Err(error) => return gemini_invalid_request_response(error.to_string()),
+            };
+            request.stream = Some(true);
+
+            match enforce_project_quota(state.store.as_ref(), request_context.project_id(), 100)
+                .await
+            {
+                Ok(Some(response)) => return response,
+                Ok(None) => {}
+                Err(_) => {
+                    return (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to evaluate quota",
+                    )
+                        .into_response();
+                }
+            }
+
+            match relay_chat_completion_stream_from_store(
+                state.store.as_ref(),
+                &state.secret_manager,
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    if record_gateway_usage_for_project(
+                        state.store.as_ref(),
+                        request_context.tenant_id(),
+                        request_context.project_id(),
+                        "chat_completion",
+                        &request.model,
+                        100,
+                        0.10,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return (
+                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to record usage",
+                        )
+                            .into_response();
+                    }
+
+                    upstream_passthrough_response(gemini_stream_from_openai(response))
+                }
+                Ok(None) => {
+                    if record_gateway_usage_for_project(
+                        state.store.as_ref(),
+                        request_context.tenant_id(),
+                        request_context.project_id(),
+                        "chat_completion",
+                        &request.model,
+                        100,
+                        0.10,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return (
+                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to record usage",
+                        )
+                            .into_response();
+                    }
+
+                    local_gemini_stream_response()
+                }
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini streamGenerateContent request",
+                ),
+            }
+        }
+        GeminiCompatAction::CountTokens => {
+            let request = gemini_count_tokens_request(&model, &payload);
+            match relay_count_response_input_tokens_from_store(
+                state.store.as_ref(),
+                &state.secret_manager,
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            )
+            .await
+            {
+                Ok(Some(response)) => {
+                    Json(openai_count_tokens_to_gemini(&response)).into_response()
+                }
+                Ok(None) => Json(openai_count_tokens_to_gemini(
+                    &serde_json::to_value(
+                        count_response_input_tokens(
+                            request_context.tenant_id(),
+                            request_context.project_id(),
+                            &request.model,
+                        )
+                        .expect("response input tokens"),
+                    )
+                    .expect("response input token value"),
+                ))
+                .into_response(),
+                Err(_) => gemini_bad_gateway_response(
+                    "failed to relay upstream gemini countTokens request",
+                ),
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum GeminiCompatAction {
+    GenerateContent,
+    StreamGenerateContent,
+    CountTokens,
+}
+
+fn parse_gemini_compat_tail(tail: &str) -> Option<(String, GeminiCompatAction)> {
+    let tail = tail.trim_start_matches('/');
+    let (model, action) = tail.split_once(':')?;
+    let action = match action {
+        "generateContent" => GeminiCompatAction::GenerateContent,
+        "streamGenerateContent" => GeminiCompatAction::StreamGenerateContent,
+        "countTokens" => GeminiCompatAction::CountTokens,
+        _ => return None,
+    };
+    Some((model.to_owned(), action))
+}
+
+fn local_anthropic_stream_response(model: &str) -> Response {
+    let body = format!(
+        "event: message_start\ndata: {}\n\n\
+event: message_delta\ndata: {}\n\n\
+event: message_stop\ndata: {}\n\n",
+        serde_json::json!({
+            "type": "message_start",
+            "message": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": model,
+                "content": [],
+                "stop_reason": Value::Null,
+                "stop_sequence": Value::Null,
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0
+                }
+            }
+        }),
+        serde_json::json!({
+            "type": "message_delta",
+            "delta": {
+                "stop_reason": "end_turn",
+                "stop_sequence": Value::Null
+            },
+            "usage": {
+                "output_tokens": 0
+            }
+        }),
+        serde_json::json!({
+            "type": "message_stop"
+        })
+    );
+    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
+}
+
+fn local_gemini_stream_response() -> Response {
+    let body = format!(
+        "data: {}\n\n",
+        serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "role": "model",
+                    "parts": [
+                        { "text": "" }
+                    ]
+                },
+                "finishReason": "STOP"
+            }]
+        })
+    );
+    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
 }
 
 async fn chat_completions_list_with_state_handler(

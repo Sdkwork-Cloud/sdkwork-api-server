@@ -25,8 +25,19 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert!(json["paths"]["/health"]["get"].is_object());
     assert!(json["paths"]["/v1/models"]["get"].is_object());
     assert!(json["paths"]["/v1/chat/completions"]["post"].is_object());
+    assert!(json["paths"]["/v1/messages"]["post"].is_object());
+    assert!(json["paths"]["/v1/messages/count_tokens"]["post"].is_object());
+    assert!(json["paths"]["/v1beta/models/{*tail}"]["post"].is_object());
     assert_eq!(
         json["paths"]["/v1/chat/completions"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/v1/messages"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/v1beta/models/{*tail}"]["post"]["security"][0]["bearerAuth"],
         serde_json::json!([])
     );
 

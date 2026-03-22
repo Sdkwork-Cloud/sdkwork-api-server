@@ -14,8 +14,12 @@ Currently implemented gateway families include:
 
 - `/v1/models`
 - `/v1/chat/completions`
+- `/v1/messages`
 - `/v1/completions`
 - `/v1/responses`
+- `/v1beta/models/{model}:generateContent`
+- `/v1beta/models/{model}:streamGenerateContent`
+- `/v1beta/models/{model}:countTokens`
 - `/v1/embeddings`
 - `/v1/files`
 - `/v1/uploads`
@@ -35,6 +39,20 @@ The control plane also exposes:
 
 - `/admin/*`
 - `/portal/*`
+
+## Agent Client Compatibility
+
+Two translated gateway surfaces are now first-class:
+
+- Anthropic Messages compatibility for Claude Code and other Anthropic clients on `POST /v1/messages` and `POST /v1/messages/count_tokens`
+- Gemini Generative Language compatibility for Gemini CLI gateway mode on `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent?alt=sse`, and `POST /v1beta/models/{model}:countTokens`
+
+These routes do not bypass SDKWork routing. They translate into the same execution path used by the OpenAI-compatible gateway, so provider selection, project routing preferences, quota enforcement, billing, and usage recording stay consistent across all three protocol families.
+
+Stateful deployments accept the compatibility-native auth inputs in addition to bearer tokens:
+
+- Anthropic surface: `Authorization: Bearer ...` or `x-api-key`
+- Gemini surface: `Authorization: Bearer ...`, `x-goog-api-key`, or `?key=...`
 
 ## How To Read Compatibility
 

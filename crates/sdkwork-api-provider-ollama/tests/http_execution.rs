@@ -37,9 +37,11 @@ async fn adapter_posts_authorized_json_to_ollama_openai_compatible_upstream() {
             sdkwork_api_contract_openai::chat_completions::ChatMessageInput {
                 role: "user".to_owned(),
                 content: Value::String("hello".to_owned()),
+                extra: serde_json::Map::new(),
             },
         ],
         stream: Some(false),
+        extra: serde_json::Map::new(),
     };
 
     let response = adapter

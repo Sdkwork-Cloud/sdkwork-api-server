@@ -1080,8 +1080,10 @@ fn chat_request(model: &str) -> CreateChatCompletionRequest {
         messages: vec![ChatMessageInput {
             role: "user".to_owned(),
             content: Value::String("hello".to_owned()),
+            extra: serde_json::Map::new(),
         }],
         stream: None,
+        extra: serde_json::Map::new(),
     }
 }
 

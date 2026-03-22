@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessageInput {
     pub role: String,
     pub content: Value,
+    #[serde(default, flatten)]
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +14,8 @@ pub struct CreateChatCompletionRequest {
     pub model: String,
     pub messages: Vec<ChatMessageInput>,
     pub stream: Option<bool>,
+    #[serde(default, flatten)]
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

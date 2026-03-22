@@ -18,8 +18,12 @@ SDKWork 使用五种执行真值标签来描述网关接口的真实实现方式
 
 - `/v1/models`
 - `/v1/chat/completions`
+- `/v1/messages`
 - `/v1/completions`
 - `/v1/responses`
+- `/v1beta/models/{model}:generateContent`
+- `/v1beta/models/{model}:streamGenerateContent`
+- `/v1beta/models/{model}:countTokens`
 - `/v1/embeddings`
 - `/v1/files`
 - `/v1/uploads`
@@ -34,6 +38,20 @@ SDKWork 使用五种执行真值标签来描述网关接口的真实实现方式
 - `/v1/webhooks`
 - `/v1/evals`
 - `/v1/videos`
+
+## Agent 客户端兼容面
+
+网关现在提供两组一等兼容协议面，方便现有 agent 客户端直接接入：
+
+- Anthropic Messages 兼容面：`POST /v1/messages` 与 `POST /v1/messages/count_tokens`，适用于 Claude Code 等客户端
+- Gemini Generative Language 兼容面：`POST /v1beta/models/{model}:generateContent`、`POST /v1beta/models/{model}:streamGenerateContent?alt=sse`、`POST /v1beta/models/{model}:countTokens`，适用于 Gemini CLI gateway mode 等客户端
+
+这些接口不会绕开 SDKWork 的路由系统，而是转换到现有 OpenAI 兼容执行链路，因此 provider 选择、项目路由偏好、配额控制、计费和 usage 记录都会与 `/v1/*` 网关保持一致。
+
+有状态网关部署除了 `Authorization: Bearer ...` 之外，还支持协议原生认证入口：
+
+- Anthropic 面：`x-api-key`
+- Gemini 面：`x-goog-api-key` 或 `?key=...`
 
 ## 如何使用这份信息
 

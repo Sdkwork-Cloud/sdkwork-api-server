@@ -336,6 +336,15 @@ Detailed operational docs:
 - [Full Compatibility Matrix](./docs/api/compatibility-matrix.md)
 - [Detailed Runtime Modes](./docs/architecture/runtime-modes.md)
 
+## Gateway Protocol Compatibility
+
+The gateway now exposes translated compatibility layers for existing agent clients without creating a second routing system.
+
+- Claude Code and other Anthropic Messages clients can call `POST /v1/messages` and `POST /v1/messages/count_tokens`.
+- Gemini CLI gateway mode and other Google Generative Language clients can call `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent?alt=sse`, and `POST /v1beta/models/{model}:countTokens`.
+- Stateful gateway deployments accept the existing `Authorization: Bearer ...` header plus compatibility-native auth inputs: `x-api-key` for Anthropic-style clients, and `x-goog-api-key` or `?key=` for Gemini-style clients.
+- These compatibility routes translate into the existing OpenAI-compatible chat and token-count execution path, so routing policy selection, quota checks, billing, usage recording, and upstream provider relay stay shared with the `/v1/*` gateway surface.
+
 ## Verification
 
 Current verification baseline:
