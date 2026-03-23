@@ -41,6 +41,9 @@ test('tenants page keeps registries primary and opens tenant, project, and key w
   assert.match(tenants, /New tenant/);
   assert.match(tenants, /New project/);
   assert.match(tenants, /Issue gateway key/);
+  assert.match(tenants, /Key label/);
+  assert.match(tenants, /Notes/);
+  assert.match(tenants, /Expires at \(ms\)/);
   assert.match(tenants, /Plaintext key ready/);
 });
 
@@ -55,17 +58,23 @@ test('coupons page turns campaign editing into modal-driven workflow', () => {
   assert.match(coupons, /ConfirmDialog/);
 });
 
-test('catalog page moves channel, provider, credential, and model maintenance out of the registry canvas', () => {
+test('catalog page moves channel, provider, credential, model, and pricing maintenance out of the registry canvas', () => {
   const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
+  const types = read('packages/sdkwork-router-admin-types/src/index.ts');
 
   assert.match(catalog, /PageToolbar/);
   assert.match(catalog, /Dialog/);
   assert.match(catalog, /DialogContent/);
   assert.match(catalog, /ConfirmDialog/);
   assert.match(catalog, /New channel/);
-  assert.match(catalog, /New provider/);
+  assert.match(catalog, /New proxy provider/);
   assert.match(catalog, /Rotate credential/);
-  assert.match(catalog, /New model/);
+  assert.match(catalog, /Manage models/);
+  assert.match(catalog, /New channel model/);
+  assert.match(catalog, /Manage pricing/);
+  assert.match(catalog, /New model pricing/);
+  assert.match(catalog, /price_unit: 'per_1m_tokens'/);
+  assert.match(types, /notes\?: string \| null;/);
   assert.doesNotMatch(catalog, /Channel maintenance/);
   assert.doesNotMatch(catalog, /Credential maintenance/);
 });

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Router Local Check App SDK Real Logic"
+  short_description: "Guide router local check remote flows onto generated SDKs."
+  default_prompt: "Use $router-local-check-app-sdk-real-logic to keep sdkwork-api-router-local-check native-first while routing remote business capabilities through spring-ai-plus-app-api and generated SDKs."

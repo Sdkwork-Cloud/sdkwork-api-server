@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use sdkwork_api_domain_catalog::{
-    Channel, ModelCapability, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
+    Channel, ChannelModelRecord, ModelCapability, ModelCatalogEntry, ModelPriceRecord,
+    ProviderChannelBinding, ProxyProvider,
 };
 use sdkwork_api_storage_core::AdminStore;
 
@@ -192,6 +193,75 @@ pub fn create_model(external_name: &str, provider_id: &str) -> Result<ModelCatal
     Ok(ModelCatalogEntry::new(external_name, provider_id))
 }
 
+pub fn create_channel_model(
+    channel_id: &str,
+    model_id: &str,
+    model_display_name: &str,
+) -> Result<ChannelModelRecord> {
+    Ok(ChannelModelRecord::new(
+        channel_id,
+        model_id,
+        model_display_name,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_channel_model_with_metadata(
+    channel_id: &str,
+    model_id: &str,
+    model_display_name: &str,
+    capabilities: &[ModelCapability],
+    streaming: bool,
+    context_window: Option<u64>,
+    description: Option<&str>,
+) -> Result<ChannelModelRecord> {
+    let mut model = create_channel_model(channel_id, model_id, model_display_name)?
+        .with_streaming(streaming)
+        .with_context_window_option(context_window)
+        .with_description_option(description.map(str::to_owned));
+    for capability in capabilities {
+        model = model.with_capability(capability.clone());
+    }
+    Ok(model)
+}
+
+pub fn create_model_price(
+    channel_id: &str,
+    model_id: &str,
+    proxy_provider_id: &str,
+) -> Result<ModelPriceRecord> {
+    Ok(ModelPriceRecord::new(
+        channel_id,
+        model_id,
+        proxy_provider_id,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_model_price_with_rates(
+    channel_id: &str,
+    model_id: &str,
+    proxy_provider_id: &str,
+    currency_code: &str,
+    price_unit: &str,
+    input_price: f64,
+    output_price: f64,
+    cache_read_price: f64,
+    cache_write_price: f64,
+    request_price: f64,
+    is_active: bool,
+) -> Result<ModelPriceRecord> {
+    Ok(create_model_price(channel_id, model_id, proxy_provider_id)?
+        .with_currency_code(currency_code)
+        .with_price_unit(price_unit)
+        .with_input_price(input_price)
+        .with_output_price(output_price)
+        .with_cache_read_price(cache_read_price)
+        .with_cache_write_price(cache_write_price)
+        .with_request_price(request_price)
+        .with_active(is_active))
+}
+
 pub fn create_model_with_metadata(
     external_name: &str,
     provider_id: &str,
@@ -214,8 +284,7 @@ pub async fn persist_model(
     external_name: &str,
     provider_id: &str,
 ) -> Result<ModelCatalogEntry> {
-    let model = create_model(external_name, provider_id)?;
-    store.insert_model(&model).await
+    persist_model_with_metadata(store, external_name, provider_id, &[], false, None).await
 }
 
 pub async fn persist_model_with_metadata(
@@ -226,6 +295,24 @@ pub async fn persist_model_with_metadata(
     streaming: bool,
     context_window: Option<u64>,
 ) -> Result<ModelCatalogEntry> {
+    let provider = store
+        .find_provider(provider_id)
+        .await?
+        .ok_or_else(|| anyhow!("provider_id is not registered"))?;
+    let channel_model = create_channel_model_with_metadata(
+        &provider.channel_id,
+        external_name,
+        external_name,
+        capabilities,
+        streaming,
+        context_window,
+        None,
+    )?;
+    store.insert_channel_model(&channel_model).await?;
+
+    let default_price = create_model_price(&provider.channel_id, external_name, provider_id)?;
+    store.insert_model_price(&default_price).await?;
+
     let model = create_model_with_metadata(
         external_name,
         provider_id,
@@ -233,11 +320,105 @@ pub async fn persist_model_with_metadata(
         streaming,
         context_window,
     )?;
-    store.insert_model(&model).await
+    Ok(model)
 }
 
 pub async fn list_model_entries(store: &dyn AdminStore) -> Result<Vec<ModelCatalogEntry>> {
     store.list_models().await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn persist_channel_model_with_metadata(
+    store: &dyn AdminStore,
+    channel_id: &str,
+    model_id: &str,
+    model_display_name: &str,
+    capabilities: &[ModelCapability],
+    streaming: bool,
+    context_window: Option<u64>,
+    description: Option<&str>,
+) -> Result<ChannelModelRecord> {
+    let record = create_channel_model_with_metadata(
+        channel_id,
+        model_id,
+        model_display_name,
+        capabilities,
+        streaming,
+        context_window,
+        description,
+    )?;
+    store.insert_channel_model(&record).await
+}
+
+pub async fn list_channel_models(store: &dyn AdminStore) -> Result<Vec<ChannelModelRecord>> {
+    store.list_channel_models().await
+}
+
+pub async fn delete_channel_model(
+    store: &dyn AdminStore,
+    channel_id: &str,
+    model_id: &str,
+) -> Result<bool> {
+    let channel_id = channel_id.trim();
+    let model_id = model_id.trim();
+    if channel_id.is_empty() || model_id.is_empty() {
+        return Err(anyhow!("channel_id and model_id are required"));
+    }
+    store.delete_channel_model(channel_id, model_id).await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn persist_model_price_with_rates(
+    store: &dyn AdminStore,
+    channel_id: &str,
+    model_id: &str,
+    proxy_provider_id: &str,
+    currency_code: &str,
+    price_unit: &str,
+    input_price: f64,
+    output_price: f64,
+    cache_read_price: f64,
+    cache_write_price: f64,
+    request_price: f64,
+    is_active: bool,
+) -> Result<ModelPriceRecord> {
+    let record = create_model_price_with_rates(
+        channel_id,
+        model_id,
+        proxy_provider_id,
+        currency_code,
+        price_unit,
+        input_price,
+        output_price,
+        cache_read_price,
+        cache_write_price,
+        request_price,
+        is_active,
+    )?;
+    store.insert_model_price(&record).await
+}
+
+pub async fn list_model_prices(store: &dyn AdminStore) -> Result<Vec<ModelPriceRecord>> {
+    store.list_model_prices().await
+}
+
+pub async fn delete_model_price(
+    store: &dyn AdminStore,
+    channel_id: &str,
+    model_id: &str,
+    proxy_provider_id: &str,
+) -> Result<bool> {
+    let channel_id = channel_id.trim();
+    let model_id = model_id.trim();
+    let proxy_provider_id = proxy_provider_id.trim();
+    if channel_id.is_empty() || model_id.is_empty() || proxy_provider_id.is_empty() {
+        return Err(anyhow!(
+            "channel_id, model_id, and proxy_provider_id are required"
+        ));
+    }
+    store
+        .delete_model_price(channel_id, model_id, proxy_provider_id)
+        .await
 }
 
 pub async fn delete_model_variant(

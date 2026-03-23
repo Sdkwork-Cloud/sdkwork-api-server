@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
-  DialogTrigger,
   FormField,
   InlineButton,
   PageToolbar,
@@ -16,7 +15,13 @@ import {
   StatCard,
   Surface,
 } from 'sdkwork-router-admin-commons';
-import type { AdminPageProps, CredentialRecord } from 'sdkwork-router-admin-types';
+import type {
+  AdminPageProps,
+  ChannelModelRecord,
+  CredentialRecord,
+  ModelPriceRecord,
+  ProxyProviderRecord,
+} from 'sdkwork-router-admin-types';
 
 type CatalogPageProps = AdminPageProps & {
   onSaveChannel: (input: { id: string; name: string }) => Promise<void>;
@@ -42,6 +47,28 @@ type CatalogPageProps = AdminPageProps & {
     streaming: boolean;
     context_window?: number;
   }) => Promise<void>;
+  onSaveChannelModel: (input: {
+    channel_id: string;
+    model_id: string;
+    model_display_name: string;
+    capabilities: string[];
+    streaming: boolean;
+    context_window?: number | null;
+    description?: string;
+  }) => Promise<void>;
+  onSaveModelPrice: (input: {
+    channel_id: string;
+    model_id: string;
+    proxy_provider_id: string;
+    currency_code: string;
+    price_unit: string;
+    input_price: number;
+    output_price: number;
+    cache_read_price: number;
+    cache_write_price: number;
+    request_price: number;
+    is_active: boolean;
+  }) => Promise<void>;
   onDeleteChannel: (channelId: string) => Promise<void>;
   onDeleteProvider: (providerId: string) => Promise<void>;
   onDeleteCredential: (
@@ -50,14 +77,105 @@ type CatalogPageProps = AdminPageProps & {
     keyReference: string,
   ) => Promise<void>;
   onDeleteModel: (externalName: string, providerId: string) => Promise<void>;
+  onDeleteChannelModel: (channelId: string, modelId: string) => Promise<void>;
+  onDeleteModelPrice: (
+    channelId: string,
+    modelId: string,
+    proxyProviderId: string,
+  ) => Promise<void>;
 };
 
 type PendingDelete =
   | { kind: 'channel'; label: string; channelId: string }
   | { kind: 'provider'; label: string; providerId: string }
   | { kind: 'credential'; label: string; tenantId: string; providerId: string; keyReference: string }
+  | { kind: 'channel-model'; label: string; channelId: string; modelId: string }
+  | {
+      kind: 'model-price';
+      label: string;
+      channelId: string;
+      modelId: string;
+      proxyProviderId: string;
+    }
   | { kind: 'model'; label: string; externalName: string; providerId: string }
   | null;
+
+type ChannelSeedModelDraft = {
+  draft_id: string;
+  model_id: string;
+  model_display_name: string;
+  capabilities: string;
+  streaming: boolean;
+  context_window: string;
+  description: string;
+};
+
+type ProviderDraft = {
+  id: string;
+  primary_channel_id: string;
+  display_name: string;
+  adapter_kind: string;
+  base_url: string;
+  extension_id: string;
+  bound_channel_ids: string[];
+};
+
+type CredentialDraft = {
+  tenant_id: string;
+  provider_id: string;
+  key_reference: string;
+  secret_value: string;
+};
+
+type ChannelModelDraft = {
+  channel_id: string;
+  model_id: string;
+  model_display_name: string;
+  capabilities: string;
+  streaming: boolean;
+  context_window: string;
+  description: string;
+};
+
+type ModelPriceDraft = {
+  channel_id: string;
+  model_id: string;
+  proxy_provider_id: string;
+  currency_code: string;
+  price_unit: string;
+  input_price: string;
+  output_price: string;
+  cache_read_price: string;
+  cache_write_price: string;
+  request_price: string;
+  is_active: boolean;
+};
+
+function createDraftId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function splitCapabilities(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseOptionalNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseRequiredNumber(value: string): number {
+  const parsed = Number(value.trim() || '0');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function credentialStorageLabel(credential: CredentialRecord): string {
   if (credential.secret_backend === 'local_encrypted_file') {
@@ -71,114 +189,492 @@ function credentialStorageLabel(credential: CredentialRecord): string {
   return 'database envelope';
 }
 
+function providerChannelIds(provider: ProxyProviderRecord): string[] {
+  const ids = new Set<string>();
+  ids.add(provider.channel_id);
+
+  for (const binding of provider.channel_bindings) {
+    ids.add(binding.channel_id);
+  }
+
+  return Array.from(ids);
+}
+
+function emptySeedModelDraft(): ChannelSeedModelDraft {
+  return {
+    draft_id: createDraftId(),
+    model_id: '',
+    model_display_name: '',
+    capabilities: 'chat',
+    streaming: true,
+    context_window: '',
+    description: '',
+  };
+}
+
+function seedModelDraftFromRecord(record: ChannelModelRecord): ChannelSeedModelDraft {
+  return {
+    draft_id: createDraftId(),
+    model_id: record.model_id,
+    model_display_name: record.model_display_name,
+    capabilities: record.capabilities.join(', '),
+    streaming: record.streaming,
+    context_window: String(record.context_window ?? ''),
+    description: record.description ?? '',
+  };
+}
+
+function emptyProviderDraft(channelId?: string): ProviderDraft {
+  return {
+    id: '',
+    primary_channel_id: channelId ?? '',
+    display_name: '',
+    adapter_kind: 'openai',
+    base_url: '',
+    extension_id: '',
+    bound_channel_ids: channelId ? [channelId] : [],
+  };
+}
+
+function providerDraftFromRecord(record: ProxyProviderRecord): ProviderDraft {
+  return {
+    id: record.id,
+    primary_channel_id: record.channel_id,
+    display_name: record.display_name,
+    adapter_kind: record.adapter_kind,
+    base_url: record.base_url,
+    extension_id: record.extension_id ?? '',
+    bound_channel_ids: providerChannelIds(record),
+  };
+}
+
+function emptyCredentialDraft(tenantId?: string, providerId?: string): CredentialDraft {
+  return {
+    tenant_id: tenantId ?? '',
+    provider_id: providerId ?? '',
+    key_reference: '',
+    secret_value: '',
+  };
+}
+
+function credentialDraftFromRecord(record: CredentialRecord): CredentialDraft {
+  return {
+    tenant_id: record.tenant_id,
+    provider_id: record.provider_id,
+    key_reference: record.key_reference,
+    secret_value: '',
+  };
+}
+
+function emptyChannelModelDraft(channelId: string): ChannelModelDraft {
+  return {
+    channel_id: channelId,
+    model_id: '',
+    model_display_name: '',
+    capabilities: 'chat',
+    streaming: true,
+    context_window: '',
+    description: '',
+  };
+}
+
+function channelModelDraftFromRecord(record: ChannelModelRecord): ChannelModelDraft {
+  return {
+    channel_id: record.channel_id,
+    model_id: record.model_id,
+    model_display_name: record.model_display_name,
+    capabilities: record.capabilities.join(', '),
+    streaming: record.streaming,
+    context_window: String(record.context_window ?? ''),
+    description: record.description ?? '',
+  };
+}
+
+function emptyModelPriceDraft(channelId: string, modelId: string): ModelPriceDraft {
+  return {
+    channel_id: channelId,
+    model_id: modelId,
+    proxy_provider_id: '',
+    currency_code: 'USD',
+    price_unit: 'per_1m_tokens',
+    input_price: '0',
+    output_price: '0',
+    cache_read_price: '0',
+    cache_write_price: '0',
+    request_price: '0',
+    is_active: true,
+  };
+}
+
+function modelPriceDraftFromRecord(record: ModelPriceRecord): ModelPriceDraft {
+  return {
+    channel_id: record.channel_id,
+    model_id: record.model_id,
+    proxy_provider_id: record.proxy_provider_id,
+    currency_code: record.currency_code,
+    price_unit: record.price_unit,
+    input_price: String(record.input_price),
+    output_price: String(record.output_price),
+    cache_read_price: String(record.cache_read_price),
+    cache_write_price: String(record.cache_write_price),
+    request_price: String(record.request_price),
+    is_active: record.is_active,
+  };
+}
+
 export function CatalogPage({
   snapshot,
   onSaveChannel,
   onSaveProvider,
   onSaveCredential,
-  onSaveModel,
+  onSaveChannelModel,
+  onSaveModelPrice,
   onDeleteChannel,
   onDeleteProvider,
   onDeleteCredential,
   onDeleteModel,
+  onDeleteChannelModel,
+  onDeleteModelPrice,
 }: CatalogPageProps) {
+  const defaultChannelId = snapshot.channels[0]?.id ?? 'openai';
+  const defaultProviderId = snapshot.providers[0]?.id ?? '';
+  const defaultTenantId = snapshot.tenants[0]?.id ?? 'tenant-local';
   const [channelDraft, setChannelDraft] = useState({
-    id: snapshot.channels[0]?.id ?? 'openai',
+    id: defaultChannelId,
     name: snapshot.channels[0]?.name ?? 'OpenAI',
   });
-  const [providerDraft, setProviderDraft] = useState({
-    id: snapshot.providers[0]?.id ?? 'provider-openai-official',
-    channel_id: snapshot.providers[0]?.channel_id ?? snapshot.channels[0]?.id ?? 'openai',
-    display_name: snapshot.providers[0]?.display_name ?? 'OpenAI Official',
-    adapter_kind: snapshot.providers[0]?.adapter_kind ?? 'openai',
-    base_url: snapshot.providers[0]?.base_url ?? 'https://api.openai.com',
-    extension_id: snapshot.providers[0]?.extension_id ?? 'sdkwork.provider.openai.official',
-  });
-  const [credentialDraft, setCredentialDraft] = useState({
-    tenant_id: snapshot.credentials[0]?.tenant_id ?? snapshot.tenants[0]?.id ?? 'tenant-local',
-    provider_id:
-      snapshot.credentials[0]?.provider_id
-      ?? snapshot.providers[0]?.id
-      ?? 'provider-openai-official',
-    key_reference: snapshot.credentials[0]?.key_reference ?? 'cred-openai-primary',
-    secret_value: '',
-  });
-  const [modelDraft, setModelDraft] = useState({
-    external_name: snapshot.models[0]?.external_name ?? 'gpt-4.1',
-    provider_id:
-      snapshot.models[0]?.provider_id ?? snapshot.providers[0]?.id ?? 'provider-openai-official',
-    capabilities: snapshot.models[0]?.capabilities.join(', ') ?? 'responses, chat_completions',
-    streaming: snapshot.models[0]?.streaming ?? true,
-    context_window: String(snapshot.models[0]?.context_window ?? 128000),
-  });
+  const [channelSeedModels, setChannelSeedModels] = useState<ChannelSeedModelDraft[]>([
+    emptySeedModelDraft(),
+  ]);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [providerDraft, setProviderDraft] = useState<ProviderDraft>(
+    emptyProviderDraft(defaultChannelId),
+  );
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const [credentialDraft, setCredentialDraft] = useState<CredentialDraft>(
+    emptyCredentialDraft(defaultTenantId, defaultProviderId),
+  );
+  const [channelModelDraft, setChannelModelDraft] = useState<ChannelModelDraft>(
+    emptyChannelModelDraft(defaultChannelId),
+  );
+  const [editingChannelModelKey, setEditingChannelModelKey] = useState<string | null>(null);
+  const [modelPriceDraft, setModelPriceDraft] = useState<ModelPriceDraft>(
+    emptyModelPriceDraft(defaultChannelId, ''),
+  );
+  const [editingModelPriceKey, setEditingModelPriceKey] = useState<string | null>(null);
+  const [activeChannelId, setActiveChannelId] = useState<string>(defaultChannelId);
+  const [pricingTarget, setPricingTarget] = useState<{
+    channel_id: string;
+    model_id: string;
+    model_display_name: string;
+  } | null>(null);
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false);
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [isCredentialDialogOpen, setIsCredentialDialogOpen] = useState(false);
-  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
+  const [isChannelModelsDialogOpen, setIsChannelModelsDialogOpen] = useState(false);
+  const [isChannelModelEditorOpen, setIsChannelModelEditorOpen] = useState(false);
+  const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
+  const [isModelPriceEditorOpen, setIsModelPriceEditorOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
-  const selectedProvider = snapshot.providers.find((provider) => provider.id === modelDraft.provider_id);
-  const selectedCredential = snapshot.credentials.find(
-    (credential) => (
-      credential.tenant_id === credentialDraft.tenant_id
-      && credential.provider_id === credentialDraft.provider_id
-      && credential.key_reference === credentialDraft.key_reference
-    ),
+  const selectedChannel =
+    snapshot.channels.find((channel) => channel.id === activeChannelId) ?? null;
+  const selectedChannelModels = snapshot.channelModels.filter(
+    (model) => model.channel_id === activeChannelId,
   );
+  const selectedModelPrices = pricingTarget
+    ? snapshot.modelPrices.filter(
+        (record) =>
+          record.channel_id === pricingTarget.channel_id &&
+          record.model_id === pricingTarget.model_id,
+      )
+    : [];
   const channelsWithProviders = new Set(
-    snapshot.providers.flatMap((provider) => [
-      provider.channel_id,
-      ...provider.channel_bindings.map((binding) => binding.channel_id),
-    ]),
+    snapshot.providers.flatMap((provider) => providerChannelIds(provider)),
   );
-  const providersWithModels = new Set(snapshot.models.map((model) => model.provider_id));
-  const providersWithCredentials = new Set(
-    snapshot.credentials.map((credential) => credential.provider_id),
+  const channelsWithModels = new Set(
+    snapshot.channelModels.map((model) => model.channel_id),
   );
-  const providersWithoutCredentials = snapshot.providers.filter(
-    (provider) => !providersWithCredentials.has(provider.id),
-  );
-  const orphanCredentials = snapshot.credentials.filter(
-    (credential) => !snapshot.providers.some((provider) => provider.id === credential.provider_id),
+  const providerNameById = new Map(
+    snapshot.providers.map((provider) => [provider.id, provider.display_name]),
   );
 
-  async function handleChannel(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSaveChannel(channelDraft);
+  function resetChannelDialog() {
+    setEditingChannelId(null);
+    setChannelDraft({
+      id: snapshot.channels[0]?.id ?? 'openai',
+      name: snapshot.channels[0]?.name ?? 'OpenAI',
+    });
+    setChannelSeedModels([emptySeedModelDraft()]);
     setIsChannelDialogOpen(false);
   }
 
-  async function handleProvider(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSaveProvider({
-      id: providerDraft.id,
-      channel_id: providerDraft.channel_id,
-      extension_id: providerDraft.extension_id || undefined,
-      adapter_kind: providerDraft.adapter_kind,
-      base_url: providerDraft.base_url,
-      display_name: providerDraft.display_name,
-      channel_bindings: [{ channel_id: providerDraft.channel_id, is_primary: true }],
-    });
+  function openNewChannelDialog() {
+    setEditingChannelId(null);
+    setChannelDraft({ id: '', name: '' });
+    setChannelSeedModels([emptySeedModelDraft()]);
+    setIsChannelDialogOpen(true);
+  }
+
+  function openEditChannelDialog(channelId: string) {
+    const channel = snapshot.channels.find((item) => item.id === channelId);
+    if (!channel) {
+      return;
+    }
+
+    const existingModels = snapshot.channelModels
+      .filter((model) => model.channel_id === channelId)
+      .map(seedModelDraftFromRecord);
+
+    setEditingChannelId(channel.id);
+    setChannelDraft({ id: channel.id, name: channel.name });
+    setChannelSeedModels(existingModels.length ? existingModels : [emptySeedModelDraft()]);
+    setIsChannelDialogOpen(true);
+  }
+
+  function resetProviderDialog() {
+    setEditingProviderId(null);
+    setProviderDraft(emptyProviderDraft(snapshot.channels[0]?.id ?? ''));
     setIsProviderDialogOpen(false);
   }
 
-  async function handleCredential(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSaveCredential(credentialDraft);
-    setCredentialDraft((current) => ({ ...current, secret_value: '' }));
+  function openNewProviderDialog(channelId?: string) {
+    setEditingProviderId(null);
+    setProviderDraft(emptyProviderDraft(channelId ?? snapshot.channels[0]?.id ?? ''));
+    setIsProviderDialogOpen(true);
+  }
+
+  function openEditProviderDialog(providerId: string) {
+    const provider = snapshot.providers.find((item) => item.id === providerId);
+    if (!provider) {
+      return;
+    }
+
+    setEditingProviderId(provider.id);
+    setProviderDraft(providerDraftFromRecord(provider));
+    setIsProviderDialogOpen(true);
+  }
+
+  function resetCredentialDialog() {
+    setCredentialDraft(
+      emptyCredentialDraft(
+        snapshot.tenants[0]?.id ?? 'tenant-local',
+        snapshot.providers[0]?.id ?? '',
+      ),
+    );
     setIsCredentialDialogOpen(false);
   }
 
-  async function handleModel(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSaveModel({
-      external_name: modelDraft.external_name,
-      provider_id: modelDraft.provider_id,
-      capabilities: modelDraft.capabilities.split(',').map((value) => value.trim()).filter(Boolean),
-      streaming: modelDraft.streaming,
-      context_window: Number(modelDraft.context_window),
+  function openNewCredentialDialog(providerId?: string) {
+    setCredentialDraft(
+      emptyCredentialDraft(
+        snapshot.tenants[0]?.id ?? 'tenant-local',
+        providerId ?? snapshot.providers[0]?.id ?? '',
+      ),
+    );
+    setIsCredentialDialogOpen(true);
+  }
+
+  function openEditCredentialDialog(record?: CredentialRecord) {
+    if (!record) {
+      openNewCredentialDialog();
+      return;
+    }
+
+    setCredentialDraft(credentialDraftFromRecord(record));
+    setIsCredentialDialogOpen(true);
+  }
+
+  function openChannelModelsDialog(channelId: string) {
+    setActiveChannelId(channelId);
+    setIsChannelModelsDialogOpen(true);
+  }
+
+  function resetChannelModelEditor() {
+    setEditingChannelModelKey(null);
+    setChannelModelDraft(
+      emptyChannelModelDraft(activeChannelId || (snapshot.channels[0]?.id ?? '')),
+    );
+    setIsChannelModelEditorOpen(false);
+  }
+
+  function openNewChannelModelDialog(channelId: string) {
+    setActiveChannelId(channelId);
+    setEditingChannelModelKey(null);
+    setChannelModelDraft(emptyChannelModelDraft(channelId));
+    setIsChannelModelEditorOpen(true);
+  }
+
+  function openEditChannelModelDialog(record: ChannelModelRecord) {
+    setActiveChannelId(record.channel_id);
+    setEditingChannelModelKey(`${record.channel_id}:${record.model_id}`);
+    setChannelModelDraft(channelModelDraftFromRecord(record));
+    setIsChannelModelEditorOpen(true);
+  }
+
+  function resetModelPriceEditor() {
+    setEditingModelPriceKey(null);
+    setModelPriceDraft(
+      emptyModelPriceDraft(
+        pricingTarget?.channel_id ?? activeChannelId,
+        pricingTarget?.model_id ?? '',
+      ),
+    );
+    setIsModelPriceEditorOpen(false);
+  }
+
+  function openPricingDialog(record: ChannelModelRecord) {
+    setActiveChannelId(record.channel_id);
+    setPricingTarget({
+      channel_id: record.channel_id,
+      model_id: record.model_id,
+      model_display_name: record.model_display_name,
     });
-    setIsModelDialogOpen(false);
+    setIsPricingDialogOpen(true);
+  }
+
+  function openNewModelPriceDialog() {
+    if (!pricingTarget) {
+      return;
+    }
+
+    setEditingModelPriceKey(null);
+    setModelPriceDraft(
+      emptyModelPriceDraft(pricingTarget.channel_id, pricingTarget.model_id),
+    );
+    setIsModelPriceEditorOpen(true);
+  }
+
+  function openEditModelPriceDialog(record: ModelPriceRecord) {
+    setPricingTarget({
+      channel_id: record.channel_id,
+      model_id: record.model_id,
+      model_display_name:
+        snapshot.channelModels.find(
+          (item) =>
+            item.channel_id === record.channel_id && item.model_id === record.model_id,
+        )?.model_display_name ?? record.model_id,
+    });
+    setEditingModelPriceKey(
+      `${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`,
+    );
+    setModelPriceDraft(modelPriceDraftFromRecord(record));
+    setIsModelPriceEditorOpen(true);
+  }
+
+  async function handleChannelSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveChannel(channelDraft);
+
+    const channelId = channelDraft.id.trim();
+    const existingModelIds = new Set(
+      snapshot.channelModels
+        .filter((model) => model.channel_id === channelId)
+        .map((model) => model.model_id),
+    );
+    const nextModelIds = new Set<string>();
+
+    for (const draft of channelSeedModels) {
+      const modelId = draft.model_id.trim();
+      const modelDisplayName = draft.model_display_name.trim();
+
+      if (!modelId || !modelDisplayName) {
+        continue;
+      }
+
+      nextModelIds.add(modelId);
+      await onSaveChannelModel({
+        channel_id: channelId,
+        model_id: modelId,
+        model_display_name: modelDisplayName,
+        capabilities: splitCapabilities(draft.capabilities),
+        streaming: draft.streaming,
+        context_window: parseOptionalNumber(draft.context_window),
+        description: draft.description.trim() || undefined,
+      });
+    }
+
+    if (editingChannelId === channelId) {
+      for (const existingModelId of existingModelIds) {
+        if (!nextModelIds.has(existingModelId)) {
+          await onDeleteChannelModel(channelId, existingModelId);
+        }
+      }
+    }
+
+    setActiveChannelId(channelId);
+    resetChannelDialog();
+  }
+
+  async function handleProviderSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const bindingIds = Array.from(
+      new Set(
+        [providerDraft.primary_channel_id, ...providerDraft.bound_channel_ids]
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    await onSaveProvider({
+      id: providerDraft.id.trim(),
+      channel_id: providerDraft.primary_channel_id.trim(),
+      extension_id: providerDraft.extension_id.trim() || undefined,
+      adapter_kind: providerDraft.adapter_kind.trim(),
+      base_url: providerDraft.base_url.trim(),
+      display_name: providerDraft.display_name.trim(),
+      channel_bindings: bindingIds.map((channelId) => ({
+        channel_id: channelId,
+        is_primary: channelId === providerDraft.primary_channel_id,
+      })),
+    });
+
+    resetProviderDialog();
+  }
+
+  async function handleCredentialSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveCredential({
+      tenant_id: credentialDraft.tenant_id.trim(),
+      provider_id: credentialDraft.provider_id.trim(),
+      key_reference: credentialDraft.key_reference.trim(),
+      secret_value: credentialDraft.secret_value,
+    });
+    resetCredentialDialog();
+  }
+
+  async function handleChannelModelSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveChannelModel({
+      channel_id: channelModelDraft.channel_id.trim(),
+      model_id: channelModelDraft.model_id.trim(),
+      model_display_name: channelModelDraft.model_display_name.trim(),
+      capabilities: splitCapabilities(channelModelDraft.capabilities),
+      streaming: channelModelDraft.streaming,
+      context_window: parseOptionalNumber(channelModelDraft.context_window),
+      description: channelModelDraft.description.trim() || undefined,
+    });
+    setActiveChannelId(channelModelDraft.channel_id);
+    resetChannelModelEditor();
+  }
+
+  async function handleModelPriceSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveModelPrice({
+      channel_id: modelPriceDraft.channel_id.trim(),
+      model_id: modelPriceDraft.model_id.trim(),
+      proxy_provider_id: modelPriceDraft.proxy_provider_id.trim(),
+      currency_code: modelPriceDraft.currency_code.trim(),
+      price_unit: modelPriceDraft.price_unit.trim(),
+      input_price: parseRequiredNumber(modelPriceDraft.input_price),
+      output_price: parseRequiredNumber(modelPriceDraft.output_price),
+      cache_read_price: parseRequiredNumber(modelPriceDraft.cache_read_price),
+      cache_write_price: parseRequiredNumber(modelPriceDraft.cache_write_price),
+      request_price: parseRequiredNumber(modelPriceDraft.request_price),
+      is_active: modelPriceDraft.is_active,
+    });
+    resetModelPriceEditor();
   }
 
   async function confirmDelete() {
@@ -188,21 +684,23 @@ export function CatalogPage({
 
     if (pendingDelete.kind === 'channel') {
       await onDeleteChannel(pendingDelete.channelId);
-    }
-
-    if (pendingDelete.kind === 'provider') {
+    } else if (pendingDelete.kind === 'provider') {
       await onDeleteProvider(pendingDelete.providerId);
-    }
-
-    if (pendingDelete.kind === 'credential') {
+    } else if (pendingDelete.kind === 'credential') {
       await onDeleteCredential(
         pendingDelete.tenantId,
         pendingDelete.providerId,
         pendingDelete.keyReference,
       );
-    }
-
-    if (pendingDelete.kind === 'model') {
+    } else if (pendingDelete.kind === 'channel-model') {
+      await onDeleteChannelModel(pendingDelete.channelId, pendingDelete.modelId);
+    } else if (pendingDelete.kind === 'model-price') {
+      await onDeleteModelPrice(
+        pendingDelete.channelId,
+        pendingDelete.modelId,
+        pendingDelete.proxyProviderId,
+      );
+    } else if (pendingDelete.kind === 'model') {
       await onDeleteModel(pendingDelete.externalName, pendingDelete.providerId);
     }
 
@@ -212,202 +710,571 @@ export function CatalogPage({
   return (
     <div className="adminx-page-grid">
       <section className="adminx-stat-grid">
-        <StatCard label="Channels" value={String(snapshot.channels.length)} detail="Adapter or protocol surfaces exposed to the router." />
-        <StatCard label="Providers" value={String(snapshot.providers.length)} detail="Proxy provider records and base URL definitions." />
-        <StatCard label="Credentials" value={String(snapshot.credentials.length)} detail="Upstream secret references tracked by the control plane." />
-        <StatCard label="Models" value={String(snapshot.models.length)} detail="Published model entries currently available for routing." />
+        <StatCard
+          label="Channels"
+          value={String(snapshot.channels.length)}
+          detail="Canonical ai_channel registry."
+        />
+        <StatCard
+          label="Channel models"
+          value={String(snapshot.channelModels.length)}
+          detail="Channel-to-model mappings."
+        />
+        <StatCard
+          label="Model pricing"
+          value={String(snapshot.modelPrices.length)}
+          detail="Provider-aware ai_model_price rows."
+        />
+        <StatCard
+          label="Proxy providers"
+          value={String(snapshot.providers.length)}
+          detail="Upstream provider endpoints and bindings."
+        />
+        <StatCard
+          label="Credentials"
+          value={String(snapshot.credentials.length)}
+          detail="Encrypted ai_router_credential_records entries."
+        />
       </section>
 
       <PageToolbar
         title="Catalog workbench"
-        detail="Review the registries first, then open a dedicated dialog only when you need to create or edit configuration."
-        actions={(
+        detail="Use a channel-first workflow: define channels, attach supported models, then maintain provider pricing and router credentials through focused dialogs."
+        actions={
           <>
-            <Dialog open={isChannelDialogOpen} onOpenChange={setIsChannelDialogOpen}>
-              <DialogTrigger asChild>
-                <InlineButton tone="primary" onClick={() => setIsChannelDialogOpen(true)}>New channel</InlineButton>
-              </DialogTrigger>
-              <DialogContent size="medium">
-                <AdminDialog title="New channel" detail="Channels define the surface that providers attach to.">
-                  <form className="adminx-form-grid" onSubmit={(event) => void handleChannel(event)}>
-                    <FormField label="Channel id"><input value={channelDraft.id} onChange={(event) => setChannelDraft((current) => ({ ...current, id: event.target.value }))} required /></FormField>
-                    <FormField label="Channel name"><input value={channelDraft.name} onChange={(event) => setChannelDraft((current) => ({ ...current, name: event.target.value }))} required /></FormField>
-                    <DialogFooter>
-                      <InlineButton onClick={() => setIsChannelDialogOpen(false)}>Cancel</InlineButton>
-                      <InlineButton tone="primary" type="submit">Save channel</InlineButton>
-                    </DialogFooter>
-                  </form>
-                </AdminDialog>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isProviderDialogOpen} onOpenChange={setIsProviderDialogOpen}>
-              <DialogTrigger asChild>
-                <InlineButton onClick={() => setIsProviderDialogOpen(true)}>New provider</InlineButton>
-              </DialogTrigger>
-              <DialogContent size="large">
-                <AdminDialog title="New provider" detail="Providers hold adapter metadata, extension identity, and upstream endpoint details.">
-                  <form className="adminx-form-grid" onSubmit={(event) => void handleProvider(event)}>
-                    <FormField label="Provider id"><input value={providerDraft.id} onChange={(event) => setProviderDraft((current) => ({ ...current, id: event.target.value }))} required /></FormField>
-                    <FormField label="Channel id">
-                      {snapshot.channels.length ? (
-                        <select value={providerDraft.channel_id} onChange={(event) => setProviderDraft((current) => ({ ...current, channel_id: event.target.value }))}>
-                          {snapshot.channels.map((channel) => (
-                            <option key={channel.id} value={channel.id}>{channel.name} ({channel.id})</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input value={providerDraft.channel_id} onChange={(event) => setProviderDraft((current) => ({ ...current, channel_id: event.target.value }))} required />
-                      )}
-                    </FormField>
-                    <FormField label="Display name"><input value={providerDraft.display_name} onChange={(event) => setProviderDraft((current) => ({ ...current, display_name: event.target.value }))} required /></FormField>
-                    <FormField label="Adapter kind"><input value={providerDraft.adapter_kind} onChange={(event) => setProviderDraft((current) => ({ ...current, adapter_kind: event.target.value }))} required /></FormField>
-                    <FormField label="Base URL"><input value={providerDraft.base_url} onChange={(event) => setProviderDraft((current) => ({ ...current, base_url: event.target.value }))} required /></FormField>
-                    <FormField label="Extension id"><input value={providerDraft.extension_id} onChange={(event) => setProviderDraft((current) => ({ ...current, extension_id: event.target.value }))} /></FormField>
-                    <DialogFooter>
-                      <InlineButton onClick={() => setIsProviderDialogOpen(false)}>Cancel</InlineButton>
-                      <InlineButton tone="primary" type="submit">Save provider</InlineButton>
-                    </DialogFooter>
-                  </form>
-                </AdminDialog>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isCredentialDialogOpen} onOpenChange={setIsCredentialDialogOpen}>
-              <DialogTrigger asChild>
-                <InlineButton onClick={() => setIsCredentialDialogOpen(true)}>Rotate credential</InlineButton>
-              </DialogTrigger>
-              <DialogContent size="large">
-                <AdminDialog title="Rotate credential" detail="Secrets remain write-only. Use this flow to add or rotate upstream credentials without crowding the inventory view.">
-                  <form className="adminx-form-grid" onSubmit={(event) => void handleCredential(event)}>
-                    <FormField label="Tenant">
-                      {snapshot.tenants.length ? (
-                        <select value={credentialDraft.tenant_id} onChange={(event) => setCredentialDraft((current) => ({ ...current, tenant_id: event.target.value }))}>
-                          {snapshot.tenants.map((tenant) => (
-                            <option key={tenant.id} value={tenant.id}>{tenant.name} ({tenant.id})</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input value={credentialDraft.tenant_id} onChange={(event) => setCredentialDraft((current) => ({ ...current, tenant_id: event.target.value }))} required />
-                      )}
-                    </FormField>
-                    <FormField label="Provider">
-                      {snapshot.providers.length ? (
-                        <select value={credentialDraft.provider_id} onChange={(event) => setCredentialDraft((current) => ({ ...current, provider_id: event.target.value }))}>
-                          {snapshot.providers.map((provider) => (
-                            <option key={provider.id} value={provider.id}>{provider.display_name} ({provider.id})</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input value={credentialDraft.provider_id} onChange={(event) => setCredentialDraft((current) => ({ ...current, provider_id: event.target.value }))} required />
-                      )}
-                    </FormField>
-                    <FormField label="Key reference"><input value={credentialDraft.key_reference} onChange={(event) => setCredentialDraft((current) => ({ ...current, key_reference: event.target.value }))} required /></FormField>
-                    <FormField label="Secret value" hint="The cleartext secret is never returned by the admin API."><input value={credentialDraft.secret_value} onChange={(event) => setCredentialDraft((current) => ({ ...current, secret_value: event.target.value }))} type="password" required /></FormField>
-                    <div className="adminx-note">
-                      <strong>Credential posture</strong>
-                      <p>
-                        Backend: {selectedCredential?.secret_backend ?? 'server-managed default'}
-                        {' | '}
-                        Storage: {selectedCredential ? credentialStorageLabel(selectedCredential) : 'selected by the control plane'}
-                      </p>
-                    </div>
-                    <DialogFooter>
-                      <InlineButton onClick={() => setIsCredentialDialogOpen(false)}>Cancel</InlineButton>
-                      <InlineButton tone="primary" type="submit">Save credential</InlineButton>
-                    </DialogFooter>
-                  </form>
-                </AdminDialog>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isModelDialogOpen} onOpenChange={setIsModelDialogOpen}>
-              <DialogTrigger asChild>
-                <InlineButton onClick={() => setIsModelDialogOpen(true)}>New model</InlineButton>
-              </DialogTrigger>
-              <DialogContent size="large">
-                <AdminDialog title="New model" detail="Models stay close to the routing mesh, but editing belongs in a dedicated dialog.">
-                  <form className="adminx-form-grid" onSubmit={(event) => void handleModel(event)}>
-                    <FormField label="Model name"><input value={modelDraft.external_name} onChange={(event) => setModelDraft((current) => ({ ...current, external_name: event.target.value }))} required /></FormField>
-                    <FormField label="Provider">
-                      {snapshot.providers.length ? (
-                        <select value={modelDraft.provider_id} onChange={(event) => setModelDraft((current) => ({ ...current, provider_id: event.target.value }))}>
-                          {snapshot.providers.map((provider) => (
-                            <option key={provider.id} value={provider.id}>{provider.display_name} ({provider.id})</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input value={modelDraft.provider_id} onChange={(event) => setModelDraft((current) => ({ ...current, provider_id: event.target.value }))} required />
-                      )}
-                    </FormField>
-                    <FormField label="Capabilities"><input value={modelDraft.capabilities} onChange={(event) => setModelDraft((current) => ({ ...current, capabilities: event.target.value }))} required /></FormField>
-                    <FormField label="Context window"><input value={modelDraft.context_window} onChange={(event) => setModelDraft((current) => ({ ...current, context_window: event.target.value }))} type="number" /></FormField>
-                    <FormField label="Streaming">
-                      <select value={modelDraft.streaming ? 'true' : 'false'} onChange={(event) => setModelDraft((current) => ({ ...current, streaming: event.target.value === 'true' }))}>
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
-                      </select>
-                    </FormField>
-                    <div className="adminx-note">
-                      <strong>Selected provider posture</strong>
-                      <p>
-                        Channel: {selectedProvider?.channel_id ?? '-'}
-                        {' | '}
-                        Base URL: {selectedProvider?.base_url ?? '-'}
-                      </p>
-                    </div>
-                    <DialogFooter>
-                      <InlineButton onClick={() => setIsModelDialogOpen(false)}>Cancel</InlineButton>
-                      <InlineButton tone="primary" type="submit">Save model</InlineButton>
-                    </DialogFooter>
-                  </form>
-                </AdminDialog>
-              </DialogContent>
-            </Dialog>
+            <InlineButton tone="primary" onClick={openNewChannelDialog}>
+              New channel
+            </InlineButton>
+            <InlineButton onClick={() => openNewProviderDialog()}>
+              New proxy provider
+            </InlineButton>
+            <InlineButton onClick={() => openNewCredentialDialog()}>
+              Rotate credential
+            </InlineButton>
           </>
-        )}
+        }
       >
         <div className="adminx-form-grid">
           <div className="adminx-note">
-            <strong>Dependency order</strong>
-            <p>Channels feed providers, providers feed models, and credentials should be rotated before live traffic is expanded.</p>
+            <strong>Schema discipline</strong>
+            <p>
+              Catalog-facing persistence now follows a canonical ai_* naming pattern, with
+              lowercase snake_case fields across channel, provider, model, pricing, and
+              credential data.
+            </p>
           </div>
           <div className="adminx-note">
-            <strong>Delete posture</strong>
-            <p>Delete actions stay behind confirmation so downstream impact is explicit before any registry record is removed.</p>
+            <strong>Channel-first flow</strong>
+            <p>
+              Manage models from the channel record, then drill into provider pricing per
+              model. This keeps API exposure, provider availability, and price posture aligned.
+            </p>
+          </div>
+          <div className="adminx-note">
+            <strong>Safety rails</strong>
+            <p>
+              Delete actions remain behind confirmation and the channel registry blocks
+              destructive removal when proxy providers are still bound to a channel.
+            </p>
           </div>
         </div>
       </PageToolbar>
 
-      <Surface title="Coverage posture" detail="Quickly see which providers are ready for live upstream traffic.">
-        <div className="adminx-card-grid">
-          <article className="adminx-mini-card">
-            <div className="adminx-row"><strong>Covered providers</strong><Pill tone="live">{providersWithCredentials.size}</Pill></div>
-            <p>Providers with at least one credential record.</p>
-          </article>
-          <article className="adminx-mini-card">
-            <div className="adminx-row"><strong>Missing coverage</strong><Pill tone={providersWithoutCredentials.length ? 'danger' : 'default'}>{providersWithoutCredentials.length}</Pill></div>
-            <p>{providersWithoutCredentials.length ? providersWithoutCredentials.map((provider) => provider.display_name).join(', ') : 'All providers currently have credential coverage.'}</p>
-          </article>
-          <article className="adminx-mini-card">
-            <div className="adminx-row"><strong>Orphan credentials</strong><Pill tone={orphanCredentials.length ? 'danger' : 'default'}>{orphanCredentials.length}</Pill></div>
-            <p>{orphanCredentials.length ? 'Credential rows exist for providers that are no longer present in the registry.' : 'No orphaned credential rows detected.'}</p>
-          </article>
-        </div>
-      </Surface>
+      <Dialog
+        open={isChannelDialogOpen}
+        onOpenChange={(nextOpen) =>
+          nextOpen ? setIsChannelDialogOpen(true) : resetChannelDialog()
+        }
+      >
+        <DialogContent size="large">
+          <AdminDialog
+            title={editingChannelId ? 'Edit channel' : 'New channel'}
+            detail="Channel records can define a starter set of supported models. For ongoing maintenance you can also open Manage models from the channel registry."
+          >
+            <form className="adminx-form-grid" onSubmit={(event) => void handleChannelSubmit(event)}>
+              <FormField
+                label="Channel id"
+                hint="Stable lowercase identifiers are recommended."
+              >
+                <input
+                  value={channelDraft.id}
+                  onChange={(event) =>
+                    setChannelDraft((current) => ({
+                      ...current,
+                      id: event.target.value,
+                    }))
+                  }
+                  disabled={Boolean(editingChannelId)}
+                  required
+                />
+              </FormField>
+              <FormField label="Channel name">
+                <input
+                  value={channelDraft.name}
+                  onChange={(event) =>
+                    setChannelDraft((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <div className="adminx-note">
+                <strong>Supported models</strong>
+                <p>
+                  The channel modal supports dynamic model rows, including model ID and model
+                  display name, so initial channel configuration can be completed in one pass.
+                </p>
+              </div>
+              {channelSeedModels.map((draft, index) => (
+                <div key={draft.draft_id} className="adminx-form-grid">
+                  <div className="adminx-row">
+                    <strong>Model #{index + 1}</strong>
+                    <InlineButton
+                      disabled={channelSeedModels.length === 1}
+                      onClick={() =>
+                        setChannelSeedModels((current) =>
+                          current.length === 1
+                            ? current
+                            : current.filter((item) => item.draft_id !== draft.draft_id),
+                        )
+                      }
+                    >
+                      Remove
+                    </InlineButton>
+                  </div>
+                  <FormField label="Model ID">
+                    <input
+                      value={draft.model_id}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, model_id: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Model display name">
+                    <input
+                      value={draft.model_display_name}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, model_display_name: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Capabilities">
+                    <input
+                      value={draft.capabilities}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, capabilities: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Context window">
+                    <input
+                      value={draft.context_window}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, context_window: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                    />
+                  </FormField>
+                  <FormField label="Streaming">
+                    <select
+                      value={draft.streaming ? 'true' : 'false'}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, streaming: event.target.value === 'true' }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Description">
+                    <input
+                      value={draft.description}
+                      onChange={(event) =>
+                        setChannelSeedModels((current) =>
+                          current.map((item) =>
+                            item.draft_id === draft.draft_id
+                              ? { ...item, description: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </FormField>
+                </div>
+              ))}
+              <DialogFooter>
+                <InlineButton
+                  onClick={() =>
+                    setChannelSeedModels((current) => [...current, emptySeedModelDraft()])
+                  }
+                >
+                  Add supported model
+                </InlineButton>
+                <InlineButton onClick={resetChannelDialog}>Cancel</InlineButton>
+                <InlineButton tone="primary" type="submit">
+                  {editingChannelId ? 'Save channel' : 'Create channel'}
+                </InlineButton>
+              </DialogFooter>
+            </form>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
 
-      <Surface title="Channel registry" detail="Live channel catalog from the admin API.">
+      <Dialog
+        open={isProviderDialogOpen}
+        onOpenChange={(nextOpen) =>
+          nextOpen ? setIsProviderDialogOpen(true) : resetProviderDialog()
+        }
+      >
+        <DialogContent size="large">
+          <AdminDialog
+            title={editingProviderId ? 'Edit proxy provider' : 'New proxy provider'}
+            detail="Provider records define adapter identity, endpoint information, and bound channels."
+          >
+            <form className="adminx-form-grid" onSubmit={(event) => void handleProviderSubmit(event)}>
+              <FormField label="Provider id">
+                <input
+                  value={providerDraft.id}
+                  onChange={(event) =>
+                    setProviderDraft((current) => ({
+                      ...current,
+                      id: event.target.value,
+                    }))
+                  }
+                  disabled={Boolean(editingProviderId)}
+                  required
+                />
+              </FormField>
+              <FormField label="Display name">
+                <input
+                  value={providerDraft.display_name}
+                  onChange={(event) =>
+                    setProviderDraft((current) => ({
+                      ...current,
+                      display_name: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Adapter kind">
+                <input
+                  value={providerDraft.adapter_kind}
+                  onChange={(event) =>
+                    setProviderDraft((current) => ({
+                      ...current,
+                      adapter_kind: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Base URL">
+                <input
+                  value={providerDraft.base_url}
+                  onChange={(event) =>
+                    setProviderDraft((current) => ({
+                      ...current,
+                      base_url: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Extension id">
+                <input
+                  value={providerDraft.extension_id}
+                  onChange={(event) =>
+                    setProviderDraft((current) => ({
+                      ...current,
+                      extension_id: event.target.value,
+                    }))
+                  }
+                />
+              </FormField>
+              <FormField label="Primary channel">
+                {snapshot.channels.length ? (
+                  <select
+                    value={providerDraft.primary_channel_id}
+                    onChange={(event) =>
+                      setProviderDraft((current) => ({
+                        ...current,
+                        primary_channel_id: event.target.value,
+                        bound_channel_ids: current.bound_channel_ids.includes(event.target.value)
+                          ? current.bound_channel_ids
+                          : [...current.bound_channel_ids, event.target.value],
+                      }))
+                    }
+                  >
+                    {snapshot.channels.map((channel) => (
+                      <option key={channel.id} value={channel.id}>
+                        {channel.name} ({channel.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={providerDraft.primary_channel_id}
+                    onChange={(event) =>
+                      setProviderDraft((current) => ({
+                        ...current,
+                        primary_channel_id: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                )}
+              </FormField>
+              <div className="adminx-note">
+                <strong>Bound channels</strong>
+                <p>
+                  Choose every API surface this proxy provider should expose. The primary channel
+                  becomes the default runtime affinity.
+                </p>
+              </div>
+              {snapshot.channels.length ? (
+                <div className="adminx-form-grid">
+                  {snapshot.channels.map((channel) => (
+                    <label key={channel.id} className="adminx-row">
+                      <input
+                        checked={providerDraft.bound_channel_ids.includes(channel.id)}
+                        onChange={(event) =>
+                          setProviderDraft((current) => ({
+                            ...current,
+                            bound_channel_ids: event.target.checked
+                              ? Array.from(
+                                  new Set([...current.bound_channel_ids, channel.id]),
+                                )
+                              : current.bound_channel_ids.filter(
+                                  (value) => value !== channel.id,
+                                ),
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      <span>
+                        {channel.name} ({channel.id})
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+              <DialogFooter>
+                <InlineButton onClick={resetProviderDialog}>Cancel</InlineButton>
+                <InlineButton tone="primary" type="submit">
+                  {editingProviderId ? 'Save provider' : 'Create provider'}
+                </InlineButton>
+              </DialogFooter>
+            </form>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isCredentialDialogOpen}
+        onOpenChange={(nextOpen) =>
+          nextOpen ? setIsCredentialDialogOpen(true) : resetCredentialDialog()
+        }
+      >
+        <DialogContent size="large">
+          <AdminDialog
+            title="Rotate credential"
+            detail="Router credentials are stored as encrypted records in ai_router_credential_records. Cleartext input is write-only."
+          >
+            <form className="adminx-form-grid" onSubmit={(event) => void handleCredentialSubmit(event)}>
+              <FormField label="Tenant">
+                {snapshot.tenants.length ? (
+                  <select
+                    value={credentialDraft.tenant_id}
+                    onChange={(event) =>
+                      setCredentialDraft((current) => ({
+                        ...current,
+                        tenant_id: event.target.value,
+                      }))
+                    }
+                  >
+                    {snapshot.tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name} ({tenant.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={credentialDraft.tenant_id}
+                    onChange={(event) =>
+                      setCredentialDraft((current) => ({
+                        ...current,
+                        tenant_id: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                )}
+              </FormField>
+              <FormField label="Proxy provider">
+                {snapshot.providers.length ? (
+                  <select
+                    value={credentialDraft.provider_id}
+                    onChange={(event) =>
+                      setCredentialDraft((current) => ({
+                        ...current,
+                        provider_id: event.target.value,
+                      }))
+                    }
+                  >
+                    {snapshot.providers.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.display_name} ({provider.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={credentialDraft.provider_id}
+                    onChange={(event) =>
+                      setCredentialDraft((current) => ({
+                        ...current,
+                        provider_id: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                )}
+              </FormField>
+              <FormField label="Key reference">
+                <input
+                  value={credentialDraft.key_reference}
+                  onChange={(event) =>
+                    setCredentialDraft((current) => ({
+                      ...current,
+                      key_reference: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField
+                label="Secret value"
+                hint="Only encrypted ciphertext and secret metadata are retained in storage."
+              >
+                <input
+                  value={credentialDraft.secret_value}
+                  onChange={(event) =>
+                    setCredentialDraft((current) => ({
+                      ...current,
+                      secret_value: event.target.value,
+                    }))
+                  }
+                  type="password"
+                  required
+                />
+              </FormField>
+              <DialogFooter>
+                <InlineButton onClick={resetCredentialDialog}>Cancel</InlineButton>
+                <InlineButton tone="primary" type="submit">
+                  Save credential
+                </InlineButton>
+              </DialogFooter>
+            </form>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
+
+      <Surface
+        title="Channel registry"
+        detail="Every router API surface and its published model inventory."
+      >
         <DataTable
           columns={[
-            { key: 'id', label: 'Channel id', render: (channel) => <strong>{channel.id}</strong> },
-            { key: 'name', label: 'Name', render: (channel) => channel.name },
+            {
+              key: 'id',
+              label: 'Channel id',
+              render: (channel) => <strong>{channel.id}</strong>,
+            },
+            { key: 'name', label: 'Channel name', render: (channel) => channel.name },
+            {
+              key: 'models',
+              label: 'Models',
+              render: (channel) => (
+                <Pill tone={channelsWithModels.has(channel.id) ? 'live' : 'default'}>
+                  {
+                    snapshot.channelModels.filter(
+                      (model) => model.channel_id === channel.id,
+                    ).length
+                  }
+                </Pill>
+              ),
+            },
+            {
+              key: 'providers',
+              label: 'Providers',
+              render: (channel) => (
+                <Pill tone={channelsWithProviders.has(channel.id) ? 'seed' : 'default'}>
+                  {
+                    snapshot.providers.filter((provider) =>
+                      providerChannelIds(provider).includes(channel.id),
+                    ).length
+                  }
+                </Pill>
+              ),
+            },
             {
               key: 'actions',
               label: 'Actions',
               render: (channel) => (
                 <div className="adminx-row">
-                  <InlineButton onClick={() => { setChannelDraft({ id: channel.id, name: channel.name }); setIsChannelDialogOpen(true); }}>Edit channel</InlineButton>
-                  <InlineButton tone="danger" disabled={channelsWithProviders.has(channel.id)} onClick={() => setPendingDelete({ kind: 'channel', label: channel.name, channelId: channel.id })}>Delete</InlineButton>
+                  <InlineButton onClick={() => openEditChannelDialog(channel.id)}>
+                    Edit channel
+                  </InlineButton>
+                  <InlineButton onClick={() => openChannelModelsDialog(channel.id)}>
+                    Manage models
+                  </InlineButton>
+                  <InlineButton
+                    tone="danger"
+                    disabled={channelsWithProviders.has(channel.id)}
+                    onClick={() =>
+                      setPendingDelete({
+                        kind: 'channel',
+                        label: `${channel.name} (${channel.id})`,
+                        channelId: channel.id,
+                      })
+                    }
+                  >
+                    Delete
+                  </InlineButton>
                 </div>
               ),
             },
@@ -418,80 +1285,649 @@ export function CatalogPage({
         />
       </Surface>
 
-      <Surface title="Provider registry" detail="Provider records, bound channels, and credential coverage.">
+      <Surface
+        title="Proxy provider registry"
+        detail="Upstream providers, base URLs, and multi-channel bindings."
+      >
         <DataTable
           columns={[
-            { key: 'id', label: 'Provider id', render: (provider) => <strong>{provider.id}</strong> },
-            { key: 'channel', label: 'Channel', render: (provider) => provider.channel_id },
-            { key: 'display', label: 'Display', render: (provider) => provider.display_name },
-            { key: 'base', label: 'Base URL', render: (provider) => provider.base_url },
-            { key: 'credentials', label: 'Credentials', render: (provider) => <Pill tone={providersWithCredentials.has(provider.id) ? 'live' : 'danger'}>{snapshot.credentials.filter((credential) => credential.provider_id === provider.id).length}</Pill> },
+            {
+              key: 'id',
+              label: 'Provider id',
+              render: (provider) => <strong>{provider.id}</strong>,
+            },
+            {
+              key: 'display_name',
+              label: 'Display name',
+              render: (provider) => provider.display_name,
+            },
+            {
+              key: 'primary_channel',
+              label: 'Primary channel',
+              render: (provider) => provider.channel_id,
+            },
+            {
+              key: 'bound_channels',
+              label: 'Bound channels',
+              render: (provider) => providerChannelIds(provider).join(', '),
+            },
+            {
+              key: 'adapter_kind',
+              label: 'Adapter',
+              render: (provider) => provider.adapter_kind,
+            },
             {
               key: 'actions',
               label: 'Actions',
               render: (provider) => (
                 <div className="adminx-row">
-                  <InlineButton onClick={() => { setProviderDraft({ id: provider.id, channel_id: provider.channel_id, display_name: provider.display_name, adapter_kind: provider.adapter_kind, base_url: provider.base_url, extension_id: provider.extension_id ?? '' }); setIsProviderDialogOpen(true); }}>Edit provider</InlineButton>
-                  <InlineButton onClick={() => { setCredentialDraft((current) => ({ ...current, provider_id: provider.id, secret_value: '' })); setIsCredentialDialogOpen(true); }}>Rotate secret</InlineButton>
-                  <InlineButton tone="danger" disabled={providersWithModels.has(provider.id)} onClick={() => setPendingDelete({ kind: 'provider', label: provider.display_name, providerId: provider.id })}>Delete</InlineButton>
+                  <InlineButton onClick={() => openEditProviderDialog(provider.id)}>
+                    Edit provider
+                  </InlineButton>
+                  <InlineButton onClick={() => openNewCredentialDialog(provider.id)}>
+                    Rotate credential
+                  </InlineButton>
+                  <InlineButton
+                    tone="danger"
+                    onClick={() =>
+                      setPendingDelete({
+                        kind: 'provider',
+                        label: `${provider.display_name} (${provider.id})`,
+                        providerId: provider.id,
+                      })
+                    }
+                  >
+                    Delete
+                  </InlineButton>
                 </div>
               ),
             },
           ]}
           rows={snapshot.providers}
-          empty="No providers available."
+          empty="No proxy providers available."
           getKey={(provider) => provider.id}
         />
       </Surface>
 
-      <Surface title="Credential inventory" detail="Write-only upstream secret inventory and backend placement metadata.">
+      <Surface
+        title="Router credential inventory"
+        detail="Encrypted upstream credentials grouped by tenant and proxy provider."
+      >
         <DataTable
           columns={[
-            { key: 'tenant', label: 'Tenant', render: (credential) => <strong>{credential.tenant_id}</strong> },
-            { key: 'provider', label: 'Provider', render: (credential) => credential.provider_id },
-            { key: 'reference', label: 'Key reference', render: (credential) => credential.key_reference },
-            { key: 'backend', label: 'Backend', render: (credential) => <Pill tone={credential.secret_backend === 'database_encrypted' ? 'live' : 'default'}>{credential.secret_backend}</Pill> },
-            { key: 'storage', label: 'Storage', render: (credential) => credentialStorageLabel(credential) },
+            {
+              key: 'tenant',
+              label: 'Tenant',
+              render: (credential) => <strong>{credential.tenant_id}</strong>,
+            },
+            {
+              key: 'provider',
+              label: 'Proxy provider',
+              render: (credential) =>
+                providerNameById.get(credential.provider_id) ?? credential.provider_id,
+            },
+            {
+              key: 'reference',
+              label: 'Key reference',
+              render: (credential) => credential.key_reference,
+            },
+            {
+              key: 'backend',
+              label: 'Backend',
+              render: (credential) => credential.secret_backend,
+            },
+            {
+              key: 'storage',
+              label: 'Storage',
+              render: (credential) => credentialStorageLabel(credential),
+            },
             {
               key: 'actions',
               label: 'Actions',
               render: (credential) => (
                 <div className="adminx-row">
-                  <InlineButton onClick={() => { setCredentialDraft({ tenant_id: credential.tenant_id, provider_id: credential.provider_id, key_reference: credential.key_reference, secret_value: '' }); setIsCredentialDialogOpen(true); }}>Rotate secret</InlineButton>
-                  <InlineButton tone="danger" onClick={() => setPendingDelete({ kind: 'credential', label: credential.key_reference, tenantId: credential.tenant_id, providerId: credential.provider_id, keyReference: credential.key_reference })}>Delete</InlineButton>
+                  <InlineButton onClick={() => openEditCredentialDialog(credential)}>
+                    Rotate credential
+                  </InlineButton>
+                  <InlineButton
+                    tone="danger"
+                    onClick={() =>
+                      setPendingDelete({
+                        kind: 'credential',
+                        label: credential.key_reference,
+                        tenantId: credential.tenant_id,
+                        providerId: credential.provider_id,
+                        keyReference: credential.key_reference,
+                      })
+                    }
+                  >
+                    Delete
+                  </InlineButton>
                 </div>
               ),
             },
           ]}
           rows={snapshot.credentials}
-          empty="No provider credentials available."
-          getKey={(credential) => `${credential.tenant_id}:${credential.provider_id}:${credential.key_reference}`}
+          empty="No router credentials available."
+          getKey={(credential) =>
+            `${credential.tenant_id}:${credential.provider_id}:${credential.key_reference}`
+          }
         />
       </Surface>
 
-      <Surface title="Model registry" detail="Live model catalog used by the routing layer.">
+      <Surface
+        title="Provider variant inventory"
+        detail="Synthesized provider-scoped models that the runtime can route today."
+      >
         <DataTable
           columns={[
-            { key: 'name', label: 'Model', render: (model) => <strong>{model.external_name}</strong> },
-            { key: 'provider', label: 'Provider', render: (model) => model.provider_id },
-            { key: 'caps', label: 'Capabilities', render: (model) => model.capabilities.join(', ') || '-' },
-            { key: 'streaming', label: 'Streaming', render: (model) => String(model.streaming) },
+            {
+              key: 'model',
+              label: 'Model',
+              render: (model) => <strong>{model.external_name}</strong>,
+            },
+            {
+              key: 'provider',
+              label: 'Provider',
+              render: (model) =>
+                providerNameById.get(model.provider_id) ?? model.provider_id,
+            },
+            {
+              key: 'capabilities',
+              label: 'Capabilities',
+              render: (model) => model.capabilities.join(', ') || '-',
+            },
+            {
+              key: 'streaming',
+              label: 'Streaming',
+              render: (model) => String(model.streaming),
+            },
             {
               key: 'actions',
               label: 'Actions',
               render: (model) => (
                 <div className="adminx-row">
-                  <InlineButton onClick={() => { setModelDraft({ external_name: model.external_name, provider_id: model.provider_id, capabilities: model.capabilities.join(', '), streaming: model.streaming, context_window: String(model.context_window ?? '') }); setIsModelDialogOpen(true); }}>Edit model</InlineButton>
-                  <InlineButton tone="danger" onClick={() => setPendingDelete({ kind: 'model', label: model.external_name, externalName: model.external_name, providerId: model.provider_id })}>Delete</InlineButton>
+                  <InlineButton
+                    tone="danger"
+                    onClick={() =>
+                      setPendingDelete({
+                        kind: 'model',
+                        label: `${model.external_name} / ${model.provider_id}`,
+                        externalName: model.external_name,
+                        providerId: model.provider_id,
+                      })
+                    }
+                  >
+                    Delete variant
+                  </InlineButton>
                 </div>
               ),
             },
           ]}
           rows={snapshot.models}
-          empty="No models available."
+          empty="No provider-scoped model variants available."
           getKey={(model) => `${model.external_name}:${model.provider_id}`}
         />
       </Surface>
+
+      <Dialog open={isChannelModelsDialogOpen} onOpenChange={setIsChannelModelsDialogOpen}>
+        <DialogContent size="large">
+          <AdminDialog
+            title={selectedChannel ? `Manage models · ${selectedChannel.name}` : 'Manage models'}
+            detail="Maintain the channel-level API model list. Each channel model can open its own pricing registry by proxy provider."
+          >
+            <div className="adminx-page-grid">
+              <div className="adminx-row">
+                <InlineButton tone="primary" onClick={() => openNewChannelModelDialog(activeChannelId)}>
+                  New channel model
+                </InlineButton>
+              </div>
+              <DataTable
+                columns={[
+                  {
+                    key: 'model_id',
+                    label: 'Model ID',
+                    render: (model) => <strong>{model.model_id}</strong>,
+                  },
+                  {
+                    key: 'display_name',
+                    label: 'Display name',
+                    render: (model) => model.model_display_name,
+                  },
+                  {
+                    key: 'capabilities',
+                    label: 'Capabilities',
+                    render: (model) => model.capabilities.join(', ') || '-',
+                  },
+                  {
+                    key: 'pricing',
+                    label: 'Pricing rows',
+                    render: (model) =>
+                      snapshot.modelPrices.filter(
+                        (record) =>
+                          record.channel_id === model.channel_id &&
+                          record.model_id === model.model_id,
+                      ).length,
+                  },
+                  {
+                    key: 'actions',
+                    label: 'Actions',
+                    render: (model) => (
+                      <div className="adminx-row">
+                        <InlineButton onClick={() => openEditChannelModelDialog(model)}>
+                          Edit
+                        </InlineButton>
+                        <InlineButton onClick={() => openPricingDialog(model)}>
+                          Manage pricing
+                        </InlineButton>
+                        <InlineButton
+                          tone="danger"
+                          onClick={() =>
+                            setPendingDelete({
+                              kind: 'channel-model',
+                              label: `${model.model_display_name} (${model.model_id})`,
+                              channelId: model.channel_id,
+                              modelId: model.model_id,
+                            })
+                          }
+                        >
+                          Delete
+                        </InlineButton>
+                      </div>
+                    ),
+                  },
+                ]}
+                rows={selectedChannelModels}
+                empty="No channel models have been configured for this channel."
+                getKey={(model) => `${model.channel_id}:${model.model_id}`}
+              />
+            </div>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isChannelModelEditorOpen}
+        onOpenChange={(nextOpen) =>
+          nextOpen ? setIsChannelModelEditorOpen(true) : resetChannelModelEditor()
+        }
+      >
+        <DialogContent size="large">
+          <AdminDialog
+            title={editingChannelModelKey ? 'Edit channel model' : 'New channel model'}
+            detail="Channel model rows define what the API catalog exposes before pricing and provider availability are attached."
+          >
+            <form
+              className="adminx-form-grid"
+              onSubmit={(event) => void handleChannelModelSubmit(event)}
+            >
+              <FormField label="Channel">
+                {snapshot.channels.length ? (
+                  <select
+                    value={channelModelDraft.channel_id}
+                    onChange={(event) =>
+                      setChannelModelDraft((current) => ({
+                        ...current,
+                        channel_id: event.target.value,
+                      }))
+                    }
+                  >
+                    {snapshot.channels.map((channel) => (
+                      <option key={channel.id} value={channel.id}>
+                        {channel.name} ({channel.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={channelModelDraft.channel_id}
+                    onChange={(event) =>
+                      setChannelModelDraft((current) => ({
+                        ...current,
+                        channel_id: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                )}
+              </FormField>
+              <FormField label="Model ID">
+                <input
+                  value={channelModelDraft.model_id}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      model_id: event.target.value,
+                    }))
+                  }
+                  disabled={Boolean(editingChannelModelKey)}
+                  required
+                />
+              </FormField>
+              <FormField label="Model display name">
+                <input
+                  value={channelModelDraft.model_display_name}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      model_display_name: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Capabilities">
+                <input
+                  value={channelModelDraft.capabilities}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      capabilities: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Context window">
+                <input
+                  value={channelModelDraft.context_window}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      context_window: event.target.value,
+                    }))
+                  }
+                  type="number"
+                />
+              </FormField>
+              <FormField label="Streaming">
+                <select
+                  value={channelModelDraft.streaming ? 'true' : 'false'}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      streaming: event.target.value === 'true',
+                    }))
+                  }
+                >
+                  <option value="true">Enabled</option>
+                  <option value="false">Disabled</option>
+                </select>
+              </FormField>
+              <FormField label="Description">
+                <input
+                  value={channelModelDraft.description}
+                  onChange={(event) =>
+                    setChannelModelDraft((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                />
+              </FormField>
+              <DialogFooter>
+                <InlineButton onClick={resetChannelModelEditor}>Cancel</InlineButton>
+                <InlineButton tone="primary" type="submit">
+                  {editingChannelModelKey ? 'Save channel model' : 'Create channel model'}
+                </InlineButton>
+              </DialogFooter>
+            </form>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPricingDialogOpen} onOpenChange={setIsPricingDialogOpen}>
+        <DialogContent size="large">
+          <AdminDialog
+            title={
+              pricingTarget
+                ? `Manage pricing · ${pricingTarget.model_display_name}`
+                : 'Manage pricing'
+            }
+            detail="Maintain provider-specific pricing for input, output, cache, and per-request cost dimensions."
+          >
+            <div className="adminx-page-grid">
+              <div className="adminx-row">
+                <InlineButton tone="primary" onClick={openNewModelPriceDialog}>
+                  New model pricing
+                </InlineButton>
+              </div>
+              <DataTable
+                columns={[
+                  {
+                    key: 'provider',
+                    label: 'Proxy provider',
+                    render: (record) =>
+                      providerNameById.get(record.proxy_provider_id) ??
+                      record.proxy_provider_id,
+                  },
+                  { key: 'currency', label: 'Currency', render: (record) => record.currency_code },
+                  { key: 'unit', label: 'Unit', render: (record) => record.price_unit },
+                  { key: 'input', label: 'Input', render: (record) => record.input_price },
+                  { key: 'output', label: 'Output', render: (record) => record.output_price },
+                  {
+                    key: 'cache',
+                    label: 'Cache read/write',
+                    render: (record) =>
+                      `${record.cache_read_price} / ${record.cache_write_price}`,
+                  },
+                  { key: 'request', label: 'Request', render: (record) => record.request_price },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    render: (record) => (
+                      <Pill tone={record.is_active ? 'live' : 'danger'}>
+                        {record.is_active ? 'active' : 'inactive'}
+                      </Pill>
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    label: 'Actions',
+                    render: (record) => (
+                      <div className="adminx-row">
+                        <InlineButton onClick={() => openEditModelPriceDialog(record)}>
+                          Edit
+                        </InlineButton>
+                        <InlineButton
+                          tone="danger"
+                          onClick={() =>
+                            setPendingDelete({
+                              kind: 'model-price',
+                              label: `${record.model_id} / ${record.proxy_provider_id}`,
+                              channelId: record.channel_id,
+                              modelId: record.model_id,
+                              proxyProviderId: record.proxy_provider_id,
+                            })
+                          }
+                        >
+                          Delete
+                        </InlineButton>
+                      </div>
+                    ),
+                  },
+                ]}
+                rows={selectedModelPrices}
+                empty="No provider pricing rows exist for this channel model."
+                getKey={(record) =>
+                  `${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`
+                }
+              />
+            </div>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isModelPriceEditorOpen}
+        onOpenChange={(nextOpen) =>
+          nextOpen ? setIsModelPriceEditorOpen(true) : resetModelPriceEditor()
+        }
+      >
+        <DialogContent size="large">
+          <AdminDialog
+            title={editingModelPriceKey ? 'Edit model pricing' : 'New model pricing'}
+            detail="Pricing rows connect a channel model to a proxy provider and define input, output, cache, and request costs."
+          >
+            <form
+              className="adminx-form-grid"
+              onSubmit={(event) => void handleModelPriceSubmit(event)}
+            >
+              <FormField label="Channel">
+                <input value={modelPriceDraft.channel_id} disabled />
+              </FormField>
+              <FormField label="Model">
+                <input value={modelPriceDraft.model_id} disabled />
+              </FormField>
+              <FormField label="Proxy provider">
+                {snapshot.providers.length ? (
+                  <select
+                    value={modelPriceDraft.proxy_provider_id}
+                    onChange={(event) =>
+                      setModelPriceDraft((current) => ({
+                        ...current,
+                        proxy_provider_id: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select provider</option>
+                    {snapshot.providers.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.display_name} ({provider.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={modelPriceDraft.proxy_provider_id}
+                    onChange={(event) =>
+                      setModelPriceDraft((current) => ({
+                        ...current,
+                        proxy_provider_id: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                )}
+              </FormField>
+              <FormField label="Currency code">
+                <input
+                  value={modelPriceDraft.currency_code}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      currency_code: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Price unit">
+                <input
+                  value={modelPriceDraft.price_unit}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      price_unit: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </FormField>
+              <FormField label="Input price">
+                <input
+                  value={modelPriceDraft.input_price}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      input_price: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  step="0.000001"
+                  required
+                />
+              </FormField>
+              <FormField label="Output price">
+                <input
+                  value={modelPriceDraft.output_price}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      output_price: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  step="0.000001"
+                  required
+                />
+              </FormField>
+              <FormField label="Cache read price">
+                <input
+                  value={modelPriceDraft.cache_read_price}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      cache_read_price: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  step="0.000001"
+                  required
+                />
+              </FormField>
+              <FormField label="Cache write price">
+                <input
+                  value={modelPriceDraft.cache_write_price}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      cache_write_price: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  step="0.000001"
+                  required
+                />
+              </FormField>
+              <FormField label="Request price">
+                <input
+                  value={modelPriceDraft.request_price}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      request_price: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  step="0.000001"
+                  required
+                />
+              </FormField>
+              <FormField label="Status">
+                <select
+                  value={modelPriceDraft.is_active ? 'active' : 'inactive'}
+                  onChange={(event) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      is_active: event.target.value === 'active',
+                    }))
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </FormField>
+              <DialogFooter>
+                <InlineButton onClick={resetModelPriceEditor}>Cancel</InlineButton>
+                <InlineButton tone="primary" type="submit">
+                  {editingModelPriceKey ? 'Save model pricing' : 'Create model pricing'}
+                </InlineButton>
+              </DialogFooter>
+            </form>
+          </AdminDialog>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
@@ -499,21 +1935,29 @@ export function CatalogPage({
           pendingDelete?.kind === 'channel'
             ? 'Delete channel'
             : pendingDelete?.kind === 'provider'
-              ? 'Delete provider'
+              ? 'Delete proxy provider'
               : pendingDelete?.kind === 'credential'
                 ? 'Delete credential'
-                : 'Delete model'
+                : pendingDelete?.kind === 'channel-model'
+                  ? 'Delete channel model'
+                  : pendingDelete?.kind === 'model-price'
+                    ? 'Delete model pricing'
+                    : 'Delete model variant'
         }
         detail={
           pendingDelete?.kind === 'channel'
-            ? `Delete ${pendingDelete.label}. Remove dependent providers first so the routing mesh stays coherent.`
+            ? `Delete ${pendingDelete.label}. Remove or rebind dependent proxy providers before retiring the channel.`
             : pendingDelete?.kind === 'provider'
-              ? `Delete ${pendingDelete.label}. Remove dependent models before retiring the provider record.`
+              ? `Delete ${pendingDelete.label}. This removes the provider record and its pricing or credential associations from the active registry.`
               : pendingDelete?.kind === 'credential'
-                ? `Delete credential ${pendingDelete.label}. This removes the stored provider secret reference from the control plane.`
-                : pendingDelete?.kind === 'model'
-                  ? `Delete model ${pendingDelete.label}. This removes the routeable catalog entry for the selected provider.`
-                  : ''
+                ? `Delete credential ${pendingDelete.label}. The encrypted router secret record will be removed from storage.`
+                : pendingDelete?.kind === 'channel-model'
+                  ? `Delete ${pendingDelete.label}. Associated pricing rows for this channel model will also be retired.`
+                  : pendingDelete?.kind === 'model-price'
+                    ? `Delete pricing row ${pendingDelete.label}. This only removes the selected provider price mapping.`
+                    : pendingDelete?.kind === 'model'
+                      ? `Delete provider model variant ${pendingDelete.label}.`
+                      : ''
         }
         confirmLabel="Delete now"
         onClose={() => setPendingDelete(null)}

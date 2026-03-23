@@ -18,9 +18,12 @@ use sdkwork_api_app_billing::{
     summarize_billing_from_store,
 };
 use sdkwork_api_app_catalog::{
-    delete_channel as delete_catalog_channel, delete_model_variant,
-    delete_provider as delete_catalog_provider, list_channels, list_model_entries, list_providers,
-    persist_channel, persist_model_with_metadata, persist_provider_with_bindings_and_extension_id,
+    delete_channel as delete_catalog_channel, delete_channel_model as delete_catalog_channel_model,
+    delete_model_price as delete_catalog_model_price, delete_model_variant,
+    delete_provider as delete_catalog_provider, list_channel_models, list_channels,
+    list_model_entries, list_model_prices, list_providers, persist_channel,
+    persist_channel_model_with_metadata, persist_model_price_with_rates,
+    persist_model_with_metadata, persist_provider_with_bindings_and_extension_id,
     PersistProviderWithBindingsRequest,
 };
 use sdkwork_api_app_coupon::{delete_coupon, list_coupons, persist_coupon};
@@ -67,7 +70,8 @@ use sdkwork_api_app_usage::list_usage_records;
 use sdkwork_api_app_usage::summarize_usage_records_from_store;
 use sdkwork_api_domain_billing::{BillingSummary, LedgerEntry, QuotaPolicy};
 use sdkwork_api_domain_catalog::{
-    Channel, ModelCapability, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
+    Channel, ChannelModelRecord, ModelCapability, ModelCatalogEntry, ModelPriceRecord,
+    ProviderChannelBinding, ProxyProvider,
 };
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
@@ -453,6 +457,52 @@ struct CreateModelRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct CreateChannelModelRequest {
+    channel_id: String,
+    model_id: String,
+    model_display_name: String,
+    #[serde(default)]
+    capabilities: Vec<ModelCapability>,
+    #[serde(default)]
+    streaming: bool,
+    #[serde(default)]
+    context_window: Option<u64>,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+fn default_currency_code() -> String {
+    "USD".to_owned()
+}
+
+fn default_price_unit() -> String {
+    "per_1m_tokens".to_owned()
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateModelPriceRequest {
+    channel_id: String,
+    model_id: String,
+    proxy_provider_id: String,
+    #[serde(default = "default_currency_code")]
+    currency_code: String,
+    #[serde(default = "default_price_unit")]
+    price_unit: String,
+    #[serde(default)]
+    input_price: f64,
+    #[serde(default)]
+    output_price: f64,
+    #[serde(default)]
+    cache_read_price: f64,
+    #[serde(default)]
+    cache_write_price: f64,
+    #[serde(default)]
+    request_price: f64,
+    #[serde(default = "default_true")]
+    is_active: bool,
+}
+
+#[derive(Debug, Deserialize)]
 struct CreateTenantRequest {
     id: String,
     name: String,
@@ -484,6 +534,8 @@ struct CreateApiKeyRequest {
     environment: String,
     #[serde(default)]
     label: Option<String>,
+    #[serde(default)]
+    notes: Option<String>,
     #[serde(default)]
     expires_at_ms: Option<u64>,
 }
@@ -771,7 +823,9 @@ pub fn admin_router() -> Router {
         .route("/admin/channels", get(|| async { "channels" }))
         .route("/admin/providers", get(|| async { "providers" }))
         .route("/admin/credentials", get(|| async { "credentials" }))
+        .route("/admin/channel-models", get(|| async { "channel-models" }))
         .route("/admin/models", get(|| async { "models" }))
+        .route("/admin/model-prices", get(|| async { "model-prices" }))
         .route(
             "/admin/extensions/installations",
             get(|| async { "extension-installations" }),
@@ -1004,12 +1058,28 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
             delete(delete_credential_handler),
         )
         .route(
+            "/admin/channel-models",
+            get(list_channel_models_handler).post(create_channel_model_handler),
+        )
+        .route(
+            "/admin/channel-models/{channel_id}/models/{model_id}",
+            delete(delete_channel_model_handler),
+        )
+        .route(
             "/admin/models",
             get(list_models_handler).post(create_model_handler),
         )
         .route(
             "/admin/models/{external_name}/providers/{provider_id}",
             delete(delete_model_handler),
+        )
+        .route(
+            "/admin/model-prices",
+            get(list_model_prices_handler).post(create_model_price_handler),
+        )
+        .route(
+            "/admin/model-prices/{channel_id}/models/{model_id}/providers/{proxy_provider_id}",
+            delete(delete_model_price_handler),
         )
         .route(
             "/admin/extensions/installations",
@@ -1514,6 +1584,51 @@ async fn delete_credential_handler(
     }
 }
 
+async fn list_channel_models_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ChannelModelRecord>>, StatusCode> {
+    list_channel_models(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_channel_model_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateChannelModelRequest>,
+) -> Result<(StatusCode, Json<ChannelModelRecord>), StatusCode> {
+    let record = persist_channel_model_with_metadata(
+        state.store.as_ref(),
+        &request.channel_id,
+        &request.model_id,
+        &request.model_display_name,
+        &request.capabilities,
+        request.streaming,
+        request.context_window,
+        request.description.as_deref(),
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn delete_channel_model_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Path((channel_id, model_id)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    let deleted = delete_catalog_channel_model(state.store.as_ref(), &channel_id, &model_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
 async fn list_models_handler(
     _claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
@@ -1550,6 +1665,60 @@ async fn delete_model_handler(
     let deleted = delete_model_variant(state.store.as_ref(), &external_name, &provider_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
+async fn list_model_prices_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<ModelPriceRecord>>, StatusCode> {
+    list_model_prices(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_model_price_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateModelPriceRequest>,
+) -> Result<(StatusCode, Json<ModelPriceRecord>), StatusCode> {
+    let record = persist_model_price_with_rates(
+        state.store.as_ref(),
+        &request.channel_id,
+        &request.model_id,
+        &request.proxy_provider_id,
+        &request.currency_code,
+        &request.price_unit,
+        request.input_price,
+        request.output_price,
+        request.cache_read_price,
+        request.cache_write_price,
+        request.request_price,
+        request.is_active,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn delete_model_price_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Path((channel_id, model_id, proxy_provider_id)): Path<(String, String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    let deleted = delete_catalog_model_price(
+        state.store.as_ref(),
+        &channel_id,
+        &model_id,
+        &proxy_provider_id,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
         Ok(StatusCode::NO_CONTENT)
     } else {
@@ -1664,16 +1833,26 @@ async fn create_api_key_handler(
     State(state): State<AdminApiState>,
     Json(request): Json<CreateApiKeyRequest>,
 ) -> Result<(StatusCode, Json<CreatedGatewayApiKey>), StatusCode> {
-    let created = if request.label.is_some() || request.expires_at_ms.is_some() {
+    let metadata_label = request
+        .label
+        .as_deref()
+        .map(str::trim)
+        .filter(|label| !label.is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("{} gateway key", request.environment.trim()));
+    let created = if request.label.is_some()
+        || request.expires_at_ms.is_some()
+        || request.notes.is_some()
+    {
         sdkwork_api_app_identity::persist_gateway_api_key_with_metadata(
             state.store.as_ref(),
             &request.tenant_id,
             &request.project_id,
             &request.environment,
-            request.label.as_deref().unwrap_or(&request.environment),
+            &metadata_label,
             request.expires_at_ms,
             None,
-            None,
+            request.notes.as_deref(),
         )
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

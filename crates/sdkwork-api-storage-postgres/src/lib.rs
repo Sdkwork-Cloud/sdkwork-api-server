@@ -1,8 +1,8 @@
 use anyhow::Result;
 use sdkwork_api_domain_billing::{LedgerEntry, QuotaPolicy};
 use sdkwork_api_domain_catalog::{
-    normalize_provider_extension_id, Channel, ModelCapability, ModelCatalogEntry,
-    ProviderChannelBinding, ProxyProvider,
+    normalize_provider_extension_id, Channel, ChannelModelRecord, ModelCapability,
+    ModelCatalogEntry, ModelPriceRecord, ProviderChannelBinding, ProxyProvider,
 };
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
@@ -23,6 +23,44 @@ use sdkwork_api_storage_core::{
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const BUILTIN_CHANNEL_SEEDS: [(&str, &str, i32); 5] = [
+    ("openai", "OpenAI", 10),
+    ("anthropic", "Anthropic", 20),
+    ("gemini", "Gemini", 30),
+    ("openrouter", "OpenRouter", 40),
+    ("ollama", "Ollama", 50),
+];
+
+const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
+    ("identity_users", "ai_portal_users"),
+    ("admin_users", "ai_admin_users"),
+    ("tenant_records", "ai_tenants"),
+    ("tenant_projects", "ai_projects"),
+    ("coupon_campaigns", "ai_coupon_campaigns"),
+    ("routing_policies", "ai_routing_policies"),
+    ("routing_policy_providers", "ai_routing_policy_providers"),
+    ("project_routing_preferences", "ai_project_routing_preferences"),
+    ("routing_decision_logs", "ai_routing_decision_logs"),
+    ("routing_provider_health", "ai_provider_health_records"),
+    ("usage_records", "ai_usage_records"),
+    ("billing_ledger_entries", "ai_billing_ledger_entries"),
+    ("billing_quota_policies", "ai_billing_quota_policies"),
+    ("extension_installations", "ai_extension_installations"),
+    ("extension_instances", "ai_extension_instances"),
+    ("service_runtime_nodes", "ai_service_runtime_nodes"),
+    ("extension_runtime_rollouts", "ai_extension_runtime_rollouts"),
+    (
+        "extension_runtime_rollout_participants",
+        "ai_extension_runtime_rollout_participants",
+    ),
+    ("standalone_config_rollouts", "ai_standalone_config_rollouts"),
+    (
+        "standalone_config_rollout_participants",
+        "ai_standalone_config_rollout_participants",
+    ),
+];
 
 pub fn dialect_name() -> &'static str {
     "postgres"
@@ -42,7 +80,7 @@ fn provider_channel_bindings(provider: &ProxyProvider) -> Vec<ProviderChannelBin
 async fn load_routing_policy_provider_ids(pool: &PgPool, policy_id: &str) -> Result<Vec<String>> {
     let rows = sqlx::query_as::<_, (String,)>(
         "SELECT provider_id
-         FROM routing_policy_providers
+         FROM ai_routing_policy_providers
          WHERE policy_id = $1
          ORDER BY position, provider_id",
     )
@@ -60,8 +98,8 @@ async fn load_provider_channel_bindings(
 ) -> Result<Vec<ProviderChannelBinding>> {
     let rows = sqlx::query_as::<_, (String, bool)>(
         "SELECT channel_id, is_primary
-         FROM catalog_provider_channel_bindings
-         WHERE provider_id = $1
+         FROM ai_proxy_provider_channel
+         WHERE proxy_provider_id = $1
          ORDER BY is_primary DESC, channel_id",
     )
     .bind(provider_id)
@@ -117,6 +155,13 @@ fn decode_string_list(values_json: &str) -> Result<Vec<String>> {
     Ok(serde_json::from_str(values_json)?)
 }
 
+fn current_timestamp_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| i64::try_from(duration.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or_default()
+}
+
 type PortalUserRow = (
     String,
     String,
@@ -151,6 +196,30 @@ type CredentialRow = (
     Option<String>,
     Option<String>,
     Option<String>,
+);
+
+type ChannelModelRow = (
+    String,
+    String,
+    String,
+    String,
+    bool,
+    Option<i64>,
+    String,
+);
+
+type ModelPriceRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    f64,
+    f64,
+    f64,
+    f64,
+    f64,
+    bool,
 );
 
 fn decode_portal_user_row(row: Option<PortalUserRow>) -> Result<Option<PortalUserRecord>> {
@@ -250,10 +319,154 @@ fn decode_credential_row(row: CredentialRow) -> UpstreamCredential {
     }
 }
 
+fn decode_channel_model_row(row: ChannelModelRow) -> Result<ChannelModelRecord> {
+    let (
+        channel_id,
+        model_id,
+        model_display_name,
+        capabilities_json,
+        streaming_enabled,
+        context_window,
+        description,
+    ) = row;
+
+    let mut record = ChannelModelRecord::new(channel_id, model_id, model_display_name)
+        .with_context_window_option(context_window.map(u64::try_from).transpose()?)
+        .with_streaming(streaming_enabled)
+        .with_description_option((!description.is_empty()).then_some(description));
+    for capability in decode_model_capabilities(&capabilities_json)? {
+        record = record.with_capability(capability);
+    }
+    Ok(record)
+}
+
+fn decode_model_price_row(row: ModelPriceRow) -> ModelPriceRecord {
+    let (
+        channel_id,
+        model_id,
+        proxy_provider_id,
+        currency_code,
+        price_unit,
+        input_price,
+        output_price,
+        cache_read_price,
+        cache_write_price,
+        request_price,
+        is_active,
+    ) = row;
+
+    ModelPriceRecord::new(channel_id, model_id, proxy_provider_id)
+        .with_currency_code(currency_code)
+        .with_price_unit(price_unit)
+        .with_input_price(input_price)
+        .with_output_price(output_price)
+        .with_cache_read_price(cache_read_price)
+        .with_cache_write_price(cache_write_price)
+        .with_request_price(request_price)
+        .with_active(is_active)
+}
+
+async fn postgres_relation_kind(pool: &PgPool, relation_name: &str) -> Result<Option<String>> {
+    let row = sqlx::query_as::<_, (String,)>(
+        "SELECT c.relkind::text
+         FROM pg_class c
+         INNER JOIN pg_namespace n
+             ON n.oid = c.relnamespace
+         WHERE n.nspname = current_schema()
+           AND c.relname = $1",
+    )
+    .bind(relation_name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|(kind,)| kind))
+}
+
+async fn postgres_table_columns(pool: &PgPool, table_name: &str) -> Result<Vec<String>> {
+    let rows = sqlx::query_as::<_, (String,)>(
+        "SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = $1
+         ORDER BY ordinal_position",
+    )
+    .bind(table_name)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(column_name,)| column_name).collect())
+}
+
+async fn ensure_postgres_column_if_table_exists(
+    pool: &PgPool,
+    table_name: &str,
+    alter_statement: &str,
+) -> Result<()> {
+    if postgres_relation_kind(pool, table_name).await?.as_deref() == Some("r") {
+        sqlx::query(alter_statement).execute(pool).await?;
+    }
+    Ok(())
+}
+
+async fn migrate_postgres_legacy_table_with_common_columns(
+    pool: &PgPool,
+    legacy_table_name: &str,
+    canonical_table_name: &str,
+) -> Result<()> {
+    if postgres_relation_kind(pool, legacy_table_name)
+        .await?
+        .as_deref()
+        != Some("r")
+    {
+        return Ok(());
+    }
+
+    let legacy_columns = postgres_table_columns(pool, legacy_table_name).await?;
+    let canonical_columns = postgres_table_columns(pool, canonical_table_name).await?;
+    let common_columns: Vec<String> = canonical_columns
+        .into_iter()
+        .filter(|column_name| legacy_columns.contains(column_name))
+        .collect();
+
+    if !common_columns.is_empty() {
+        let column_list = common_columns.join(", ");
+        let insert = format!(
+            "INSERT INTO {canonical_table_name} ({column_list})
+             SELECT {column_list} FROM {legacy_table_name}
+             ON CONFLICT DO NOTHING"
+        );
+        sqlx::query(&insert).execute(pool).await?;
+    }
+
+    let drop_table = format!("DROP TABLE {legacy_table_name}");
+    sqlx::query(&drop_table).execute(pool).await?;
+    Ok(())
+}
+
+async fn recreate_postgres_compatibility_view(
+    pool: &PgPool,
+    legacy_name: &str,
+    select_sql: &str,
+) -> Result<()> {
+    match postgres_relation_kind(pool, legacy_name).await?.as_deref() {
+        Some("r") => {
+            let drop_table = format!("DROP TABLE {legacy_name}");
+            sqlx::query(&drop_table).execute(pool).await?;
+        }
+        Some("v") => {
+            let drop_view = format!("DROP VIEW {legacy_name}");
+            sqlx::query(&drop_view).execute(pool).await?;
+        }
+        _ => {}
+    }
+
+    let create_view = format!("CREATE VIEW {legacy_name} AS {select_sql}");
+    sqlx::query(&create_view).execute(pool).await?;
+    Ok(())
+}
+
 pub async fn run_migrations(url: &str) -> Result<PgPool> {
     let pool = PgPoolOptions::new().max_connections(5).connect(url).await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS identity_users (
+        "CREATE TABLE IF NOT EXISTS ai_portal_users (
             id TEXT PRIMARY KEY NOT NULL,
             email TEXT NOT NULL,
             display_name TEXT NOT NULL DEFAULT '',
@@ -268,47 +481,47 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS password_salt TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS password_salt TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS workspace_tenant_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS workspace_tenant_id TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS workspace_project_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS workspace_project_id TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_users ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_portal_users ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_users_email ON identity_users (email)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_portal_users_email ON ai_portal_users (email)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS admin_users (
+        "CREATE TABLE IF NOT EXISTS ai_admin_users (
             id TEXT PRIMARY KEY NOT NULL,
             email TEXT NOT NULL,
             display_name TEXT NOT NULL DEFAULT '',
@@ -321,35 +534,35 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS password_salt TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS password_salt TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
-    sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users (email)")
+    sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)")
         .execute(&pool)
         .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS tenant_records (
+        "CREATE TABLE IF NOT EXISTS ai_tenants (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL
         )",
@@ -357,7 +570,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS tenant_projects (
+        "CREATE TABLE IF NOT EXISTS ai_projects (
             id TEXT PRIMARY KEY NOT NULL,
             tenant_id TEXT NOT NULL,
             name TEXT NOT NULL
@@ -366,7 +579,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS coupon_campaigns (
+        "CREATE TABLE IF NOT EXISTS ai_coupon_campaigns (
             id TEXT PRIMARY KEY NOT NULL,
             code TEXT NOT NULL,
             discount_label TEXT NOT NULL,
@@ -381,121 +594,12 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_coupon_campaigns_code ON coupon_campaigns (code)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_coupon_campaigns_code ON ai_coupon_campaigns (code)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS catalog_channels (
-            id TEXT PRIMARY KEY NOT NULL,
-            name TEXT NOT NULL
-        )",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS catalog_proxy_providers (
-            id TEXT PRIMARY KEY NOT NULL,
-            channel_id TEXT NOT NULL,
-            extension_id TEXT NOT NULL DEFAULT '',
-            adapter_kind TEXT NOT NULL DEFAULT 'openai',
-            base_url TEXT NOT NULL DEFAULT 'http://localhost',
-            display_name TEXT NOT NULL
-        )",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS extension_id TEXT NOT NULL DEFAULT ''",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS adapter_kind TEXT NOT NULL DEFAULT 'openai'",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT 'http://localhost'",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS catalog_provider_channel_bindings (
-            provider_id TEXT NOT NULL,
-            channel_id TEXT NOT NULL,
-            is_primary BOOLEAN NOT NULL DEFAULT FALSE,
-            PRIMARY KEY (provider_id, channel_id)
-        )",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS credential_records (
-            tenant_id TEXT NOT NULL,
-            provider_id TEXT NOT NULL,
-            key_reference TEXT NOT NULL,
-            secret_backend TEXT NOT NULL DEFAULT 'database_encrypted',
-            secret_local_file TEXT,
-            secret_keyring_service TEXT,
-            secret_master_key_id TEXT,
-            secret_ciphertext TEXT,
-            secret_key_version INTEGER,
-            PRIMARY KEY (tenant_id, provider_id, key_reference)
-        )",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_backend TEXT NOT NULL DEFAULT 'database_encrypted'",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query("ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_local_file TEXT")
-        .execute(&pool)
-        .await?;
-    sqlx::query(
-        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_keyring_service TEXT",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_master_key_id TEXT",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query("ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_ciphertext TEXT")
-        .execute(&pool)
-        .await?;
-    sqlx::query(
-        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_key_version INTEGER",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS catalog_models (
-            external_name TEXT NOT NULL,
-            provider_id TEXT NOT NULL,
-            PRIMARY KEY (external_name, provider_id)
-        )",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS capabilities TEXT NOT NULL DEFAULT '[]'",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS streaming BOOLEAN NOT NULL DEFAULT FALSE",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query("ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS context_window BIGINT")
-        .execute(&pool)
-        .await?;
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS routing_policies (
+        "CREATE TABLE IF NOT EXISTS ai_routing_policies (
             policy_id TEXT PRIMARY KEY NOT NULL,
             capability TEXT NOT NULL,
             model_pattern TEXT NOT NULL,
@@ -508,23 +612,23 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS strategy TEXT NOT NULL DEFAULT 'deterministic_priority'",
+        "ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS strategy TEXT NOT NULL DEFAULT 'deterministic_priority'",
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS max_cost DOUBLE PRECISION")
+    sqlx::query("ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS max_cost DOUBLE PRECISION")
         .execute(&pool)
         .await?;
-    sqlx::query("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS max_latency_ms BIGINT")
+    sqlx::query("ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS max_latency_ms BIGINT")
         .execute(&pool)
         .await?;
     sqlx::query(
-        "ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS require_healthy BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS require_healthy BOOLEAN NOT NULL DEFAULT FALSE",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS routing_policy_providers (
+        "CREATE TABLE IF NOT EXISTS ai_routing_policy_providers (
             policy_id TEXT NOT NULL,
             provider_id TEXT NOT NULL,
             position INTEGER NOT NULL,
@@ -534,7 +638,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS project_routing_preferences (
+        "CREATE TABLE IF NOT EXISTS ai_project_routing_preferences (
             project_id TEXT PRIMARY KEY NOT NULL,
             preset_id TEXT NOT NULL DEFAULT '',
             strategy TEXT NOT NULL DEFAULT 'deterministic_priority',
@@ -550,7 +654,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS routing_decision_logs (
+        "CREATE TABLE IF NOT EXISTS ai_routing_decision_logs (
             decision_id TEXT PRIMARY KEY NOT NULL,
             decision_source TEXT NOT NULL,
             tenant_id TEXT,
@@ -571,11 +675,11 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE routing_decision_logs ADD COLUMN IF NOT EXISTS requested_region TEXT")
+    sqlx::query("ALTER TABLE ai_routing_decision_logs ADD COLUMN IF NOT EXISTS requested_region TEXT")
         .execute(&pool)
         .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS routing_provider_health (
+        "CREATE TABLE IF NOT EXISTS ai_provider_health_records (
             provider_id TEXT NOT NULL,
             extension_id TEXT NOT NULL,
             runtime TEXT NOT NULL,
@@ -589,7 +693,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS usage_records (
+        "CREATE TABLE IF NOT EXISTS ai_usage_records (
             project_id TEXT NOT NULL,
             model TEXT NOT NULL,
             provider_id TEXT NOT NULL,
@@ -604,37 +708,37 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS units BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS units BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS amount DOUBLE PRECISION NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS amount DOUBLE PRECISION NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS input_tokens BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS input_tokens BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS output_tokens BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS output_tokens BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS total_tokens BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS total_tokens BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+        "ALTER TABLE ai_usage_records ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS billing_ledger_entries (
+        "CREATE TABLE IF NOT EXISTS ai_billing_ledger_entries (
             project_id TEXT NOT NULL,
             units BIGINT NOT NULL,
             amount DOUBLE PRECISION NOT NULL
@@ -643,7 +747,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS billing_quota_policies (
+        "CREATE TABLE IF NOT EXISTS ai_billing_quota_policies (
             policy_id TEXT PRIMARY KEY NOT NULL,
             project_id TEXT NOT NULL,
             max_units BIGINT NOT NULL,
@@ -653,8 +757,104 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS identity_gateway_api_keys (
+        "CREATE TABLE IF NOT EXISTS ai_channel (
+            channel_id TEXT PRIMARY KEY NOT NULL,
+            channel_name TEXT NOT NULL,
+            channel_description TEXT NOT NULL DEFAULT '',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_proxy_provider (
+            proxy_provider_id TEXT PRIMARY KEY NOT NULL,
+            primary_channel_id TEXT NOT NULL,
+            extension_id TEXT NOT NULL DEFAULT '',
+            adapter_kind TEXT NOT NULL DEFAULT 'openai',
+            base_url TEXT NOT NULL DEFAULT 'http://localhost',
+            display_name TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_proxy_provider_channel (
+            proxy_provider_id TEXT NOT NULL,
+            channel_id TEXT NOT NULL,
+            is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (proxy_provider_id, channel_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_router_credential_records (
+            tenant_id TEXT NOT NULL,
+            proxy_provider_id TEXT NOT NULL,
+            key_reference TEXT NOT NULL,
+            secret_backend TEXT NOT NULL DEFAULT 'database_encrypted',
+            secret_local_file TEXT,
+            secret_keyring_service TEXT,
+            secret_master_key_id TEXT,
+            secret_ciphertext TEXT,
+            secret_key_version INTEGER,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (tenant_id, proxy_provider_id, key_reference)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_model (
+            channel_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            model_display_name TEXT NOT NULL,
+            capabilities_json TEXT NOT NULL DEFAULT '[]',
+            streaming_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            context_window BIGINT,
+            description TEXT NOT NULL DEFAULT '',
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (channel_id, model_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_model_price (
+            channel_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            proxy_provider_id TEXT NOT NULL,
+            currency_code TEXT NOT NULL DEFAULT 'USD',
+            price_unit TEXT NOT NULL DEFAULT 'per_1m_tokens',
+            input_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            output_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            cache_read_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            cache_write_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            request_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (channel_id, model_id, proxy_provider_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_app_api_keys (
             hashed_key TEXT PRIMARY KEY NOT NULL,
+            raw_key TEXT,
             tenant_id TEXT NOT NULL,
             project_id TEXT NOT NULL,
             environment TEXT NOT NULL,
@@ -669,30 +869,323 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS channel_description TEXT NOT NULL DEFAULT ''",
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS notes TEXT")
+    sqlx::query(
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS is_builtin BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_channel ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS extension_id TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS adapter_kind TEXT NOT NULL DEFAULT 'openai'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT 'http://localhost'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_channel ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_channel ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_backend TEXT NOT NULL DEFAULT 'database_encrypted'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_local_file TEXT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_keyring_service TEXT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_master_key_id TEXT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_ciphertext TEXT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS secret_key_version INTEGER",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_router_credential_records ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS capabilities_json TEXT NOT NULL DEFAULT '[]'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS streaming_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS context_window BIGINT")
         .execute(&pool)
         .await?;
     sqlx::query(
+        "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS currency_code TEXT NOT NULL DEFAULT 'USD'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAULT 'per_1m_tokens'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS input_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS output_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS cache_read_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS cache_write_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS request_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS raw_key TEXT")
+        .execute(&pool)
+        .await?;
+    sqlx::query(
+        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS notes TEXT")
+        .execute(&pool)
+        .await?;
+    sqlx::query(
+        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS last_used_at_ms BIGINT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS expires_at_ms BIGINT",
+    )
+    .execute(&pool)
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_proxy_providers",
+        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS extension_id TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_proxy_providers",
+        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS adapter_kind TEXT NOT NULL DEFAULT 'openai'",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_proxy_providers",
+        "ALTER TABLE catalog_proxy_providers ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT 'http://localhost'",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_backend TEXT NOT NULL DEFAULT 'database_encrypted'",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_local_file TEXT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_keyring_service TEXT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_master_key_id TEXT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_ciphertext TEXT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "credential_records",
+        "ALTER TABLE credential_records ADD COLUMN IF NOT EXISTS secret_key_version INTEGER",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_models",
+        "ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS capabilities TEXT NOT NULL DEFAULT '[]'",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_models",
+        "ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS streaming BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "catalog_models",
+        "ALTER TABLE catalog_models ADD COLUMN IF NOT EXISTS context_window BIGINT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "identity_gateway_api_keys",
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "identity_gateway_api_keys",
+        "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS notes TEXT",
+    )
+    .await?;
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "identity_gateway_api_keys",
         "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
     )
-    .execute(&pool)
     .await?;
-    sqlx::query(
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "identity_gateway_api_keys",
         "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS last_used_at_ms BIGINT",
     )
-    .execute(&pool)
     .await?;
-    sqlx::query(
+    ensure_postgres_column_if_table_exists(
+        &pool,
+        "identity_gateway_api_keys",
         "ALTER TABLE identity_gateway_api_keys ADD COLUMN IF NOT EXISTS expires_at_ms BIGINT",
     )
-    .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS extension_installations (
+        "CREATE TABLE IF NOT EXISTS ai_extension_installations (
             installation_id TEXT PRIMARY KEY NOT NULL,
             extension_id TEXT NOT NULL,
             runtime TEXT NOT NULL,
@@ -704,7 +1197,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS extension_instances (
+        "CREATE TABLE IF NOT EXISTS ai_extension_instances (
             instance_id TEXT PRIMARY KEY NOT NULL,
             installation_id TEXT NOT NULL,
             extension_id TEXT NOT NULL,
@@ -717,7 +1210,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS service_runtime_nodes (
+        "CREATE TABLE IF NOT EXISTS ai_service_runtime_nodes (
             node_id TEXT PRIMARY KEY NOT NULL,
             service_kind TEXT NOT NULL,
             started_at_ms BIGINT NOT NULL,
@@ -727,13 +1220,13 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_service_runtime_nodes_last_seen
-         ON service_runtime_nodes (last_seen_at_ms DESC, node_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_service_runtime_nodes_last_seen
+         ON ai_service_runtime_nodes (last_seen_at_ms DESC, node_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS extension_runtime_rollouts (
+        "CREATE TABLE IF NOT EXISTS ai_extension_runtime_rollouts (
             rollout_id TEXT PRIMARY KEY NOT NULL,
             scope TEXT NOT NULL,
             requested_extension_id TEXT,
@@ -747,13 +1240,13 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_extension_runtime_rollouts_created_at
-         ON extension_runtime_rollouts (created_at_ms DESC, rollout_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_extension_runtime_rollouts_created_at
+         ON ai_extension_runtime_rollouts (created_at_ms DESC, rollout_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS extension_runtime_rollout_participants (
+        "CREATE TABLE IF NOT EXISTS ai_extension_runtime_rollout_participants (
             rollout_id TEXT NOT NULL,
             node_id TEXT NOT NULL,
             service_kind TEXT NOT NULL,
@@ -766,19 +1259,19 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_extension_runtime_rollout_participants_node_status
-         ON extension_runtime_rollout_participants (node_id, status, updated_at_ms, rollout_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_extension_runtime_rollout_participants_node_status
+         ON ai_extension_runtime_rollout_participants (node_id, status, updated_at_ms, rollout_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_extension_runtime_rollout_participants_rollout
-         ON extension_runtime_rollout_participants (rollout_id, node_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_extension_runtime_rollout_participants_rollout
+         ON ai_extension_runtime_rollout_participants (rollout_id, node_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS standalone_config_rollouts (
+        "CREATE TABLE IF NOT EXISTS ai_standalone_config_rollouts (
             rollout_id TEXT PRIMARY KEY NOT NULL,
             requested_service_kind TEXT,
             created_by TEXT NOT NULL,
@@ -789,13 +1282,13 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_standalone_config_rollouts_created_at
-         ON standalone_config_rollouts (created_at_ms DESC, rollout_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_standalone_config_rollouts_created_at
+         ON ai_standalone_config_rollouts (created_at_ms DESC, rollout_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS standalone_config_rollout_participants (
+        "CREATE TABLE IF NOT EXISTS ai_standalone_config_rollout_participants (
             rollout_id TEXT NOT NULL,
             node_id TEXT NOT NULL,
             service_kind TEXT NOT NULL,
@@ -808,16 +1301,393 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_standalone_config_rollout_participants_node_status
-         ON standalone_config_rollout_participants (node_id, status, updated_at_ms, rollout_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_standalone_config_rollout_participants_node_status
+         ON ai_standalone_config_rollout_participants (node_id, status, updated_at_ms, rollout_id)",
     )
     .execute(&pool)
     .await?;
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_standalone_config_rollout_participants_rollout
-         ON standalone_config_rollout_participants (rollout_id, node_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_standalone_config_rollout_participants_rollout
+         ON ai_standalone_config_rollout_participants (rollout_id, node_id)",
     )
     .execute(&pool)
+    .await?;
+    for (legacy_table_name, canonical_table_name) in LEGACY_RENAMED_TABLE_MAPPINGS {
+        migrate_postgres_legacy_table_with_common_columns(&pool, legacy_table_name, canonical_table_name)
+            .await?;
+    }
+
+    if postgres_relation_kind(&pool, "catalog_channels")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_channel (
+                channel_id,
+                channel_name,
+                channel_description,
+                sort_order,
+                is_builtin,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT id, name, '', 0, FALSE, TRUE, 0, 0
+            FROM catalog_channels
+            ON CONFLICT (channel_id) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE catalog_channels")
+            .execute(&pool)
+            .await?;
+    }
+
+    for (channel_id, channel_name, sort_order) in BUILTIN_CHANNEL_SEEDS {
+        sqlx::query(
+            "INSERT INTO ai_channel (
+                channel_id,
+                channel_name,
+                channel_description,
+                sort_order,
+                is_builtin,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, '', $3, TRUE, TRUE, 0, 0)
+            ON CONFLICT (channel_id) DO UPDATE SET
+                channel_name = EXCLUDED.channel_name,
+                sort_order = EXCLUDED.sort_order,
+                is_builtin = TRUE,
+                is_active = TRUE",
+        )
+        .bind(channel_id)
+        .bind(channel_name)
+        .bind(sort_order)
+        .execute(&pool)
+        .await?;
+    }
+
+    if postgres_relation_kind(&pool, "catalog_proxy_providers")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_proxy_provider (
+                proxy_provider_id,
+                primary_channel_id,
+                extension_id,
+                adapter_kind,
+                base_url,
+                display_name,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT id, channel_id, extension_id, adapter_kind, base_url, display_name, TRUE, 0, 0
+            FROM catalog_proxy_providers
+            ON CONFLICT (proxy_provider_id) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query(
+            "INSERT INTO ai_proxy_provider_channel (
+                proxy_provider_id,
+                channel_id,
+                is_primary,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT id, channel_id, TRUE, 0, 0
+            FROM catalog_proxy_providers
+            ON CONFLICT (proxy_provider_id, channel_id) DO UPDATE SET
+                is_primary = EXCLUDED.is_primary,
+                updated_at_ms = EXCLUDED.updated_at_ms",
+        )
+        .execute(&pool)
+        .await?;
+    }
+
+    if postgres_relation_kind(&pool, "catalog_provider_channel_bindings")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_proxy_provider_channel (
+                proxy_provider_id,
+                channel_id,
+                is_primary,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT provider_id, channel_id, is_primary, 0, 0
+            FROM catalog_provider_channel_bindings
+            ON CONFLICT (proxy_provider_id, channel_id) DO UPDATE SET
+                is_primary = EXCLUDED.is_primary,
+                updated_at_ms = EXCLUDED.updated_at_ms",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE catalog_provider_channel_bindings")
+            .execute(&pool)
+            .await?;
+    }
+
+    if postgres_relation_kind(&pool, "catalog_proxy_providers")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query("DROP TABLE catalog_proxy_providers")
+            .execute(&pool)
+            .await?;
+    }
+
+    if postgres_relation_kind(&pool, "credential_records")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_router_credential_records (
+                tenant_id,
+                proxy_provider_id,
+                key_reference,
+                secret_backend,
+                secret_local_file,
+                secret_keyring_service,
+                secret_master_key_id,
+                secret_ciphertext,
+                secret_key_version,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT
+                tenant_id,
+                provider_id,
+                key_reference,
+                secret_backend,
+                secret_local_file,
+                secret_keyring_service,
+                secret_master_key_id,
+                secret_ciphertext,
+                secret_key_version,
+                0,
+                0
+            FROM credential_records
+            ON CONFLICT (tenant_id, proxy_provider_id, key_reference) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE credential_records")
+            .execute(&pool)
+            .await?;
+    }
+
+    if postgres_relation_kind(&pool, "catalog_models")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_model (
+                channel_id,
+                model_id,
+                model_display_name,
+                capabilities_json,
+                streaming_enabled,
+                context_window,
+                description,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT
+                providers.primary_channel_id,
+                models.external_name,
+                models.external_name,
+                models.capabilities,
+                models.streaming,
+                models.context_window,
+                '',
+                0,
+                0
+            FROM catalog_models models
+            INNER JOIN ai_proxy_provider providers
+                ON providers.proxy_provider_id = models.provider_id
+            ON CONFLICT (channel_id, model_id) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query(
+            "INSERT INTO ai_model_price (
+                channel_id,
+                model_id,
+                proxy_provider_id,
+                currency_code,
+                price_unit,
+                input_price,
+                output_price,
+                cache_read_price,
+                cache_write_price,
+                request_price,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            )
+            SELECT
+                providers.primary_channel_id,
+                models.external_name,
+                models.provider_id,
+                'USD',
+                'per_1m_tokens',
+                0,
+                0,
+                0,
+                0,
+                0,
+                TRUE,
+                0,
+                0
+            FROM catalog_models models
+            INNER JOIN ai_proxy_provider providers
+                ON providers.proxy_provider_id = models.provider_id
+            ON CONFLICT (channel_id, model_id, proxy_provider_id) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE catalog_models")
+            .execute(&pool)
+            .await?;
+    }
+
+    if postgres_relation_kind(&pool, "identity_gateway_api_keys")
+        .await?
+        .as_deref()
+        == Some("r")
+    {
+        sqlx::query(
+            "INSERT INTO ai_app_api_keys (
+                hashed_key,
+                raw_key,
+                tenant_id,
+                project_id,
+                environment,
+                label,
+                notes,
+                created_at_ms,
+                last_used_at_ms,
+                expires_at_ms,
+                active
+            )
+            SELECT
+                hashed_key,
+                NULL,
+                tenant_id,
+                project_id,
+                environment,
+                label,
+                notes,
+                created_at_ms,
+                last_used_at_ms,
+                expires_at_ms,
+                active
+            FROM identity_gateway_api_keys
+            ON CONFLICT (hashed_key) DO NOTHING",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE identity_gateway_api_keys")
+            .execute(&pool)
+            .await?;
+    }
+
+    for (legacy_table_name, canonical_table_name) in LEGACY_RENAMED_TABLE_MAPPINGS {
+        let select_sql = format!("SELECT * FROM {canonical_table_name}");
+        recreate_postgres_compatibility_view(&pool, legacy_table_name, &select_sql).await?;
+    }
+
+    recreate_postgres_compatibility_view(
+        &pool,
+        "catalog_channels",
+        "SELECT channel_id AS id, channel_name AS name FROM ai_channel",
+    )
+    .await?;
+    recreate_postgres_compatibility_view(
+        &pool,
+        "catalog_proxy_providers",
+        "SELECT
+            proxy_provider_id AS id,
+            primary_channel_id AS channel_id,
+            extension_id,
+            adapter_kind,
+            base_url,
+            display_name
+         FROM ai_proxy_provider",
+    )
+    .await?;
+    recreate_postgres_compatibility_view(
+        &pool,
+        "catalog_provider_channel_bindings",
+        "SELECT
+            proxy_provider_id AS provider_id,
+            channel_id,
+            is_primary
+         FROM ai_proxy_provider_channel",
+    )
+    .await?;
+    recreate_postgres_compatibility_view(
+        &pool,
+        "credential_records",
+        "SELECT
+            tenant_id,
+            proxy_provider_id AS provider_id,
+            key_reference,
+            secret_backend,
+            secret_local_file,
+            secret_keyring_service,
+            secret_master_key_id,
+            secret_ciphertext,
+            secret_key_version
+         FROM ai_router_credential_records",
+    )
+    .await?;
+    recreate_postgres_compatibility_view(
+        &pool,
+        "catalog_models",
+        "SELECT
+            models.model_id AS external_name,
+            prices.proxy_provider_id AS provider_id,
+            models.capabilities_json AS capabilities,
+            models.streaming_enabled AS streaming,
+            models.context_window
+         FROM ai_model models
+         INNER JOIN ai_model_price prices
+             ON prices.channel_id = models.channel_id
+            AND prices.model_id = models.model_id
+         INNER JOIN ai_proxy_provider providers
+             ON providers.proxy_provider_id = prices.proxy_provider_id
+         WHERE models.channel_id = providers.primary_channel_id",
+    )
+    .await?;
+    recreate_postgres_compatibility_view(
+        &pool,
+        "identity_gateway_api_keys",
+        "SELECT
+            hashed_key,
+            tenant_id,
+            project_id,
+            environment,
+            label,
+            notes,
+            created_at_ms,
+            last_used_at_ms,
+            expires_at_ms,
+            active
+         FROM ai_app_api_keys",
+    )
     .await?;
     Ok(pool)
 }
@@ -833,12 +1703,19 @@ impl PostgresAdminStore {
     }
 
     pub async fn insert_channel(&self, channel: &Channel) -> Result<Channel> {
+        let now = current_timestamp_ms();
         sqlx::query(
-            "INSERT INTO catalog_channels (id, name) VALUES ($1, $2)
-             ON CONFLICT(id) DO UPDATE SET name = excluded.name",
+            "INSERT INTO ai_channel (channel_id, channel_name, created_at_ms, updated_at_ms)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT(channel_id) DO UPDATE SET
+                channel_name = excluded.channel_name,
+                updated_at_ms = excluded.updated_at_ms,
+                is_active = TRUE",
         )
         .bind(&channel.id)
         .bind(&channel.name)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(channel.clone())
@@ -846,7 +1723,10 @@ impl PostgresAdminStore {
 
     pub async fn list_channels(&self) -> Result<Vec<Channel>> {
         let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM catalog_channels ORDER BY id",
+            "SELECT channel_id, channel_name
+             FROM ai_channel
+             WHERE is_active = TRUE
+             ORDER BY sort_order, channel_id",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -857,11 +1737,19 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_channel(&self, channel_id: &str) -> Result<bool> {
-        sqlx::query("DELETE FROM catalog_provider_channel_bindings WHERE channel_id = $1")
+        sqlx::query("DELETE FROM ai_proxy_provider_channel WHERE channel_id = $1")
             .bind(channel_id)
             .execute(&self.pool)
             .await?;
-        let result = sqlx::query("DELETE FROM catalog_channels WHERE id = $1")
+        sqlx::query("DELETE FROM ai_model_price WHERE channel_id = $1")
+            .bind(channel_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM ai_model WHERE channel_id = $1")
+            .bind(channel_id)
+            .execute(&self.pool)
+            .await?;
+        let result = sqlx::query("DELETE FROM ai_channel WHERE channel_id = $1")
             .bind(channel_id)
             .execute(&self.pool)
             .await?;
@@ -869,9 +1757,27 @@ impl PostgresAdminStore {
     }
 
     pub async fn insert_provider(&self, provider: &ProxyProvider) -> Result<ProxyProvider> {
+        let now = current_timestamp_ms();
         sqlx::query(
-            "INSERT INTO catalog_proxy_providers (id, channel_id, extension_id, adapter_kind, base_url, display_name) VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT(id) DO UPDATE SET channel_id = excluded.channel_id, extension_id = excluded.extension_id, adapter_kind = excluded.adapter_kind, base_url = excluded.base_url, display_name = excluded.display_name",
+            "INSERT INTO ai_proxy_provider (
+                proxy_provider_id,
+                primary_channel_id,
+                extension_id,
+                adapter_kind,
+                base_url,
+                display_name,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8)
+             ON CONFLICT(proxy_provider_id) DO UPDATE SET
+                primary_channel_id = excluded.primary_channel_id,
+                extension_id = excluded.extension_id,
+                adapter_kind = excluded.adapter_kind,
+                base_url = excluded.base_url,
+                display_name = excluded.display_name,
+                is_active = TRUE,
+                updated_at_ms = excluded.updated_at_ms",
         )
         .bind(&provider.id)
         .bind(&provider.channel_id)
@@ -879,21 +1785,33 @@ impl PostgresAdminStore {
         .bind(&provider.adapter_kind)
         .bind(&provider.base_url)
         .bind(&provider.display_name)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
-        sqlx::query("DELETE FROM catalog_provider_channel_bindings WHERE provider_id = $1")
+        sqlx::query("DELETE FROM ai_proxy_provider_channel WHERE proxy_provider_id = $1")
             .bind(&provider.id)
             .execute(&self.pool)
             .await?;
 
         for binding in provider_channel_bindings(provider) {
             sqlx::query(
-                "INSERT INTO catalog_provider_channel_bindings (provider_id, channel_id, is_primary) VALUES ($1, $2, $3)
-                 ON CONFLICT(provider_id, channel_id) DO UPDATE SET is_primary = excluded.is_primary",
+                "INSERT INTO ai_proxy_provider_channel (
+                    proxy_provider_id,
+                    channel_id,
+                    is_primary,
+                    created_at_ms,
+                    updated_at_ms
+                ) VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT(proxy_provider_id, channel_id) DO UPDATE SET
+                    is_primary = excluded.is_primary,
+                    updated_at_ms = excluded.updated_at_ms",
             )
             .bind(&binding.provider_id)
             .bind(&binding.channel_id)
             .bind(binding.is_primary)
+            .bind(now)
+            .bind(now)
             .execute(&self.pool)
             .await?;
         }
@@ -902,7 +1820,10 @@ impl PostgresAdminStore {
 
     pub async fn list_providers(&self) -> Result<Vec<ProxyProvider>> {
         let rows = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT id, channel_id, extension_id, adapter_kind, base_url, display_name FROM catalog_proxy_providers ORDER BY id",
+            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, base_url, display_name
+             FROM ai_proxy_provider
+             WHERE is_active = TRUE
+             ORDER BY proxy_provider_id",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -925,7 +1846,9 @@ impl PostgresAdminStore {
 
     pub async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>> {
         let row = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT id, channel_id, extension_id, adapter_kind, base_url, display_name FROM catalog_proxy_providers WHERE id = $1",
+            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, base_url, display_name
+             FROM ai_proxy_provider
+             WHERE proxy_provider_id = $1",
         )
         .bind(provider_id)
         .fetch_optional(&self.pool)
@@ -949,25 +1872,29 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_provider(&self, provider_id: &str) -> Result<bool> {
-        sqlx::query("DELETE FROM credential_records WHERE provider_id = $1")
+        sqlx::query("DELETE FROM ai_router_credential_records WHERE proxy_provider_id = $1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
-        sqlx::query("DELETE FROM routing_policy_providers WHERE provider_id = $1")
+        sqlx::query("DELETE FROM ai_model_price WHERE proxy_provider_id = $1")
+            .bind(provider_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM ai_routing_policy_providers WHERE provider_id = $1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
         sqlx::query(
-            "UPDATE routing_policies SET default_provider_id = NULL WHERE default_provider_id = $1",
+            "UPDATE ai_routing_policies SET default_provider_id = NULL WHERE default_provider_id = $1",
         )
         .bind(provider_id)
         .execute(&self.pool)
         .await?;
-        sqlx::query("DELETE FROM catalog_provider_channel_bindings WHERE provider_id = $1")
+        sqlx::query("DELETE FROM ai_proxy_provider_channel WHERE proxy_provider_id = $1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
-        let result = sqlx::query("DELETE FROM catalog_proxy_providers WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_proxy_provider WHERE proxy_provider_id = $1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
@@ -978,9 +1905,29 @@ impl PostgresAdminStore {
         &self,
         credential: &UpstreamCredential,
     ) -> Result<UpstreamCredential> {
+        let now = current_timestamp_ms();
         sqlx::query(
-            "INSERT INTO credential_records (tenant_id, provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id, secret_ciphertext, secret_key_version) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL)
-             ON CONFLICT(tenant_id, provider_id, key_reference) DO UPDATE SET secret_backend = excluded.secret_backend, secret_local_file = excluded.secret_local_file, secret_keyring_service = excluded.secret_keyring_service, secret_master_key_id = excluded.secret_master_key_id, secret_ciphertext = NULL, secret_key_version = NULL",
+            "INSERT INTO ai_router_credential_records (
+                tenant_id,
+                proxy_provider_id,
+                key_reference,
+                secret_backend,
+                secret_local_file,
+                secret_keyring_service,
+                secret_master_key_id,
+                secret_ciphertext,
+                secret_key_version,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, $8, $9)
+             ON CONFLICT(tenant_id, proxy_provider_id, key_reference) DO UPDATE SET
+                secret_backend = excluded.secret_backend,
+                secret_local_file = excluded.secret_local_file,
+                secret_keyring_service = excluded.secret_keyring_service,
+                secret_master_key_id = excluded.secret_master_key_id,
+                secret_ciphertext = NULL,
+                secret_key_version = NULL,
+                updated_at_ms = excluded.updated_at_ms",
         )
         .bind(&credential.tenant_id)
         .bind(&credential.provider_id)
@@ -989,6 +1936,8 @@ impl PostgresAdminStore {
         .bind(&credential.secret_local_file)
         .bind(&credential.secret_keyring_service)
         .bind(&credential.secret_master_key_id)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(credential.clone())
@@ -999,9 +1948,29 @@ impl PostgresAdminStore {
         credential: &UpstreamCredential,
         envelope: &SecretEnvelope,
     ) -> Result<UpstreamCredential> {
+        let now = current_timestamp_ms();
         sqlx::query(
-            "INSERT INTO credential_records (tenant_id, provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id, secret_ciphertext, secret_key_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             ON CONFLICT(tenant_id, provider_id, key_reference) DO UPDATE SET secret_backend = excluded.secret_backend, secret_local_file = excluded.secret_local_file, secret_keyring_service = excluded.secret_keyring_service, secret_master_key_id = excluded.secret_master_key_id, secret_ciphertext = excluded.secret_ciphertext, secret_key_version = excluded.secret_key_version",
+            "INSERT INTO ai_router_credential_records (
+                tenant_id,
+                proxy_provider_id,
+                key_reference,
+                secret_backend,
+                secret_local_file,
+                secret_keyring_service,
+                secret_master_key_id,
+                secret_ciphertext,
+                secret_key_version,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             ON CONFLICT(tenant_id, proxy_provider_id, key_reference) DO UPDATE SET
+                secret_backend = excluded.secret_backend,
+                secret_local_file = excluded.secret_local_file,
+                secret_keyring_service = excluded.secret_keyring_service,
+                secret_master_key_id = excluded.secret_master_key_id,
+                secret_ciphertext = excluded.secret_ciphertext,
+                secret_key_version = excluded.secret_key_version,
+                updated_at_ms = excluded.updated_at_ms",
         )
         .bind(&credential.tenant_id)
         .bind(&credential.provider_id)
@@ -1012,6 +1981,8 @@ impl PostgresAdminStore {
         .bind(&credential.secret_master_key_id)
         .bind(&envelope.ciphertext)
         .bind(i32::try_from(envelope.key_version)?)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(credential.clone())
@@ -1019,7 +1990,9 @@ impl PostgresAdminStore {
 
     pub async fn list_credentials(&self) -> Result<Vec<UpstreamCredential>> {
         let rows = sqlx::query_as::<_, CredentialRow>(
-            "SELECT tenant_id, provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id FROM credential_records ORDER BY provider_id, tenant_id",
+            "SELECT tenant_id, proxy_provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id
+             FROM ai_router_credential_records
+             ORDER BY proxy_provider_id, tenant_id, updated_at_ms DESC, created_at_ms DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1033,7 +2006,9 @@ impl PostgresAdminStore {
         key_reference: &str,
     ) -> Result<Option<UpstreamCredential>> {
         let row = sqlx::query_as::<_, CredentialRow>(
-            "SELECT tenant_id, provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id FROM credential_records WHERE tenant_id = $1 AND provider_id = $2 AND key_reference = $3",
+            "SELECT tenant_id, proxy_provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id
+             FROM ai_router_credential_records
+             WHERE tenant_id = $1 AND proxy_provider_id = $2 AND key_reference = $3",
         )
         .bind(tenant_id)
         .bind(provider_id)
@@ -1051,7 +2026,9 @@ impl PostgresAdminStore {
         key_reference: &str,
     ) -> Result<Option<SecretEnvelope>> {
         let row = sqlx::query_as::<_, (Option<String>, Option<i32>)>(
-            "SELECT secret_ciphertext, secret_key_version FROM credential_records WHERE tenant_id = $1 AND provider_id = $2 AND key_reference = $3",
+            "SELECT secret_ciphertext, secret_key_version
+             FROM ai_router_credential_records
+             WHERE tenant_id = $1 AND proxy_provider_id = $2 AND key_reference = $3",
         )
         .bind(tenant_id)
         .bind(provider_id)
@@ -1075,7 +2052,11 @@ impl PostgresAdminStore {
         provider_id: &str,
     ) -> Result<Option<UpstreamCredential>> {
         let row = sqlx::query_as::<_, CredentialRow>(
-            "SELECT tenant_id, provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id FROM credential_records WHERE tenant_id = $1 AND provider_id = $2 ORDER BY ctid DESC LIMIT 1",
+            "SELECT tenant_id, proxy_provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id
+             FROM ai_router_credential_records
+             WHERE tenant_id = $1 AND proxy_provider_id = $2
+             ORDER BY updated_at_ms DESC, created_at_ms DESC
+             LIMIT 1",
         )
         .bind(tenant_id)
         .bind(provider_id)
@@ -1092,7 +2073,8 @@ impl PostgresAdminStore {
         key_reference: &str,
     ) -> Result<bool> {
         let result = sqlx::query(
-            "DELETE FROM credential_records WHERE tenant_id = $1 AND provider_id = $2 AND key_reference = $3",
+            "DELETE FROM ai_router_credential_records
+             WHERE tenant_id = $1 AND proxy_provider_id = $2 AND key_reference = $3",
         )
         .bind(tenant_id)
         .bind(provider_id)
@@ -1104,26 +2086,44 @@ impl PostgresAdminStore {
     }
 
     pub async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {
-        let context_window = model.context_window.map(i64::try_from).transpose()?;
-        sqlx::query(
-            "INSERT INTO catalog_models (external_name, provider_id, capabilities, streaming, context_window) VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT(external_name, provider_id) DO UPDATE SET capabilities = excluded.capabilities, streaming = excluded.streaming, context_window = excluded.context_window",
+        let provider = self
+            .find_provider(&model.provider_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("provider_id is not registered"))?;
+        let mut channel_model = ChannelModelRecord::new(
+            &provider.channel_id,
+            &model.external_name,
+            &model.external_name,
         )
-        .bind(&model.external_name)
-        .bind(&model.provider_id)
-        .bind(encode_model_capabilities(&model.capabilities)?)
-        .bind(model.streaming)
-        .bind(context_window)
-        .execute(&self.pool)
+        .with_context_window_option(model.context_window)
+        .with_streaming(model.streaming);
+        for capability in &model.capabilities {
+            channel_model = channel_model.with_capability(capability.clone());
+        }
+        self.insert_channel_model(&channel_model).await?;
+        self.insert_model_price(&ModelPriceRecord::new(
+            &provider.channel_id,
+            &model.external_name,
+            &model.provider_id,
+        ))
         .await?;
         Ok(model.clone())
     }
 
     pub async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>> {
         let rows = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
-            "SELECT external_name, provider_id, capabilities, streaming, context_window
-             FROM catalog_models
-             ORDER BY external_name, provider_id",
+            "SELECT
+                models.model_id,
+                prices.proxy_provider_id,
+                models.capabilities_json,
+                models.streaming_enabled,
+                models.context_window
+             FROM ai_model models
+             INNER JOIN ai_model_price prices
+                 ON prices.channel_id = models.channel_id
+                AND prices.model_id = models.model_id
+             WHERE prices.is_active = TRUE
+             ORDER BY models.model_id, prices.proxy_provider_id",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1142,9 +2142,19 @@ impl PostgresAdminStore {
 
     pub async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>> {
         let row = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
-            "SELECT external_name, provider_id, capabilities, streaming, context_window FROM catalog_models
-             WHERE external_name = $1
-             ORDER BY provider_id
+            "SELECT
+                models.model_id,
+                prices.proxy_provider_id,
+                models.capabilities_json,
+                models.streaming_enabled,
+                models.context_window
+             FROM ai_model models
+             INNER JOIN ai_model_price prices
+                 ON prices.channel_id = models.channel_id
+                AND prices.model_id = models.model_id
+             WHERE models.model_id = $1
+               AND prices.is_active = TRUE
+             ORDER BY prices.proxy_provider_id
              LIMIT 1",
         )
         .bind(external_name)
@@ -1166,7 +2176,11 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_model(&self, external_name: &str) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM catalog_models WHERE external_name = $1")
+        sqlx::query("DELETE FROM ai_model_price WHERE model_id = $1")
+            .bind(external_name)
+            .execute(&self.pool)
+            .await?;
+        let result = sqlx::query("DELETE FROM ai_model WHERE model_id = $1")
             .bind(external_name)
             .execute(&self.pool)
             .await?;
@@ -1178,18 +2192,190 @@ impl PostgresAdminStore {
         external_name: &str,
         provider_id: &str,
     ) -> Result<bool> {
-        let result =
-            sqlx::query("DELETE FROM catalog_models WHERE external_name = $1 AND provider_id = $2")
-                .bind(external_name)
-                .bind(provider_id)
-                .execute(&self.pool)
-                .await?;
+        let result = sqlx::query(
+            "DELETE FROM ai_model_price WHERE model_id = $1 AND proxy_provider_id = $2",
+        )
+        .bind(external_name)
+        .bind(provider_id)
+        .execute(&self.pool)
+        .await?;
+        sqlx::query(
+            "DELETE FROM ai_model
+             WHERE model_id = $1
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ai_model_price prices
+                   WHERE prices.channel_id = ai_model.channel_id
+                     AND prices.model_id = ai_model.model_id
+               )",
+        )
+        .bind(external_name)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn insert_channel_model(
+        &self,
+        record: &ChannelModelRecord,
+    ) -> Result<ChannelModelRecord> {
+        let now = current_timestamp_ms();
+        sqlx::query(
+            "INSERT INTO ai_model (
+                channel_id,
+                model_id,
+                model_display_name,
+                capabilities_json,
+                streaming_enabled,
+                context_window,
+                description,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT(channel_id, model_id) DO UPDATE SET
+                model_display_name = excluded.model_display_name,
+                capabilities_json = excluded.capabilities_json,
+                streaming_enabled = excluded.streaming_enabled,
+                context_window = excluded.context_window,
+                description = excluded.description,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&record.channel_id)
+        .bind(&record.model_id)
+        .bind(&record.model_display_name)
+        .bind(encode_model_capabilities(&record.capabilities)?)
+        .bind(record.streaming)
+        .bind(record.context_window.map(i64::try_from).transpose()?)
+        .bind(record.description.clone().unwrap_or_default())
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    pub async fn list_channel_models(&self) -> Result<Vec<ChannelModelRecord>> {
+        let rows = sqlx::query_as::<_, ChannelModelRow>(
+            "SELECT
+                channel_id,
+                model_id,
+                model_display_name,
+                capabilities_json,
+                streaming_enabled,
+                context_window,
+                description
+             FROM ai_model
+             ORDER BY channel_id, model_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(decode_channel_model_row).collect()
+    }
+
+    pub async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool> {
+        sqlx::query("DELETE FROM ai_model_price WHERE channel_id = $1 AND model_id = $2")
+            .bind(channel_id)
+            .bind(model_id)
+            .execute(&self.pool)
+            .await?;
+        let result = sqlx::query("DELETE FROM ai_model WHERE channel_id = $1 AND model_id = $2")
+            .bind(channel_id)
+            .bind(model_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn insert_model_price(&self, record: &ModelPriceRecord) -> Result<ModelPriceRecord> {
+        let now = current_timestamp_ms();
+        sqlx::query(
+            "INSERT INTO ai_model_price (
+                channel_id,
+                model_id,
+                proxy_provider_id,
+                currency_code,
+                price_unit,
+                input_price,
+                output_price,
+                cache_read_price,
+                cache_write_price,
+                request_price,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             ON CONFLICT(channel_id, model_id, proxy_provider_id) DO UPDATE SET
+                currency_code = excluded.currency_code,
+                price_unit = excluded.price_unit,
+                input_price = excluded.input_price,
+                output_price = excluded.output_price,
+                cache_read_price = excluded.cache_read_price,
+                cache_write_price = excluded.cache_write_price,
+                request_price = excluded.request_price,
+                is_active = excluded.is_active,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&record.channel_id)
+        .bind(&record.model_id)
+        .bind(&record.proxy_provider_id)
+        .bind(&record.currency_code)
+        .bind(&record.price_unit)
+        .bind(record.input_price)
+        .bind(record.output_price)
+        .bind(record.cache_read_price)
+        .bind(record.cache_write_price)
+        .bind(record.request_price)
+        .bind(record.is_active)
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    pub async fn list_model_prices(&self) -> Result<Vec<ModelPriceRecord>> {
+        let rows = sqlx::query_as::<_, ModelPriceRow>(
+            "SELECT
+                channel_id,
+                model_id,
+                proxy_provider_id,
+                currency_code,
+                price_unit,
+                input_price,
+                output_price,
+                cache_read_price,
+                cache_write_price,
+                request_price,
+                is_active
+             FROM ai_model_price
+             ORDER BY channel_id, model_id, proxy_provider_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(decode_model_price_row).collect())
+    }
+
+    pub async fn delete_model_price(
+        &self,
+        channel_id: &str,
+        model_id: &str,
+        proxy_provider_id: &str,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            "DELETE FROM ai_model_price
+             WHERE channel_id = $1 AND model_id = $2 AND proxy_provider_id = $3",
+        )
+        .bind(channel_id)
+        .bind(model_id)
+        .bind(proxy_provider_id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 
     pub async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {
         sqlx::query(
-            "INSERT INTO routing_policies (policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id, max_cost, max_latency_ms, require_healthy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "INSERT INTO ai_routing_policies (policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id, max_cost, max_latency_ms, require_healthy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT(policy_id) DO UPDATE SET capability = excluded.capability, model_pattern = excluded.model_pattern, enabled = excluded.enabled, priority = excluded.priority, strategy = excluded.strategy, default_provider_id = excluded.default_provider_id, max_cost = excluded.max_cost, max_latency_ms = excluded.max_latency_ms, require_healthy = excluded.require_healthy",
         )
         .bind(&policy.policy_id)
@@ -1205,14 +2391,14 @@ impl PostgresAdminStore {
         .execute(&self.pool)
         .await?;
 
-        sqlx::query("DELETE FROM routing_policy_providers WHERE policy_id = $1")
+        sqlx::query("DELETE FROM ai_routing_policy_providers WHERE policy_id = $1")
             .bind(&policy.policy_id)
             .execute(&self.pool)
             .await?;
 
         for (position, provider_id) in policy.ordered_provider_ids.iter().enumerate() {
             sqlx::query(
-                "INSERT INTO routing_policy_providers (policy_id, provider_id, position) VALUES ($1, $2, $3)
+                "INSERT INTO ai_routing_policy_providers (policy_id, provider_id, position) VALUES ($1, $2, $3)
                  ON CONFLICT(policy_id, provider_id) DO UPDATE SET position = excluded.position",
             )
             .bind(&policy.policy_id)
@@ -1242,7 +2428,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT policy_id, capability, model_pattern, enabled, priority, strategy, default_provider_id, max_cost, max_latency_ms, require_healthy
-             FROM routing_policies
+             FROM ai_routing_policies
              ORDER BY priority DESC, policy_id",
         )
         .fetch_all(&self.pool)
@@ -1287,7 +2473,7 @@ impl PostgresAdminStore {
         preferences: &ProjectRoutingPreferences,
     ) -> Result<ProjectRoutingPreferences> {
         sqlx::query(
-            "INSERT INTO project_routing_preferences (
+            "INSERT INTO ai_project_routing_preferences (
                 project_id,
                 preset_id,
                 strategy,
@@ -1346,7 +2532,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT project_id, preset_id, strategy, ordered_provider_ids_json, default_provider_id, max_cost, max_latency_ms, require_healthy, preferred_region, updated_at_ms
-             FROM project_routing_preferences
+             FROM ai_project_routing_preferences
              WHERE project_id = $1",
         )
         .bind(project_id)
@@ -1389,7 +2575,7 @@ impl PostgresAdminStore {
         log: &RoutingDecisionLog,
     ) -> Result<RoutingDecisionLog> {
         sqlx::query(
-            "INSERT INTO routing_decision_logs (decision_id, decision_source, tenant_id, project_id, capability, route_key, selected_provider_id, matched_policy_id, strategy, selection_seed, selection_reason, requested_region, slo_applied, slo_degraded, created_at_ms, assessments_json)
+            "INSERT INTO ai_routing_decision_logs (decision_id, decision_source, tenant_id, project_id, capability, route_key, selected_provider_id, matched_policy_id, strategy, selection_seed, selection_reason, requested_region, slo_applied, slo_degraded, created_at_ms, assessments_json)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
              ON CONFLICT(decision_id) DO UPDATE SET decision_source = excluded.decision_source, tenant_id = excluded.tenant_id, project_id = excluded.project_id, capability = excluded.capability, route_key = excluded.route_key, selected_provider_id = excluded.selected_provider_id, matched_policy_id = excluded.matched_policy_id, strategy = excluded.strategy, selection_seed = excluded.selection_seed, selection_reason = excluded.selection_reason, requested_region = excluded.requested_region, slo_applied = excluded.slo_applied, slo_degraded = excluded.slo_degraded, created_at_ms = excluded.created_at_ms, assessments_json = excluded.assessments_json",
         )
@@ -1438,7 +2624,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT decision_id, decision_source, tenant_id, project_id, capability, route_key, selected_provider_id, matched_policy_id, strategy, selection_seed, selection_reason, requested_region, slo_applied, slo_degraded, created_at_ms, assessments_json
-             FROM routing_decision_logs
+             FROM ai_routing_decision_logs
              ORDER BY created_at_ms DESC, decision_id DESC",
         )
         .fetch_all(&self.pool)
@@ -1492,7 +2678,7 @@ impl PostgresAdminStore {
         snapshot: &ProviderHealthSnapshot,
     ) -> Result<ProviderHealthSnapshot> {
         sqlx::query(
-            "INSERT INTO routing_provider_health (provider_id, extension_id, runtime, observed_at_ms, instance_id, running, healthy, message)
+            "INSERT INTO ai_provider_health_records (provider_id, extension_id, runtime, observed_at_ms, instance_id, running, healthy, message)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         )
         .bind(&snapshot.provider_id)
@@ -1524,7 +2710,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT provider_id, extension_id, runtime, observed_at_ms, instance_id, running, healthy, message
-             FROM routing_provider_health
+             FROM ai_provider_health_records
              ORDER BY observed_at_ms DESC, provider_id, runtime, instance_id",
         )
         .fetch_all(&self.pool)
@@ -1559,7 +2745,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
         sqlx::query(
-            "INSERT INTO usage_records (project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms)
+            "INSERT INTO ai_usage_records (project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         )
         .bind(&record.project_id)
@@ -1578,7 +2764,7 @@ impl PostgresAdminStore {
 
     pub async fn list_usage_records(&self) -> Result<Vec<UsageRecord>> {
         let rows = sqlx::query_as::<_, (String, String, String, i64, f64, i64, i64, i64, i64)>(
-            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms FROM usage_records",
+            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms FROM ai_usage_records",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1615,7 +2801,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_ledger_entry(&self, entry: &LedgerEntry) -> Result<LedgerEntry> {
         sqlx::query(
-            "INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES ($1, $2, $3)",
+            "INSERT INTO ai_billing_ledger_entries (project_id, units, amount) VALUES ($1, $2, $3)",
         )
         .bind(&entry.project_id)
         .bind(i64::try_from(entry.units)?)
@@ -1627,7 +2813,7 @@ impl PostgresAdminStore {
 
     pub async fn list_ledger_entries(&self) -> Result<Vec<LedgerEntry>> {
         let rows = sqlx::query_as::<_, (String, i64, f64)>(
-            "SELECT project_id, units, amount FROM billing_ledger_entries",
+            "SELECT project_id, units, amount FROM ai_billing_ledger_entries",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1646,7 +2832,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_quota_policy(&self, policy: &QuotaPolicy) -> Result<QuotaPolicy> {
         sqlx::query(
-            "INSERT INTO billing_quota_policies (policy_id, project_id, max_units, enabled)
+            "INSERT INTO ai_billing_quota_policies (policy_id, project_id, max_units, enabled)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT(policy_id) DO UPDATE SET
              project_id = excluded.project_id,
@@ -1665,7 +2851,7 @@ impl PostgresAdminStore {
     pub async fn list_quota_policies(&self) -> Result<Vec<QuotaPolicy>> {
         let rows = sqlx::query_as::<_, (String, String, i64, bool)>(
             "SELECT policy_id, project_id, max_units, enabled
-             FROM billing_quota_policies
+             FROM ai_billing_quota_policies
              ORDER BY policy_id",
         )
         .fetch_all(&self.pool)
@@ -1687,7 +2873,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant> {
         sqlx::query(
-            "INSERT INTO tenant_records (id, name) VALUES ($1, $2)
+            "INSERT INTO ai_tenants (id, name) VALUES ($1, $2)
              ON CONFLICT(id) DO UPDATE SET name = excluded.name",
         )
         .bind(&tenant.id)
@@ -1699,7 +2885,7 @@ impl PostgresAdminStore {
 
     pub async fn list_tenants(&self) -> Result<Vec<Tenant>> {
         let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM tenant_records ORDER BY id",
+            "SELECT id, name FROM ai_tenants ORDER BY id",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1711,7 +2897,7 @@ impl PostgresAdminStore {
 
     pub async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
         let row = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM tenant_records WHERE id = $1",
+            "SELECT id, name FROM ai_tenants WHERE id = $1",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
@@ -1720,11 +2906,11 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_tenant(&self, tenant_id: &str) -> Result<bool> {
-        sqlx::query("DELETE FROM credential_records WHERE tenant_id = $1")
+        sqlx::query("DELETE FROM ai_router_credential_records WHERE tenant_id = $1")
             .bind(tenant_id)
             .execute(&self.pool)
             .await?;
-        let result = sqlx::query("DELETE FROM tenant_records WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_tenants WHERE id = $1")
             .bind(tenant_id)
             .execute(&self.pool)
             .await?;
@@ -1733,7 +2919,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_project(&self, project: &Project) -> Result<Project> {
         sqlx::query(
-            "INSERT INTO tenant_projects (id, tenant_id, name) VALUES ($1, $2, $3)
+            "INSERT INTO ai_projects (id, tenant_id, name) VALUES ($1, $2, $3)
              ON CONFLICT(id) DO UPDATE SET tenant_id = excluded.tenant_id, name = excluded.name",
         )
         .bind(&project.id)
@@ -1746,7 +2932,7 @@ impl PostgresAdminStore {
 
     pub async fn list_projects(&self) -> Result<Vec<Project>> {
         let rows = sqlx::query_as::<_, (String, String, String)>(
-            "SELECT tenant_id, id, name FROM tenant_projects ORDER BY tenant_id, id",
+            "SELECT tenant_id, id, name FROM ai_projects ORDER BY tenant_id, id",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -1762,7 +2948,7 @@ impl PostgresAdminStore {
 
     pub async fn find_project(&self, project_id: &str) -> Result<Option<Project>> {
         let row = sqlx::query_as::<_, (String, String, String)>(
-            "SELECT tenant_id, id, name FROM tenant_projects WHERE id = $1",
+            "SELECT tenant_id, id, name FROM ai_projects WHERE id = $1",
         )
         .bind(project_id)
         .fetch_optional(&self.pool)
@@ -1775,15 +2961,15 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_project(&self, project_id: &str) -> Result<bool> {
-        sqlx::query("DELETE FROM identity_gateway_api_keys WHERE project_id = $1")
+        sqlx::query("DELETE FROM ai_app_api_keys WHERE project_id = $1")
             .bind(project_id)
             .execute(&self.pool)
             .await?;
-        sqlx::query("DELETE FROM billing_quota_policies WHERE project_id = $1")
+        sqlx::query("DELETE FROM ai_billing_quota_policies WHERE project_id = $1")
             .bind(project_id)
             .execute(&self.pool)
             .await?;
-        let result = sqlx::query("DELETE FROM tenant_projects WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_projects WHERE id = $1")
             .bind(project_id)
             .execute(&self.pool)
             .await?;
@@ -1792,7 +2978,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_coupon(&self, coupon: &CouponCampaign) -> Result<CouponCampaign> {
         sqlx::query(
-            "INSERT INTO coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
+            "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT(id) DO UPDATE SET
              code = excluded.code,
@@ -1821,7 +3007,7 @@ impl PostgresAdminStore {
     pub async fn list_coupons(&self) -> Result<Vec<CouponCampaign>> {
         let rows = sqlx::query_as::<_, CouponRow>(
             "SELECT id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms
-             FROM coupon_campaigns
+             FROM ai_coupon_campaigns
              ORDER BY active DESC, created_at_ms DESC, code ASC",
         )
         .fetch_all(&self.pool)
@@ -1838,7 +3024,7 @@ impl PostgresAdminStore {
     pub async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>> {
         let row = sqlx::query_as::<_, CouponRow>(
             "SELECT id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms
-             FROM coupon_campaigns
+             FROM ai_coupon_campaigns
              WHERE id = $1",
         )
         .bind(coupon_id)
@@ -1848,7 +3034,7 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_coupon(&self, coupon_id: &str) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM coupon_campaigns WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_coupon_campaigns WHERE id = $1")
             .bind(coupon_id)
             .execute(&self.pool)
             .await?;
@@ -1857,7 +3043,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord> {
         sqlx::query(
-            "INSERT INTO identity_users (id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms)
+            "INSERT INTO ai_portal_users (id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT(id) DO UPDATE SET
              email = excluded.email,
@@ -1886,7 +3072,7 @@ impl PostgresAdminStore {
     pub async fn list_portal_users(&self) -> Result<Vec<PortalUserRecord>> {
         let rows = sqlx::query_as::<_, PortalUserRow>(
             "SELECT id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms
-             FROM identity_users
+             FROM ai_portal_users
              ORDER BY created_at_ms DESC, email ASC",
         )
         .fetch_all(&self.pool)
@@ -1903,7 +3089,7 @@ impl PostgresAdminStore {
     pub async fn find_portal_user_by_email(&self, email: &str) -> Result<Option<PortalUserRecord>> {
         let row = sqlx::query_as::<_, (String, String, String, String, String, String, String, bool, i64)>(
             "SELECT id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms
-             FROM identity_users
+             FROM ai_portal_users
              WHERE email = $1",
         )
         .bind(email)
@@ -1915,7 +3101,7 @@ impl PostgresAdminStore {
     pub async fn find_portal_user_by_id(&self, user_id: &str) -> Result<Option<PortalUserRecord>> {
         let row = sqlx::query_as::<_, (String, String, String, String, String, String, String, bool, i64)>(
             "SELECT id, email, display_name, password_salt, password_hash, workspace_tenant_id, workspace_project_id, active, created_at_ms
-             FROM identity_users
+             FROM ai_portal_users
              WHERE id = $1",
         )
         .bind(user_id)
@@ -1925,7 +3111,7 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_portal_user(&self, user_id: &str) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM identity_users WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_portal_users WHERE id = $1")
             .bind(user_id)
             .execute(&self.pool)
             .await?;
@@ -1934,7 +3120,7 @@ impl PostgresAdminStore {
 
     pub async fn insert_admin_user(&self, user: &AdminUserRecord) -> Result<AdminUserRecord> {
         sqlx::query(
-            "INSERT INTO admin_users (id, email, display_name, password_salt, password_hash, active, created_at_ms)
+            "INSERT INTO ai_admin_users (id, email, display_name, password_salt, password_hash, active, created_at_ms)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT(id) DO UPDATE SET
              email = excluded.email,
@@ -1959,7 +3145,7 @@ impl PostgresAdminStore {
     pub async fn list_admin_users(&self) -> Result<Vec<AdminUserRecord>> {
         let rows = sqlx::query_as::<_, AdminUserRow>(
             "SELECT id, email, display_name, password_salt, password_hash, active, created_at_ms
-             FROM admin_users
+             FROM ai_admin_users
              ORDER BY created_at_ms DESC, email ASC",
         )
         .fetch_all(&self.pool)
@@ -1976,7 +3162,7 @@ impl PostgresAdminStore {
     pub async fn find_admin_user_by_email(&self, email: &str) -> Result<Option<AdminUserRecord>> {
         let row = sqlx::query_as::<_, AdminUserRow>(
             "SELECT id, email, display_name, password_salt, password_hash, active, created_at_ms
-             FROM admin_users
+             FROM ai_admin_users
              WHERE email = $1",
         )
         .bind(email)
@@ -1988,7 +3174,7 @@ impl PostgresAdminStore {
     pub async fn find_admin_user_by_id(&self, user_id: &str) -> Result<Option<AdminUserRecord>> {
         let row = sqlx::query_as::<_, AdminUserRow>(
             "SELECT id, email, display_name, password_salt, password_hash, active, created_at_ms
-             FROM admin_users
+             FROM ai_admin_users
              WHERE id = $1",
         )
         .bind(user_id)
@@ -1998,7 +3184,7 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_admin_user(&self, user_id: &str) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM admin_users WHERE id = $1")
+        let result = sqlx::query("DELETE FROM ai_admin_users WHERE id = $1")
             .bind(user_id)
             .execute(&self.pool)
             .await?;
@@ -2010,10 +3196,33 @@ impl PostgresAdminStore {
         record: &GatewayApiKeyRecord,
     ) -> Result<GatewayApiKeyRecord> {
         sqlx::query(
-            "INSERT INTO identity_gateway_api_keys (hashed_key, tenant_id, project_id, environment, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-             ON CONFLICT(hashed_key) DO UPDATE SET tenant_id = excluded.tenant_id, project_id = excluded.project_id, environment = excluded.environment, label = excluded.label, notes = excluded.notes, created_at_ms = excluded.created_at_ms, last_used_at_ms = excluded.last_used_at_ms, expires_at_ms = excluded.expires_at_ms, active = excluded.active",
+            "INSERT INTO ai_app_api_keys (
+                hashed_key,
+                raw_key,
+                tenant_id,
+                project_id,
+                environment,
+                label,
+                notes,
+                created_at_ms,
+                last_used_at_ms,
+                expires_at_ms,
+                active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             ON CONFLICT(hashed_key) DO UPDATE SET
+                raw_key = excluded.raw_key,
+                tenant_id = excluded.tenant_id,
+                project_id = excluded.project_id,
+                environment = excluded.environment,
+                label = excluded.label,
+                notes = excluded.notes,
+                created_at_ms = excluded.created_at_ms,
+                last_used_at_ms = excluded.last_used_at_ms,
+                expires_at_ms = excluded.expires_at_ms,
+                active = excluded.active",
         )
         .bind(&record.hashed_key)
+        .bind(&record.raw_key)
         .bind(&record.tenant_id)
         .bind(&record.project_id)
         .bind(&record.environment)
@@ -2029,8 +3238,10 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_gateway_api_keys(&self) -> Result<Vec<GatewayApiKeyRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys",
+        let rows = sqlx::query_as::<_, (String, Option<String>, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT hashed_key, raw_key, tenant_id, project_id, environment, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active
+             FROM ai_app_api_keys
+             ORDER BY created_at_ms DESC, hashed_key",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -2038,10 +3249,11 @@ impl PostgresAdminStore {
             .into_iter()
             .map(
                 |(
+                    hashed_key,
+                    raw_key,
                     tenant_id,
                     project_id,
                     environment,
-                    hashed_key,
                     label,
                     notes,
                     created_at_ms,
@@ -2053,6 +3265,7 @@ impl PostgresAdminStore {
                     project_id,
                     environment,
                     hashed_key,
+                    raw_key,
                     label,
                     notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
@@ -2068,8 +3281,10 @@ impl PostgresAdminStore {
         &self,
         hashed_key: &str,
     ) -> Result<Option<GatewayApiKeyRecord>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
-            "SELECT tenant_id, project_id, environment, hashed_key, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active FROM identity_gateway_api_keys WHERE hashed_key = $1",
+        let row = sqlx::query_as::<_, (String, Option<String>, String, String, String, String, Option<String>, i64, Option<i64>, Option<i64>, bool)>(
+            "SELECT hashed_key, raw_key, tenant_id, project_id, environment, label, notes, created_at_ms, last_used_at_ms, expires_at_ms, active
+             FROM ai_app_api_keys
+             WHERE hashed_key = $1",
         )
         .bind(hashed_key)
         .fetch_optional(&self.pool)
@@ -2077,10 +3292,11 @@ impl PostgresAdminStore {
 
         Ok(row.map(
             |(
+                hashed_key,
+                raw_key,
                 tenant_id,
                 project_id,
                 environment,
-                hashed_key,
                 label,
                 notes,
                 created_at_ms,
@@ -2093,6 +3309,7 @@ impl PostgresAdminStore {
                     project_id,
                     environment,
                     hashed_key,
+                    raw_key,
                     label,
                     notes,
                     created_at_ms: u64::try_from(created_at_ms).unwrap_or_default(),
@@ -2105,7 +3322,7 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_gateway_api_key(&self, hashed_key: &str) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM identity_gateway_api_keys WHERE hashed_key = $1")
+        let result = sqlx::query("DELETE FROM ai_app_api_keys WHERE hashed_key = $1")
             .bind(hashed_key)
             .execute(&self.pool)
             .await?;
@@ -2117,7 +3334,7 @@ impl PostgresAdminStore {
         installation: &ExtensionInstallation,
     ) -> Result<ExtensionInstallation> {
         sqlx::query(
-            "INSERT INTO extension_installations (installation_id, extension_id, runtime, enabled, entrypoint, config_json) VALUES ($1, $2, $3, $4, $5, $6)
+            "INSERT INTO ai_extension_installations (installation_id, extension_id, runtime, enabled, entrypoint, config_json) VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT(installation_id) DO UPDATE SET extension_id = excluded.extension_id, runtime = excluded.runtime, enabled = excluded.enabled, entrypoint = excluded.entrypoint, config_json = excluded.config_json",
         )
         .bind(&installation.installation_id)
@@ -2134,7 +3351,7 @@ impl PostgresAdminStore {
     pub async fn list_extension_installations(&self) -> Result<Vec<ExtensionInstallation>> {
         let rows = sqlx::query_as::<_, (String, String, String, bool, Option<String>, String)>(
             "SELECT installation_id, extension_id, runtime, enabled, entrypoint, config_json
-             FROM extension_installations
+             FROM ai_extension_installations
              ORDER BY installation_id",
         )
         .fetch_all(&self.pool)
@@ -2159,7 +3376,7 @@ impl PostgresAdminStore {
         instance: &ExtensionInstance,
     ) -> Result<ExtensionInstance> {
         sqlx::query(
-            "INSERT INTO extension_instances (instance_id, installation_id, extension_id, enabled, base_url, credential_ref, config_json) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "INSERT INTO ai_extension_instances (instance_id, installation_id, extension_id, enabled, base_url, credential_ref, config_json) VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT(instance_id) DO UPDATE SET installation_id = excluded.installation_id, extension_id = excluded.extension_id, enabled = excluded.enabled, base_url = excluded.base_url, credential_ref = excluded.credential_ref, config_json = excluded.config_json",
         )
         .bind(&instance.instance_id)
@@ -2188,7 +3405,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT instance_id, installation_id, extension_id, enabled, base_url, credential_ref, config_json
-             FROM extension_instances
+             FROM ai_extension_instances
              ORDER BY instance_id",
         )
         .fetch_all(&self.pool)
@@ -2223,7 +3440,7 @@ impl PostgresAdminStore {
         record: &ServiceRuntimeNodeRecord,
     ) -> Result<ServiceRuntimeNodeRecord> {
         sqlx::query(
-            "INSERT INTO service_runtime_nodes (node_id, service_kind, started_at_ms, last_seen_at_ms)
+            "INSERT INTO ai_service_runtime_nodes (node_id, service_kind, started_at_ms, last_seen_at_ms)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT(node_id) DO UPDATE SET
                  service_kind = excluded.service_kind,
@@ -2243,7 +3460,7 @@ impl PostgresAdminStore {
     pub async fn list_service_runtime_nodes(&self) -> Result<Vec<ServiceRuntimeNodeRecord>> {
         let rows = sqlx::query_as::<_, (String, String, i64, i64)>(
             "SELECT node_id, service_kind, started_at_ms, last_seen_at_ms
-             FROM service_runtime_nodes
+             FROM ai_service_runtime_nodes
              ORDER BY node_id",
         )
         .fetch_all(&self.pool)
@@ -2267,7 +3484,7 @@ impl PostgresAdminStore {
         rollout: &ExtensionRuntimeRolloutRecord,
     ) -> Result<ExtensionRuntimeRolloutRecord> {
         sqlx::query(
-            "INSERT INTO extension_runtime_rollouts (
+            "INSERT INTO ai_extension_runtime_rollouts (
                 rollout_id,
                 scope,
                 requested_extension_id,
@@ -2318,7 +3535,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT rollout_id, scope, requested_extension_id, requested_instance_id, resolved_extension_id, created_by, created_at_ms, deadline_at_ms
-             FROM extension_runtime_rollouts
+             FROM ai_extension_runtime_rollouts
              WHERE rollout_id = $1",
         )
         .bind(rollout_id)
@@ -2365,7 +3582,7 @@ impl PostgresAdminStore {
             ),
         >(
             "SELECT rollout_id, scope, requested_extension_id, requested_instance_id, resolved_extension_id, created_by, created_at_ms, deadline_at_ms
-             FROM extension_runtime_rollouts
+             FROM ai_extension_runtime_rollouts
              ORDER BY created_at_ms DESC, rollout_id",
         )
         .fetch_all(&self.pool)
@@ -2402,7 +3619,7 @@ impl PostgresAdminStore {
         participant: &ExtensionRuntimeRolloutParticipantRecord,
     ) -> Result<ExtensionRuntimeRolloutParticipantRecord> {
         sqlx::query(
-            "INSERT INTO extension_runtime_rollout_participants (
+            "INSERT INTO ai_extension_runtime_rollout_participants (
                 rollout_id,
                 node_id,
                 service_kind,
@@ -2434,7 +3651,7 @@ impl PostgresAdminStore {
     ) -> Result<Vec<ExtensionRuntimeRolloutParticipantRecord>> {
         let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, i64)>(
             "SELECT rollout_id, node_id, service_kind, status, message, updated_at_ms
-             FROM extension_runtime_rollout_participants
+             FROM ai_extension_runtime_rollout_participants
              WHERE rollout_id = $1
              ORDER BY node_id",
         )
@@ -2465,8 +3682,8 @@ impl PostgresAdminStore {
     ) -> Result<Vec<ExtensionRuntimeRolloutParticipantRecord>> {
         let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, i64)>(
             "SELECT participants.rollout_id, participants.node_id, participants.service_kind, participants.status, participants.message, participants.updated_at_ms
-             FROM extension_runtime_rollout_participants AS participants
-             INNER JOIN extension_runtime_rollouts AS rollouts ON rollouts.rollout_id = participants.rollout_id
+             FROM ai_extension_runtime_rollout_participants AS participants
+             INNER JOIN ai_extension_runtime_rollouts AS rollouts ON rollouts.rollout_id = participants.rollout_id
              WHERE participants.node_id = $1
                AND participants.status = 'pending'
              ORDER BY rollouts.created_at_ms, participants.rollout_id",
@@ -2502,7 +3719,7 @@ impl PostgresAdminStore {
         updated_at_ms: u64,
     ) -> Result<bool> {
         let result = sqlx::query(
-            "UPDATE extension_runtime_rollout_participants
+            "UPDATE ai_extension_runtime_rollout_participants
              SET status = $1, message = $2, updated_at_ms = $3
              WHERE rollout_id = $4 AND node_id = $5 AND status = $6",
         )
@@ -2523,7 +3740,7 @@ impl PostgresAdminStore {
         rollout: &StandaloneConfigRolloutRecord,
     ) -> Result<StandaloneConfigRolloutRecord> {
         sqlx::query(
-            "INSERT INTO standalone_config_rollouts (
+            "INSERT INTO ai_standalone_config_rollouts (
                 rollout_id,
                 requested_service_kind,
                 created_by,
@@ -2553,7 +3770,7 @@ impl PostgresAdminStore {
     ) -> Result<Option<StandaloneConfigRolloutRecord>> {
         let row = sqlx::query_as::<_, (String, Option<String>, String, i64, i64)>(
             "SELECT rollout_id, requested_service_kind, created_by, created_at_ms, deadline_at_ms
-             FROM standalone_config_rollouts
+             FROM ai_standalone_config_rollouts
              WHERE rollout_id = $1",
         )
         .bind(rollout_id)
@@ -2578,7 +3795,7 @@ impl PostgresAdminStore {
     ) -> Result<Vec<StandaloneConfigRolloutRecord>> {
         let rows = sqlx::query_as::<_, (String, Option<String>, String, i64, i64)>(
             "SELECT rollout_id, requested_service_kind, created_by, created_at_ms, deadline_at_ms
-             FROM standalone_config_rollouts
+             FROM ai_standalone_config_rollouts
              ORDER BY created_at_ms DESC, rollout_id",
         )
         .fetch_all(&self.pool)
@@ -2611,7 +3828,7 @@ impl PostgresAdminStore {
         participant: &StandaloneConfigRolloutParticipantRecord,
     ) -> Result<StandaloneConfigRolloutParticipantRecord> {
         sqlx::query(
-            "INSERT INTO standalone_config_rollout_participants (
+            "INSERT INTO ai_standalone_config_rollout_participants (
                 rollout_id,
                 node_id,
                 service_kind,
@@ -2643,7 +3860,7 @@ impl PostgresAdminStore {
     ) -> Result<Vec<StandaloneConfigRolloutParticipantRecord>> {
         let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, i64)>(
             "SELECT rollout_id, node_id, service_kind, status, message, updated_at_ms
-             FROM standalone_config_rollout_participants
+             FROM ai_standalone_config_rollout_participants
              WHERE rollout_id = $1
              ORDER BY node_id",
         )
@@ -2674,8 +3891,8 @@ impl PostgresAdminStore {
     ) -> Result<Vec<StandaloneConfigRolloutParticipantRecord>> {
         let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, i64)>(
             "SELECT participants.rollout_id, participants.node_id, participants.service_kind, participants.status, participants.message, participants.updated_at_ms
-             FROM standalone_config_rollout_participants AS participants
-             INNER JOIN standalone_config_rollouts AS rollouts ON rollouts.rollout_id = participants.rollout_id
+             FROM ai_standalone_config_rollout_participants AS participants
+             INNER JOIN ai_standalone_config_rollouts AS rollouts ON rollouts.rollout_id = participants.rollout_id
              WHERE participants.node_id = $1
                AND participants.status = 'pending'
              ORDER BY rollouts.created_at_ms, participants.rollout_id",
@@ -2711,7 +3928,7 @@ impl PostgresAdminStore {
         updated_at_ms: u64,
     ) -> Result<bool> {
         let result = sqlx::query(
-            "UPDATE standalone_config_rollout_participants
+            "UPDATE ai_standalone_config_rollout_participants
              SET status = $1, message = $2, updated_at_ms = $3
              WHERE rollout_id = $4 AND node_id = $5 AND status = $6",
         )
@@ -2835,6 +4052,36 @@ impl AdminStore for PostgresAdminStore {
 
     async fn delete_model_variant(&self, external_name: &str, provider_id: &str) -> Result<bool> {
         PostgresAdminStore::delete_model_variant(self, external_name, provider_id).await
+    }
+
+    async fn insert_channel_model(&self, record: &ChannelModelRecord) -> Result<ChannelModelRecord> {
+        PostgresAdminStore::insert_channel_model(self, record).await
+    }
+
+    async fn list_channel_models(&self) -> Result<Vec<ChannelModelRecord>> {
+        PostgresAdminStore::list_channel_models(self).await
+    }
+
+    async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool> {
+        PostgresAdminStore::delete_channel_model(self, channel_id, model_id).await
+    }
+
+    async fn insert_model_price(&self, record: &ModelPriceRecord) -> Result<ModelPriceRecord> {
+        PostgresAdminStore::insert_model_price(self, record).await
+    }
+
+    async fn list_model_prices(&self) -> Result<Vec<ModelPriceRecord>> {
+        PostgresAdminStore::list_model_prices(self).await
+    }
+
+    async fn delete_model_price(
+        &self,
+        channel_id: &str,
+        model_id: &str,
+        proxy_provider_id: &str,
+    ) -> Result<bool> {
+        PostgresAdminStore::delete_model_price(self, channel_id, model_id, proxy_provider_id)
+            .await
     }
 
     async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {

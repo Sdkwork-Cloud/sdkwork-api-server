@@ -13,10 +13,12 @@ import {
   clearAdminSessionToken,
   createApiKey,
   deleteApiKey,
+  deleteChannelModel,
   deleteCredential,
   deleteChannel,
   deleteCoupon,
   deleteModel,
+  deleteModelPrice,
   deleteOperatorUser,
   deletePortalUser,
   deleteProject,
@@ -26,9 +28,11 @@ import {
   getBillingSummary,
   getUsageSummary,
   listApiKeys,
+  listChannelModels,
   listChannels,
   listCoupons,
   listCredentials,
+  listModelPrices,
   listModels,
   listOperatorUsers,
   listPortalUsers,
@@ -44,9 +48,11 @@ import {
   readAdminSessionToken,
   reloadExtensionRuntimes,
   saveChannel,
+  saveChannelModel,
   saveCoupon,
   saveCredential,
   saveModel,
+  saveModelPrice,
   saveOperatorUser,
   savePortalUser,
   saveProject,
@@ -102,6 +108,8 @@ const emptySnapshot: AdminWorkspaceSnapshot = {
   providers: [],
   credentials: [],
   models: [],
+  channelModels: [],
+  modelPrices: [],
   usageRecords: [],
   usageSummary: emptyUsageSummary,
   billingSummary: emptyBillingSummary,
@@ -327,6 +335,30 @@ type SaveModelInput = {
   context_window?: number;
 };
 
+type SaveChannelModelInput = {
+  channel_id: string;
+  model_id: string;
+  model_display_name: string;
+  capabilities: string[];
+  streaming: boolean;
+  context_window?: number | null;
+  description?: string;
+};
+
+type SaveModelPriceInput = {
+  channel_id: string;
+  model_id: string;
+  proxy_provider_id: string;
+  currency_code: string;
+  price_unit: string;
+  input_price: number;
+  output_price: number;
+  cache_read_price: number;
+  cache_write_price: number;
+  request_price: number;
+  is_active: boolean;
+};
+
 interface AdminWorkbenchContextValue {
   authResolved: boolean;
   sessionUser: AdminSessionUser | null;
@@ -353,6 +385,7 @@ interface AdminWorkbenchContextValue {
     project_id: string;
     environment: string;
     label?: string;
+    notes?: string;
     expires_at_ms?: number | null;
   }) => Promise<CreatedGatewayApiKey>;
   handleUpdateApiKeyStatus: (hashedKey: string, active: boolean) => Promise<void>;
@@ -367,6 +400,14 @@ interface AdminWorkbenchContextValue {
   handleSaveProvider: (input: SaveProviderInput) => Promise<void>;
   handleDeleteProvider: (providerId: string) => Promise<void>;
   handleSaveModel: (input: SaveModelInput) => Promise<void>;
+  handleSaveChannelModel: (input: SaveChannelModelInput) => Promise<void>;
+  handleDeleteChannelModel: (channelId: string, modelId: string) => Promise<void>;
+  handleSaveModelPrice: (input: SaveModelPriceInput) => Promise<void>;
+  handleDeleteModelPrice: (
+    channelId: string,
+    modelId: string,
+    proxyProviderId: string,
+  ) => Promise<void>;
   handleSaveCredential: (input: {
     tenant_id: string;
     provider_id: string;
@@ -413,6 +454,8 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         providers,
         credentials,
         models,
+        channelModels,
+        modelPrices,
         usageRecords,
         usageSummary,
         billingSummary,
@@ -428,6 +471,8 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         listProviders(),
         listCredentials(),
         listModels(),
+        listChannelModels(),
+        listModelPrices(),
         listUsageRecords(),
         getUsageSummary(),
         getBillingSummary(),
@@ -446,6 +491,8 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         providers,
         credentials,
         models,
+        channelModels,
+        modelPrices,
         usageRecords,
         usageSummary,
         billingSummary,
@@ -667,6 +714,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
     project_id: string;
     environment: string;
     label?: string;
+    notes?: string;
     expires_at_ms?: number | null;
   }): Promise<CreatedGatewayApiKey> {
     setStatus('Issuing gateway key...');
@@ -767,6 +815,54 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
     await refreshWorkspace();
   }
 
+  async function handleSaveChannelModel(input: SaveChannelModelInput) {
+    setStatus(`Saving channel model ${input.model_id}...`);
+    try {
+      await saveChannelModel(input);
+      await refreshWorkspace();
+      setStatus('Channel model saved.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to save channel model.');
+    }
+  }
+
+  async function handleDeleteChannelModel(channelId: string, modelId: string) {
+    setStatus('Deleting channel model...');
+    try {
+      await deleteChannelModel(channelId, modelId);
+      await refreshWorkspace();
+      setStatus('Channel model deleted.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to delete channel model.');
+    }
+  }
+
+  async function handleSaveModelPrice(input: SaveModelPriceInput) {
+    setStatus(`Saving model pricing for ${input.model_id}...`);
+    try {
+      await saveModelPrice(input);
+      await refreshWorkspace();
+      setStatus('Model pricing saved.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to save model pricing.');
+    }
+  }
+
+  async function handleDeleteModelPrice(
+    channelId: string,
+    modelId: string,
+    proxyProviderId: string,
+  ) {
+    setStatus('Deleting model pricing...');
+    try {
+      await deleteModelPrice(channelId, modelId, proxyProviderId);
+      await refreshWorkspace();
+      setStatus('Model pricing deleted.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to delete model pricing.');
+    }
+  }
+
   async function handleSaveCredential(input: {
     tenant_id: string;
     provider_id: string;
@@ -841,6 +937,10 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
       handleSaveProvider,
       handleDeleteProvider,
       handleSaveModel,
+      handleSaveChannelModel,
+      handleDeleteChannelModel,
+      handleSaveModelPrice,
+      handleDeleteModelPrice,
       handleSaveCredential,
       handleDeleteCredential,
       handleDeleteModel,

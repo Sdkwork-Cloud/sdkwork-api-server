@@ -97,9 +97,11 @@ export function AppRoutes() {
     handleCreateApiKey,
     handleDeleteApiKey,
     handleDeleteChannel,
+    handleDeleteChannelModel,
     handleDeleteCoupon,
     handleDeleteCredential,
     handleDeleteModel,
+    handleDeleteModelPrice,
     handleDeleteOperatorUser,
     handleDeletePortalUser,
     handleDeleteProject,
@@ -107,9 +109,11 @@ export function AppRoutes() {
     handleDeleteTenant,
     handleReloadRuntimes,
     handleSaveChannel,
+    handleSaveChannelModel,
     handleSaveCoupon,
     handleSaveCredential,
     handleSaveModel,
+    handleSaveModelPrice,
     handleSaveOperatorUser,
     handleSavePortalUser,
     handleSaveProject,
@@ -232,10 +236,14 @@ export function AppRoutes() {
                 onSaveProvider={handleSaveProvider}
                 onSaveCredential={handleSaveCredential}
                 onSaveModel={handleSaveModel}
+                onSaveChannelModel={handleSaveChannelModel}
+                onSaveModelPrice={handleSaveModelPrice}
                 onDeleteChannel={handleDeleteChannel}
                 onDeleteProvider={handleDeleteProvider}
                 onDeleteCredential={handleDeleteCredential}
                 onDeleteModel={handleDeleteModel}
+                onDeleteChannelModel={handleDeleteChannelModel}
+                onDeleteModelPrice={handleDeleteModelPrice}
               />
             </PageFrame>
           </ProtectedRoute>

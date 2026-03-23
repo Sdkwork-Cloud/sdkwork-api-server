@@ -56,6 +56,23 @@ async fn login_token(app: Router) -> String {
         .to_owned()
 }
 
+async fn create_provider_fixture(app: Router, token: &str, body: &str) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_owned()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+}
+
 #[serial(extension_env)]
 #[tokio::test]
 async fn login_returns_a_gateway_jwt_like_token() {
@@ -120,8 +137,140 @@ async fn create_and_list_channels() {
 
     assert_eq!(list.status(), StatusCode::OK);
     let json = read_json(list).await;
-    assert_eq!(json.as_array().unwrap().len(), 1);
-    assert_eq!(json[0]["id"], "openai");
+    assert!(json.as_array().unwrap().len() >= 5);
+    assert!(json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == "openai" && item["name"] == "OpenAI"));
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn builtin_channels_channel_models_and_model_prices_are_exposed_through_admin_api() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let channels = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/channels")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(channels.status(), StatusCode::OK);
+    let channels_json = read_json(channels).await;
+    assert!(channels_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == "openai"));
+    assert!(channels_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == "anthropic"));
+
+    let provider = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"id":"provider-openai-official","channel_id":"openai","adapter_kind":"openai","base_url":"https://api.openai.com","display_name":"OpenAI Official","channel_bindings":[{"channel_id":"openai","is_primary":true}]}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(provider.status(), StatusCode::CREATED);
+
+    let create_model = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/channel-models")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"channel_id":"openai","model_id":"gpt-4.1","model_display_name":"GPT-4.1","capabilities":["responses","chat_completions"],"streaming":true,"context_window":128000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_model.status(), StatusCode::CREATED);
+
+    let models = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/channel-models")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(models.status(), StatusCode::OK);
+    let models_json = read_json(models).await;
+    assert!(models_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["channel_id"] == "openai" && item["model_id"] == "gpt-4.1"));
+
+    let create_price = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/model-prices")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"channel_id":"openai","model_id":"gpt-4.1","proxy_provider_id":"provider-openai-official","currency_code":"USD","price_unit":"per_1m_tokens","input_price":2.5,"output_price":10.0,"cache_read_price":0.3,"cache_write_price":1.0,"request_price":0.0,"is_active":true}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_price.status(), StatusCode::CREATED);
+
+    let prices = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/model-prices")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(prices.status(), StatusCode::OK);
+    let prices_json = read_json(prices).await;
+    assert!(prices_json.as_array().unwrap().iter().any(|item| {
+        item["channel_id"] == "openai"
+            && item["model_id"] == "gpt-4.1"
+            && item["proxy_provider_id"] == "provider-openai-official"
+    }));
 }
 
 #[serial(extension_env)]
@@ -759,6 +908,13 @@ async fn create_and_list_models() {
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
 
+    create_provider_fixture(
+        app.clone(),
+        &token,
+        r#"{"id":"provider-openai-official","channel_id":"openai","adapter_kind":"openai","base_url":"https://api.openai.com","display_name":"OpenAI Official","channel_bindings":[{"channel_id":"openai","is_primary":true}]}"#,
+    )
+    .await;
+
     let create = app
         .clone()
         .oneshot(
@@ -1138,10 +1294,11 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
         (
             "/admin/providers/provider-openai-official",
             "/admin/providers",
+            "provider-openai-official",
         ),
-        ("/admin/channels/openai", "/admin/channels"),
-        ("/admin/projects/project-acme", "/admin/projects"),
-        ("/admin/tenants/tenant-acme", "/admin/tenants"),
+        ("/admin/channels/openai", "/admin/channels", "openai"),
+        ("/admin/projects/project-acme", "/admin/projects", "project-acme"),
+        ("/admin/tenants/tenant-acme", "/admin/tenants", "tenant-acme"),
     ] {
         let deleted = app
             .clone()
@@ -1172,7 +1329,10 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
             .unwrap();
 
         assert_eq!(listed.status(), StatusCode::OK);
-        assert_eq!(read_json(listed).await.as_array().unwrap().len(), 0);
+        let listed_json = read_json(listed).await;
+        assert!(!listed_json.as_array().unwrap().iter().any(|item| {
+            item["id"] == request.2
+        }));
     }
 
     let credentials = app
@@ -1302,10 +1462,106 @@ async fn delete_gateway_api_key_from_admin_api() {
 
 #[serial(extension_env)]
 #[tokio::test]
+async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let token = login_token(app.clone()).await;
+
+    for request in [
+        ("/admin/tenants", r#"{"id":"tenant-acme","name":"Acme"}"#),
+        (
+            "/admin/projects",
+            r#"{"tenant_id":"tenant-acme","id":"project-acme","name":"Acme Production"}"#,
+        ),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(request.0)
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(request.1))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":"tenant-acme","project_id":"project-acme","environment":"production","label":"Production App Key","notes":"retained for admin inventory","expires_at_ms":4102444800000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let created_json = read_json(created).await;
+    let plaintext_key = created_json["plaintext"].as_str().unwrap().to_owned();
+    let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
+
+    let listed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(listed.status(), StatusCode::OK);
+    let listed_json = read_json(listed).await;
+    assert_eq!(listed_json[0]["raw_key"], plaintext_key);
+    assert_eq!(listed_json[0]["label"], "Production App Key");
+    assert_eq!(listed_json[0]["notes"], "retained for admin inventory");
+    assert_eq!(listed_json[0]["expires_at_ms"], 4102444800000_u64);
+
+    let stored_row: (String, Option<String>, Option<i64>) = sqlx::query_as(
+        "SELECT raw_key, notes, expires_at_ms FROM ai_app_api_keys WHERE hashed_key = ?",
+    )
+    .bind(&hashed_key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stored_row.0, plaintext_key);
+    assert_eq!(stored_row.1.as_deref(), Some("retained for admin inventory"));
+    assert_eq!(stored_row.2, Some(4_102_444_800_000));
+}
+
+#[serial(extension_env)]
+#[tokio::test]
 async fn routing_simulation_uses_catalog_models() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
+
+    create_provider_fixture(
+        app.clone(),
+        &token,
+        r#"{"id":"provider-openrouter","channel_id":"openrouter","adapter_kind":"openai","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
+    )
+    .await;
+    create_provider_fixture(
+        app.clone(),
+        &token,
+        r#"{"id":"provider-openai-official","channel_id":"openai","adapter_kind":"openai","base_url":"https://api.openai.com","display_name":"OpenAI Official","channel_bindings":[{"channel_id":"openai","is_primary":true}]}"#,
+    )
+    .await;
 
     let create_openrouter = app
         .clone()
@@ -1502,6 +1758,19 @@ async fn routing_simulation_reports_policy_selected_provider() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
+
+    create_provider_fixture(
+        app.clone(),
+        &token,
+        r#"{"id":"provider-openrouter","channel_id":"openrouter","adapter_kind":"openai","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
+    )
+    .await;
+    create_provider_fixture(
+        app.clone(),
+        &token,
+        r#"{"id":"provider-openai-official","channel_id":"openai","adapter_kind":"openai","base_url":"https://api.openai.com","display_name":"OpenAI Official","channel_bindings":[{"channel_id":"openai","is_primary":true}]}"#,
+    )
+    .await;
 
     let create_openrouter = app
         .clone()

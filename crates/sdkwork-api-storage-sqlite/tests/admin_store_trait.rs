@@ -12,7 +12,9 @@ async fn sqlite_store_implements_admin_store_trait() {
     let trait_store: &dyn AdminStore = &store;
 
     assert_eq!(trait_store.dialect(), StorageDialect::Sqlite);
-    assert!(trait_store.list_channels().await.unwrap().is_empty());
+    let channels = trait_store.list_channels().await.unwrap();
+    assert!(channels.len() >= 5);
+    assert!(channels.iter().any(|channel| channel.id == "openai"));
 }
 
 #[tokio::test]
