@@ -18,6 +18,15 @@ import {
 } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, CreatedGatewayApiKey } from 'sdkwork-router-admin-types';
 
+type ApiKeyDraft = {
+  tenant_id: string;
+  project_id: string;
+  environment: string;
+  label: string;
+  notes: string;
+  expires_at_ms: string;
+};
+
 export function TenantsPage({
   snapshot,
   onSaveTenant,
@@ -34,6 +43,9 @@ export function TenantsPage({
     tenant_id: string;
     project_id: string;
     environment: string;
+    label?: string;
+    notes?: string;
+    expires_at_ms?: number | null;
   }) => Promise<CreatedGatewayApiKey>;
   onUpdateApiKeyStatus: (hashedKey: string, active: boolean) => Promise<void>;
   onDeleteApiKey: (hashedKey: string) => Promise<void>;
@@ -46,11 +58,18 @@ export function TenantsPage({
     id: '',
     name: '',
   });
-  const [apiKeyDraft, setApiKeyDraft] = useState({
-    tenant_id: snapshot.tenants[0]?.id ?? 'tenant_local_demo',
-    project_id: snapshot.projects[0]?.id ?? 'project_local_demo',
+  const defaultTenantId = snapshot.tenants[0]?.id ?? 'tenant_local_demo';
+  const defaultProjectId = snapshot.projects[0]?.id ?? 'project_local_demo';
+  const createApiKeyDraft = (overrides: Partial<ApiKeyDraft> = {}): ApiKeyDraft => ({
+    tenant_id: defaultTenantId,
+    project_id: defaultProjectId,
     environment: 'production',
+    label: '',
+    notes: '',
+    expires_at_ms: '',
+    ...overrides,
   });
+  const [apiKeyDraft, setApiKeyDraft] = useState<ApiKeyDraft>(createApiKeyDraft());
   const [isTenantDialogOpen, setIsTenantDialogOpen] = useState(false);
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
@@ -89,7 +108,7 @@ export function TenantsPage({
 
   function resetProjectDialog() {
     setProjectDraft({
-      tenant_id: snapshot.tenants[0]?.id ?? 'tenant_local_demo',
+      tenant_id: defaultTenantId,
       id: '',
       name: '',
     });
@@ -97,11 +116,7 @@ export function TenantsPage({
   }
 
   function resetApiKeyDialog() {
-    setApiKeyDraft({
-      tenant_id: snapshot.tenants[0]?.id ?? 'tenant_local_demo',
-      project_id: snapshot.projects[0]?.id ?? 'project_local_demo',
-      environment: 'production',
-    });
+    setApiKeyDraft(createApiKeyDraft());
     setIsApiKeyDialogOpen(false);
   }
 
@@ -119,9 +134,26 @@ export function TenantsPage({
 
   async function handleApiKeySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const created = await onCreateApiKey(apiKeyDraft);
+    const normalizedLabel = apiKeyDraft.label.trim();
+    const normalizedNotes = apiKeyDraft.notes.trim();
+    const normalizedExpiresAt = apiKeyDraft.expires_at_ms.trim();
+    const parsedExpiresAt =
+      normalizedExpiresAt === '' ? undefined : Number(normalizedExpiresAt);
+    const created = await onCreateApiKey({
+      tenant_id: apiKeyDraft.tenant_id,
+      project_id: apiKeyDraft.project_id,
+      environment: apiKeyDraft.environment,
+      label: normalizedLabel || undefined,
+      notes: normalizedNotes || undefined,
+      expires_at_ms:
+        parsedExpiresAt !== undefined
+        && Number.isFinite(parsedExpiresAt)
+        && Number.isInteger(parsedExpiresAt)
+          ? parsedExpiresAt
+          : undefined,
+    });
     setRevealedApiKey(created);
-    setIsApiKeyDialogOpen(false);
+    resetApiKeyDialog();
   }
 
   async function confirmDelete() {
@@ -342,6 +374,32 @@ export function TenantsPage({
                         <option value="development">Development</option>
                       </select>
                     </FormField>
+                    <FormField label="Key label">
+                      <input
+                        value={apiKeyDraft.label}
+                        onChange={(event) => setApiKeyDraft((current) => ({ ...current, label: event.target.value }))}
+                        placeholder="Production App Key"
+                      />
+                    </FormField>
+                    <FormField label="Notes">
+                      <textarea
+                        value={apiKeyDraft.notes}
+                        onChange={(event) => setApiKeyDraft((current) => ({ ...current, notes: event.target.value }))}
+                        rows={3}
+                        placeholder="Retained for admin inventory"
+                      />
+                    </FormField>
+                    <FormField label="Expires at (ms)">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        step="1"
+                        value={apiKeyDraft.expires_at_ms}
+                        onChange={(event) => setApiKeyDraft((current) => ({ ...current, expires_at_ms: event.target.value }))}
+                        placeholder="4102444800000"
+                      />
+                    </FormField>
                     <DialogFooter>
                       <InlineButton onClick={resetApiKeyDialog}>Cancel</InlineButton>
                       <InlineButton tone="primary" type="submit">
@@ -450,16 +508,15 @@ export function TenantsPage({
                   >
                     Edit project
                   </InlineButton>
-                  <InlineButton
-                    onClick={() => {
-                      setApiKeyDraft({
-                        tenant_id: project.tenant_id,
-                        project_id: project.id,
-                        environment: 'production',
-                      });
-                      setIsApiKeyDialogOpen(true);
-                    }}
-                  >
+                      <InlineButton
+                        onClick={() => {
+                          setApiKeyDraft(createApiKeyDraft({
+                            tenant_id: project.tenant_id,
+                            project_id: project.id,
+                          }));
+                          setIsApiKeyDialogOpen(true);
+                        }}
+                      >
                     Issue gateway key
                   </InlineButton>
                   <InlineButton
@@ -484,12 +541,36 @@ export function TenantsPage({
         />
       </Surface>
 
-      <Surface title="Gateway key inventory" detail="Keys are presented as hashed records only.">
+      <Surface
+        title="Gateway key inventory"
+        detail="The registry now shows both the canonical hashed key and the persisted raw_key when the control plane retains it."
+      >
         <DataTable
           columns={[
             { key: 'project', label: 'Project', render: (key) => key.project_id },
             { key: 'tenant', label: 'Tenant', render: (key) => key.tenant_id },
+            { key: 'label', label: 'Label', render: (key) => key.label },
             { key: 'environment', label: 'Environment', render: (key) => key.environment },
+            {
+              key: 'notes',
+              label: 'Notes',
+              render: (key) => key.notes ?? 'none',
+            },
+            {
+              key: 'expires_at_ms',
+              label: 'Expires at (ms)',
+              render: (key) => key.expires_at_ms ?? 'never',
+            },
+            {
+              key: 'raw_key',
+              label: 'Raw key',
+              render: (key) => key.raw_key ?? 'not retained',
+            },
+            {
+              key: 'hashed_key',
+              label: 'Hashed key',
+              render: (key) => key.hashed_key,
+            },
             {
               key: 'active',
               label: 'Status',
@@ -539,23 +620,35 @@ export function TenantsPage({
         <DialogContent size="medium">
           <AdminDialog
             title="Plaintext key ready"
-            detail="Store this secret now. After the dialog closes, the inventory only retains the hashed record."
+            detail="Store this secret now. The control plane persists both hashed_key and raw_key in the canonical ai_app_api_keys table."
           >
             {revealedApiKey ? (
               <div className="adminx-form-grid">
                 <div className="adminx-note">
                   <strong>Issued scope</strong>
-                  <p>
-                    {revealedApiKey.project_id}
-                    {' | '}
-                    {revealedApiKey.environment}
-                    {' | '}
-                    hashed: {revealedApiKey.hashed}
-                  </p>
-                </div>
-                <div className="adminx-note">
-                  <strong>Plaintext key</strong>
-                  <code>{revealedApiKey.plaintext}</code>
+                      <p>
+                        {revealedApiKey.project_id}
+                        {' | '}
+                        {revealedApiKey.environment}
+                        {' | '}
+                        {revealedApiKey.label}
+                        {' | '}
+                        hashed: {revealedApiKey.hashed}
+                      </p>
+                    </div>
+                    {revealedApiKey.notes ? (
+                      <div className="adminx-note">
+                        <strong>Notes</strong>
+                        <p>{revealedApiKey.notes}</p>
+                      </div>
+                    ) : null}
+                    <div className="adminx-note">
+                      <strong>Expires at (ms)</strong>
+                      <p>{revealedApiKey.expires_at_ms ?? 'never'}</p>
+                    </div>
+                    <div className="adminx-note">
+                      <strong>Plaintext key</strong>
+                      <code>{revealedApiKey.plaintext}</code>
                 </div>
                 <DialogFooter>
                   <InlineButton

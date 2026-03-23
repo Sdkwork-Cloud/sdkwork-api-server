@@ -629,6 +629,7 @@ pub async fn persist_gateway_api_key_with_metadata(
     )?;
     let record =
         GatewayApiKeyRecord::new(tenant_id, project_id, environment, created.hashed.clone())
+            .with_raw_key(created.plaintext.clone())
             .with_label(created.label.clone())
             .with_notes_option(created.notes.clone())
             .with_created_at_ms(created.created_at_ms)

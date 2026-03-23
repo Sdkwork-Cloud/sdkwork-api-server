@@ -113,7 +113,9 @@ export interface GatewayApiKeyRecord {
   project_id: string;
   environment: string;
   hashed_key: string;
+  raw_key?: string | null;
   label: string;
+  notes?: string | null;
   created_at_ms: number;
   last_used_at_ms?: number | null;
   expires_at_ms?: number | null;
@@ -127,6 +129,7 @@ export interface CreatedGatewayApiKey {
   project_id: string;
   environment: string;
   label: string;
+  notes?: string | null;
   created_at_ms: number;
   expires_at_ms?: number | null;
 }
@@ -157,6 +160,30 @@ export interface ModelCatalogRecord {
   capabilities: string[];
   streaming: boolean;
   context_window?: number | null;
+}
+
+export interface ChannelModelRecord {
+  channel_id: string;
+  model_id: string;
+  model_display_name: string;
+  capabilities: string[];
+  streaming: boolean;
+  context_window?: number | null;
+  description?: string | null;
+}
+
+export interface ModelPriceRecord {
+  channel_id: string;
+  model_id: string;
+  proxy_provider_id: string;
+  currency_code: string;
+  price_unit: string;
+  input_price: number;
+  output_price: number;
+  cache_read_price: number;
+  cache_write_price: number;
+  request_price: number;
+  is_active: boolean;
 }
 
 export interface CredentialRecord {
@@ -280,6 +307,8 @@ export interface AdminWorkspaceSnapshot {
   providers: ProxyProviderRecord[];
   credentials: CredentialRecord[];
   models: ModelCatalogRecord[];
+  channelModels: ChannelModelRecord[];
+  modelPrices: ModelPriceRecord[];
   usageRecords: UsageRecord[];
   usageSummary: UsageSummary;
   billingSummary: BillingSummary;

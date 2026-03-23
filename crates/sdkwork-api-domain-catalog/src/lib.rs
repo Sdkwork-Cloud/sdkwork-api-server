@@ -166,6 +166,148 @@ pub enum ModelCapability {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelModelRecord {
+    pub channel_id: String,
+    pub model_id: String,
+    pub model_display_name: String,
+    #[serde(default)]
+    pub capabilities: Vec<ModelCapability>,
+    #[serde(default)]
+    pub streaming: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl ChannelModelRecord {
+    pub fn new(
+        channel_id: impl Into<String>,
+        model_id: impl Into<String>,
+        model_display_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            channel_id: channel_id.into(),
+            model_id: model_id.into(),
+            model_display_name: model_display_name.into(),
+            capabilities: Vec::new(),
+            streaming: false,
+            context_window: None,
+            description: None,
+        }
+    }
+
+    pub fn with_capability(mut self, capability: ModelCapability) -> Self {
+        if !self.capabilities.contains(&capability) {
+            self.capabilities.push(capability);
+        }
+        self
+    }
+
+    pub fn with_streaming(mut self, streaming: bool) -> Self {
+        self.streaming = streaming;
+        self
+    }
+
+    pub fn with_context_window(mut self, context_window: u64) -> Self {
+        self.context_window = Some(context_window);
+        self
+    }
+
+    pub fn with_context_window_option(mut self, context_window: Option<u64>) -> Self {
+        self.context_window = context_window;
+        self
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn with_description_option(mut self, description: Option<String>) -> Self {
+        self.description = description;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModelPriceRecord {
+    pub channel_id: String,
+    pub model_id: String,
+    pub proxy_provider_id: String,
+    pub currency_code: String,
+    pub price_unit: String,
+    pub input_price: f64,
+    pub output_price: f64,
+    pub cache_read_price: f64,
+    pub cache_write_price: f64,
+    pub request_price: f64,
+    pub is_active: bool,
+}
+
+impl ModelPriceRecord {
+    pub fn new(
+        channel_id: impl Into<String>,
+        model_id: impl Into<String>,
+        proxy_provider_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            channel_id: channel_id.into(),
+            model_id: model_id.into(),
+            proxy_provider_id: proxy_provider_id.into(),
+            currency_code: "USD".to_owned(),
+            price_unit: "per_1m_tokens".to_owned(),
+            input_price: 0.0,
+            output_price: 0.0,
+            cache_read_price: 0.0,
+            cache_write_price: 0.0,
+            request_price: 0.0,
+            is_active: true,
+        }
+    }
+
+    pub fn with_currency_code(mut self, currency_code: impl Into<String>) -> Self {
+        self.currency_code = currency_code.into();
+        self
+    }
+
+    pub fn with_price_unit(mut self, price_unit: impl Into<String>) -> Self {
+        self.price_unit = price_unit.into();
+        self
+    }
+
+    pub fn with_input_price(mut self, input_price: f64) -> Self {
+        self.input_price = input_price;
+        self
+    }
+
+    pub fn with_output_price(mut self, output_price: f64) -> Self {
+        self.output_price = output_price;
+        self
+    }
+
+    pub fn with_cache_read_price(mut self, cache_read_price: f64) -> Self {
+        self.cache_read_price = cache_read_price;
+        self
+    }
+
+    pub fn with_cache_write_price(mut self, cache_write_price: f64) -> Self {
+        self.cache_write_price = cache_write_price;
+        self
+    }
+
+    pub fn with_request_price(mut self, request_price: f64) -> Self {
+        self.request_price = request_price;
+        self
+    }
+
+    pub fn with_active(mut self, is_active: bool) -> Self {
+        self.is_active = is_active;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelCatalogEntry {
     pub external_name: String,
     pub provider_id: String,

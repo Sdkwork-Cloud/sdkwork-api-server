@@ -3,11 +3,13 @@ import type {
   AdminSessionUser,
   BillingSummary,
   ChannelRecord,
+  ChannelModelRecord,
   CouponRecord,
   CreatedGatewayApiKey,
   CredentialRecord,
   GatewayApiKeyRecord,
   ModelCatalogRecord,
+  ModelPriceRecord,
   OperatorUserRecord,
   PortalUserRecord,
   ProjectRecord,
@@ -251,6 +253,7 @@ export function createApiKey(input: {
   project_id: string;
   environment: string;
   label?: string;
+  notes?: string;
   expires_at_ms?: number | null;
 }): Promise<CreatedGatewayApiKey> {
   return postJson<typeof input, CreatedGatewayApiKey>('/api-keys', input, requiredToken());
@@ -334,6 +337,29 @@ export function listModels(token?: string): Promise<ModelCatalogRecord[]> {
   return getJson<ModelCatalogRecord[]>('/models', token);
 }
 
+export function listChannelModels(token?: string): Promise<ChannelModelRecord[]> {
+  return getJson<ChannelModelRecord[]>('/channel-models', token);
+}
+
+export function saveChannelModel(input: {
+  channel_id: string;
+  model_id: string;
+  model_display_name: string;
+  capabilities: string[];
+  streaming: boolean;
+  context_window?: number | null;
+  description?: string;
+}): Promise<ChannelModelRecord> {
+  return postJson<typeof input, ChannelModelRecord>('/channel-models', input, requiredToken());
+}
+
+export function deleteChannelModel(channelId: string, modelId: string): Promise<void> {
+  return deleteEmpty(
+    `/channel-models/${encodeURIComponent(channelId)}/models/${encodeURIComponent(modelId)}`,
+    requiredToken(),
+  );
+}
+
 export function saveModel(input: {
   external_name: string;
   provider_id: string;
@@ -347,6 +373,37 @@ export function saveModel(input: {
 export function deleteModel(externalName: string, providerId: string): Promise<void> {
   return deleteEmpty(
     `/models/${encodeURIComponent(externalName)}/providers/${encodeURIComponent(providerId)}`,
+    requiredToken(),
+  );
+}
+
+export function listModelPrices(token?: string): Promise<ModelPriceRecord[]> {
+  return getJson<ModelPriceRecord[]>('/model-prices', token);
+}
+
+export function saveModelPrice(input: {
+  channel_id: string;
+  model_id: string;
+  proxy_provider_id: string;
+  currency_code: string;
+  price_unit: string;
+  input_price: number;
+  output_price: number;
+  cache_read_price: number;
+  cache_write_price: number;
+  request_price: number;
+  is_active: boolean;
+}): Promise<ModelPriceRecord> {
+  return postJson<typeof input, ModelPriceRecord>('/model-prices', input, requiredToken());
+}
+
+export function deleteModelPrice(
+  channelId: string,
+  modelId: string,
+  proxyProviderId: string,
+): Promise<void> {
+  return deleteEmpty(
+    `/model-prices/${encodeURIComponent(channelId)}/models/${encodeURIComponent(modelId)}/providers/${encodeURIComponent(proxyProviderId)}`,
     requiredToken(),
   );
 }

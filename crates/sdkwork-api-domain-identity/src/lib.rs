@@ -41,6 +41,8 @@ pub struct GatewayApiKeyRecord {
     pub project_id: String,
     pub environment: String,
     pub hashed_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_key: Option<String>,
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
@@ -64,6 +66,7 @@ impl GatewayApiKeyRecord {
             project_id: project_id.into(),
             environment: environment.into(),
             hashed_key: hashed_key.into(),
+            raw_key: None,
             label: String::new(),
             notes: None,
             created_at_ms: 0,
@@ -75,6 +78,16 @@ impl GatewayApiKeyRecord {
 
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = label.into();
+        self
+    }
+
+    pub fn with_raw_key(mut self, raw_key: impl Into<String>) -> Self {
+        self.raw_key = Some(raw_key.into());
+        self
+    }
+
+    pub fn with_raw_key_option(mut self, raw_key: Option<String>) -> Self {
+        self.raw_key = raw_key;
         self
     }
 
