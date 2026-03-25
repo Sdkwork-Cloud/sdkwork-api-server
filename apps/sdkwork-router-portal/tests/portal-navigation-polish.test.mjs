@@ -18,7 +18,9 @@ test('portal shell keeps sidebar navigation compact and product-led', () => {
   assert.match(sidebar, /routeGroups\.map/);
   assert.match(sidebar, /resolvePortalPath/);
   assert.match(sidebar, /Collapse sidebar|Expand sidebar/);
-  assert.match(profileDock, /Active workspace/);
+  assert.match(profileDock, /data-slot="portal-sidebar-footer-settings"/);
+  assert.match(profileDock, /data-slot="portal-sidebar-user-control"/);
+  assert.doesNotMatch(profileDock, /Active workspace/);
   assert.match(routes, /Dashboard/);
   assert.match(routes, /Routing/);
   assert.match(routes, /API Keys/);

@@ -12,8 +12,7 @@ import {
   InlineButton,
   PageToolbar,
   Pill,
-  StatCard,
-  Surface,
+  ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type {
   AdminPageProps,
@@ -363,6 +362,7 @@ export function CatalogPage({
   );
   const [editingModelPriceKey, setEditingModelPriceKey] = useState<string | null>(null);
   const [activeChannelId, setActiveChannelId] = useState<string>(defaultChannelId);
+  const [search, setSearch] = useState('');
   const [pricingTarget, setPricingTarget] = useState<{
     channel_id: string;
     model_id: string;
@@ -398,6 +398,57 @@ export function CatalogPage({
   const providerNameById = new Map(
     snapshot.providers.map((provider) => [provider.id, provider.display_name]),
   );
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredChannels = snapshot.channels.filter((channel) =>
+    !normalizedSearch
+    || [channel.id, channel.name].join(' ').toLowerCase().includes(normalizedSearch));
+  const filteredProviders = snapshot.providers.filter((provider) =>
+    !normalizedSearch
+    || [
+      provider.id,
+      provider.display_name,
+      provider.channel_id,
+      provider.adapter_kind,
+      provider.base_url,
+      provider.extension_id ?? '',
+      providerChannelIds(provider).join(' '),
+    ].join(' ').toLowerCase().includes(normalizedSearch));
+  const filteredCredentials = snapshot.credentials.filter((credential) =>
+    !normalizedSearch
+    || [
+      credential.tenant_id,
+      credential.provider_id,
+      credential.key_reference,
+      credential.secret_backend,
+      credential.secret_local_file ?? '',
+      credential.secret_keyring_service ?? '',
+      credential.secret_master_key_id ?? '',
+    ].join(' ').toLowerCase().includes(normalizedSearch));
+  const filteredModels = snapshot.models.filter((model) =>
+    !normalizedSearch
+    || [
+      model.external_name,
+      model.provider_id,
+      model.capabilities.join(' '),
+    ].join(' ').toLowerCase().includes(normalizedSearch));
+  const filteredSelectedChannelModels = selectedChannelModels.filter((model) =>
+    !normalizedSearch
+    || [
+      model.channel_id,
+      model.model_id,
+      model.model_display_name ?? '',
+      model.capabilities.join(' '),
+    ].join(' ').toLowerCase().includes(normalizedSearch));
+  const filteredSelectedModelPrices = selectedModelPrices.filter((record) =>
+    !normalizedSearch
+    || [
+      record.channel_id,
+      record.model_id,
+      record.proxy_provider_id,
+      record.currency_code,
+      String(record.input_price),
+      String(record.output_price),
+    ].join(' ').toLowerCase().includes(normalizedSearch));
 
   function resetChannelDialog() {
     setEditingChannelId(null);
@@ -709,75 +760,28 @@ export function CatalogPage({
 
   return (
     <div className="adminx-page-grid">
-      <section className="adminx-stat-grid">
-        <StatCard
-          label="Channels"
-          value={String(snapshot.channels.length)}
-          detail="Canonical ai_channel registry."
-        />
-        <StatCard
-          label="Channel models"
-          value={String(snapshot.channelModels.length)}
-          detail="Channel-to-model mappings."
-        />
-        <StatCard
-          label="Model pricing"
-          value={String(snapshot.modelPrices.length)}
-          detail="Provider-aware ai_model_price rows."
-        />
-        <StatCard
-          label="Proxy providers"
-          value={String(snapshot.providers.length)}
-          detail="Upstream provider endpoints and bindings."
-        />
-        <StatCard
-          label="Credentials"
-          value={String(snapshot.credentials.length)}
-          detail="Encrypted ai_router_credential_records entries."
-        />
-      </section>
-
       <PageToolbar
-        title="Catalog workbench"
-        detail="Use a channel-first workflow: define channels, attach supported models, then maintain provider pricing and router credentials through focused dialogs."
+        compact
         actions={
           <>
             <InlineButton tone="primary" onClick={openNewChannelDialog}>
               New channel
             </InlineButton>
             <InlineButton onClick={() => openNewProviderDialog()}>
-              New proxy provider
+              New provider
             </InlineButton>
             <InlineButton onClick={() => openNewCredentialDialog()}>
-              Rotate credential
+              Rotate secret
             </InlineButton>
           </>
         }
       >
-        <div className="adminx-form-grid">
-          <div className="adminx-note">
-            <strong>Schema discipline</strong>
-            <p>
-              Catalog-facing persistence now follows a canonical ai_* naming pattern, with
-              lowercase snake_case fields across channel, provider, model, pricing, and
-              credential data.
-            </p>
-          </div>
-          <div className="adminx-note">
-            <strong>Channel-first flow</strong>
-            <p>
-              Manage models from the channel record, then drill into provider pricing per
-              model. This keeps API exposure, provider availability, and price posture aligned.
-            </p>
-          </div>
-          <div className="adminx-note">
-            <strong>Safety rails</strong>
-            <p>
-              Delete actions remain behind confirmation and the channel registry blocks
-              destructive removal when proxy providers are still bound to a channel.
-            </p>
-          </div>
-        </div>
+        <ToolbarSearchField
+          label="Search catalog"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="channel, provider, model, credential"
+        />
       </PageToolbar>
 
       <Dialog
@@ -1213,10 +1217,10 @@ export function CatalogPage({
         </DialogContent>
       </Dialog>
 
-      <Surface
-        title="Channel registry"
-        detail="Every router API surface and its published model inventory."
-      >
+      <section className="adminx-page-grid">
+        <div className="adminx-row">
+          <strong>Channel registry</strong>
+        </div>
         <DataTable
           columns={[
             {
@@ -1279,16 +1283,16 @@ export function CatalogPage({
               ),
             },
           ]}
-          rows={snapshot.channels}
+          rows={filteredChannels}
           empty="No channels available."
           getKey={(channel) => channel.id}
         />
-      </Surface>
+      </section>
 
-      <Surface
-        title="Proxy provider registry"
-        detail="Upstream providers, base URLs, and multi-channel bindings."
-      >
+      <section className="adminx-page-grid">
+        <div className="adminx-row">
+          <strong>Proxy provider registry</strong>
+        </div>
         <DataTable
           columns={[
             {
@@ -1343,16 +1347,16 @@ export function CatalogPage({
               ),
             },
           ]}
-          rows={snapshot.providers}
+          rows={filteredProviders}
           empty="No proxy providers available."
           getKey={(provider) => provider.id}
         />
-      </Surface>
+      </section>
 
-      <Surface
-        title="Router credential inventory"
-        detail="Encrypted upstream credentials grouped by tenant and proxy provider."
-      >
+      <section className="adminx-page-grid">
+        <div className="adminx-row">
+          <strong>Credential inventory</strong>
+        </div>
         <DataTable
           columns={[
             {
@@ -1407,18 +1411,18 @@ export function CatalogPage({
               ),
             },
           ]}
-          rows={snapshot.credentials}
+          rows={filteredCredentials}
           empty="No router credentials available."
           getKey={(credential) =>
             `${credential.tenant_id}:${credential.provider_id}:${credential.key_reference}`
           }
         />
-      </Surface>
+      </section>
 
-      <Surface
-        title="Provider variant inventory"
-        detail="Synthesized provider-scoped models that the runtime can route today."
-      >
+      <section className="adminx-page-grid">
+        <div className="adminx-row">
+          <strong>Provider variant inventory</strong>
+        </div>
         <DataTable
           columns={[
             {
@@ -1464,11 +1468,11 @@ export function CatalogPage({
               ),
             },
           ]}
-          rows={snapshot.models}
+          rows={filteredModels}
           empty="No provider-scoped model variants available."
           getKey={(model) => `${model.external_name}:${model.provider_id}`}
         />
-      </Surface>
+      </section>
 
       <Dialog open={isChannelModelsDialogOpen} onOpenChange={setIsChannelModelsDialogOpen}>
         <DialogContent size="large">
@@ -1537,7 +1541,7 @@ export function CatalogPage({
                     ),
                   },
                 ]}
-                rows={selectedChannelModels}
+                rows={filteredSelectedChannelModels}
                 empty="No channel models have been configured for this channel."
                 getKey={(model) => `${model.channel_id}:${model.model_id}`}
               />
@@ -1747,7 +1751,7 @@ export function CatalogPage({
                     ),
                   },
                 ]}
-                rows={selectedModelPrices}
+                rows={filteredSelectedModelPrices}
                 empty="No provider pricing rows exist for this channel model."
                 getKey={(record) =>
                   `${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`

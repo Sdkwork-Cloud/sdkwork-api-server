@@ -1,26 +1,22 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   Activity,
   Coins,
   Gauge,
   KeyRound,
   PanelLeftClose,
-  PanelLeftOpen,
   ReceiptText,
   Route,
   UserRound,
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { NavLink } from 'react-router-dom';
+import { usePortalI18n } from 'sdkwork-router-portal-commons';
 import type { PortalRouteKey, PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
 
 import { resolvePortalPath } from '../application/router/routeManifest';
-import {
-  clampSidebarWidth,
-  PORTAL_COLLAPSED_SIDEBAR_WIDTH,
-  PORTAL_MIN_SIDEBAR_WIDTH,
-} from '../lib/portalPreferences';
+import { PORTAL_COLLAPSED_SIDEBAR_WIDTH } from '../lib/portalPreferences';
 import { portalRoutes } from '../routes';
 import { usePortalAuthStore } from '../store/usePortalAuthStore';
 import { usePortalShellStore } from '../store/usePortalShellStore';
@@ -45,10 +41,10 @@ const routeGroups: Array<{ title: string; items: PortalRouteKey[] }> = [
 
 function getUserInitials(workspace: PortalWorkspaceSummary | null): string {
   const rawValue =
-    workspace?.user.display_name?.trim() ||
-    workspace?.user.email?.split('@')[0] ||
-    workspace?.tenant.name ||
-    'PW';
+    workspace?.user.display_name?.trim()
+    || workspace?.user.email?.split('@')[0]
+    || workspace?.tenant.name
+    || 'PW';
 
   const segments = rawValue
     .split(/\s+/)
@@ -67,90 +63,84 @@ export function Sidebar({
   onOpenConfigCenter: () => void;
   workspace?: PortalWorkspaceSummary | null;
 }) {
+  const { t } = usePortalI18n();
   const storedWorkspace = usePortalAuthStore((state) => state.workspace);
-  const {
-    hiddenSidebarItems,
-    isSidebarCollapsed,
-    sidebarWidth,
-    toggleSidebar,
-    setSidebarCollapsed,
-    setSidebarWidth,
-  } = usePortalShellStore();
-  const [isHovered, setIsHovered] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeStartXRef = useRef(0);
-  const resizeStartWidthRef = useRef(0);
+  const { hiddenSidebarItems, isSidebarCollapsed, sidebarWidth, toggleSidebar } =
+    usePortalShellStore();
 
   const resolvedWorkspace = workspace ?? storedWorkspace;
-  const resolvedSidebarWidth = clampSidebarWidth(sidebarWidth);
   const userInitials = getUserInitials(resolvedWorkspace);
-
-  useEffect(() => {
-    if (resolvedSidebarWidth !== sidebarWidth) {
-      setSidebarWidth(resolvedSidebarWidth);
-    }
-  }, [resolvedSidebarWidth, setSidebarWidth, sidebarWidth]);
-
-  useEffect(() => {
-    if (!isResizing) {
-      return;
-    }
-
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const nextWidth = clampSidebarWidth(
-        resizeStartWidthRef.current + (event.clientX - resizeStartXRef.current),
-      );
-      setSidebarWidth(nextWidth);
-    };
-
-    const handlePointerUp = () => {
-      setIsResizing(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-
-    return () => {
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isResizing, setSidebarWidth]);
-
-  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const nextWidth = isSidebarCollapsed ? PORTAL_MIN_SIDEBAR_WIDTH : resolvedSidebarWidth;
-    resizeStartXRef.current = event.clientX;
-    resizeStartWidthRef.current = nextWidth;
-
-    if (isSidebarCollapsed) {
-      setSidebarCollapsed(false);
-      setSidebarWidth(nextWidth);
-    }
-
-    setIsResizing(true);
-  }
-
-  const currentWidth = isSidebarCollapsed ? PORTAL_COLLAPSED_SIDEBAR_WIDTH : resolvedSidebarWidth;
-  const showEdgeControls = isHovered || isResizing;
+  const currentWidth = isSidebarCollapsed ? PORTAL_COLLAPSED_SIDEBAR_WIDTH : sidebarWidth;
 
   return (
-    <div
-      className={`relative z-20 flex h-full shrink-0 ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{ width: currentWidth }}
+    <motion.div
+      initial={false}
+      animate={{ width: currentWidth }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+      className="relative z-20 flex h-full shrink-0"
     >
-      <aside className="flex h-full w-full flex-col overflow-visible border-r border-zinc-900/90 bg-[linear-gradient(180deg,_#13151a_0%,_#0b0c10_100%)] text-zinc-300 shadow-[18px_0_50px_rgba(9,9,11,0.16)]">
-        <nav className={`scrollbar-hide flex-1 space-y-5 overflow-x-hidden overflow-y-auto ${isSidebarCollapsed ? 'px-2 py-4' : 'px-3 py-5'}`}>
+      <aside className="flex h-full w-full flex-col overflow-hidden border-r border-zinc-900/90 bg-zinc-950 bg-[linear-gradient(180deg,_#13151a_0%,_#0b0c10_100%)] text-zinc-300 shadow-[18px_0_50px_rgba(9,9,11,0.16)]">
+        <div className={`relative flex flex-col pb-4 pt-6 ${isSidebarCollapsed ? 'items-center' : 'px-5'}`}>
+          <div
+            className={`flex w-full items-center overflow-hidden whitespace-nowrap ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}
+          >
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={isSidebarCollapsed ? t('Expand sidebar') : undefined}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-600 shadow-lg shadow-primary-900/20 ${
+                isSidebarCollapsed ? 'cursor-pointer transition-colors hover:bg-primary-500' : ''
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-white"
+              >
+                <path d="M12 2v2" />
+                <path d="M12 18v4" />
+                <path d="M4.93 10.93l1.41 1.41" />
+                <path d="M17.66 17.66l1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="M4.93 13.07l1.41-1.41" />
+                <path d="M17.66 6.34l1.41-1.41" />
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                <path d="M12 6a6 6 0 0 1 6 6" />
+                <path d="M12 18a6 6 0 0 1-6-6" />
+              </svg>
+            </button>
+
+            {!isSidebarCollapsed ? (
+              <>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    {t('Developer portal')}
+                  </div>
+                  <div className="truncate text-[19px] font-bold tracking-tight text-white">
+                    {t('SDKWork Router')}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="absolute right-4 top-6 rounded-md p-1 text-zinc-500 transition-opacity hover:bg-white/5 hover:text-white"
+                  title={t('Collapse sidebar')}
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <nav className={`scrollbar-hide flex-1 space-y-5 overflow-x-hidden overflow-y-auto ${isSidebarCollapsed ? 'px-2 pb-4' : 'px-3 pb-5'}`}>
           {routeGroups.map((group) => {
             const visibleRoutes = group.items
               .map((routeKey) => portalRoutes.find((route) => route.key === routeKey))
@@ -164,7 +154,7 @@ export function Sidebar({
               <div key={group.title}>
                 {!isSidebarCollapsed ? (
                   <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                    {group.title}
+                    {t(group.title)}
                   </div>
                 ) : (
                   <div className="mx-2 my-4 h-px bg-white/6" />
@@ -180,18 +170,18 @@ export function Sidebar({
 
                     return (
                       <NavLink
+                        key={route.key}
+                        title={isSidebarCollapsed ? t(route.label) : undefined}
+                        to={resolvePortalPath(route.key)}
                         className={({ isActive }) =>
-                          `group relative flex items-center rounded-2xl transition-all duration-200 ${
-                            isSidebarCollapsed ? 'mx-auto h-11 w-11 justify-center' : 'justify-between px-3 py-2.5'
+                          `group relative flex items-center rounded-xl transition-all duration-200 ${
+                            isSidebarCollapsed ? 'mx-auto h-10 w-10 justify-center' : 'justify-between px-3 py-2.5'
                           } ${
                             isActive
-                              ? 'bg-white/[0.08] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                              ? 'bg-primary-500/10 font-medium text-primary-400'
                               : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
                           }`
                         }
-                        key={route.key}
-                        title={isSidebarCollapsed ? route.label : undefined}
-                        to={resolvePortalPath(route.key)}
                       >
                         {({ isActive }) => (
                           <>
@@ -205,7 +195,7 @@ export function Sidebar({
                                 }`}
                               />
                               {!isSidebarCollapsed ? (
-                                <span className="text-[14px] tracking-tight">{route.label}</span>
+                                <span className="text-[14px] tracking-tight">{t(route.label)}</span>
                               ) : null}
                             </div>
                           </>
@@ -229,25 +219,6 @@ export function Sidebar({
           />
         </div>
       </aside>
-
-      <button
-        className={`absolute right-1 top-5 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-200 shadow-[0_10px_24px_rgba(9,9,11,0.26)] transition-all duration-200 dark:bg-zinc-900 ${
-          showEdgeControls
-            ? 'opacity-100 hover:scale-105 hover:bg-zinc-900'
-            : 'pointer-events-none opacity-0'
-        }`}
-        onClick={toggleSidebar}
-        title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        type="button"
-      >
-        {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-      </button>
-
-      <div
-        className="absolute inset-y-0 right-0 z-20 w-3 cursor-col-resize touch-none"
-        data-slot="sidebar-resize-handle"
-        onPointerDown={startResize}
-      />
-    </div>
+    </motion.div>
   );
 }

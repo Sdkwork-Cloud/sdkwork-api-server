@@ -58,6 +58,7 @@ import {
   saveProject,
   saveProvider,
   saveTenant,
+  updateApiKey,
   updateApiKeyStatus,
   updateOperatorUserStatus,
   updatePortalUserStatus,
@@ -387,7 +388,17 @@ interface AdminWorkbenchContextValue {
     label?: string;
     notes?: string;
     expires_at_ms?: number | null;
+    plaintext_key?: string;
   }) => Promise<CreatedGatewayApiKey>;
+  handleUpdateApiKey: (input: {
+    hashed_key: string;
+    tenant_id: string;
+    project_id: string;
+    environment: string;
+    label: string;
+    notes?: string | null;
+    expires_at_ms?: number | null;
+  }) => Promise<void>;
   handleUpdateApiKeyStatus: (hashedKey: string, active: boolean) => Promise<void>;
   handleDeleteApiKey: (hashedKey: string) => Promise<void>;
   handleReloadRuntimes: (input?: {
@@ -716,6 +727,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
     label?: string;
     notes?: string;
     expires_at_ms?: number | null;
+    plaintext_key?: string;
   }): Promise<CreatedGatewayApiKey> {
     setStatus('Issuing gateway key...');
     try {
@@ -725,6 +737,26 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
       return created;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Failed to issue gateway key.');
+      throw error;
+    }
+  }
+
+  async function handleUpdateApiKey(input: {
+    hashed_key: string;
+    tenant_id: string;
+    project_id: string;
+    environment: string;
+    label: string;
+    notes?: string | null;
+    expires_at_ms?: number | null;
+  }) {
+    setStatus(`Updating gateway key ${input.hashed_key}...`);
+    try {
+      await updateApiKey(input);
+      await refreshWorkspace();
+      setStatus('Gateway key updated.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to update gateway key.');
       throw error;
     }
   }
@@ -928,6 +960,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
       handleDeleteTenant,
       handleSaveProject,
       handleCreateApiKey,
+      handleUpdateApiKey,
       handleUpdateApiKeyStatus,
       handleDeleteApiKey,
       handleReloadRuntimes,

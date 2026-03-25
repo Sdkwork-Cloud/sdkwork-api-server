@@ -1,64 +1,65 @@
-import { Monitor, PanelsTopLeft } from 'lucide-react';
-
+import { useAdminI18n } from 'sdkwork-router-admin-commons';
 import { useAdminAppStore } from 'sdkwork-router-admin-core';
 
-import { SettingsSection } from './Shared';
+import { SettingsInfoCard, SettingsSection } from './Shared';
 
 export function WorkspaceSettings() {
   const { hiddenSidebarItems, isSidebarCollapsed, sidebarWidth, themeColor, themeMode } =
     useAdminAppStore();
+  const { t } = useAdminI18n();
 
   return (
-    <div className="admin-shell-settings-stack">
-      <SettingsSection
-        eyebrow="Workspace"
-        title="shell posture"
-        icon={<PanelsTopLeft className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-kpi-grid">
-          <div className="admin-shell-settings-kpi">
-            <span>Theme mode</span>
-            <strong>{themeMode}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Theme color</span>
-            <strong>{themeColor}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Sidebar width</span>
-            <strong>{sidebarWidth}px</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Content region</span>
-            <strong>right canvas</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Sidebar mode</span>
-            <strong>{isSidebarCollapsed ? 'collapsed' : 'expanded'}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Hidden nav items</span>
-            <strong>{hiddenSidebarItems.length}</strong>
-          </div>
-        </div>
-      </SettingsSection>
+    <div className="space-y-8">
+      <div>
+        <h2 className="mb-1 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+          {t('Workspace')}
+        </h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {t('Shell posture, persistence, and canvas continuity for the control plane workspace.')}
+        </p>
+      </div>
 
-      <SettingsSection
-        eyebrow="Continuity"
-        title="workspace persistence"
-        icon={<Monitor className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-copy">
-          <p>
-            Theme preferences, sidebar width, hidden entries, and collapse state are persisted so
-            the control-plane workspace reopens with the same shell posture.
-          </p>
-          <p>
-            The layout stays split into a claw-style left navigation rail and a single right content
-            region, keeping product behavior and visual framing consistent.
-          </p>
-        </div>
-      </SettingsSection>
+      <div className="space-y-6">
+        <SettingsSection
+          eyebrow={t('Workspace')}
+          title={t('shell posture')}
+          description={t('Keep the left navigation rail and the right canvas in a single consistent shell contract.')}
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <SettingsInfoCard label={t('Theme mode')} value={t(themeMode)} />
+            <SettingsInfoCard label={t('Theme color')} value={t(themeColor)} />
+            <SettingsInfoCard label={t('Sidebar width')} value={`${sidebarWidth}px`} />
+            <SettingsInfoCard
+              label={t('Sidebar mode')}
+              value={isSidebarCollapsed ? t('collapsed') : t('expanded')}
+            />
+            <SettingsInfoCard
+              label={t('Hidden nav items')}
+              value={hiddenSidebarItems.length}
+            />
+            <SettingsInfoCard label={t('Content region')} value={t('right canvas')} />
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          eyebrow={t('Continuity')}
+          title={t('workspace persistence')}
+          description={t('Theme, sidebar, and hidden-navigation preferences reopen with the same shell posture on the next launch.')}
+        >
+          <div className="space-y-3 text-sm leading-7 text-zinc-500 dark:text-zinc-400">
+            <p>
+              {t(
+                'Theme preferences, sidebar width, hidden entries, and collapse state are persisted so the control-plane workspace reopens with the same shell posture.',
+              )}
+            </p>
+            <p>
+              {t(
+                'The layout stays split into a claw-style left navigation rail and a single right content region, keeping product behavior and visual framing consistent.',
+              )}
+            </p>
+          </div>
+        </SettingsSection>
+      </div>
     </div>
   );
 }

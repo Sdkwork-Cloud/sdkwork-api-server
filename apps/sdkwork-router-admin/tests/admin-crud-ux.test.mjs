@@ -86,6 +86,6 @@ test('operations page uses a targeted reload dialog instead of leaving a persist
   assert.match(operations, /Dialog/);
   assert.match(operations, /DialogContent/);
   assert.match(operations, /Targeted reload/);
-  assert.match(operations, /Latest reload report/);
+  assert.match(operations, /Reload runtimes/);
   assert.doesNotMatch(operations, /title="Reload runtimes"/);
 });

@@ -10,6 +10,7 @@ import {
   User,
 } from 'lucide-react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { ADMIN_ROUTE_PATHS } from 'sdkwork-router-admin-core';
 
@@ -94,6 +95,7 @@ export function AdminLoginPage({
   isAuthenticated: boolean;
   onLogin: (input: { email: string; password: string }) => Promise<void>;
 }) {
+  const { t } = useAdminI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -135,7 +137,7 @@ export function AdminLoginPage({
     }
 
     if (mode === 'login' && status && status !== DEFAULT_LOGIN_STATUS) {
-      return status;
+      return t(status);
     }
 
     return '';
@@ -151,13 +153,18 @@ export function AdminLoginPage({
 
     if (mode === 'register') {
       setModeNotice(
-        `Operator account requests stay inside the control plane. Ask an existing admin to provision ${email.trim() || name.trim() || 'your'} access from Users.`,
+        t(
+          'Operator account requests stay inside the control plane. Ask an existing admin to provision {name} access from Users.',
+          { name: email.trim() || name.trim() || t('your') },
+        ),
       );
       return;
     }
 
     setModeNotice(
-      'Password resets are managed by an authenticated admin in Users. Contact the platform owner to rotate your credential safely.',
+      t(
+        'Password resets are managed by an authenticated admin in Users. Contact the platform owner to rotate your credential safely.',
+      ),
     );
   }
 
@@ -173,9 +180,9 @@ export function AdminLoginPage({
           <div className="adminx-auth-qr-badge">
             <QrCode className="adminx-auth-qr-badge-icon" />
           </div>
-          <h2 className="adminx-auth-qr-title">Scan to Login</h2>
+          <h2 className="adminx-auth-qr-title">{t('Scan to Login')}</h2>
           <p className="adminx-auth-qr-desc">
-            Use the SDKWork mobile app to scan the QR code for instant access.
+            {t('Use the SDKWork mobile app to scan the QR code for instant access.')}
           </p>
 
           <div className="adminx-auth-qr-card">
@@ -186,7 +193,7 @@ export function AdminLoginPage({
 
           <div className="adminx-auth-qr-footer">
             <Smartphone className="adminx-auth-qr-footer-icon" />
-            <span>Open SDKWork App</span>
+            <span>{t('Open SDKWork App')}</span>
           </div>
         </div>
       </div>
@@ -194,14 +201,14 @@ export function AdminLoginPage({
       <div className="adminx-auth-content">
         <div className="adminx-auth-content-inner">
           <div className="adminx-auth-heading">
-            <h1 className="adminx-auth-title">{titleByMode(mode)}</h1>
-            <p className="adminx-auth-subtitle">{descriptionByMode(mode)}</p>
+            <h1 className="adminx-auth-title">{t(titleByMode(mode))}</h1>
+            <p className="adminx-auth-subtitle">{t(descriptionByMode(mode))}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="adminx-auth-form">
             {mode === 'register' ? (
               <div className="adminx-auth-form-group">
-                <label className="adminx-auth-label">Full Name</label>
+                <label className="adminx-auth-label">{t('Full Name')}</label>
                 <div className="adminx-auth-input-shell">
                   <div className="adminx-auth-input-icon-wrap">
                     <User className="adminx-auth-input-icon" />
@@ -210,7 +217,7 @@ export function AdminLoginPage({
                     type="text"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="John Doe"
+                    placeholder={t('John Doe')}
                     autoComplete="name"
                     required
                   />
@@ -219,7 +226,7 @@ export function AdminLoginPage({
             ) : null}
 
             <div className="adminx-auth-form-group">
-              <label className="adminx-auth-label">Email Address</label>
+              <label className="adminx-auth-label">{t('Email Address')}</label>
               <div className="adminx-auth-input-shell">
                 <div className="adminx-auth-input-icon-wrap">
                   <Mail className="adminx-auth-input-icon" />
@@ -228,7 +235,7 @@ export function AdminLoginPage({
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={t('you@example.com')}
                   autoComplete="email"
                   required
                 />
@@ -238,14 +245,14 @@ export function AdminLoginPage({
             {mode !== 'forgot' ? (
               <div className="adminx-auth-form-group">
                 <div className="adminx-auth-label-row">
-                  <label className="adminx-auth-label">Password</label>
+                  <label className="adminx-auth-label">{t('Password')}</label>
                   {mode === 'login' ? (
                     <button
                       type="button"
                       onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.FORGOT_PASSWORD))}
                       className="adminx-auth-link-button"
                     >
-                      Forgot password
+                      {t('Forgot password')}
                     </button>
                   ) : null}
                 </div>
@@ -257,7 +264,7 @@ export function AdminLoginPage({
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('Enter your password')}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     required
                   />
@@ -270,7 +277,7 @@ export function AdminLoginPage({
               disabled={mode === 'login' ? loading : false}
               className="adminx-auth-primary-button"
             >
-              <span>{submitLabelByMode(mode, loading)}</span>
+              <span>{t(submitLabelByMode(mode, loading))}</span>
               <ArrowRight className="adminx-auth-primary-button-icon" />
             </button>
           </form>
@@ -281,7 +288,7 @@ export function AdminLoginPage({
             <div className="adminx-auth-provider-section">
               <div className="adminx-auth-divider">
                 <div className="adminx-auth-divider-line" />
-                <span>Or continue with</span>
+                <span>{t('Or continue with')}</span>
               </div>
 
               <div className="adminx-auth-provider-grid">
@@ -295,7 +302,7 @@ export function AdminLoginPage({
                   }
                 >
                   <Github className="adminx-auth-provider-icon" />
-                  <span>GitHub</span>
+                  <span>{t('GitHub')}</span>
                 </button>
                 <button
                   type="button"
@@ -307,7 +314,7 @@ export function AdminLoginPage({
                   }
                 >
                   <Chrome className="adminx-auth-provider-icon" />
-                  <span>Google</span>
+                  <span>{t('Google')}</span>
                 </button>
               </div>
             </div>
@@ -316,24 +323,24 @@ export function AdminLoginPage({
           <div className="adminx-auth-mode-switch">
             {mode === 'login' ? (
               <>
-                <span>Don't have an account?</span>{' '}
+                <span>{t("Don't have an account?")}</span>{' '}
                 <button
                   type="button"
                   onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.REGISTER))}
                   className="adminx-auth-mode-link"
                 >
-                  Sign Up
+                  {t('Sign Up')}
                 </button>
               </>
             ) : mode === 'register' ? (
               <>
-                <span>Already have an account?</span>{' '}
+                <span>{t('Already have an account?')}</span>{' '}
                 <button
                   type="button"
                   onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.LOGIN))}
                   className="adminx-auth-mode-link"
                 >
-                  Sign In
+                  {t('Sign In')}
                 </button>
               </>
             ) : (
@@ -343,7 +350,7 @@ export function AdminLoginPage({
                 className="adminx-auth-back-link"
               >
                 <ArrowRight className="adminx-auth-back-link-icon" />
-                <span>Back to login</span>
+                <span>{t('Back to login')}</span>
               </button>
             )}
           </div>
@@ -355,7 +362,7 @@ export function AdminLoginPage({
                 onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.REGISTER))}
                 className="adminx-auth-mode-link"
               >
-                Sign Up
+                {t('Sign Up')}
               </button>
             </div>
           ) : null}

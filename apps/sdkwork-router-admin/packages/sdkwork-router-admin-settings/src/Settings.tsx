@@ -1,14 +1,9 @@
-import {
-  LayoutPanelLeft,
-  Monitor,
-  PanelsTopLeft,
-  Search,
-  ShieldCheck,
-} from 'lucide-react';
+import { LayoutPanelLeft, Monitor, PanelsTopLeft, Search, ShieldCheck } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { adminRoutes, useAdminAppStore, useAdminWorkbench } from 'sdkwork-router-admin-core';
+import { Input, useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { AppearanceSettings } from './AppearanceSettings';
 import { GeneralSettings } from './GeneralSettings';
@@ -20,26 +15,26 @@ const SETTINGS_TABS = [
   {
     id: 'general',
     label: 'General',
-    detail: 'control plane framing, operator continuity, and shell summary',
     icon: ShieldCheck,
+    keywords: 'workspace operator language',
   },
   {
     id: 'appearance',
     label: 'Appearance',
-    detail: 'theme mode, accent color, and shell visual snapshot',
     icon: Monitor,
+    keywords: 'theme mode theme color',
   },
   {
     id: 'navigation',
     label: 'Navigation',
-    detail: 'sidebar visibility, collapse posture, and rail preview',
     icon: LayoutPanelLeft,
+    keywords: 'sidebar visibility routing',
   },
   {
     id: 'workspace',
     label: 'Workspace',
-    detail: 'content region rules, persistence, and shell posture',
     icon: PanelsTopLeft,
+    keywords: 'persistence canvas locale',
   },
 ] as const;
 
@@ -56,19 +51,13 @@ function resolveTab(requestedTab: string | null): SettingsTab {
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const { hiddenSidebarItems, isSidebarCollapsed, sidebarWidth, themeColor, themeMode } =
-    useAdminAppStore();
-  const { sessionUser, status } = useAdminWorkbench();
+  const { t } = useAdminI18n();
   const activeTab = resolveTab(searchParams.get('tab'));
-  const activeSettingsTab = SETTINGS_TABS.find((tab) => tab.id === activeTab) ?? SETTINGS_TABS[0];
-  const visibleRoutes = adminRoutes.filter(
-    (route) => route.key !== 'settings' && !hiddenSidebarItems.includes(route.key),
-  ).length;
 
   const filteredTabs = useMemo(
     () =>
       SETTINGS_TABS.filter((tab) => {
-        const haystack = `${tab.label} ${tab.detail}`.toLowerCase();
+        const haystack = `${tab.label} ${tab.keywords}`.toLowerCase();
         return haystack.includes(search.toLowerCase());
       }),
     [search],
@@ -97,167 +86,66 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="admin-shell-settings">
-      <aside className="admin-shell-settings-nav">
-        <div className="admin-shell-settings-nav-head">
-          <span>Settings Center</span>
-          <strong>Control plane workspace</strong>
-          <p>
-            Claw-studio-aligned settings center for shell appearance, navigation behavior, and
-            workspace continuity.
-          </p>
-        </div>
-
-        <div className="admin-shell-settings-nav-summary">
-          <div className="admin-shell-settings-nav-summary-head">
-            <span>Live shell</span>
-            <strong>Claw-aligned posture</strong>
-            <p>
-              Theme, rail state, and the right content canvas stay synchronized with the live admin
-              workspace.
-            </p>
-          </div>
-
-          <div className="admin-shell-settings-nav-summary-grid">
-            <div>
-              <span>Theme</span>
-              <strong>
-                {themeMode} / {themeColor}
-              </strong>
-            </div>
-            <div>
-              <span>Rail</span>
-              <strong>{isSidebarCollapsed ? 'collapsed' : `${sidebarWidth}px`}</strong>
-            </div>
-            <div>
-              <span>Visible routes</span>
-              <strong>{visibleRoutes}</strong>
-            </div>
-            <div>
-              <span>Operator</span>
-              <strong>{sessionUser?.display_name ?? 'Control plane operator'}</strong>
-            </div>
-          </div>
-
-          <div className="admin-shell-settings-nav-summary-status" title={status}>
-            {status}
-          </div>
-
-          <div className="admin-shell-settings-nav-shell-preview" aria-hidden="true">
-            <div
-              className={`admin-shell-settings-nav-shell-preview-rail ${
-                isSidebarCollapsed ? 'is-collapsed' : ''
-              }`.trim()}
-            >
-              <span />
-              <span />
-              <span />
-              <div className="admin-shell-settings-nav-shell-preview-profile">
-                <span className="admin-shell-settings-nav-shell-preview-avatar" />
-                {!isSidebarCollapsed ? (
-                  <div className="admin-shell-settings-nav-shell-preview-copy">
-                    <span />
-                    <span />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="admin-shell-settings-nav-shell-preview-canvas">
-              <span className="admin-shell-settings-nav-shell-preview-header" />
-              <div className="admin-shell-settings-nav-shell-preview-grid">
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <label className="admin-shell-settings-search">
-          <span>Search settings</span>
-          <div className="admin-shell-settings-search-input">
-            <Search />
-            <input
+    <div className="flex h-full bg-zinc-50/50 dark:bg-zinc-950/50">
+      <div className="flex w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/80">
+        <div className="p-6 pb-4">
+          <h1 className="mb-6 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            {t('Settings')}
+          </h1>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+            <Input
+              type="text"
+              placeholder={t('Search settings')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="appearance, sidebar, workspace"
+              className="py-2.5 pl-9 pr-4 text-[13px]"
             />
           </div>
-        </label>
-
-        {/* data-settings-tab is applied by SettingsNavButton to keep each tab addressable. */}
-        <div className="admin-shell-settings-tabs">
-          {filteredTabs.map((tab) => {
-            const Icon = tab.icon;
-
-            return (
-              <SettingsNavButton
-                key={tab.id}
-                tabId={tab.id}
-                active={activeTab === tab.id}
-                icon={<Icon />}
-                label={tab.label}
-                detail={tab.detail}
-                onClick={() => {
-                  const nextSearchParams = new URLSearchParams(searchParams);
-                  nextSearchParams.set('tab', tab.id);
-                  setSearchParams(nextSearchParams, { replace: true });
-                }}
-              />
-            );
-          })}
-          {!filteredTabs.length ? (
-            <div className="admin-shell-settings-empty">
-              No settings sections match the current filter.
-            </div>
-          ) : null}
         </div>
-      </aside>
 
-      <section className="admin-shell-settings-panel">
-        <div className="admin-shell-settings-panel-stage">
-          <div className="admin-shell-settings-panel-stage-head">
-            <div>
-              <span>{activeSettingsTab.label}</span>
-              <strong>{activeSettingsTab.detail}</strong>
-              <p>
-                The settings stage keeps live theme, navigation posture, and the single right-side
-                canvas aligned with the current admin shell.
-              </p>
-            </div>
+        <nav className="scrollbar-hide flex-1 space-y-1.5 overflow-y-auto px-4 pb-6">
+          {filteredTabs.length ? (
+            filteredTabs.map((tab) => {
+              const Icon = tab.icon;
 
-            <div className="admin-shell-settings-panel-stage-pills">
-              <span className="admin-shell-settings-panel-pill">{themeColor}</span>
-              <span className="admin-shell-settings-panel-pill">
-                {isSidebarCollapsed ? 'collapsed rail' : `${sidebarWidth}px rail`}
-              </span>
+              return (
+                // data-settings-tab is applied by SettingsNavButton so the left-nav shell stays query-driven.
+                <SettingsNavButton
+                  key={tab.id}
+                  tabId={tab.id}
+                  active={activeTab === tab.id}
+                  icon={Icon}
+                  label={t(tab.label)}
+                  onClick={() => {
+                    const nextSearchParams = new URLSearchParams(searchParams);
+                    nextSearchParams.set('tab', tab.id);
+                    setSearchParams(nextSearchParams, { replace: true });
+                  }}
+                />
+              );
+            })
+          ) : (
+            <div className="px-3 py-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              {t('No settings sections match the current filter.')}
             </div>
-          </div>
+          )}
+        </nav>
+      </div>
 
-          <div className="admin-shell-settings-stage-metrics">
-            <div>
-              <span>Stage</span>
-              <strong>{activeSettingsTab.label}</strong>
-            </div>
-            <div>
-              <span>Theme mode</span>
-              <strong>{themeMode}</strong>
-            </div>
-            <div>
-              <span>Rail posture</span>
-              <strong>{isSidebarCollapsed ? 'collapsed' : 'expanded'}</strong>
-            </div>
-            <div>
-              <span>Content surface</span>
-              <strong>Right canvas</strong>
-            </div>
-          </div>
-
-          <div className="admin-shell-settings-panel-stage-body">{renderActivePanel()}</div>
+      <div className="scrollbar-hide flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl p-8 md:p-12">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-full"
+          >
+            {renderActivePanel()}
+          </motion.div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

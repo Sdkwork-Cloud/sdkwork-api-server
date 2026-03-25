@@ -34,7 +34,9 @@ test('portal shell keeps workspace context in the rail and moves shell settings 
   assert.doesNotMatch(header, /Current workspace|Workspace context/);
   assert.doesNotMatch(header, /Config center/);
   assert.doesNotMatch(header, /Workspace shell/);
-  assert.match(profileDock, /Settings/);
+  assert.match(profileDock, /data-slot="portal-sidebar-footer-settings"/);
+  assert.match(profileDock, /data-slot="portal-sidebar-user-control"/);
+  assert.doesNotMatch(profileDock, /Active workspace/);
   assert.match(profileDock, /Sign out/);
   assert.match(routes, /Routing/);
   assert.doesNotMatch(sidebar, /Need help\?/);
@@ -84,8 +86,8 @@ test('credits and billing pages expose runway and guardrail decision support', (
   const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
   const billingPage = read('packages/sdkwork-router-portal-billing/src/pages/index.tsx');
 
-  assert.match(creditsPage, /Redemption guardrails/);
-  assert.match(creditsPage, /Recommended offer/);
+  assert.match(creditsPage, /portal-credits-toolbar/);
+  assert.match(creditsPage, /Search offers or ledger/);
   assert.match(billingPage, /Estimated runway/);
   assert.match(billingPage, /Recommended bundle/);
 });
@@ -98,9 +100,9 @@ test('user and account modules are separated into personal identity and financia
   assert.match(userPage, /Password rotation/);
   assert.match(userPage, /Profile facts/);
 
-  assert.match(accountPage, /Financial account/);
-  assert.match(accountPage, /Cash balance/);
-  assert.match(accountPage, /Ledger evidence/);
+  assert.match(accountPage, /portal-account-toolbar/);
+  assert.match(accountPage, /Search ledger/);
+  assert.doesNotMatch(accountPage, /Remaining units:/);
 });
 
 test('portal workspaces remove top section heroes so pages open directly on real content', () => {
@@ -137,13 +139,16 @@ test('portal workspaces remove top section heroes so pages open directly on real
   assert.doesNotMatch(userPage, /MetricCard/);
   assert.doesNotMatch(accountPage, /MetricCard/);
   assert.match(dashboardPage, /Traffic posture/);
-  assert.match(usagePage, /Request volume/);
+  assert.match(usagePage, /Search usage/);
+  assert.match(usagePage, /Manage keys/);
+  assert.match(usagePage, /Review billing/);
   assert.match(routingPage, /Routing posture presets/);
   assert.match(apiKeysPage, /PortalApiKeyManagerToolbar/);
   assert.match(billingPage, /Decision support/);
-  assert.match(creditsPage, /Recommended offer/);
+  assert.match(creditsPage, /Search offers or ledger/);
   assert.match(userPage, /Profile facts/);
-  assert.match(accountPage, /Cash balance/);
+  assert.match(accountPage, /Search ledger/);
+  assert.doesNotMatch(accountPage, /Remaining units:/);
 });
 
 test('portal api key workspace uses a manager toolbar, filter bar, and usage dialog flow inspired by claw api-router', () => {
@@ -159,8 +164,9 @@ test('portal api key workspace uses a manager toolbar, filter bar, and usage dia
   assert.match(components, /PortalApiKeyDialogs/);
   assert.match(components, /PortalApiKeyCreateForm/);
   assert.match(toolbar, /Create API key/);
+  assert.match(toolbar, /Open usage/);
   assert.match(toolbar, /Search API keys/);
-  assert.match(toolbar, /All environments/);
+  assert.doesNotMatch(toolbar, /All environments/);
   assert.match(apiKeysPage, /Usage method/);
   assert.match(dialogs, /Create API key/);
   assert.match(createForm, /Key label/);
@@ -172,6 +178,13 @@ test('portal api key workspace uses a manager toolbar, filter bar, and usage dia
   assert.match(createForm, /Expires at/);
   assert.match(createForm, /Notes/);
   assert.match(dialogs, /How to use this key/);
+  assert.match(dialogs, /Quick setup/);
+  assert.match(dialogs, /Codex/);
+  assert.match(dialogs, /Claude Code/);
+  assert.match(dialogs, /OpenCode/);
+  assert.match(dialogs, /Gemini/);
+  assert.match(dialogs, /OpenClaw/);
+  assert.match(dialogs, /Apply setup/);
   assert.match(apiKeysPage, /data-slot="api-router-page"/);
   assert.match(apiKeysPage, /bg-zinc-50 dark:bg-zinc-950/);
   assert.match(toolbar, /rounded-\[28px\] border border-zinc-200\/80 bg-white\/92 p-4 shadow-\[0_18px_48px_rgba\(15,23,42,0\.08\)\] backdrop-blur dark:border-zinc-800\/80 dark:bg-zinc-950\/70/);
@@ -181,9 +194,47 @@ test('portal api key workspace uses a manager toolbar, filter bar, and usage dia
   assert.match(createForm, /rounded-\[28px\] border border-zinc-200 bg-zinc-50\/80 p-5 dark:border-zinc-800 dark:bg-zinc-900\/50/);
   assert.doesNotMatch(apiKeysPage, /Global API keys/);
   assert.doesNotMatch(apiKeysPage, /Latest plaintext key/);
+  assert.doesNotMatch(apiKeysPage, /One-time plaintext available/);
   assert.doesNotMatch(apiKeysPage, /MetricCard/);
   assert.doesNotMatch(apiKeysPage, /Rotation checklist/);
   assert.doesNotMatch(apiKeysPage, /Environment strategy/);
   assert.doesNotMatch(apiKeysPage, /TabsTrigger value="coverage"/);
   assert.doesNotMatch(apiKeysPage, /TabsTrigger value="rotation"/);
+});
+
+test('portal tauri bridge exposes native Api Key setup commands for quick setup parity', () => {
+  const tauriMain = read('src-tauri/src/main.rs');
+
+  assert.match(tauriMain, /install_api_router_client_setup/);
+  assert.match(tauriMain, /list_api_key_instances/);
+});
+
+test('portal shell adds i18n infrastructure and collapsible extra filters for table workbenches', () => {
+  const providers = read('packages/sdkwork-router-portal-core/src/application/providers/AppProviders.tsx');
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+  const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
+  const usagePage = read('packages/sdkwork-router-portal-usage/src/pages/index.tsx');
+  const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
+  const accountPage = read('packages/sdkwork-router-portal-account/src/pages/index.tsx');
+  const apiKeyToolbar = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyManagerToolbar.tsx');
+
+  assert.match(providers, /PortalI18nProvider/);
+  assert.match(commons, /ToolbarDisclosure/);
+  assert.match(commons, /ToolbarField/);
+  assert.match(commons, /ToolbarSearchField/);
+  assert.match(configCenter, /Language/);
+  assert.doesNotMatch(configCenter, /Theme preview|Shell preview|SettingsSection|SettingsStatCard/);
+  assert.match(usagePage, /ToolbarDisclosure/);
+  assert.match(usagePage, /ToolbarSearchField/);
+  assert.match(creditsPage, /ToolbarField/);
+  assert.match(accountPage, /ToolbarSearchField/);
+  assert.match(apiKeyToolbar, /ToolbarSearchField/);
+});
+
+test('credits workbench stays on a single switchable table instead of parallel offers and ledger grids', () => {
+  const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
+  const tableCount = creditsPage.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.match(creditsPage, /ToolbarDisclosure/);
 });

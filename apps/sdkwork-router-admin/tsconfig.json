@@ -17,6 +17,7 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "sdkwork-router-admin-apirouter": ["packages/sdkwork-router-admin-apirouter/src/index.ts"],
       "sdkwork-router-admin-admin-api": ["packages/sdkwork-router-admin-admin-api/src/index.ts"],
       "sdkwork-router-admin-auth": ["packages/sdkwork-router-admin-auth/src/index.tsx"],
       "sdkwork-router-admin-catalog": ["packages/sdkwork-router-admin-catalog/src/index.tsx"],

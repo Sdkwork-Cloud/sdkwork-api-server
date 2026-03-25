@@ -12,6 +12,7 @@
     }
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
     "react": "^19.0.0",
     "sdkwork-router-portal-commons": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",

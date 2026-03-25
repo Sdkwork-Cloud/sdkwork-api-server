@@ -11,16 +11,19 @@ function read(relativePath) {
 
 test('portal route pages expose contextual handoffs to the next user action', () => {
   const apiKeysPage = read('packages/sdkwork-router-portal-api-keys/src/pages/index.tsx');
+  const apiKeysToolbar = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyManagerToolbar.tsx');
   const usagePage = read('packages/sdkwork-router-portal-usage/src/pages/index.tsx');
   const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
   const billingPage = read('packages/sdkwork-router-portal-billing/src/pages/index.tsx');
   const userPage = read('packages/sdkwork-router-portal-user/src/pages/index.tsx');
   const accountPage = read('packages/sdkwork-router-portal-account/src/pages/index.tsx');
 
-  assert.match(apiKeysPage, /Open usage/);
-  assert.match(usagePage, /Connected actions/);
-  assert.match(creditsPage, /Recharge decision/);
+  assert.match(apiKeysPage, /PortalApiKeyManagerToolbar/);
+  assert.match(apiKeysToolbar, /Open usage/);
+  assert.match(usagePage, /Manage keys/);
+  assert.match(usagePage, /Review billing/);
+  assert.match(creditsPage, /Search offers or ledger/);
   assert.match(billingPage, /Activation path/);
   assert.match(userPage, /Return to command center/);
-  assert.match(accountPage, /Recommended next financial move/);
+  assert.match(accountPage, /Search ledger/);
 });

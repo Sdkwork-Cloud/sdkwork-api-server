@@ -9,30 +9,32 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-test('remaining portal workspaces use admin-style tabs and dialogs instead of long inline flows', () => {
+test('remaining portal workspaces keep compact controls while preserving focused dialog flows', () => {
   const usagePage = read('packages/sdkwork-router-portal-usage/src/pages/index.tsx');
   const billingPage = read('packages/sdkwork-router-portal-billing/src/pages/index.tsx');
   const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
   const accountPage = read('packages/sdkwork-router-portal-account/src/pages/index.tsx');
 
-  assert.match(usagePage, /<Tabs/);
-  assert.match(usagePage, /Request log/);
-  assert.match(usagePage, /Demand mix/);
-  assert.match(usagePage, /AreaChart/);
+  assert.match(usagePage, /portal-usage-toolbar/);
+  assert.match(usagePage, /Search usage/);
+  assert.match(usagePage, /Manage keys/);
+  assert.doesNotMatch(usagePage, /<Tabs/);
+  assert.doesNotMatch(usagePage, /AreaChart/);
 
   assert.match(billingPage, /<Tabs/);
   assert.match(billingPage, /<Dialog/);
   assert.match(billingPage, /Checkout preview/);
   assert.match(billingPage, /Plan catalog/);
 
-  assert.match(creditsPage, /<Tabs/);
+  assert.match(creditsPage, /portal-credits-toolbar/);
   assert.match(creditsPage, /<Dialog/);
   assert.match(creditsPage, /Redeem credits/);
-  assert.match(creditsPage, /Offer catalog/);
+  assert.match(creditsPage, /Search offers or ledger/);
+  assert.doesNotMatch(creditsPage, /<Tabs/);
 
-  assert.match(accountPage, /<Tabs/);
-  assert.match(accountPage, /Balance summary/);
-  assert.match(accountPage, /Ledger table/);
+  assert.match(accountPage, /portal-account-toolbar/);
+  assert.match(accountPage, /Search ledger/);
+  assert.doesNotMatch(accountPage, /<Tabs/);
 });
 
 test('usage contracts and financial evidence stay aligned with real server data', () => {
@@ -47,6 +49,7 @@ test('usage contracts and financial evidence stay aligned with real server data'
   assert.match(usagePage, /Input tokens/);
   assert.match(usagePage, /Output tokens/);
   assert.match(usagePage, /Total tokens/);
+  assert.match(usagePage, /Search usage/);
   assert.doesNotMatch(accountServices, /Date\.now\(\) - index \* 60_000/);
   assert.match(readme, /sdkwork-router-portal-routing/);
   assert.match(readme, /sdkwork-router-portal-user/);

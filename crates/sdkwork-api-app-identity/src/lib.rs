@@ -657,6 +657,65 @@ pub async fn set_gateway_api_key_active(
     Ok(Some(saved))
 }
 
+pub async fn update_gateway_api_key_metadata(
+    store: &dyn AdminStore,
+    hashed_key: &str,
+    tenant_id: &str,
+    project_id: &str,
+    environment: &str,
+    label: &str,
+    expires_at_ms: Option<u64>,
+    notes: Option<&str>,
+) -> AdminResult<Option<GatewayApiKeyRecord>> {
+    let normalized_tenant_id = tenant_id.trim();
+    if normalized_tenant_id.is_empty() {
+        return Err(AdminIdentityError::InvalidInput(
+            "tenant_id is required".to_owned(),
+        ));
+    }
+
+    let normalized_project_id = project_id.trim();
+    if normalized_project_id.is_empty() {
+        return Err(AdminIdentityError::InvalidInput(
+            "project_id is required".to_owned(),
+        ));
+    }
+
+    let normalized_environment = environment.trim();
+    if normalized_environment.is_empty() {
+        return Err(AdminIdentityError::InvalidInput(
+            "environment is required".to_owned(),
+        ));
+    }
+
+    validate_gateway_api_key_metadata(label, notes, expires_at_ms)
+        .map_err(AdminIdentityError::InvalidInput)?;
+
+    let Some(existing) = store
+        .find_gateway_api_key(hashed_key)
+        .await
+        .map_err(AdminIdentityError::from)?
+    else {
+        return Ok(None);
+    };
+
+    let updated = GatewayApiKeyRecord {
+        tenant_id: normalized_tenant_id.to_owned(),
+        project_id: normalized_project_id.to_owned(),
+        environment: normalized_environment.to_owned(),
+        label: normalize_gateway_api_key_label(label),
+        notes: normalize_gateway_api_key_notes(notes),
+        expires_at_ms,
+        ..existing
+    };
+
+    let saved = store
+        .insert_gateway_api_key(&updated)
+        .await
+        .map_err(AdminIdentityError::from)?;
+    Ok(Some(saved))
+}
+
 pub async fn delete_gateway_api_key(store: &dyn AdminStore, hashed_key: &str) -> Result<bool> {
     store.delete_gateway_api_key(hashed_key).await
 }

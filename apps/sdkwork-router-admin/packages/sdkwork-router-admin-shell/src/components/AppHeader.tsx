@@ -1,22 +1,11 @@
 import { useEffect, type ReactNode } from 'react';
-import { Minus, RefreshCw, Search, Square, X } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-import {
-  adminRouteKeyFromPathname,
-  adminRoutes,
-  useAdminAppStore,
-  useAdminWorkbench,
-} from 'sdkwork-router-admin-core';
+import { useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { ROUTE_PATHS } from '../application/router/routePaths';
-import {
-  closeWindow,
-  isTauriDesktop,
-  minimizeWindow,
-  toggleMaximizeWindow,
-} from '../desktopWindow';
-import { ShellStatus } from './ShellStatus';
+import { isTauriDesktop } from '../desktopWindow';
 
 function BrandMark() {
   return (
@@ -30,10 +19,17 @@ function BrandMark() {
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M5 12h14" />
-        <path d="M9 7l-4 5 4 5" />
-        <path d="M15 7l4 5-4 5" />
-        <path d="M12 5v14" />
+        <path d="M12 2v2" />
+        <path d="M12 18v4" />
+        <path d="M4.93 10.93l1.41 1.41" />
+        <path d="M17.66 17.66l1.41 1.41" />
+        <path d="M2 12h2" />
+        <path d="M20 12h2" />
+        <path d="M4.93 13.07l1.41-1.41" />
+        <path d="M17.66 6.34l1.41-1.41" />
+        <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        <path d="M12 6a6 6 0 0 1 6 6" />
+        <path d="M12 18a6 6 0 0 1-6-6" />
       </svg>
     </div>
   );
@@ -63,61 +59,10 @@ function HeaderActionButton({
   );
 }
 
-function DesktopWindowControls() {
-  return (
-    <div
-      className="adminx-window-controls"
-      data-tauri-drag-region="false"
-    >
-      <button
-        type="button"
-        title="Minimize window"
-        data-tauri-drag-region="false"
-        onClick={() => {
-          void minimizeWindow();
-        }}
-      >
-        <Minus />
-      </button>
-      <button
-        type="button"
-        title="Maximize window"
-        data-tauri-drag-region="false"
-        onClick={() => {
-          void toggleMaximizeWindow();
-        }}
-      >
-        <Square />
-      </button>
-      <button
-        type="button"
-        title="Close window"
-        className="is-danger"
-        data-tauri-drag-region="false"
-        onClick={() => {
-          void closeWindow();
-        }}
-      >
-        <X />
-      </button>
-    </div>
-  );
-}
-
 export function AppHeader() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { themeColor, themeMode } = useAdminAppStore();
-  const { loading, refreshWorkspace, status } = useAdminWorkbench();
-  const routeKey = adminRouteKeyFromPathname(location.pathname);
-  const activeRoute = adminRoutes.find((route) => route.key === routeKey);
+  const { t } = useAdminI18n();
   const isDesktop = isTauriDesktop();
-  const activeRouteLabel = activeRoute?.label ?? 'Operator Workspace';
-  const activeRouteEyebrow = activeRoute?.eyebrow ?? 'Control Plane';
-  const activeRouteDetail =
-    activeRoute?.detail
-    ?? `Right-side operator canvas aligned to claw-studio in ${themeMode} mode.`;
-  const workspaceMeta = `${activeRouteEyebrow} / ${themeMode} / ${themeColor}`;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -144,8 +89,8 @@ export function AppHeader() {
           <div className="adminx-shell-brand">
             <BrandMark />
             <div className="adminx-shell-brand-copy">
-              <span>Control plane</span>
-              <strong>SDKWork Router Admin</strong>
+              <span>{t('Control plane')}</span>
+              <strong>{t('SDKWork Router Admin')}</strong>
             </div>
           </div>
 
@@ -155,45 +100,14 @@ export function AppHeader() {
             data-tauri-drag-region="false"
           >
             <HeaderActionButton
-              title="Open workspace search"
+              title={t('Open workspace search')}
               onClick={() => navigate(ROUTE_PATHS.SETTINGS)}
             >
               <Search className="adminx-shell-meta-icon" />
-              <span className="adminx-shell-header-search-label">Search</span>
+              <span className="adminx-shell-header-search-label">{t('Search')}</span>
               <span className="adminx-shell-header-search-shortcut">Ctrl K</span>
             </HeaderActionButton>
           </div>
-        </div>
-
-        <div
-          className="adminx-shell-header-center"
-          data-slot="app-header-center"
-          data-tauri-drag-region={isDesktop ? 'true' : undefined}
-        >
-          <span className="adminx-shell-header-workspace">Workspace</span>
-          <div className="adminx-shell-header-center-panel">
-            <div className="adminx-shell-header-workspace-pill" title={activeRouteDetail}>
-              <strong>{activeRouteLabel}</strong>
-              <span>{workspaceMeta}</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="adminx-shell-header-actions"
-          data-slot="app-header-trailing"
-          data-tauri-drag-region="false"
-        >
-          <ShellStatus status={status} />
-
-          <HeaderActionButton
-            title="Refresh workspace"
-            onClick={() => refreshWorkspace()}
-            className="adminx-shell-header-action-icon"
-          >
-            <RefreshCw className={loading ? 'is-spinning' : undefined} />
-          </HeaderActionButton>
-          {isDesktop ? <DesktopWindowControls /> : null}
         </div>
       </header>
     </div>

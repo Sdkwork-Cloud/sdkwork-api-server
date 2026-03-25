@@ -11,6 +11,7 @@ function read(relativePath) {
 
 test('api keys page exposes lifecycle, environment, and key-handling guidance', () => {
   const apiKeysPage = read('packages/sdkwork-router-portal-api-keys/src/pages/index.tsx');
+  const toolbar = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyManagerToolbar.tsx');
   const dialogs = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyDialogs.tsx');
   const table = read('packages/sdkwork-router-portal-api-keys/src/components/PortalApiKeyTable.tsx');
   const portalApi = read('packages/sdkwork-router-portal-portal-api/src/index.ts');
@@ -18,7 +19,7 @@ test('api keys page exposes lifecycle, environment, and key-handling guidance', 
   const portalTypes = read('packages/sdkwork-router-portal-types/src/index.ts');
 
   assert.match(apiKeysPage, /Credential inventory/);
-  assert.match(apiKeysPage, /One-time plaintext available/);
+  assert.match(toolbar, /Open usage/);
   assert.match(dialogs, /Recommended key setup/);
   assert.match(dialogs, /Key label/);
   assert.match(dialogs, /Custom environment/);
@@ -40,12 +41,16 @@ test('api keys page exposes lifecycle, environment, and key-handling guidance', 
   assert.match(portalTypes, /expires_at_ms\?: number \| null/);
 });
 
-test('usage page exposes traffic and spend diagnosis surfaces', () => {
+test('usage page stays focused on a compact request log workbench', () => {
   const usagePage = read('packages/sdkwork-router-portal-usage/src/pages/index.tsx');
 
-  assert.match(usagePage, /Traffic profile/);
-  assert.match(usagePage, /Spend watch/);
-  assert.match(usagePage, /Request diagnostics/);
+  assert.match(usagePage, /Search usage/);
+  assert.match(usagePage, /Manage keys/);
+  assert.match(usagePage, /Review billing/);
+  assert.match(usagePage, /Recorded/);
+  assert.doesNotMatch(usagePage, /Request volume/);
+  assert.doesNotMatch(usagePage, /Demand mix/);
+  assert.doesNotMatch(usagePage, /Request diagnostics/);
 });
 
 test('user page exposes trust, security, and recovery guidance', () => {
@@ -59,7 +64,7 @@ test('user page exposes trust, security, and recovery guidance', () => {
 test('account page exposes financial posture, ledger, and runway guidance', () => {
   const accountPage = read('packages/sdkwork-router-portal-account/src/pages/index.tsx');
 
-  assert.match(accountPage, /Cash balance/);
-  assert.match(accountPage, /Ledger evidence/);
-  assert.match(accountPage, /Operating guardrails/);
+  assert.match(accountPage, /portal-account-toolbar/);
+  assert.match(accountPage, /Search ledger/);
+  assert.doesNotMatch(accountPage, /Remaining units:/);
 });

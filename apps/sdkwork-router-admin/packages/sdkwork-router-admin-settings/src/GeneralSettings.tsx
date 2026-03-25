@@ -1,101 +1,87 @@
-import { LayoutPanelLeft, Monitor, PanelsTopLeft, ShieldCheck } from 'lucide-react';
+import {
+  ADMIN_LOCALE_OPTIONS,
+  Select,
+  useAdminI18n,
+} from 'sdkwork-router-admin-commons';
 
-import { adminRoutes, useAdminAppStore, useAdminWorkbench } from 'sdkwork-router-admin-core';
+import { useAdminAppStore, useAdminWorkbench } from 'sdkwork-router-admin-core';
 
-import { SettingsSection } from './Shared';
+import { SettingsInfoCard, SettingsSection } from './Shared';
 
 export function GeneralSettings() {
-  const { hiddenSidebarItems, isSidebarCollapsed, sidebarWidth, themeColor, themeMode } =
-    useAdminAppStore();
+  const {
+    hiddenSidebarItems,
+    isSidebarCollapsed,
+    sidebarWidth,
+    themeColor,
+    themeMode,
+  } = useAdminAppStore();
   const { sessionUser, status } = useAdminWorkbench();
-  const visibleSidebarItems = adminRoutes.filter((route) => route.key !== 'settings').length
-    - hiddenSidebarItems.length;
+  const { locale, setLocale, t } = useAdminI18n();
 
   return (
-    <div className="admin-shell-settings-stack">
-      <SettingsSection
-        eyebrow="General"
-        title="control plane settings center"
-        icon={<ShieldCheck className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-copy">
-          <p>
-            This workspace keeps operator preferences, shell posture, and control plane continuity
-            aligned with claw-studio while preserving router-admin workflows.
-          </p>
-          <p>
-            The left rail remains the navigation source of truth and the right canvas remains the
-            only content display region for every admin page.
-          </p>
-        </div>
-      </SettingsSection>
+    <div className="space-y-8">
+      <div>
+        <h2 className="mb-1 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+          {t('General')}
+        </h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {t('Operator workspace language, shell posture, and persistence defaults.')}
+        </p>
+      </div>
 
-      <SettingsSection
-        eyebrow="Workspace"
-        title="live shell summary"
-        icon={<PanelsTopLeft className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-kpi-grid">
-          <div className="admin-shell-settings-kpi">
-            <span>Operator</span>
-            <strong>{sessionUser?.display_name ?? 'Control plane operator'}</strong>
+      <div className="space-y-6">
+        <SettingsSection
+          eyebrow={t('Language')}
+          title={t('Language and locale')}
+          description={t(
+            'Choose the operator workspace language. Dates, numbers, and shared shell copy follow this setting immediately.',
+          )}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {t('Language')}
+              </span>
+              <Select
+                value={locale}
+                onChange={(event) => setLocale(event.target.value as typeof locale)}
+              >
+                {ADMIN_LOCALE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {t(option.label)}
+                  </option>
+                ))}
+              </Select>
+            </label>
           </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Theme posture</span>
-            <strong>{themeMode}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Theme color</span>
-            <strong>{themeColor}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Shell status</span>
-            <strong>{status}</strong>
-          </div>
-        </div>
-      </SettingsSection>
+        </SettingsSection>
 
-      <SettingsSection
-        eyebrow="Navigation"
-        title="sidebar and canvas posture"
-        icon={<LayoutPanelLeft className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-kpi-grid">
-          <div className="admin-shell-settings-kpi">
-            <span>Sidebar state</span>
-            <strong>{isSidebarCollapsed ? 'collapsed' : 'expanded'}</strong>
+        <SettingsSection
+          eyebrow={t('Workspace')}
+          title={t('Workspace posture')}
+          description={t('Current shell posture for the control plane workspace.')}
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <SettingsInfoCard
+              label={t('Operator')}
+              value={sessionUser?.display_name ?? t('Control plane operator')}
+              detail={sessionUser?.email ?? t(status)}
+            />
+            <SettingsInfoCard label={t('Theme mode')} value={t(themeMode)} />
+            <SettingsInfoCard label={t('Theme color')} value={t(themeColor)} />
+            <SettingsInfoCard
+              label={t('Sidebar mode')}
+              value={isSidebarCollapsed ? t('collapsed') : t('expanded')}
+            />
+            <SettingsInfoCard label={t('Sidebar width')} value={`${sidebarWidth}px`} />
+            <SettingsInfoCard
+              label={t('Hidden nav items')}
+              value={hiddenSidebarItems.length}
+            />
           </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Sidebar width</span>
-            <strong>{sidebarWidth}px</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Visible routes</span>
-            <strong>{visibleSidebarItems}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Content region</span>
-            <strong>right canvas</strong>
-          </div>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        eyebrow="Appearance"
-        title="shell continuity"
-        icon={<Monitor className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-copy">
-          <p>
-            Appearance, navigation, and workspace sections now live in a real settings center
-            instead of a standalone preferences panel.
-          </p>
-          <p>
-            Every shell preference persists so the control plane reopens with the same workspace and
-            operator posture.
-          </p>
-        </div>
-      </SettingsSection>
+        </SettingsSection>
+      </div>
     </div>
   );
 }

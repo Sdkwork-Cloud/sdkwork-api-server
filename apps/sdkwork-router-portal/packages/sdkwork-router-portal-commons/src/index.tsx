@@ -4,9 +4,14 @@ import { Slot } from '@radix-ui/react-slot';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx, type ClassValue } from 'clsx';
-import { X } from 'lucide-react';
+import { Search as SearchIcon, X } from 'lucide-react';
 import {
+  createContext,
   forwardRef,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
   type ComponentPropsWithoutRef,
   type ElementRef,
   type ReactNode,
@@ -15,6 +20,249 @@ import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
+}
+
+export type PortalLocale = 'en-US' | 'zh-CN';
+
+type TranslationValues = Record<string, string | number>;
+
+type PortalI18nContextValue = {
+  locale: PortalLocale;
+  setLocale: (locale: PortalLocale) => void;
+  t: (text: string, values?: TranslationValues) => string;
+};
+
+const PORTAL_I18N_STORAGE_KEY = 'sdkwork-router-portal.locale.v1';
+
+const portalMessages: Record<Exclude<PortalLocale, 'en-US'>, Record<string, string>> = {
+  'zh-CN': {
+    Close: '关闭',
+    'More filters': '更多筛选',
+    'Hide filters': '收起筛选',
+    Language: '语言',
+    English: '英文',
+    'Simplified Chinese': '简体中文',
+    Pending: '待处理',
+    'Search usage': '搜索使用记录',
+    'Time range': '时间范围',
+    Refresh: '刷新',
+    'Review billing': '查看账单',
+    'Manage keys': '管理密钥',
+    'Last 24 hours': '最近 24 小时',
+    'Last 7 days': '最近 7 天',
+    'Last 30 days': '最近 30 天',
+    'All time': '全部时间',
+    Settings: '设置',
+    'Portal workspace settings': '门户工作区设置',
+    'Theme, sidebar, and shell preferences': '主题、侧边栏与壳层偏好',
+    'Sign out': '退出登录',
+    'End this portal session on the current device': '在当前设备结束本次门户会话',
+    'Search settings...': '搜索设置...',
+    'No settings found.': '未找到匹配设置。',
+    Appearance: '外观',
+    'Theme mode and Theme color': '主题模式与主题颜色',
+    Navigation: '导航',
+    'Sidebar behavior and Sidebar navigation': '侧边栏行为与侧边栏导航',
+    Workspace: '工作区',
+    'Language and workspace preferences': '语言与工作区偏好',
+    'Language and locale': '语言与区域',
+    'Choose the portal workspace language. Shared shell copy and locale-aware formatting update immediately.': '选择门户工作区语言。共享壳层文案和区域格式会立即同步更新。',
+    'Theme mode': '主题模式',
+    'Theme mode stays synchronized across header, sidebar, content surfaces, and dialogs.': '主题模式会在顶部栏、侧边栏、内容面板与弹窗之间保持同步。',
+    'Theme color': '主题颜色',
+    'Theme color updates the accent surfaces without changing the claw-style shell contract.': '主题颜色会更新强调色表面，同时不改变 claw 风格壳层契约。',
+    'Sidebar behavior': '侧边栏行为',
+    'Keep the left rail aligned with claw-studio while preserving the portal route set.': '在保留门户路由集的同时，使左侧导航栏与 claw-studio 保持一致。',
+    'Show or hide workspace modules while keeping the left rail compact and stable.': '在保持左侧导航栏紧凑稳定的同时，显示或隐藏工作区模块。',
+    'Reset shell preferences': '重置壳层偏好',
+    'Workspace preferences': '工作区偏好',
+    'Keep workspace identity and shell reset controls in one place.': '将工作区身份信息与壳层重置控制统一收纳在同一处。',
+    'Portal workspace': '门户工作区',
+    'Awaiting workspace session': '等待工作区会话',
+    'Portal tenant': '门户租户',
+    'Portal operator': '门户操作员',
+    Light: '浅色',
+    Dark: '深色',
+    System: '跟随系统',
+    'Search ledger': '搜索账本',
+    'Financial account': '财务账户',
+    'Financial account posture will appear after the portal loads billing summary and ledger evidence.': '门户加载账单摘要和账本凭证后，这里会显示财务账户状态。',
+    'Preparing account': '正在准备账户',
+    'No ledger entries recorded yet.': '暂无账本条目。',
+    'No ledger entries for this slice': '当前视图下没有账本条目',
+    'Open credits': '打开额度',
+    'Open usage': '打开使用记录',
+    'Search offers or ledger': '搜索优惠或账本',
+    'View mode': '视图模式',
+    Offers: '优惠',
+    Ledger: '账本',
+    'Create API key': '创建 API Key',
+    'Search API keys': '搜索 API Key',
+    'Redeem credits': '兑换额度',
+    'Coupon code': '优惠码',
+    WELCOME100: 'WELCOME100',
+    'Preview redemption': '预览兑换结果',
+    'Preview offer': '预览优惠',
+    'Seed coupons can be replaced by a live redemption backend without changing the page contract.': '种子优惠券后续可被真实兑换后端替换，而无需改变页面契约。',
+    'No offers match the current filter.': '当前筛选条件下没有匹配的优惠。',
+    'No offers for this slice': '当前视图下没有优惠',
+    'No points ledger entries recorded yet.': '暂无积分账本记录。',
+    'No ledger entries yet': '暂无账本记录',
+    'Welcome back': '欢迎回来',
+    'Create account': '创建账户',
+    'Recover access': '恢复访问',
+    'Sign in': '登录',
+    'Sign up': '注册',
+    'Back to login': '返回登录',
+    'Continue with': '继续使用',
+    'QR login': '扫码登录',
+    'Open app to scan': '打开应用扫码',
+    'Create your workspace access and continue into the portal shell.': '创建你的工作区访问权限并继续进入门户壳层。',
+    'Password reset links are not enabled for the current portal backend. Continue back to sign in with your workspace email.': '当前门户后端未启用密码重置链接，请返回并使用工作区邮箱登录。',
+    'Sign in to continue to your portal workspace.': '登录后继续进入你的门户工作区。',
+    Name: '姓名',
+    Email: '邮箱',
+    Password: '密码',
+    'Forgot password?': '忘记密码？',
+    'Loading...': '加载中...',
+    'No account?': '没有账户？',
+    'Already have an account?': '已有账户？',
+  },
+};
+
+const portalSupplementalZhMessages: Record<string, string> = {
+  Dashboard: '总览',
+  Routing: '路由',
+  'API Keys': 'API 密钥',
+  Usage: '使用记录',
+  User: '用户',
+  Credits: '额度',
+  Billing: '账单',
+  Account: '账户',
+  Overview: '概览',
+  Control: '控制',
+  Credentials: '凭证',
+  Telemetry: '遥测',
+  Identity: '身份',
+  Points: '积分',
+  Financial: '财务',
+  Access: '访问',
+  Commerce: '商业',
+  'Traffic, routing, access, and spend at a glance': '流量、路由、访问与支出总览',
+  'Default strategy, failover posture, and route evidence': '默认策略、故障转移姿态与路由证据',
+  'Issue, inspect, and rotate project keys': '签发、检查并轮换项目密钥',
+  'Requests, models, providers, and spend telemetry': '请求、模型、提供商与支出遥测',
+  'Profile, security, and personal access settings': '资料、安全与个人访问设置',
+  'Quota posture, redemption, and remaining units': '配额姿态、兑换与剩余单位',
+  'Plans, recharge packs, and billing recovery': '套餐、充值包与账单恢复',
+  'Cash balance, ledger visibility, and payment posture': '现金余额、账本可见性与支付姿态',
+  'Expand sidebar': '展开侧栏',
+  'Collapse sidebar': '收起侧栏',
+  'Tech Blue': '科技蓝',
+  Lobster: '龙虾红',
+  'Green Tech': '科技绿',
+  Zinc: '锌灰',
+  Violet: '紫罗兰',
+  Rose: '玫瑰粉',
+  'SDKWork Router': 'SDKWork 路由',
+  'Developer portal': '开发者门户',
+};
+
+Object.assign(portalMessages['zh-CN'], portalSupplementalZhMessages);
+
+export const PORTAL_LOCALE_OPTIONS: Array<{ id: PortalLocale; label: string }> = [
+  { id: 'en-US', label: 'English' },
+  { id: 'zh-CN', label: 'Simplified Chinese' },
+];
+
+let activePortalLocale: PortalLocale = 'en-US';
+
+function interpolate(text: string, values?: TranslationValues): string {
+  if (!values) {
+    return text;
+  }
+
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    text,
+  );
+}
+
+function normalizeLocale(value: string | null | undefined): PortalLocale {
+  if (!value) {
+    return 'en-US';
+  }
+
+  return value.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+}
+
+function translateForLocale(locale: PortalLocale, text: string, values?: TranslationValues): string {
+  const translated = locale === 'en-US' ? text : portalMessages[locale][text] ?? text;
+  return interpolate(translated, values);
+}
+
+function resolveInitialLocale(): PortalLocale {
+  if (typeof window === 'undefined') {
+    return activePortalLocale;
+  }
+
+  try {
+    const persisted = window.localStorage.getItem(PORTAL_I18N_STORAGE_KEY);
+    if (persisted) {
+      return normalizeLocale(persisted);
+    }
+  } catch {
+    // Ignore storage access failures and fall back to browser locale.
+  }
+
+  return normalizeLocale(window.navigator.language);
+}
+
+const PortalI18nContext = createContext<PortalI18nContextValue | null>(null);
+
+export function translatePortalText(text: string, values?: TranslationValues): string {
+  return translateForLocale(activePortalLocale, text, values);
+}
+
+export function PortalI18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocale] = useState<PortalLocale>(resolveInitialLocale);
+
+  useEffect(() => {
+    activePortalLocale = locale;
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(PORTAL_I18N_STORAGE_KEY, locale);
+      } catch {
+        // Ignore storage write failures.
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = locale;
+    }
+  }, [locale]);
+
+  const value = useMemo<PortalI18nContextValue>(
+    () => ({
+      locale,
+      setLocale,
+      t: (text, values) => translateForLocale(locale, text, values),
+    }),
+    [locale],
+  );
+
+  return <PortalI18nContext.Provider value={value}>{children}</PortalI18nContext.Provider>;
+}
+
+export function usePortalI18n(): PortalI18nContextValue {
+  const context = useContext(PortalI18nContext);
+
+  if (!context) {
+    throw new Error('Portal i18n hooks must be used inside PortalI18nProvider.');
+  }
+
+  return context;
 }
 
 const portalBorder = 'border-[color:var(--portal-border-color)]';
@@ -193,7 +441,7 @@ export const DialogContent = forwardRef<
       {children}
       <DialogPrimitive.Close className={`absolute right-4 top-4 rounded-md p-2 ${portalTextMuted} transition hover:bg-[var(--portal-hover-surface)] hover:text-[var(--portal-text-primary)]`}>
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">{translatePortalText('Close')}</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
@@ -335,6 +583,54 @@ export function FormField({
   );
 }
 
+export function ToolbarField({
+  label,
+  children,
+  className,
+  controlClassName,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+  controlClassName?: string;
+}) {
+  return (
+    <label className={cn('flex min-w-0 max-w-full items-center gap-3', className)}>
+      <span className={cn(`shrink-0 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.18em] ${portalTextMuted}`)}>
+        {label}
+      </span>
+      <span className={cn('min-w-0 flex-1', controlClassName)}>{children}</span>
+    </label>
+  );
+}
+
+export function ToolbarSearchField({
+  label,
+  className,
+  inputClassName,
+  ...props
+}: ComponentPropsWithoutRef<'input'> & {
+  label: string;
+  className?: string;
+  inputClassName?: string;
+}) {
+  return (
+    <ToolbarField
+      label={label}
+      className={cn('flex-1 basis-[24rem]', className)}
+      controlClassName="min-w-0"
+    >
+      <span className="relative block w-full">
+        <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+        <Input
+          className={cn('pl-11', inputClassName)}
+          {...props}
+        />
+      </span>
+    </ToolbarField>
+  );
+}
+
 export function SectionHero({
   eyebrow,
   title,
@@ -439,6 +735,32 @@ export function InlineButton({
   );
 }
 
+export function ToolbarDisclosure({
+  children,
+  defaultOpen = false,
+  openLabel,
+  closeLabel,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  openLabel?: string;
+  closeLabel?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const { t } = usePortalI18n();
+
+  return (
+    <div className="flex min-w-full flex-col gap-3">
+      <div>
+        <InlineButton onClick={() => setOpen((current) => !current)} tone="secondary">
+          {open ? closeLabel ?? t('Hide filters') : openLabel ?? t('More filters')}
+        </InlineButton>
+      </div>
+      {open ? <div className="grid gap-3">{children}</div> : null}
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   detail,
@@ -505,19 +827,24 @@ export function DataTable<T>({
 }
 
 export function formatCurrency(amount: number): string {
-  return `$${amount.toFixed(2)}`;
+  return new Intl.NumberFormat(activePortalLocale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 export function formatUnits(units: number): string {
-  return new Intl.NumberFormat('en-US').format(units);
+  return new Intl.NumberFormat(activePortalLocale).format(units);
 }
 
 export function formatDateTime(timestamp: number): string {
   if (!timestamp) {
-    return 'Pending';
+    return translatePortalText('Pending');
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(activePortalLocale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

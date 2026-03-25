@@ -255,8 +255,35 @@ export function createApiKey(input: {
   label?: string;
   notes?: string;
   expires_at_ms?: number | null;
+  plaintext_key?: string;
 }): Promise<CreatedGatewayApiKey> {
   return postJson<typeof input, CreatedGatewayApiKey>('/api-keys', input, requiredToken());
+}
+
+export function updateApiKey(input: {
+  hashed_key: string;
+  tenant_id: string;
+  project_id: string;
+  environment: string;
+  label: string;
+  notes?: string | null;
+  expires_at_ms?: number | null;
+}): Promise<GatewayApiKeyRecord> {
+  return fetch(`${adminBaseUrl()}/api-keys/${encodeURIComponent(input.hashed_key)}`, {
+    method: 'PUT',
+    headers: {
+      authorization: `Bearer ${requiredToken()}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      tenant_id: input.tenant_id,
+      project_id: input.project_id,
+      environment: input.environment,
+      label: input.label,
+      notes: input.notes,
+      expires_at_ms: input.expires_at_ms,
+    }),
+  }).then((response) => readJson<GatewayApiKeyRecord>(response));
 }
 
 export function updateApiKeyStatus(

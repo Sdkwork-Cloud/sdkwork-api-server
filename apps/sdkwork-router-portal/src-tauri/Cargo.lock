@@ -3576,6 +3576,8 @@ name = "sdkwork-router-portal-tauri"
 version = "0.1.0"
 dependencies = [
  "sdkwork-api-runtime-host",
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]

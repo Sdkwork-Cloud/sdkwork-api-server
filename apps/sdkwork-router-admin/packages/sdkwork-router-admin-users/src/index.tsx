@@ -13,8 +13,9 @@ import {
   InlineButton,
   PageToolbar,
   Pill,
-  StatCard,
-  Surface,
+  ToolbarDisclosure,
+  ToolbarField,
+  ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, ManagedUser } from 'sdkwork-router-admin-types';
 
@@ -110,13 +111,15 @@ function emptyPortalDraft(snapshot: AdminPageProps['snapshot']): PortalDraft {
 function matchesFilters(
   user: ManagedUser,
   deferredQuery: string,
+  roleFilter: 'all' | 'operator' | 'portal',
   statusFilter: 'all' | 'active' | 'disabled',
 ): boolean {
+  const roleMatches = roleFilter === 'all' || user.role === roleFilter;
   const statusMatches = statusFilter === 'all'
     || (statusFilter === 'active' && user.active)
     || (statusFilter === 'disabled' && !user.active);
 
-  if (!statusMatches) {
+  if (!roleMatches || !statusMatches) {
     return false;
   }
 
@@ -142,6 +145,7 @@ export function UsersPage({
   onDeletePortalUser,
 }: UsersPageProps) {
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'operator' | 'portal'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [operatorDraft, setOperatorDraft] = useState<OperatorDraft>(() => emptyOperatorDraft());
   const [portalDraft, setPortalDraft] = useState<PortalDraft>(() => emptyPortalDraft(snapshot));
@@ -177,10 +181,13 @@ export function UsersPage({
     });
   }, [snapshot.projects, snapshot.tenants]);
 
-  const filteredOperators = snapshot.operatorUsers.filter((user) =>
-    matchesFilters(user, deferredQuery, statusFilter));
-  const filteredPortalUsers = snapshot.portalUsers.filter((user) =>
-    matchesFilters(user, deferredQuery, statusFilter));
+  const filteredUsers = [...snapshot.operatorUsers, ...snapshot.portalUsers]
+    .filter((user) => matchesFilters(user, deferredQuery, roleFilter, statusFilter))
+    .sort((left, right) => (
+      left.role.localeCompare(right.role)
+      || left.display_name.localeCompare(right.display_name)
+      || left.email.localeCompare(right.email)
+    ));
   const availableProjects = snapshot.projects.filter(
     (project) => project.tenant_id === portalDraft.workspace_tenant_id,
   );
@@ -196,11 +203,6 @@ export function UsersPage({
   const selectedProjectTokens = snapshot.usageRecords
     .filter((record) => record.project_id === portalDraft.workspace_project_id)
     .reduce((sum, record) => sum + record.total_tokens, 0);
-  const totalUsageUnits = snapshot.portalUsers.reduce((sum, user) => sum + user.usage_units, 0);
-  const totalPortalTokens = snapshot.portalUsers.reduce((sum, user) => sum + user.total_tokens, 0);
-  const disabledUsers = snapshot.operatorUsers
-    .concat(snapshot.portalUsers)
-    .filter((user) => !user.active).length;
 
   function resetOperatorDialog() {
     setIsOperatorDialogOpen(false);
@@ -291,37 +293,8 @@ export function UsersPage({
 
   return (
     <div className="adminx-page-grid">
-      <section className="adminx-stat-grid">
-        <StatCard
-          label="Operator users"
-          value={String(snapshot.operatorUsers.length)}
-          detail="Super-admin and support operators with direct control-plane access."
-        />
-        <StatCard
-          label="Portal users"
-          value={String(snapshot.portalUsers.length)}
-          detail="End-user identities bound to tenant and project scopes."
-        />
-        <StatCard
-          label="Metered units"
-          value={String(totalUsageUnits)}
-          detail="Usage units attributed back to active portal workspaces."
-        />
-        <StatCard
-          label="Portal tokens"
-          value={String(totalPortalTokens)}
-          detail="Prompt and completion tokens consumed across portal identities."
-        />
-        <StatCard
-          label="Disabled users"
-          value={String(disabledUsers)}
-          detail="Accounts waiting for manual restore or retirement decisions."
-        />
-      </section>
-
       <PageToolbar
-        title="User directory workbench"
-        detail="Keep the roster readable, preserve filters while you work, and move create or edit into dedicated dialogs with explicit confirmation."
+        compact
         actions={(
           <>
             <Dialog
@@ -561,189 +534,136 @@ export function UsersPage({
           </>
         )}
       >
-        <div className="adminx-form-grid">
-          <FormField label="Search users">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="name, email, tenant, project"
-            />
-          </FormField>
-          <FormField label="Status">
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as 'all' | 'active' | 'disabled')}
-            >
-              <option value="all">All users</option>
-              <option value="active">Active only</option>
-              <option value="disabled">Disabled only</option>
-            </select>
-          </FormField>
-          <div className="adminx-note">
-            <strong>Identity guardrails</strong>
-            <p>
-              Passwords are only required on first creation. Protected bootstrap accounts stay
-              undeletable, and editing with a blank password preserves the current secret.
-            </p>
+        <ToolbarSearchField
+          label="Search users"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="name, email, tenant, project"
+        />
+        <ToolbarDisclosure>
+          <div className="adminx-form-grid">
+            <ToolbarField label="User type">
+              <select
+                value={roleFilter}
+                onChange={(event) =>
+                  setRoleFilter(event.target.value as 'all' | 'operator' | 'portal')}
+              >
+                <option value="all">All users</option>
+                <option value="operator">Operators</option>
+                <option value="portal">Portal users</option>
+              </select>
+            </ToolbarField>
+            <ToolbarField label="Status">
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as 'all' | 'active' | 'disabled')}
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </ToolbarField>
           </div>
-        </div>
+        </ToolbarDisclosure>
       </PageToolbar>
 
-      <Surface
-        title="Operator roster"
-        detail="Manage super-admin and support operator accounts with controlled activation and explicit password rotation."
-        actions={<Pill tone="default">{filteredOperators.length} visible</Pill>}
-      >
-        <DataTable
-          columns={[
-            {
-              key: 'operator',
-              label: 'Operator',
-              render: (user) => (
-                <div className="adminx-table-cell-stack">
-                  <strong>{user.display_name}</strong>
-                  <span>{user.id}</span>
-                </div>
-              ),
-            },
-            { key: 'email', label: 'Email', render: (user) => user.email },
-            {
-              key: 'role',
-              label: 'Role',
-              render: () => <Pill tone="live">operator</Pill>,
-            },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (user) => (
-                <Pill tone={user.active ? 'live' : 'danger'}>
-                  {user.active ? 'active' : 'disabled'}
-                </Pill>
-              ),
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (user) => (
-                <div className="adminx-row">
-                  <InlineButton onClick={() => openOperatorDialog(user)}>Edit operator</InlineButton>
-                  <InlineButton onClick={() => void onToggleOperatorUser(user.id, !user.active)}>
-                    {user.active ? 'Disable' : 'Restore'}
-                  </InlineButton>
-                  <InlineButton
-                    tone="danger"
-                    disabled={
-                      user.email === bootstrapOperatorEmail
-                      || user.id === snapshot.sessionUser?.id
+      <DataTable
+        columns={[
+          {
+            key: 'user',
+            label: 'User',
+            render: (user) => (
+              <div className="adminx-table-cell-stack">
+                <strong>{user.display_name}</strong>
+                <span>{user.email}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'type',
+            label: 'Type',
+            render: (user) => (
+              <div className="adminx-table-cell-stack">
+                <Pill tone={user.role === 'operator' ? 'live' : 'default'}>{user.role}</Pill>
+                <span>{user.id}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'workspace',
+            label: 'Workspace',
+            render: (user) => (
+              <div className="adminx-table-cell-stack">
+                <strong>{user.workspace_tenant_id ?? '-'}</strong>
+                <span>{user.workspace_project_id ?? 'control-plane'}</span>
+              </div>
+            ),
+          },
+          { key: 'requests', label: 'Requests', render: (user) => user.request_count },
+          { key: 'tokens', label: 'Tokens', render: (user) => user.total_tokens },
+          {
+            key: 'status',
+            label: 'Status',
+            render: (user) => (
+              <Pill tone={user.active ? 'live' : 'danger'}>
+                {user.active ? 'active' : 'disabled'}
+              </Pill>
+            ),
+          },
+          {
+            key: 'actions',
+            label: 'Actions',
+            render: (user) => (
+              <div className="adminx-row">
+                <InlineButton
+                  onClick={() => {
+                    if (user.role === 'operator') {
+                      openOperatorDialog(user);
+                      return;
                     }
-                    onClick={() => setPendingDelete({ kind: 'operator', user })}
-                  >
-                    Delete
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredOperators}
-          empty="No operator users match the current filter."
-          getKey={(user) => user.id}
-        />
-      </Surface>
 
-      <Surface
-        title="Portal roster"
-        detail="Inspect portal identities with workspace binding, request load, token usage, and metered units before intervening."
-        actions={<Pill tone="default">{filteredPortalUsers.length} visible</Pill>}
-      >
-        <DataTable
-          columns={[
-            {
-              key: 'portal-user',
-              label: 'Portal user',
-              render: (user) => (
-                <div className="adminx-table-cell-stack">
-                  <strong>{user.display_name}</strong>
-                  <span>{user.email}</span>
-                </div>
-              ),
-            },
-            {
-              key: 'workspace',
-              label: 'Workspace',
-              render: (user) => (
-                <div className="adminx-table-cell-stack">
-                  <strong>{user.workspace_tenant_id ?? '-'}</strong>
-                  <span>{user.workspace_project_id ?? '-'}</span>
-                </div>
-              ),
-            },
-            { key: 'requests', label: 'Requests', render: (user) => user.request_count },
-            { key: 'tokens', label: 'Tokens', render: (user) => user.total_tokens },
-            { key: 'units', label: 'Metered units', render: (user) => user.usage_units },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (user) => (
-                <Pill tone={user.active ? 'live' : 'danger'}>
-                  {user.active ? 'active' : 'disabled'}
-                </Pill>
-              ),
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (user) => (
-                <div className="adminx-row">
-                  <InlineButton onClick={() => openPortalDialog(user)}>Edit portal user</InlineButton>
-                  <InlineButton onClick={() => void onTogglePortalUser(user.id, !user.active)}>
-                    {user.active ? 'Disable' : 'Restore'}
-                  </InlineButton>
-                  <InlineButton
-                    tone="danger"
-                    disabled={user.email === bootstrapPortalEmail}
-                    onClick={() => setPendingDelete({ kind: 'portal', user })}
-                  >
-                    Delete
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredPortalUsers}
-          empty="No portal users match the current filter."
-          getKey={(user) => user.id}
-        />
-      </Surface>
+                    openPortalDialog(user);
+                  }}
+                >
+                  {user.role === 'operator' ? 'Edit operator' : 'Edit portal user'}
+                </InlineButton>
+                <InlineButton
+                  onClick={() => {
+                    if (user.role === 'operator') {
+                      void onToggleOperatorUser(user.id, !user.active);
+                      return;
+                    }
 
-      <Surface
-        title="Intervention guidance"
-        detail="Keep admin actions aligned with the product expectations of a mature backend: fast scanning, focused mutation, and explicit state changes."
-      >
-        <div className="adminx-card-grid">
-          <article className="adminx-mini-card">
-            <div className="adminx-row">
-              <strong>Bootstrap accounts stay protected</strong>
-              <Pill tone="default">safety</Pill>
-            </div>
-            <p>Primary bootstrap identities remain visible in the roster but cannot be deleted from this surface.</p>
-          </article>
-          <article className="adminx-mini-card">
-            <div className="adminx-row">
-              <strong>Workspace binding stays visible</strong>
-              <Pill tone="live">context</Pill>
-            </div>
-            <p>Portal user dialogs keep tenant and project posture visible so support changes stay attributable.</p>
-          </article>
-          <article className="adminx-mini-card">
-            <div className="adminx-row">
-              <strong>Filters survive mutations</strong>
-              <Pill tone="seed">focus</Pill>
-            </div>
-            <p>Search and status filters remain in place after closing dialogs, making back-to-back interventions faster.</p>
-          </article>
-        </div>
-      </Surface>
+                    void onTogglePortalUser(user.id, !user.active);
+                  }}
+                >
+                  {user.active ? 'Disable' : 'Restore'}
+                </InlineButton>
+                <InlineButton
+                  tone="danger"
+                  disabled={
+                    (user.role === 'operator'
+                      && (user.email === bootstrapOperatorEmail
+                        || user.id === snapshot.sessionUser?.id))
+                    || (user.role === 'portal' && user.email === bootstrapPortalEmail)
+                  }
+                  onClick={() =>
+                    setPendingDelete({
+                      kind: user.role,
+                      user,
+                    })}
+                >
+                  Delete
+                </InlineButton>
+              </div>
+            ),
+          },
+        ]}
+        rows={filteredUsers}
+        empty="No users match the current filter."
+        getKey={(user) => user.id}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}

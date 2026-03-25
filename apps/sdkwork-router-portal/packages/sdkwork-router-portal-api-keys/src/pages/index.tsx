@@ -1,6 +1,6 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { InlineButton, copyText } from 'sdkwork-router-portal-commons';
+import { copyText } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 import type { CreatedGatewayApiKey, GatewayApiKeyRecord } from 'sdkwork-router-portal-types';
 
@@ -18,12 +18,23 @@ import {
 import {
   buildPortalApiKeyUsagePreview,
   buildPortalApiKeysViewModel,
+  clearPortalApiKeyPlaintextReveal,
   createEmptyPortalApiKeyFormState,
+  readPortalApiKeyPlaintextReveal,
+  rememberPortalApiKeyPlaintextReveal,
   resolvePortalApiKeyEnvironment,
   resolvePortalApiKeyExpiresAt,
   resolvePortalApiKeyNotes,
   resolvePortalApiKeyPlaintext,
 } from '../services';
+import {
+  applyApiKeyQuickSetup,
+  buildApiKeyQuickSetupPlans,
+  listApiKeyInstances,
+  resolveGatewayBaseUrl,
+  type ApiKeySetupClientId,
+  type ApiKeySetupInstance,
+} from '../services/quickSetup';
 import type {
   PortalApiKeyCreateFormState,
   PortalApiKeyFilterState,
@@ -42,8 +53,14 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
   const [formState, setFormState] = useState<PortalApiKeyCreateFormState>(
     createEmptyPortalApiKeyFormState,
   );
-  const [status, setStatus] = useState('Loading issued keys...');
-  const [copyStatus, setCopyStatus] = useState('Plaintext keys are only shown once at creation time.');
+  const [gatewayBaseUrl, setGatewayBaseUrl] = useState('http://127.0.0.1:8080');
+  const [openClawInstances, setOpenClawInstances] = useState<ApiKeySetupInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<ApiKeySetupClientId>('codex');
+  const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
+  const [applyingClientId, setApplyingClientId] = useState<ApiKeySetupClientId | null>(null);
+  const [usageStatus, setUsageStatus] = useState('');
+  const [, setStatus] = useState('Loading issued keys...');
   const [submitting, setSubmitting] = useState(false);
   const [mutatingKey, setMutatingKey] = useState<string | null>(null);
   const deferredSearchQuery = useDeferredValue(filters.searchQuery);
@@ -117,13 +134,9 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
         expires_at_ms: expiresAtMs,
       });
 
+      rememberPortalApiKeyPlaintextReveal(nextKey.hashed, nextKey.plaintext);
       await refresh();
       setCreatedKey(nextKey);
-      setCopyStatus(
-        formState.keyMode === 'custom'
-          ? 'Custom key saved in write-only mode. Verify the plaintext value now before closing this screen.'
-          : 'Copy the plaintext secret now. It will not be shown again after you leave this screen.',
-      );
       setStatus(
         formState.keyMode === 'custom'
           ? `Custom key stored for ${environment}. Verify the plaintext value before leaving this page.`
@@ -140,12 +153,13 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
   }
 
   async function handleCopyPlaintext() {
-    if (!createdKey) {
+    const plaintext = usagePlaintext ?? createdKey?.plaintext ?? null;
+    if (!plaintext) {
       return;
     }
 
-    const copied = await copyText(createdKey.plaintext);
-    setCopyStatus(
+    const copied = await copyText(plaintext);
+    setStatus(
       copied
         ? 'Plaintext key copied to clipboard.'
         : 'Clipboard copy is unavailable in this browser context.',
@@ -177,6 +191,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
 
     try {
       await removePortalApiKey(key.hashed_key);
+      clearPortalApiKeyPlaintextReveal(key.hashed_key);
       await refresh();
 
       if (createdKey?.hashed === key.hashed_key) {
@@ -207,23 +222,124 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     () => buildPortalApiKeysViewModel(apiKeys, createdKey, resolvedFilters),
     [apiKeys, createdKey, resolvedFilters],
   );
+  const usagePlaintext = usageKey
+    ? readPortalApiKeyPlaintextReveal(usageKey.hashed_key) ??
+      (createdKey?.hashed === usageKey.hashed_key ? createdKey.plaintext : null)
+    : null;
   const usagePreview = useMemo(
-    () => (usageKey ? buildPortalApiKeyUsagePreview(usageKey, createdKey) : null),
-    [createdKey, usageKey],
+    () => (usageKey ? buildPortalApiKeyUsagePreview(usageKey, usagePlaintext) : null),
+    [usageKey, usagePlaintext],
   );
+  const quickSetupPlans = useMemo(
+    () =>
+      usageKey
+        ? buildApiKeyQuickSetupPlans({
+            hashedKey: usageKey.hashed_key,
+            label: usageKey.label,
+            plaintextKey: usagePlaintext || '<api-key-not-visible-on-this-device>',
+            gatewayBaseUrl,
+          })
+        : [],
+    [gatewayBaseUrl, usageKey, usagePlaintext],
+  );
+  const selectedPlan =
+    quickSetupPlans.find((plan) => plan.id === selectedClientId) ?? quickSetupPlans[0] ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void resolveGatewayBaseUrl().then((baseUrl) => {
+      if (!cancelled) {
+        setGatewayBaseUrl(baseUrl);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!usageKey) {
+      setSelectedClientId('codex');
+      setSelectedInstanceIds([]);
+      setUsageStatus('');
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingInstances(true);
+
+    void Promise.all([resolveGatewayBaseUrl(), listApiKeyInstances()])
+      .then(([baseUrl, instances]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setGatewayBaseUrl(baseUrl);
+        setOpenClawInstances(instances);
+        setSelectedInstanceIds(instances.slice(0, 1).map((item) => item.id));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingInstances(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usageKey]);
+
+  async function handleApplySetup() {
+    if (!selectedPlan) {
+      return;
+    }
+
+    if (!usagePlaintext) {
+      setUsageStatus('Plaintext Api key is no longer visible on this device. Create a replacement first.');
+      return;
+    }
+
+    if (selectedPlan.requiresInstances && !selectedInstanceIds.length) {
+      setUsageStatus('Select at least one OpenClaw instance before applying setup.');
+      return;
+    }
+
+    setApplyingClientId(selectedPlan.id);
+    setUsageStatus(`Applying ${selectedPlan.label} setup...`);
+
+    try {
+      const result = await applyApiKeyQuickSetup({
+        ...selectedPlan.request,
+        provider: {
+          ...selectedPlan.request.provider,
+          apiKey: usagePlaintext,
+        },
+        openClaw: selectedPlan.requiresInstances
+          ? {
+              instanceIds: selectedInstanceIds,
+            }
+          : undefined,
+      });
+      setUsageStatus(
+        result.updatedInstanceIds.length
+          ? `Applied setup to ${result.updatedInstanceIds.length} OpenClaw instance(s).`
+          : `Applied setup and wrote ${result.writtenFiles.length} file(s).`,
+      );
+    } catch (error) {
+      setUsageStatus(portalErrorMessage(error));
+    } finally {
+      setApplyingClientId(null);
+    }
+  }
 
   return (
     <div data-slot="api-router-page" className="h-full overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
       <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-4 sm:py-6 xl:px-4 xl:py-6">
         <PortalApiKeyManagerToolbar
-          environment={filters.environment}
-          environmentOptions={viewModel.environment_options}
-          onEnvironmentChange={(value) =>
-            startTransition(() => {
-              setFilters((current) => ({ ...current, environment: value }));
-            })
-          }
           onOpenCreate={() => setCreateDialogOpen(true)}
+          onOpenUsage={() => onNavigate('usage')}
           onRefresh={() => {
             void refresh().then(() =>
               setStatus('Credential inventory is synced with the latest project key state.'),
@@ -237,35 +353,23 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
           searchQuery={filters.searchQuery}
         />
 
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{status}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            {createdKey ? (
-              <>
-                <span className="text-sm text-emerald-700 dark:text-emerald-300">
-                  One-time plaintext available for {createdKey.environment}.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handleCopyPlaintext()}
-                  className="inline-flex h-9 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"
-                >
-                  Copy plaintext
-                </button>
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">{copyStatus}</span>
-              </>
-            ) : null}
-            <InlineButton onClick={() => onNavigate('usage')} tone="secondary">
-              Open usage
-            </InlineButton>
-          </div>
-        </div>
-
         <PortalApiKeyTable
           items={viewModel.filtered_keys}
           latestCreatedKey={createdKey}
           mutatingKey={mutatingKey}
           onCopyLatestPlaintext={() => void handleCopyPlaintext()}
+          onCopyPlaintext={(item) => {
+            const plaintext =
+              readPortalApiKeyPlaintextReveal(item.hashed_key) ??
+              (createdKey?.hashed === item.hashed_key ? createdKey.plaintext : null);
+            if (plaintext) {
+              void copyText(plaintext);
+            }
+          }}
+          resolvePlaintext={(item) =>
+            readPortalApiKeyPlaintextReveal(item.hashed_key) ??
+            (createdKey?.hashed === item.hashed_key ? createdKey.plaintext : null)
+          }
           onDelete={(item) => void handleDeleteKey(item)}
           onOpenUsage={setUsageKey}
           onToggleStatus={(item) => void handleKeyStatusChange(item, !item.active)}
@@ -281,7 +385,20 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
           onCloseUsage={() => setUsageKey(null)}
           onCopyPlaintext={() => void handleCopyPlaintext()}
           onCreate={(event) => void handleCreate(event)}
+          applyingClientId={applyingClientId}
+          gatewayBaseUrl={gatewayBaseUrl}
+          loadingInstances={loadingInstances}
+          onApplySetup={() => void handleApplySetup()}
+          onChangeInstanceSelection={setSelectedInstanceIds}
+          onSelectClient={setSelectedClientId}
           submitting={submitting}
+          openClawInstances={openClawInstances}
+          quickSetupPlans={quickSetupPlans}
+          selectedClientId={selectedClientId}
+          selectedInstanceIds={selectedInstanceIds}
+          selectedPlan={selectedPlan}
+          usagePlaintext={usagePlaintext}
+          usageStatus={usageStatus}
           usageKey={usageKey}
           usagePreview={usagePreview}
         />

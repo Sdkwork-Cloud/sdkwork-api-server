@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { AdminLoginPage } from 'sdkwork-router-admin-auth';
 import {
@@ -12,6 +13,12 @@ import { CatalogPage } from 'sdkwork-router-admin-catalog';
 import { CouponsPage } from 'sdkwork-router-admin-coupons';
 import { OperationsPage } from 'sdkwork-router-admin-operations';
 import { OverviewPage } from 'sdkwork-router-admin-overview';
+import {
+  GatewayAccessPage,
+  GatewayModelMappingsPage,
+  GatewayRoutesPage,
+  GatewayUsagePage,
+} from 'sdkwork-router-admin-apirouter';
 import { SettingsPage } from 'sdkwork-router-admin-settings';
 import { TenantsPage } from 'sdkwork-router-admin-tenants';
 import { TrafficPage } from 'sdkwork-router-admin-traffic';
@@ -37,11 +44,13 @@ function PageFrame({
 }
 
 function LoadingScreen() {
+  const { t } = useAdminI18n();
+
   return (
     <div className="adminx-shell-loading">
       <div className="adminx-shell-loading-orb" />
-      <strong>Synchronizing operator workspace...</strong>
-      <span>Restoring theme, session, and live control-plane state.</span>
+      <strong>{t('Synchronizing operator workspace...')}</strong>
+      <span>{t('Restoring theme, session, and live control-plane state.')}</span>
     </div>
   );
 }
@@ -53,6 +62,10 @@ function resolveRedirectTarget(rawTarget: string | null) {
 
   if (rawTarget === ROUTE_PATHS.ROOT || isAdminAuthPath(rawTarget)) {
     return ROUTE_PATHS.OVERVIEW;
+  }
+
+  if (rawTarget === ROUTE_PATHS.API_ROUTER_ROOT) {
+    return ROUTE_PATHS.API_ROUTER_API_KEYS;
   }
 
   return rawTarget;
@@ -92,9 +105,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { authResolved, handleLogin, sessionUser, snapshot, status, loading } = useAdminWorkbench();
+  const {
+    authResolved,
+    handleLogin,
+    sessionUser,
+    snapshot,
+    status,
+    loading,
+    refreshWorkspace,
+  } = useAdminWorkbench();
   const {
     handleCreateApiKey,
+    handleUpdateApiKey,
     handleDeleteApiKey,
     handleDeleteChannel,
     handleDeleteChannelModel,
@@ -220,6 +242,65 @@ export function AppRoutes() {
                 onSaveCoupon={handleSaveCoupon}
                 onToggleCoupon={handleToggleCoupon}
                 onDeleteCoupon={handleDeleteCoupon}
+              />
+            </PageFrame>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.API_ROUTER_ROOT}
+        element={<Navigate to={ROUTE_PATHS.API_ROUTER_API_KEYS} replace />}
+      />
+      <Route
+        path={ROUTE_PATHS.API_ROUTER_API_KEYS}
+        element={
+          <ProtectedRoute>
+            <PageFrame routeKey={location.pathname}>
+              <GatewayAccessPage
+                snapshot={snapshot}
+                onRefreshWorkspace={refreshWorkspace}
+                onCreateApiKey={handleCreateApiKey}
+                onUpdateApiKey={handleUpdateApiKey}
+                onUpdateApiKeyStatus={handleUpdateApiKeyStatus}
+                onDeleteApiKey={handleDeleteApiKey}
+              />
+            </PageFrame>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.API_ROUTER_ROUTE_CONFIG}
+        element={
+          <ProtectedRoute>
+            <PageFrame routeKey={location.pathname}>
+              <GatewayRoutesPage
+                snapshot={snapshot}
+                onRefreshWorkspace={refreshWorkspace}
+                onSaveProvider={handleSaveProvider}
+                onDeleteProvider={handleDeleteProvider}
+              />
+            </PageFrame>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.API_ROUTER_MODEL_MAPPING}
+        element={
+          <ProtectedRoute>
+            <PageFrame routeKey={location.pathname}>
+              <GatewayModelMappingsPage snapshot={snapshot} />
+            </PageFrame>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.API_ROUTER_USAGE_RECORDS}
+        element={
+          <ProtectedRoute>
+            <PageFrame routeKey={location.pathname}>
+              <GatewayUsagePage
+                snapshot={snapshot}
+                onRefreshWorkspace={refreshWorkspace}
               />
             </PageFrame>
           </ProtectedRoute>

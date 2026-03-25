@@ -18,8 +18,9 @@ test('portal shell replaces the mission strip with compact workspace navigation'
   assert.match(shellStatus, /Workspace status/);
   assert.match(sidebar, /SidebarProfileDock/);
   assert.match(sidebar, /routeGroups\.map/);
-  assert.match(profileDock, /Active workspace/);
-  assert.match(profileDock, /Settings/);
+  assert.match(profileDock, /data-slot="portal-sidebar-footer-settings"/);
+  assert.match(profileDock, /data-slot="portal-sidebar-user-control"/);
+  assert.doesNotMatch(profileDock, /Active workspace/);
   assert.match(profileDock, /Sign out/);
   assert.doesNotMatch(sidebar, /Mission strip/);
   assert.doesNotMatch(shellStatus, /Primary mission/);

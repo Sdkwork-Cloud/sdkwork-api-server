@@ -14,12 +14,18 @@ test('shared admin commons expose page toolbar, dialog primitives, and form fiel
   const theme = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
 
   assert.match(commons, /PageToolbar/);
+  assert.match(commons, /ToolbarField/);
+  assert.match(commons, /ToolbarSearchField/);
   assert.match(commons, /Dialog/);
   assert.match(commons, /DialogContent/);
   assert.match(commons, /DialogFooter/);
   assert.match(commons, /ConfirmDialog/);
   assert.match(commons, /FormField/);
+  assert.match(theme, /adminx-toolbar-field/);
+  assert.match(theme, /adminx-toolbar-field-label/);
+  assert.match(commons, /adminx-page-toolbar-row/);
   assert.match(theme, /adminx-page-toolbar/);
+  assert.match(theme, /adminx-page-toolbar-row/);
   assert.match(theme, /adminx-dialog-backdrop/);
   assert.match(theme, /adminx-dialog-panel/);
   assert.match(theme, /adminx-confirm-dialog/);
@@ -39,6 +45,15 @@ test('users workbench separates create and edit flows into dedicated dialogs', (
   assert.match(users, /pendingDelete/);
 });
 
+test('users workbench stays on a single directory table without split operator and portal sections', () => {
+  const users = read('packages/sdkwork-router-admin-users/src/index.tsx');
+  const tableCount = users.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.doesNotMatch(users, /Operator roster/);
+  assert.doesNotMatch(users, /Portal roster/);
+});
+
 test('tenants workbench promotes tenant, project, and key issuance into independent actions and dialogs', () => {
   const tenants = read('packages/sdkwork-router-admin-tenants/src/index.tsx');
 
@@ -50,6 +65,16 @@ test('tenants workbench promotes tenant, project, and key issuance into independ
   assert.match(tenants, /Issue gateway key/);
   assert.match(tenants, /ConfirmDialog/);
   assert.match(tenants, /revealedApiKey/);
+});
+
+test('tenants workbench stays on a single tenant table instead of stacked tenant, project, and key registries', () => {
+  const tenants = read('packages/sdkwork-router-admin-tenants/src/index.tsx');
+  const tableCount = tenants.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.doesNotMatch(tenants, /Tenant registry/);
+  assert.doesNotMatch(tenants, /Project registry/);
+  assert.doesNotMatch(tenants, /Gateway key inventory/);
 });
 
 test('coupon workbench uses a focused campaign dialog instead of inline form editing', () => {
@@ -86,7 +111,7 @@ test('operations workbench uses targeted dialogs and preserves runtime status as
   assert.match(operations, /Dialog/);
   assert.match(operations, /DialogContent/);
   assert.match(operations, /Targeted reload/);
-  assert.match(operations, /Latest reload report/);
+  assert.match(operations, /Reload runtimes/);
 });
 
 test('admin pages remove top section heroes so real workspace content starts immediately', () => {
@@ -94,6 +119,7 @@ test('admin pages remove top section heroes so real workspace content starts imm
   const users = read('packages/sdkwork-router-admin-users/src/index.tsx');
   const tenants = read('packages/sdkwork-router-admin-tenants/src/index.tsx');
   const coupons = read('packages/sdkwork-router-admin-coupons/src/index.tsx');
+  const apiRouter = read('packages/sdkwork-router-admin-apirouter/src/index.ts');
   const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
   const traffic = read('packages/sdkwork-router-admin-traffic/src/index.tsx');
   const operations = read('packages/sdkwork-router-admin-operations/src/index.tsx');
@@ -102,11 +128,53 @@ test('admin pages remove top section heroes so real workspace content starts imm
   assert.doesNotMatch(users, /SectionHero/);
   assert.doesNotMatch(tenants, /SectionHero/);
   assert.doesNotMatch(coupons, /SectionHero/);
+  assert.doesNotMatch(apiRouter, /SectionHero/);
   assert.doesNotMatch(catalog, /SectionHero/);
   assert.doesNotMatch(traffic, /SectionHero/);
   assert.doesNotMatch(operations, /SectionHero/);
   assert.match(overview, /adminx-stat-grid/);
   assert.doesNotMatch(overview, /Data-source posture/);
+});
+
+test('gateway parity package exposes the four migrated claw surfaces through a shared package root', () => {
+  const apiRouter = read('packages/sdkwork-router-admin-apirouter/src/index.ts');
+
+  assert.match(apiRouter, /GatewayAccessPage/);
+  assert.match(apiRouter, /GatewayRoutesPage/);
+  assert.match(apiRouter, /GatewayModelMappingsPage/);
+  assert.match(apiRouter, /GatewayUsagePage/);
+  assert.match(apiRouter, /Api Key/);
+  assert.match(apiRouter, /Route Config/);
+  assert.match(apiRouter, /Model Mapping/);
+  assert.match(apiRouter, /Usage Records/);
+});
+
+test('api router workbenches stay table-first and avoid extra registry layers above the grid', () => {
+  const accessPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx');
+  const routesPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayRoutesPage.tsx');
+  const mappingsPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayModelMappingsPage.tsx');
+  const usagePage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx');
+
+  assert.doesNotMatch(accessPage, /All statuses|All tenants|All projects/);
+  assert.doesNotMatch(routesPage, /Credential registry/);
+  assert.doesNotMatch(routesPage, /Rotate credential/);
+  assert.doesNotMatch(routesPage, /All channels|Health posture/);
+  assert.doesNotMatch(mappingsPage, /Rule preview:/);
+  assert.doesNotMatch(mappingsPage, /All statuses/);
+  assert.doesNotMatch(
+    usagePage,
+    /All providers|All models|<span>Sort by<\/span>|<span>Page size<\/span>|<span>Start date<\/span>|<span>End date<\/span>/,
+  );
+  assert.match(mappingsPage, /Mapping rules:/);
+  assert.match(accessPage, /Create Api key/);
+  assert.match(accessPage, /Usage method/);
+  assert.match(accessPage, /Quick setup/);
+  assert.match(accessPage, /Codex/);
+  assert.match(accessPage, /Claude Code/);
+  assert.match(accessPage, /OpenCode/);
+  assert.match(accessPage, /Gemini/);
+  assert.match(accessPage, /OpenClaw/);
+  assert.match(accessPage, /Apply setup/);
 });
 
 test('settings center copy frames shell continuity instead of a standalone preferences page', () => {
@@ -115,4 +183,42 @@ test('settings center copy frames shell continuity instead of a standalone prefe
 
   assert.match(settings, /control plane|settings center|workspace/i);
   assert.match(workspace, /right canvas|content region|shell posture/i);
+});
+
+test('admin shell adds i18n infrastructure and collapsible extra filters for dense table workbenches', () => {
+  const providers = read('packages/sdkwork-router-admin-shell/src/application/providers/AppProviders.tsx');
+  const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
+  const generalSettings = read('packages/sdkwork-router-admin-settings/src/GeneralSettings.tsx');
+  const usagePage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx');
+  const trafficPage = read('packages/sdkwork-router-admin-traffic/src/index.tsx');
+  const usersPage = read('packages/sdkwork-router-admin-users/src/index.tsx');
+  const tenantsPage = read('packages/sdkwork-router-admin-tenants/src/index.tsx');
+  const routesPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayRoutesPage.tsx');
+
+  assert.match(providers, /AdminI18nProvider/);
+  assert.match(commons, /ToolbarDisclosure/);
+  assert.match(commons, /ToolbarField/);
+  assert.match(commons, /ToolbarSearchField/);
+  assert.match(generalSettings, /Language/);
+  assert.match(usagePage, /ToolbarDisclosure/);
+  assert.match(trafficPage, /ToolbarDisclosure/);
+  assert.match(usersPage, /ToolbarSearchField/);
+  assert.match(tenantsPage, /ToolbarSearchField/);
+  assert.match(routesPage, /ToolbarSearchField/);
+});
+
+test('traffic workbench stays on a single switchable table instead of stacked analytics grids', () => {
+  const trafficPage = read('packages/sdkwork-router-admin-traffic/src/index.tsx');
+  const tableCount = trafficPage.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.doesNotMatch(trafficPage, /adminx-users-grid/);
+});
+
+test('operations workbench stays on a single switchable table instead of separate provider and runtime grids', () => {
+  const operationsPage = read('packages/sdkwork-router-admin-operations/src/index.tsx');
+  const tableCount = operationsPage.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.match(operationsPage, /ToolbarDisclosure/);
 });

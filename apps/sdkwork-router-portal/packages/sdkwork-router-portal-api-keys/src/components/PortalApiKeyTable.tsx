@@ -50,16 +50,20 @@ export function PortalApiKeyTable({
   latestCreatedKey,
   mutatingKey,
   onCopyLatestPlaintext,
+  onCopyPlaintext,
   onDelete,
   onOpenUsage,
+  resolvePlaintext,
   onToggleStatus,
 }: {
   items: GatewayApiKeyRecord[];
   latestCreatedKey: CreatedGatewayApiKey | null;
   mutatingKey: string | null;
   onCopyLatestPlaintext: () => void;
+  onCopyPlaintext: (item: GatewayApiKeyRecord) => void;
   onDelete: (item: GatewayApiKeyRecord) => void;
   onOpenUsage: (item: GatewayApiKeyRecord) => void;
+  resolvePlaintext: (item: GatewayApiKeyRecord) => string | null;
   onToggleStatus: (item: GatewayApiKeyRecord) => void;
 }) {
   if (!items.length) {
@@ -96,9 +100,9 @@ export function PortalApiKeyTable({
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {items.map((item) => {
               const isLatestCreatedKey = latestCreatedKey?.hashed === item.hashed_key;
-              const displayValue = isLatestCreatedKey
-                ? latestCreatedKey?.plaintext ?? item.hashed_key
-                : item.hashed_key;
+              const plaintext = resolvePlaintext(item);
+              const hasVisiblePlaintext = Boolean(plaintext);
+              const displayValue = plaintext ?? item.hashed_key;
 
               return (
                 <tr key={item.hashed_key} className="align-top">
@@ -120,10 +124,14 @@ export function PortalApiKeyTable({
                       <div className="flex-1 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
                         {maskValue(displayValue)}
                       </div>
-                      {isLatestCreatedKey ? (
+                      {hasVisiblePlaintext ? (
                         <button
                           type="button"
-                          onClick={onCopyLatestPlaintext}
+                          onClick={() =>
+                            isLatestCreatedKey
+                              ? onCopyLatestPlaintext()
+                              : onCopyPlaintext(item)
+                          }
                           className="inline-flex h-9 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
                         >
                           Copy key

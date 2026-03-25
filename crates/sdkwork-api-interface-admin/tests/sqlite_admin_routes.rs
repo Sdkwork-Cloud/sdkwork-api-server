@@ -1545,6 +1545,112 @@ async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
 
 #[serial(extension_env)]
 #[tokio::test]
+async fn update_gateway_api_key_metadata_from_admin_api() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let token = login_token(app.clone()).await;
+
+    for request in [
+        ("/admin/tenants", r#"{"id":"tenant-acme","name":"Acme"}"#),
+        (
+            "/admin/projects",
+            r#"{"tenant_id":"tenant-acme","id":"project-acme","name":"Acme Production"}"#,
+        ),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(request.0)
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(request.1))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":"tenant-acme","project_id":"project-acme","environment":"production","label":"Production App Key","notes":"initial notes","expires_at_ms":4102444800000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let created_json = read_json(created).await;
+    let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
+    let plaintext_key = created_json["plaintext"].as_str().unwrap().to_owned();
+
+    let updated = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/admin/api-keys/{hashed_key}"))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":"tenant-acme","project_id":"project-acme","environment":"production","label":"Production Key Updated","notes":"rotated by operator","expires_at_ms":4105123200000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(updated.status(), StatusCode::OK);
+    let updated_json = read_json(updated).await;
+    assert_eq!(updated_json["hashed_key"], hashed_key);
+    assert_eq!(updated_json["raw_key"], plaintext_key);
+    assert_eq!(updated_json["label"], "Production Key Updated");
+    assert_eq!(updated_json["notes"], "rotated by operator");
+    assert_eq!(updated_json["expires_at_ms"], 4105123200000_u64);
+
+    let listed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(listed.status(), StatusCode::OK);
+    let listed_json = read_json(listed).await;
+    assert_eq!(listed_json[0]["label"], "Production Key Updated");
+    assert_eq!(listed_json[0]["notes"], "rotated by operator");
+    assert_eq!(listed_json[0]["expires_at_ms"], 4105123200000_u64);
+
+    let stored_row: (String, Option<String>, Option<i64>) = sqlx::query_as(
+        "SELECT label, notes, expires_at_ms FROM ai_app_api_keys WHERE hashed_key = ?",
+    )
+    .bind(&hashed_key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stored_row.0, "Production Key Updated");
+    assert_eq!(stored_row.1.as_deref(), Some("rotated by operator"));
+    assert_eq!(stored_row.2, Some(4_105_123_200_000));
+}
+
+#[serial(extension_env)]
+#[tokio::test]
 async fn routing_simulation_uses_catalog_models() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);

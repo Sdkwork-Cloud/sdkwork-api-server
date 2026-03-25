@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use sdkwork_api_runtime_host::{EmbeddedRuntime, RuntimeHostConfig};
 
+mod api_key_setup;
+
 #[derive(Clone)]
 struct RuntimeState {
     base_url: String,
@@ -23,7 +25,11 @@ fn main() {
 
     tauri::Builder::default()
         .manage(state)
-        .invoke_handler(tauri::generate_handler![runtime_base_url])
+        .invoke_handler(tauri::generate_handler![
+            runtime_base_url,
+            api_key_setup::install_api_router_client_setup,
+            api_key_setup::list_api_key_instances
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");
 }

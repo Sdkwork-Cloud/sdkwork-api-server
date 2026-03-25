@@ -4,13 +4,23 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   InlineButton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from 'sdkwork-router-portal-commons';
 import type { CreatedGatewayApiKey, GatewayApiKeyRecord } from 'sdkwork-router-portal-types';
 
 import type { PortalApiKeyCreateFormState, PortalApiKeyUsagePreview } from '../types';
+import type {
+  ApiKeyQuickSetupPlan,
+  ApiKeySetupClientId,
+  ApiKeySetupInstance,
+} from '../services/quickSetup';
 import { PortalApiKeyCreateForm } from './PortalApiKeyCreateForm';
 
 export function PortalApiKeyDialogs({
@@ -22,7 +32,20 @@ export function PortalApiKeyDialogs({
   onCloseUsage,
   onCopyPlaintext,
   onCreate,
+  onApplySetup,
+  onChangeInstanceSelection,
+  onSelectClient,
   submitting,
+  applyingClientId,
+  gatewayBaseUrl,
+  loadingInstances,
+  openClawInstances,
+  quickSetupPlans,
+  selectedClientId,
+  selectedInstanceIds,
+  selectedPlan,
+  usagePlaintext,
+  usageStatus,
   usageKey,
   usagePreview,
 }: {
@@ -34,7 +57,20 @@ export function PortalApiKeyDialogs({
   onCloseUsage: () => void;
   onCopyPlaintext: () => void;
   onCreate: (event: FormEvent<HTMLFormElement>) => void;
+  onApplySetup: () => void;
+  onChangeInstanceSelection: (nextValue: string[]) => void;
+  onSelectClient: (clientId: ApiKeySetupClientId) => void;
   submitting: boolean;
+  applyingClientId: ApiKeySetupClientId | null;
+  gatewayBaseUrl: string;
+  loadingInstances: boolean;
+  openClawInstances: ApiKeySetupInstance[];
+  quickSetupPlans: ApiKeyQuickSetupPlan[];
+  selectedClientId: ApiKeySetupClientId;
+  selectedInstanceIds: string[];
+  selectedPlan: ApiKeyQuickSetupPlan | null;
+  usagePlaintext: string | null;
+  usageStatus: string;
   usageKey: GatewayApiKeyRecord | null;
   usagePreview: PortalApiKeyUsagePreview | null;
 }) {
@@ -95,7 +131,7 @@ export function PortalApiKeyDialogs({
                     >
                       {usageKey.active ? 'Active' : 'Inactive'}
                     </span>
-                    {isLatestUsageKey ? (
+                    {usagePlaintext || isLatestUsageKey ? (
                       <InlineButton onClick={onCopyPlaintext} tone="secondary">
                         Copy plaintext
                       </InlineButton>
@@ -111,7 +147,7 @@ export function PortalApiKeyDialogs({
                     Portal endpoint
                   </div>
                   <div className="mt-3 break-all text-sm text-zinc-600 dark:text-zinc-300">
-                    http://127.0.0.1:8080/v1/models
+                    {gatewayBaseUrl}/v1/models
                   </div>
                 </article>
 
@@ -153,6 +189,116 @@ export function PortalApiKeyDialogs({
                 </p>
               </article>
 
+              <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                  Quick setup
+                </div>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  Apply setup directly on this device for Codex, Claude Code, OpenCode, Gemini,
+                  or OpenClaw, or copy the generated snippets into your preferred environment.
+                </p>
+
+                <Tabs className="mt-4" value={selectedClientId} onValueChange={(value) => onSelectClient(value as ApiKeySetupClientId)}>
+                  <TabsList>
+                    {quickSetupPlans.map((plan) => (
+                      <TabsTrigger key={plan.id} value={plan.id}>
+                        {plan.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {quickSetupPlans.map((plan) => (
+                    <TabsContent key={plan.id} value={plan.id}>
+                      <div className="space-y-4">
+                        <div className="rounded-[20px] border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                          <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {plan.label}
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                            {plan.description}
+                          </p>
+                        </div>
+
+                        {plan.requiresInstances ? (
+                          <div className="rounded-[20px] border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                            <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                              OpenClaw instances
+                            </div>
+                            {loadingInstances ? (
+                              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                                Loading local instances...
+                              </p>
+                            ) : openClawInstances.length ? (
+                              <div className="mt-3 grid gap-2">
+                                {openClawInstances.map((instance) => (
+                                  <label key={instance.id} className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                                    <input
+                                      checked={selectedInstanceIds.includes(instance.id)}
+                                      onChange={(event) =>
+                                        onChangeInstanceSelection(
+                                          event.target.checked
+                                            ? [...selectedInstanceIds, instance.id]
+                                            : selectedInstanceIds.filter((item) => item !== instance.id),
+                                        )
+                                      }
+                                      type="checkbox"
+                                    />
+                                    <span>
+                                      {instance.label}
+                                      {instance.detail ? ` · ${instance.detail}` : ''}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                                No OpenClaw instances were detected on this machine.
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {plan.snippets.map((snippet) => (
+                          <div
+                            key={snippet.id}
+                            className="rounded-[20px] border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60"
+                          >
+                            <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                              {snippet.title}
+                            </div>
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              {snippet.target}
+                            </p>
+                            <pre className="mt-3 overflow-x-auto rounded-2xl bg-zinc-950 p-4 text-sm leading-6 text-zinc-300">
+                              <code>{snippet.content}</code>
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+
+                <DialogFooter className="mt-4">
+                  {usagePlaintext || isLatestUsageKey ? (
+                    <InlineButton onClick={onCopyPlaintext} tone="secondary">
+                      Copy plaintext
+                    </InlineButton>
+                  ) : null}
+                  <InlineButton
+                    disabled={
+                      !selectedPlan ||
+                      !usagePlaintext ||
+                      applyingClientId === selectedClientId ||
+                      (selectedPlan.requiresInstances && !selectedInstanceIds.length)
+                    }
+                    onClick={onApplySetup}
+                  >
+                    {applyingClientId === selectedClientId ? 'Applying...' : 'Apply setup'}
+                  </InlineButton>
+                </DialogFooter>
+              </article>
+
               {usageKey.notes ? (
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
@@ -160,6 +306,17 @@ export function PortalApiKeyDialogs({
                   </div>
                   <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                     {usageKey.notes}
+                  </p>
+                </article>
+              ) : null}
+
+              {usageStatus ? (
+                <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                    Status
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                    {usageStatus}
                   </p>
                 </article>
               ) : null}

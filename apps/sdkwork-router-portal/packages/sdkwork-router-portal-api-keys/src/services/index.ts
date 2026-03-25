@@ -13,6 +13,79 @@ import type {
 } from '../types';
 
 const environmentOrder = ['live', 'staging', 'test'];
+const PORTAL_API_KEY_PLAINTEXT_REVEAL_STORAGE_KEY =
+  'sdkwork-router-portal.api-keys.plaintext-reveals';
+
+type PortalApiKeyPlaintextRevealRecord = {
+  plaintext_key: string;
+  updated_at_ms: number;
+};
+
+function storage(): Storage | null {
+  if (typeof globalThis.localStorage !== 'undefined') {
+    return globalThis.localStorage;
+  }
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage;
+  }
+
+  return null;
+}
+
+function readRevealCache(): Record<string, PortalApiKeyPlaintextRevealRecord> {
+  const currentStorage = storage();
+  if (!currentStorage) {
+    return {};
+  }
+
+  const rawValue = currentStorage.getItem(PORTAL_API_KEY_PLAINTEXT_REVEAL_STORAGE_KEY);
+  if (!rawValue) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawValue) as Record<string, PortalApiKeyPlaintextRevealRecord>;
+  } catch {
+    return {};
+  }
+}
+
+function writeRevealCache(value: Record<string, PortalApiKeyPlaintextRevealRecord>): void {
+  const currentStorage = storage();
+  if (!currentStorage) {
+    return;
+  }
+
+  currentStorage.setItem(PORTAL_API_KEY_PLAINTEXT_REVEAL_STORAGE_KEY, JSON.stringify(value));
+}
+
+export function rememberPortalApiKeyPlaintextReveal(
+  hashedKey: string,
+  plaintextKey: string,
+): void {
+  const next = readRevealCache();
+  next[hashedKey] = {
+    plaintext_key: plaintextKey,
+    updated_at_ms: Date.now(),
+  };
+  writeRevealCache(next);
+}
+
+export function readPortalApiKeyPlaintextReveal(hashedKey: string): string | null {
+  const reveal = readRevealCache()[hashedKey];
+  return reveal?.plaintext_key?.trim() || null;
+}
+
+export function clearPortalApiKeyPlaintextReveal(hashedKey: string): void {
+  const next = readRevealCache();
+  if (!next[hashedKey]) {
+    return;
+  }
+
+  delete next[hashedKey];
+  writeRevealCache(next);
+}
 
 function sortKeys(keys: GatewayApiKeyRecord[]): GatewayApiKeyRecord[] {
   return [...keys].sort((left, right) => right.created_at_ms - left.created_at_ms);
@@ -281,10 +354,8 @@ export function resolvePortalApiKeyNotes(
 
 export function buildPortalApiKeyUsagePreview(
   key: GatewayApiKeyRecord,
-  createdKey: CreatedGatewayApiKey | null,
+  plaintext: string | null,
 ): PortalApiKeyUsagePreview {
-  const hasPlaintext = createdKey?.hashed === key.hashed_key;
-  const plaintext = hasPlaintext ? createdKey?.plaintext ?? null : null;
 
   return {
     title: plaintext ? 'How to use this key' : 'Usage method',

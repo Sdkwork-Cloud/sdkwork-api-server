@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-primary-50: var(--theme-primary-50);
@@ -31,13 +32,21 @@
   --scrollbar-thumb: color-mix(in srgb, var(--theme-primary-500) 18%, #71717a 82%);
   --scrollbar-thumb-hover: color-mix(in srgb, var(--theme-primary-500) 30%, #52525b 70%);
   --scrollbar-thumb-border: rgba(255, 255, 255, 0.72);
-  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
   color: var(--portal-text-primary, #102138);
   background: var(
     --portal-shell-background,
-    radial-gradient(circle at top left, rgba(236, 144, 54, 0.18), transparent 30%),
-    radial-gradient(circle at top right, rgba(36, 116, 207, 0.14), transparent 28%),
-    linear-gradient(180deg, #f7f3eb 0%, #eef2f8 100%)
+    radial-gradient(circle at top, rgb(var(--portal-accent-rgb, 59 130 246) / 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb, 37 99 235) / 0.08), transparent 30%),
+    linear-gradient(180deg, #f4f4f5 0%, #f8fafc 100%)
   );
   line-height: 1.5;
   font-weight: 400;
@@ -1293,9 +1302,9 @@ button {
   color: var(--portal-text-primary, #ebf1fb);
   background: var(
     --portal-shell-background,
-    radial-gradient(circle at top left, rgba(66, 133, 244, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(53, 119, 92, 0.14), transparent 28%),
-    linear-gradient(180deg, #09111f 0%, #0d1728 48%, #0a1220 100%)
+    radial-gradient(circle at top, rgb(var(--portal-accent-rgb, 59 130 246) / 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb, 37 99 235) / 0.1), transparent 30%),
+    linear-gradient(180deg, #09090b 0%, #09090b 100%)
   );
   color-scheme: dark;
 }
@@ -1304,8 +1313,9 @@ button {
   color: var(--portal-text-primary, #ebf1fb);
   background: var(
     --portal-shell-background,
-    radial-gradient(circle at top center, rgba(66, 133, 244, 0.08), transparent 32%),
-    linear-gradient(180deg, #09111f 0%, #0d1728 52%, #0a1220 100%)
+    radial-gradient(circle at top, rgb(var(--portal-accent-rgb, 59 130 246) / 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb, 37 99 235) / 0.1), transparent 30%),
+    linear-gradient(180deg, #09090b 0%, #09090b 100%)
   );
 }
 
@@ -1842,32 +1852,33 @@ button {
   --portal-accent-rgb: 59 130 246;
   --portal-accent-strong-rgb: 37 99 235;
   --portal-shell-background:
-    radial-gradient(circle at top left, rgb(var(--portal-accent-rgb) / 0.16), transparent 28%),
-    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb) / 0.12), transparent 30%),
-    linear-gradient(180deg, #f7f3eb 0%, #eef2f8 48%, #e7eef8 100%);
-  --portal-content-background: rgba(255, 255, 255, 0.4);
+    radial-gradient(circle at top, rgb(var(--portal-accent-rgb) / 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb) / 0.08), transparent 30%),
+    radial-gradient(circle at left, rgba(15, 23, 42, 0.08), transparent 34%),
+    linear-gradient(180deg, #f4f4f5 0%, #f8fafc 100%);
+  --portal-content-background: rgba(244, 244, 245, 0.24);
   --portal-surface-background: rgba(255, 255, 255, 0.84);
-  --portal-surface-elevated: rgba(247, 249, 252, 0.92);
+  --portal-surface-elevated: rgba(248, 250, 252, 0.92);
   --portal-surface-contrast:
-    linear-gradient(180deg, rgba(17, 27, 45, 0.96), rgba(10, 18, 33, 0.96));
-  --portal-glass-background: rgba(255, 255, 255, 0.76);
-  --portal-overlay: rgba(8, 15, 28, 0.56);
+    linear-gradient(180deg, rgba(19, 21, 26, 0.98), rgba(11, 12, 16, 0.99));
+  --portal-glass-background: rgba(255, 255, 255, 0.78);
+  --portal-overlay: rgba(9, 9, 11, 0.56);
   --portal-overlay-surface: rgba(252, 253, 255, 0.96);
-  --portal-shell-button-background: rgba(16, 33, 56, 0.045);
-  --portal-hover-surface: rgba(16, 33, 56, 0.055);
-  --portal-border-color: rgba(16, 33, 56, 0.1);
-  --portal-border-strong: rgba(16, 33, 56, 0.18);
+  --portal-shell-button-background: rgba(24, 24, 27, 0.045);
+  --portal-hover-surface: rgba(24, 24, 27, 0.055);
+  --portal-border-color: rgba(24, 24, 27, 0.1);
+  --portal-border-strong: rgba(24, 24, 27, 0.16);
   --portal-contrast-border: rgba(255, 255, 255, 0.08);
   --portal-contrast-soft: rgba(255, 255, 255, 0.035);
   --portal-titlebar-border: rgba(255, 255, 255, 0.08);
   --portal-window-control-hover: rgba(255, 255, 255, 0.08);
   --portal-window-control-danger-hover:
     linear-gradient(180deg, rgba(244, 63, 94, 0.92), rgba(225, 29, 72, 0.94));
-  --portal-text-primary: #102138;
-  --portal-text-secondary: rgba(16, 33, 56, 0.74);
-  --portal-text-muted: rgba(16, 33, 56, 0.56);
-  --portal-text-on-contrast: #f7fbff;
-  --portal-text-muted-on-contrast: rgba(219, 228, 244, 0.78);
+  --portal-text-primary: #18181b;
+  --portal-text-secondary: rgba(24, 24, 27, 0.74);
+  --portal-text-muted: rgba(24, 24, 27, 0.56);
+  --portal-text-on-contrast: #f5f5f5;
+  --portal-text-muted-on-contrast: rgba(228, 228, 231, 0.74);
   --portal-sidebar-background:
     linear-gradient(180deg, rgba(19, 21, 26, 0.98) 0%, rgba(11, 12, 16, 0.99) 100%);
   --portal-sidebar-surface: rgba(255, 255, 255, 0.04);
@@ -1884,7 +1895,7 @@ button {
     linear-gradient(180deg, rgb(var(--portal-accent-rgb) / 0.16), rgb(var(--portal-accent-rgb) / 0.08));
   --portal-sidebar-dock-border: rgba(255, 255, 255, 0.1);
   --portal-sidebar-dock-muted: rgba(205, 216, 234, 0.76);
-  --portal-shell-sidebar-glow: rgba(8, 15, 28, 0.12);
+  --portal-shell-sidebar-glow: rgba(15, 23, 42, 0.08);
   --portal-danger-soft: rgba(244, 63, 94, 0.14);
   --portal-danger-hover: rgba(244, 63, 94, 0.12);
   --portal-danger-border: rgba(244, 63, 94, 0.24);
@@ -1895,33 +1906,39 @@ button {
   --portal-chart-axis: rgba(73, 93, 124, 0.82);
   --portal-chart-tooltip-background: rgba(255, 255, 255, 0.96);
   --portal-chart-tooltip-border: rgba(16, 33, 56, 0.14);
-  --portal-shadow-soft: 0 18px 42px rgba(17, 37, 68, 0.1);
-  --portal-shadow-strong: 0 28px 80px rgba(3, 7, 18, 0.34);
+  --portal-shadow-soft: 0 24px 60px rgba(15, 23, 42, 0.12);
+  --portal-shadow-strong: 0 28px 80px rgba(9, 9, 11, 0.28);
 }
 
+:root.theme-light {
+  color-scheme: light;
+}
+
+:root.theme-dark,
 :root.dark {
   color-scheme: dark;
   --portal-shell-background:
-    radial-gradient(circle at top left, rgb(var(--portal-accent-rgb) / 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb) / 0.14), transparent 28%),
-    linear-gradient(180deg, #09111f 0%, #0d1728 48%, #0a1220 100%);
-  --portal-content-background: rgba(8, 14, 27, 0.26);
-  --portal-surface-background: rgba(11, 19, 34, 0.9);
-  --portal-surface-elevated: rgba(8, 14, 27, 0.82);
-  --portal-glass-background: rgba(12, 19, 33, 0.78);
-  --portal-overlay: rgba(3, 7, 18, 0.76);
-  --portal-overlay-surface: rgba(9, 16, 29, 0.96);
+    radial-gradient(circle at top, rgb(var(--portal-accent-rgb) / 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgb(var(--portal-accent-strong-rgb) / 0.1), transparent 30%),
+    radial-gradient(circle at left, rgba(255, 255, 255, 0.04), transparent 34%),
+    linear-gradient(180deg, #09090b 0%, #09090b 100%);
+  --portal-content-background: rgba(9, 9, 11, 0.22);
+  --portal-surface-background: rgba(24, 24, 27, 0.9);
+  --portal-surface-elevated: rgba(9, 9, 11, 0.82);
+  --portal-glass-background: rgba(24, 24, 27, 0.78);
+  --portal-overlay: rgba(3, 7, 18, 0.72);
+  --portal-overlay-surface: rgba(9, 9, 11, 0.96);
   --portal-shell-button-background: rgba(255, 255, 255, 0.05);
   --portal-hover-surface: rgba(255, 255, 255, 0.06);
-  --portal-border-color: rgba(128, 145, 176, 0.14);
-  --portal-border-strong: rgba(128, 145, 176, 0.22);
-  --portal-titlebar-border: rgba(255, 255, 255, 0.07);
+  --portal-border-color: rgba(255, 255, 255, 0.09);
+  --portal-border-strong: rgba(255, 255, 255, 0.14);
+  --portal-titlebar-border: rgba(255, 255, 255, 0.08);
   --portal-window-control-hover: rgba(255, 255, 255, 0.07);
   --portal-window-control-danger-hover:
     linear-gradient(180deg, rgba(244, 63, 94, 0.9), rgba(225, 29, 72, 0.92));
-  --portal-text-primary: #f5f9ff;
-  --portal-text-secondary: rgba(213, 223, 241, 0.78);
-  --portal-text-muted: rgba(145, 162, 190, 0.76);
+  --portal-text-primary: #f5f5f5;
+  --portal-text-secondary: rgba(244, 244, 245, 0.72);
+  --portal-text-muted: rgba(228, 228, 231, 0.56);
   --portal-sidebar-surface: rgba(255, 255, 255, 0.05);
   --portal-sidebar-dock-surface: rgba(255, 255, 255, 0.05);
   --portal-sidebar-dock-hover: rgba(255, 255, 255, 0.08);
@@ -1931,7 +1948,7 @@ button {
     linear-gradient(180deg, rgb(var(--portal-accent-rgb) / 0.18), rgb(var(--portal-accent-rgb) / 0.08));
   --portal-sidebar-dock-border: rgba(255, 255, 255, 0.08);
   --portal-sidebar-dock-muted: rgba(191, 205, 228, 0.76);
-  --portal-shell-sidebar-glow: rgba(255, 255, 255, 0.05);
+  --portal-shell-sidebar-glow: rgba(255, 255, 255, 0.04);
   --portal-danger-soft: rgba(244, 63, 94, 0.16);
   --portal-danger-hover: rgba(244, 63, 94, 0.14);
   --portal-danger-border: rgba(244, 63, 94, 0.26);

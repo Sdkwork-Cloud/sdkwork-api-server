@@ -3,11 +3,10 @@ import { persist } from 'zustand/middleware';
 
 import type { AdminSidebarItemKey, ThemeColor, ThemeMode } from 'sdkwork-router-admin-types';
 
-const MIN_SIDEBAR_WIDTH = 220;
-const MAX_SIDEBAR_WIDTH = 360;
+const CLAW_SIDEBAR_WIDTH = 240;
 
-function clampSidebarWidth(width: number): number {
-  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, width));
+function clampSidebarWidth(_: number): number {
+  return CLAW_SIDEBAR_WIDTH;
 }
 
 interface AdminAppStore {
@@ -28,7 +27,7 @@ export const useAdminAppStore = create<AdminAppStore>()(
   persist(
     (set) => ({
       isSidebarCollapsed: false,
-      sidebarWidth: 252,
+      sidebarWidth: CLAW_SIDEBAR_WIDTH,
       hiddenSidebarItems: [],
       themeMode: 'system',
       themeColor: 'lobster',

@@ -15,8 +15,12 @@ test('portal theme system exposes claw-style theme mode and color controls', () 
   const store = read('packages/sdkwork-router-portal-core/src/store/usePortalShellStore.ts');
 
   assert.match(themeManager, /data-theme/);
+  assert.match(themeManager, /data-theme-mode/);
   assert.match(themeManager, /themeMode/);
   assert.match(themeManager, /themeColor/);
+  assert.match(themeManager, /theme-light/);
+  assert.match(themeManager, /theme-dark/);
+  assert.match(themeManager, /colorScheme/);
   assert.match(store, /themeMode/);
   assert.match(store, /themeColor/);
   assert.match(store, /tech-blue/);
@@ -31,6 +35,8 @@ test('portal theme system exposes claw-style theme mode and color controls', () 
   assert.match(theme, /\[data-theme="zinc"\]/);
   assert.match(theme, /\[data-theme="violet"\]/);
   assert.match(theme, /\[data-theme="rose"\]/);
+  assert.match(theme, /:root\.theme-dark/);
+  assert.match(theme, /:root\.theme-light/);
 });
 
 test('portal preferences persist under a dedicated shell storage key', () => {
@@ -40,9 +46,8 @@ test('portal preferences persist under a dedicated shell storage key', () => {
 
   assert.match(preferences, /sdkwork-router-portal\.preferences\.v1/);
   assert.match(store, /persist/);
-  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72/);
-  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 220/);
-  assert.match(configCenter, /Workspace shell/);
+  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 60/);
+  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 240/);
   assert.match(configCenter, /Appearance/);
   assert.match(configCenter, /Theme mode/);
   assert.match(configCenter, /Theme color/);
@@ -57,16 +62,15 @@ test('portal preferences persist under a dedicated shell storage key', () => {
 test('portal config center mirrors claw-studio settings shell navigation and live preview structure', () => {
   const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
 
+  assert.match(configCenter, /motion\.(div|section)/);
+  assert.match(configCenter, /from 'motion\/react'/);
   assert.match(configCenter, /Search settings/);
   assert.match(configCenter, /appearance/);
   assert.match(configCenter, /navigation/);
   assert.match(configCenter, /workspace/);
-  assert.match(configCenter, /Theme preview|Shell preview/);
-  assert.match(configCenter, /Current theme/);
-  assert.match(configCenter, /Restore defaults/);
-  assert.match(configCenter, /Sidebar behavior/);
-  assert.match(configCenter, /Theme palette|Theme color/);
-  assert.match(configCenter, /SettingsSection|ThemeOptionButton|ThemeColorButton/);
+  assert.match(configCenter, /Theme mode/);
+  assert.match(configCenter, /Theme color/);
+  assert.match(configCenter, /Sidebar navigation/);
   assert.match(configCenter, /flex h-full min-h-\[760px\] bg-zinc-50\/50 dark:bg-zinc-950\/50/);
   assert.match(
     configCenter,
@@ -78,10 +82,17 @@ test('portal config center mirrors claw-studio settings shell navigation and liv
     configCenter,
     /border-zinc-200\/50 bg-white text-primary-600 shadow-sm dark:border-zinc-700\/50 dark:bg-zinc-800 dark:text-primary-400/,
   );
-  assert.match(
-    configCenter,
-    /overflow-hidden rounded-\[1\.5rem\] border border-zinc-200\/80 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-zinc-800\/80 dark:bg-zinc-900/,
-  );
+  assert.doesNotMatch(configCenter, /Theme preview|Shell preview/);
+  assert.doesNotMatch(configCenter, /SettingsSection|ThemeOptionButton|ThemeColorButton|SettingsStatCard/);
+});
+
+test('portal config center uses claw-style sections without extra summary KPI cards', () => {
+  const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
+
+  assert.match(configCenter, /overflow-hidden rounded-\[1\.5rem\] border border-zinc-200\/80 bg-white shadow-sm/);
+  assert.doesNotMatch(configCenter, /Sidebar width/);
+  assert.doesNotMatch(configCenter, /Sidebar state/);
+  assert.doesNotMatch(configCenter, /Visible routes/);
 });
 
 test('portal default theme behavior matches claw-studio defaults', () => {
@@ -177,7 +188,16 @@ test('portal shell background gradients stay theme-driven instead of mixing fixe
 
 test('portal theme substrate matches claw-studio scrollbar and dark color-scheme behavior', () => {
   const theme = read('src/theme.css');
+  const layout = read('packages/sdkwork-router-portal-core/src/application/layouts/MainLayout.tsx');
 
+  assert.match(layout, /font-sans/);
+  assert.match(theme, /font-family:\s*ui-sans-serif,\s*system-ui/s);
+  assert.doesNotMatch(theme, /Space Grotesk/);
+  assert.doesNotMatch(theme, /Avenir Next/);
+  assert.doesNotMatch(theme, /#f7f3eb|#eef2f8|#e7eef8/);
+  assert.doesNotMatch(theme, /#09111f|#0d1728|#0a1220/);
+  assert.match(theme, /:root\s*\{[^}]*#f4f4f5[^}]*#f8fafc/s);
+  assert.match(theme, /:root\.dark\s*\{[^}]*#09090b/s);
   assert.match(theme, /--scrollbar-size: 10px/);
   assert.match(theme, /--scrollbar-track:/);
   assert.match(theme, /--scrollbar-thumb:/);
@@ -194,9 +214,21 @@ test('portal desktop chrome uses claw-style glass titlebar and account-control s
   assert.match(header, /bg-white\/72 backdrop-blur-xl dark:bg-zinc-950\/78/);
   assert.match(windowControls, /hover:bg-zinc-950\/\[0\.06\]/);
   assert.match(windowControls, /hover:bg-rose-500 hover:text-white/);
-  assert.match(profileDock, /border-white\/8 bg-white\/\[0\.04\]/);
-  assert.match(profileDock, /border-white\/10 bg-zinc-950\/96/);
-  assert.match(profileDock, /bg-primary-500\/15[\s\S]*text-primary-200/);
-  assert.doesNotMatch(profileDock, /var\(--portal-sidebar-dock-surface\)/);
+  assert.match(profileDock, /data-slot="portal-sidebar-footer-settings"/);
+  assert.match(profileDock, /data-slot="portal-sidebar-user-control"/);
+  assert.doesNotMatch(profileDock, /Active workspace/);
+  assert.doesNotMatch(profileDock, /Theme, sidebar, and shell preferences/);
   assert.doesNotMatch(windowControls, /var\(--portal-window-control-hover\)/);
+});
+
+test('portal sidebar translates group and route labels through the shared i18n layer', () => {
+  const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
+  const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
+  const profileDock = read('packages/sdkwork-router-portal-core/src/components/SidebarProfileDock.tsx');
+
+  assert.match(sidebar, /usePortalI18n/);
+  assert.match(sidebar, /t\(group\.title\)/);
+  assert.match(sidebar, /t\(route\.label\)/);
+  assert.match(configCenter, /label=\{t\(option\.label\)\}/);
+  assert.match(profileDock, /t\('Portal operator'\)/);
 });

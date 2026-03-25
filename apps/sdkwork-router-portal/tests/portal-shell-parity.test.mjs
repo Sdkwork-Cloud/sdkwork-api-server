@@ -53,25 +53,36 @@ test('portal header behaves like a claw-style desktop titlebar without a centere
   assert.match(windowControls, /maximizeWindow/);
   assert.match(windowControls, /closeWindow/);
   assert.match(windowControls, /hover:bg-zinc-950\/\[0\.06\]|hover:bg-white\/\[0\.1\]/);
+  assert.match(header, /M12 2v2/);
+  assert.match(header, /M15 12a3 3 0 1 1-6 0/);
+  assert.doesNotMatch(header, /Sparkles/);
 });
 
-test('portal shell sidebar supports collapse, expand, resize, and claw width parity', () => {
+test('portal shell sidebar keeps claw-style collapse rhythm without custom resize affordances', () => {
   const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
+  const packageJson = read('packages/sdkwork-router-portal-core/package.json');
   const store = read('packages/sdkwork-router-portal-core/src/store/usePortalShellStore.ts');
   const configCenter = read('packages/sdkwork-router-portal-core/src/components/ConfigCenter.tsx');
   const preferences = read('packages/sdkwork-router-portal-core/src/lib/portalPreferences.ts');
 
+  assert.match(packageJson, /"motion"/);
+  assert.match(sidebar, /from 'motion\/react'/);
   assert.match(store, /isSidebarCollapsed/);
   assert.match(store, /sidebarWidth/);
   assert.match(store, /hiddenSidebarItems/);
-  assert.match(sidebar, /PanelLeftClose|ChevronsLeft|SidebarLeft/);
-  assert.match(sidebar, /PanelLeftOpen|ChevronsRight|SidebarRight/);
-  assert.match(sidebar, /cursor-col-resize/);
+  assert.match(sidebar, /motion\.(div|aside)/);
+  assert.match(sidebar, /w-full items-center overflow-hidden whitespace-nowrap/);
+  assert.match(sidebar, /SDKWork Router/);
+  assert.match(sidebar, /Developer portal/);
+  assert.match(sidebar, /M12 2v2/);
+  assert.match(sidebar, /M15 12a3 3 0 1 1-6 0/);
   assert.match(sidebar, /toggleSidebar/);
+  assert.doesNotMatch(sidebar, /sidebar-resize-handle/);
+  assert.doesNotMatch(sidebar, /cursor-col-resize/);
   assert.doesNotMatch(sidebar, /Active workspace/);
-  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72/);
-  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 220/);
-  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 252/);
+  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 60/);
+  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 240/);
+  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 240/);
   assert.match(configCenter, /hiddenSidebarItems/);
   assert.match(configCenter, /themeColor/);
 });
@@ -96,9 +107,20 @@ test('portal sidebar footer collapses shell actions into a dedicated profile doc
   assert.match(profileDock, /onOpenConfigCenter/);
   assert.match(profileDock, /onLogout/);
   assert.match(profileDock, /workspace\?\.user\.display_name|workspace\?\.user\.email/);
-  assert.match(profileDock, /workspace\?\.tenant\.name|workspace\?\.project\.name/);
-  assert.match(profileDock, /Settings/);
+  assert.match(profileDock, /data-slot="portal-sidebar-footer-settings"/);
+  assert.match(profileDock, /data-slot="portal-sidebar-user-control"/);
+  assert.doesNotMatch(profileDock, /Active workspace/);
+  assert.doesNotMatch(profileDock, /Theme, sidebar, and shell preferences/);
   assert.match(profileDock, /Sign out|Logout/);
+  assert.match(profileDock, /const userControlRef = useRef/);
+  assert.match(profileDock, /const userMenuPanelRef = useRef/);
+  assert.match(profileDock, /const \[userMenuStyle, setUserMenuStyle\] = useState/);
+  assert.match(profileDock, /getBoundingClientRect/);
+  assert.match(profileDock, /window\.innerWidth/);
+  assert.match(profileDock, /window\.innerHeight/);
+  assert.match(profileDock, /style=\{userMenuStyle\}/);
+  assert.doesNotMatch(profileDock, /bottom-full left-0 right-0 mb-3/);
+  assert.doesNotMatch(profileDock, /bottom-0 left-full ml-3 w-72/);
 });
 
 test('portal shell exposes a dedicated WindowControls component and desktop host scaffold', () => {

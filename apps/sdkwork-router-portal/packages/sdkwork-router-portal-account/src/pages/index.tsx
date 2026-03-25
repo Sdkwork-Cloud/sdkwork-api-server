@@ -1,28 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import {
+  Button,
   DataTable,
   EmptyState,
   formatCurrency,
   formatUnits,
   InlineButton,
   Surface,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+  ToolbarSearchField,
+  usePortalI18n,
 } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 import type { LedgerEntry, ProjectBillingSummary } from 'sdkwork-router-portal-types';
 
-import { AccountBalanceFacts } from '../components';
 import { getPortalBillingSummary, listPortalBillingLedger } from '../repository';
-import { buildPortalAccountViewModel } from '../services';
 import type { PortalAccountPageProps } from '../types';
 
-export function PortalAccountPage({ workspace, onNavigate }: PortalAccountPageProps) {
+export function PortalAccountPage({ onNavigate }: PortalAccountPageProps) {
+  const { t } = usePortalI18n();
   const [summary, setSummary] = useState<ProjectBillingSummary | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [status, setStatus] = useState('Loading the financial account posture...');
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery.trim().toLowerCase());
 
   useEffect(() => {
     let cancelled = false;
@@ -48,179 +48,71 @@ export function PortalAccountPage({ workspace, onNavigate }: PortalAccountPagePr
     };
   }, []);
 
-  const viewModel = useMemo(() => {
-    if (!summary) {
-      return null;
-    }
-    return buildPortalAccountViewModel(summary, ledger);
-  }, [ledger, summary]);
+  const visibleLedger = ledger.filter((entry) =>
+    !deferredSearch
+    || entry.project_id.toLowerCase().includes(deferredSearch));
 
-  if (!viewModel || !summary) {
+  if (!summary) {
     return (
-      <Surface detail={status} title="Financial account">
+      <Surface detail={status} title={t('Financial account')}>
         <EmptyState
-          detail="Financial account posture will appear after the portal loads billing summary and ledger evidence."
-          title="Preparing account"
+          detail={t('Financial account posture will appear after the portal loads billing summary and ledger evidence.')}
+          title={t('Preparing account')}
         />
       </Surface>
     );
   }
 
   return (
-    <>
-      <Tabs className="grid gap-6" defaultValue="balance-summary">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="balance-summary">Balance summary</TabsTrigger>
-          <TabsTrigger value="ledger-table">Ledger table</TabsTrigger>
-          <TabsTrigger value="controls">Controls</TabsTrigger>
-        </TabsList>
+    <div className="grid gap-4">
+      <section
+        data-slot="portal-account-toolbar"
+        className="rounded-[28px] border border-zinc-200/80 bg-white/92 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/70 sm:p-5"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" onClick={() => onNavigate('credits')}>
+              {t('Open credits')}
+            </Button>
+            <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
+              {t('Review billing')}
+            </InlineButton>
+            <InlineButton onClick={() => onNavigate('usage')} tone="secondary">
+              {t('Open usage')}
+            </InlineButton>
+          </div>
 
-        <TabsContent className="space-y-6" value="balance-summary">
-          <Surface
-            actions={
-              <div className="flex flex-wrap gap-2">
-                <InlineButton onClick={() => onNavigate('credits')} tone="primary">
-                  Open credits
-                </InlineButton>
-                <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
-                  Review billing
-                </InlineButton>
-              </div>
-            }
-            detail={status}
-            title="Cash balance"
-          >
-            <div className="grid gap-6">
-              <div className="portalx-summary-grid">
-                {viewModel.cash_balance_cards.map((item) => (
-                  <article className="portalx-summary-card" key={item.id}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                    <p>{item.detail}</p>
-                  </article>
-                ))}
-              </div>
+          <ToolbarSearchField
+            label={t('Search ledger')}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('Search ledger')}
+            className="w-full lg:max-w-[24rem]"
+          />
+        </div>
+      </section>
 
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                <article className="portal-shell-info-card">
-                  <strong className="portal-shell-info-title">Financial account</strong>
-                  <p className="portal-shell-info-copy mt-2 text-sm">
-                    Project runway, tenant ownership, and booked spend stay visible without a
-                    decorative page-top status strip.
-                  </p>
-                  <div className="mt-4">
-                    <AccountBalanceFacts summary={summary} workspace={workspace} />
-                  </div>
-                </article>
-
-                <article className="portal-shell-info-card">
-                  <strong className="portal-shell-info-title">Workspace handoff</strong>
-                  <p className="portal-shell-info-copy mt-2 text-sm">
-                    Move directly into credits or billing once the current cash posture is clear.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <InlineButton onClick={() => onNavigate('credits')} tone="primary">
-                      Open credits
-                    </InlineButton>
-                    <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
-                      Review billing
-                    </InlineButton>
-                    <InlineButton onClick={() => onNavigate('usage')} tone="ghost">
-                      Open usage
-                    </InlineButton>
-                  </div>
-                </article>
-              </div>
-            </div>
-          </Surface>
-
-          <Surface
-            detail="Runway, recharge, and ownership boundaries should stay explicit on every financial review."
-            title="Operating guardrails"
-          >
-            <div className="portalx-guardrail-list">
-              {viewModel.guardrails.map((item) => (
-                <article className="portalx-guardrail-card" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </article>
-              ))}
-            </div>
-          </Surface>
-        </TabsContent>
-
-        <TabsContent className="space-y-6" value="ledger-table">
-          <Surface detail="The account view should expose the raw ledger table before any higher-level interpretation." title="Ledger table">
-            {ledger.length ? (
-              <DataTable
-                columns={[
-                  { key: 'project', label: 'Project', render: (row) => row.project_id },
-                  { key: 'units', label: 'Units', render: (row) => formatUnits(row.units) },
-                  { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
-                ]}
-                empty="No ledger entries recorded yet."
-                getKey={(row, index) => `${row.project_id}-${row.units}-${index}`}
-                rows={ledger}
-              />
-            ) : (
-              <EmptyState
-                detail="Ledger lines will appear here as quota and billing activity accumulates."
-                title="No ledger entries yet"
-              />
-            )}
-          </Surface>
-
-          <Surface
-            detail="Ledger evidence should explain why the financial account looks the way it does right now."
-            title="Ledger evidence"
-          >
-            <div className="portalx-guardrail-list">
-              {viewModel.ledger_evidence.map((item) => (
-                <article className="portalx-guardrail-card" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </article>
-              ))}
-            </div>
-          </Surface>
-        </TabsContent>
-
-        <TabsContent className="space-y-6" value="controls">
-          <Surface
-            detail="The account module should always direct the user back into the operational loop with a specific next move."
-            title="Recommended next financial move"
-          >
-            <div className="portalx-checklist-grid">
-              <article className="portalx-checklist-card">
-                <strong>Protect runway before the next launch window</strong>
-                <p>Use Credits when you want to add headroom or review coupon-driven top-up options.</p>
-                <InlineButton onClick={() => onNavigate('credits')} tone="primary">
-                  Open credits
-                </InlineButton>
-              </article>
-              <article className="portalx-checklist-card">
-                <strong>Review billing for plan changes</strong>
-                <p>Billing remains the lane for bundle selection, subscription shaping, and recovery planning.</p>
-                <InlineButton onClick={() => onNavigate('billing')} tone="secondary">
-                  Review billing
-                </InlineButton>
-              </article>
-              <article className="portalx-checklist-card">
-                <strong>Reconnect money posture with routing and traffic</strong>
-                <p>Use Routing and Usage together when commercial posture should inform the next provider or rollout decision.</p>
-                <div className="portalx-form-actions">
-                  <InlineButton onClick={() => onNavigate('routing')} tone="ghost">
-                    Open routing
-                  </InlineButton>
-                  <InlineButton onClick={() => onNavigate('usage')} tone="ghost">
-                    Open usage
-                  </InlineButton>
-                </div>
-              </article>
-            </div>
-          </Surface>
-        </TabsContent>
-      </Tabs>
-    </>
+      {visibleLedger.length ? (
+        <DataTable
+          columns={[
+            { key: 'project', label: 'Project', render: (row) => row.project_id },
+            { key: 'units', label: 'Units', render: (row) => formatUnits(row.units) },
+            { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
+          ]}
+          empty={t('No ledger entries recorded yet.')}
+          getKey={(row, index) => `${row.project_id}-${row.units}-${index}`}
+          rows={visibleLedger}
+        />
+      ) : (
+        <EmptyState
+          detail={
+            ledger.length
+              ? 'Adjust the search or wait for quota and billing activity to populate the ledger.'
+              : status
+          }
+            title={t('No ledger entries for this slice')}
+        />
+      )}
+    </div>
   );
 }

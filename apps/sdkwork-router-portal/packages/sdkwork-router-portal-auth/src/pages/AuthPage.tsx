@@ -1,7 +1,7 @@
 import { ArrowRight, Chrome, Github, Lock, Mail, QrCode, Smartphone, User } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Input, Label } from 'sdkwork-router-portal-commons';
+import { Button, Input, Label, usePortalI18n } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 
 import type { PortalAuthMode, PortalAuthPageProps } from '../types';
@@ -67,6 +67,7 @@ function authCopy(mode: PortalAuthMode) {
 }
 
 export function AuthPage({ signIn, register }: PortalAuthPageProps) {
+  const { t } = usePortalI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -143,7 +144,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
             <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-600 shadow-lg">
               <QrCode className="h-8 w-8 text-white" />
             </div>
-            <h2 className="mb-2 text-2xl font-bold">QR login</h2>
+            <h2 className="mb-2 text-2xl font-bold">{t('QR login')}</h2>
             <p className="mb-8 max-w-[200px] text-sm text-zinc-400">
               Open the desktop app and scan this code to continue without typing credentials.
             </p>
@@ -156,7 +157,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
 
             <div className="flex items-center gap-2 text-sm text-zinc-400">
               <Smartphone className="h-4 w-4" />
-              <span>Open app to scan</span>
+              <span>{t('Open app to scan')}</span>
             </div>
           </div>
         </div>
@@ -165,15 +166,15 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
           <div className="mx-auto max-w-md">
             <div className="mb-8">
               <h1 className="mb-2 text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
-                {copy.title}
+                {t(copy.title)}
               </h1>
-              <p className="text-zinc-500 dark:text-zinc-400">{copy.description}</p>
+              <p className="text-zinc-500 dark:text-zinc-400">{t(copy.description)}</p>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               {mode === 'register' ? (
                 <div>
-                  <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">Name</Label>
+                <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">{t('Name')}</Label>
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <User className="h-5 w-5 text-zinc-400" />
@@ -191,7 +192,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
               ) : null}
 
               <div>
-                <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">Email</Label>
+                <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">{t('Email')}</Label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <Mail className="h-5 w-5 text-zinc-400" />
@@ -211,14 +212,14 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
               {mode !== 'forgot-password' ? (
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
-                    <Label className="text-zinc-700 dark:text-zinc-300">Password</Label>
+                    <Label className="text-zinc-700 dark:text-zinc-300">{t('Password')}</Label>
                     {mode === 'login' ? (
                       <button
                         className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500"
                         onClick={() => navigate(withRedirect('/forgot-password', { email }))}
                         type="button"
                       >
-                        Forgot password?
+                        {t('Forgot password?')}
                       </button>
                     ) : null}
                   </div>
@@ -240,7 +241,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
               ) : null}
 
               <Button className="h-auto w-full rounded-xl py-3 font-bold shadow-sm" disabled={submitting} type="submit">
-                {submitting ? 'Loading...' : copy.submitLabel}
+                {submitting ? t('Loading...') : t(copy.submitLabel)}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </form>
@@ -257,7 +258,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                   </div>
                   <div className="relative flex justify-center text-sm">
                     <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-900">
-                      Continue with
+                      {t('Continue with')}
                     </span>
                   </div>
                 </div>
@@ -278,24 +279,24 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
             <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
               {mode === 'login' ? (
                 <>
-                  No account?{' '}
+                  {t('No account?')}{' '}
                   <button
                     className="font-bold text-primary-600 transition-colors hover:text-primary-500"
                     onClick={() => navigate(withRedirect(copy.alternatePath))}
                     type="button"
                   >
-                    {copy.alternateLabel}
+                    {t(copy.alternateLabel)}
                   </button>
                 </>
               ) : mode === 'register' ? (
                 <>
-                  Already have an account?{' '}
+                  {t('Already have an account?')}{' '}
                   <button
                     className="font-bold text-primary-600 transition-colors hover:text-primary-500"
                     onClick={() => navigate(withRedirect(copy.alternatePath))}
                     type="button"
                   >
-                    {copy.alternateLabel}
+                    {t(copy.alternateLabel)}
                   </button>
                 </>
               ) : (
@@ -305,7 +306,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                   type="button"
                 >
                   <ArrowRight className="h-4 w-4 rotate-180" />
-                  Back to login
+                  {t('Back to login')}
                 </button>
               )}
             </div>
@@ -317,7 +318,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                   onClick={() => navigate(withRedirect('/register'))}
                   type="button"
                 >
-                  Create account
+                  {t('Create account')}
                 </button>
               </div>
             ) : null}

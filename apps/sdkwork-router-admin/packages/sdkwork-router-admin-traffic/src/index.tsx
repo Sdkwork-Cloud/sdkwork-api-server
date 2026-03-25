@@ -1,16 +1,27 @@
 import { useDeferredValue, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import {
   DataTable,
+  formatAdminCurrency,
+  formatAdminDateTime,
+  formatAdminNumber,
   InlineButton,
   PageToolbar,
   Pill,
-  StatCard,
-  Surface,
+  ToolbarDisclosure,
+  ToolbarField,
+  ToolbarSearchField,
+  useAdminI18n,
 } from 'sdkwork-router-admin-commons';
-import type { AdminPageProps, ManagedUser } from 'sdkwork-router-admin-types';
+import type {
+  AdminPageProps,
+  ManagedUser,
+  RoutingDecisionLogRecord,
+  UsageRecord,
+} from 'sdkwork-router-admin-types';
 
-type ViewMode = 'all' | 'usage' | 'routing';
+type ViewMode = 'usage' | 'routing' | 'billing' | 'users' | 'projects';
 type RecentWindow = 'all' | '24h' | '7d' | '30d';
 
 type FilteredPortalTrafficRow = ManagedUser & {
@@ -20,19 +31,32 @@ type FilteredPortalTrafficRow = ManagedUser & {
   filtered_amount: number;
 };
 
-function formatTimestamp(timestamp: number): string {
-  if (!timestamp) {
-    return '-';
-  }
-  return new Date(timestamp).toLocaleString();
-}
+type BillingRow = AdminPageProps['snapshot']['billingSummary']['projects'][number] & {
+  kind: 'billing';
+};
 
-function formatIsoTimestamp(timestamp: number): string {
-  if (!timestamp) {
-    return '';
-  }
-  return new Date(timestamp).toISOString();
-}
+type UsageRow = UsageRecord & {
+  kind: 'usage';
+};
+
+type RoutingRow = RoutingDecisionLogRecord & {
+  kind: 'routing';
+};
+
+type UserTrafficRow = FilteredPortalTrafficRow & {
+  kind: 'users';
+};
+
+type ProjectHotspotRow = {
+  kind: 'projects';
+  project_id: string;
+  request_count: number;
+  total_tokens: number;
+  total_units: number;
+  total_amount: number;
+};
+
+type TrafficTableRow = UsageRow | RoutingRow | BillingRow | UserTrafficRow | ProjectHotspotRow;
 
 function recentWindowCutoff(window: RecentWindow): number | null {
   const now = Date.now();
@@ -83,49 +107,34 @@ function userMatchesQuery(user: ManagedUser, query: string): boolean {
   return haystack.includes(query);
 }
 
-function sortUnique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+function rowKey(row: TrafficTableRow, index: number): string {
+  switch (row.kind) {
+    case 'usage':
+      return `${row.project_id}:${row.model}:${row.provider}:${row.created_at_ms}:${index}`;
+    case 'routing':
+      return row.decision_id;
+    case 'billing':
+      return row.project_id;
+    case 'users':
+      return row.id;
+    case 'projects':
+      return row.project_id;
+    default:
+      return String(index);
+  }
 }
 
 export function TrafficPage({ snapshot }: AdminPageProps) {
+  const { t } = useAdminI18n();
   const [search, setSearch] = useState('');
-  const [mode, setMode] = useState<ViewMode>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('usage');
   const [recentWindow, setRecentWindow] = useState<RecentWindow>('all');
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [providerFilter, setProviderFilter] = useState('all');
-  const [modelFilter, setModelFilter] = useState('all');
-  const [portalUserScope, setPortalUserScope] = useState('all');
   const deferredQuery = useDeferredValue(search.trim().toLowerCase());
 
-  const projectOptions = sortUnique([
-    ...snapshot.projects.map((project) => project.id),
-    ...snapshot.usageRecords.map((record) => record.project_id),
-  ]);
-  const providerOptions = sortUnique([
-    ...snapshot.providers.map((provider) => provider.id),
-    ...snapshot.usageRecords.map((record) => record.provider),
-    ...snapshot.routingLogs.map((log) => log.selected_provider_id),
-  ]);
-  const modelOptions = sortUnique(snapshot.usageRecords.map((record) => record.model));
   const recentCutoff = recentWindowCutoff(recentWindow);
-  const scopedProjectId = portalUserScope === 'all'
-    ? null
-    : snapshot.portalUsers.find((user) => user.id === portalUserScope)?.workspace_project_id ?? '__missing__';
 
   const filteredUsageRecords = snapshot.usageRecords.filter((record) => {
     if (recentCutoff && record.created_at_ms < recentCutoff) {
-      return false;
-    }
-    if (projectFilter !== 'all' && record.project_id !== projectFilter) {
-      return false;
-    }
-    if (providerFilter !== 'all' && record.provider !== providerFilter) {
-      return false;
-    }
-    if (modelFilter !== 'all' && record.model !== modelFilter) {
-      return false;
-    }
-    if (scopedProjectId && record.project_id !== scopedProjectId) {
       return false;
     }
 
@@ -135,9 +144,6 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
 
   const filteredRoutingLogs = snapshot.routingLogs.filter((log) => {
     if (recentCutoff && log.created_at_ms < recentCutoff) {
-      return false;
-    }
-    if (providerFilter !== 'all' && log.selected_provider_id !== providerFilter) {
       return false;
     }
 
@@ -175,36 +181,29 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
     total_amount: number;
   }>());
 
-  const filteredPortalUsers: FilteredPortalTrafficRow[] = snapshot.portalUsers
+  const userRows: UserTrafficRow[] = snapshot.portalUsers
     .map((user) => {
       const projectUsage = usageByProject.get(user.workspace_project_id ?? '');
       return {
         ...user,
+        kind: 'users' as const,
         filtered_request_count: projectUsage?.request_count ?? 0,
         filtered_total_tokens: projectUsage?.total_tokens ?? 0,
         filtered_usage_units: projectUsage?.total_units ?? 0,
         filtered_amount: projectUsage?.total_amount ?? 0,
       };
     })
-    .filter((user) => {
-      if (portalUserScope !== 'all' && user.id !== portalUserScope) {
-        return false;
-      }
-      if (!deferredQuery) {
-        return true;
-      }
-      return userMatchesQuery(user, deferredQuery) || user.filtered_request_count > 0;
-    })
+    .filter((user) => !deferredQuery || userMatchesQuery(user, deferredQuery) || user.filtered_request_count > 0)
     .sort((left, right) => (
       right.filtered_request_count - left.filtered_request_count
       || right.filtered_total_tokens - left.filtered_total_tokens
       || right.filtered_usage_units - left.filtered_usage_units
       || right.filtered_amount - left.filtered_amount
-    ))
-    .slice(0, 8);
+    ));
 
-  const projectHotspots = Array.from(usageByProject.entries())
+  const projectRows: ProjectHotspotRow[] = Array.from(usageByProject.entries())
     .map(([project_id, entry]) => ({
+      kind: 'projects' as const,
       project_id,
       ...entry,
     }))
@@ -212,349 +211,298 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
       right.request_count - left.request_count
       || right.total_tokens - left.total_tokens
       || right.total_amount - left.total_amount
-    ))
-    .slice(0, 8);
+    ));
 
-  const filteredUnits = filteredUsageRecords.reduce((sum, record) => sum + record.units, 0);
-  const filteredTokens = filteredUsageRecords.reduce((sum, record) => sum + record.total_tokens, 0);
-  const filteredAmount = filteredUsageRecords.reduce((sum, record) => sum + record.amount, 0);
+  const billingRows: BillingRow[] = snapshot.billingSummary.projects
+    .filter((project) => {
+      if (!deferredQuery) {
+        return true;
+      }
+
+      return [
+        project.project_id,
+        project.quota_policy_id ?? '',
+        project.remaining_units ?? '',
+        project.exhausted ? 'exhausted' : 'healthy',
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(deferredQuery);
+    })
+    .map((project) => ({
+      ...project,
+      kind: 'billing' as const,
+    }));
+
+  const usageRows: UsageRow[] = filteredUsageRecords.map((record) => ({
+    ...record,
+    kind: 'usage' as const,
+  }));
+
+  const routingRows: RoutingRow[] = filteredRoutingLogs.map((log) => ({
+    ...log,
+    kind: 'routing' as const,
+  }));
 
   function clearFilters() {
     setSearch('');
-    setMode('all');
+    setViewMode('usage');
     setRecentWindow('all');
-    setProjectFilter('all');
-    setProviderFilter('all');
-    setModelFilter('all');
-    setPortalUserScope('all');
   }
 
-  function exportUsageCsv() {
-    downloadCsv(
-      'sdkwork-router-usage-records.csv',
-      [
-        'project_id',
-        'model',
-        'provider',
-        'input_tokens',
-        'output_tokens',
-        'total_tokens',
-        'units',
-        'amount',
-        'created_at',
-      ],
-      filteredUsageRecords.map((record) => [
-        record.project_id,
-        record.model,
-        record.provider,
-        record.input_tokens,
-        record.output_tokens,
-        record.total_tokens,
-        record.units,
-        record.amount.toFixed(4),
-        formatIsoTimestamp(record.created_at_ms),
-      ]),
-    );
+  function exportCurrentCsv() {
+    switch (viewMode) {
+      case 'routing':
+        downloadCsv(
+          'sdkwork-router-routing-logs.csv',
+          [
+            'decision_id',
+            'selected_provider_id',
+            'capability',
+            'route_key',
+            'strategy',
+            'selection_reason',
+            'requested_region',
+            'slo_applied',
+            'slo_degraded',
+            'created_at',
+          ],
+          routingRows.map((log) => [
+            log.decision_id,
+            log.selected_provider_id,
+            log.capability,
+            log.route_key,
+            log.strategy ?? '',
+            log.selection_reason ?? '',
+            log.requested_region ?? '',
+            log.slo_applied,
+            log.slo_degraded,
+            new Date(log.created_at_ms).toISOString(),
+          ]),
+        );
+        return;
+      case 'billing':
+        downloadCsv(
+          'sdkwork-router-billing-summary.csv',
+          ['project_id', 'entry_count', 'used_units', 'booked_amount', 'remaining_units', 'status'],
+          billingRows.map((project) => [
+            project.project_id,
+            project.entry_count,
+            project.used_units,
+            project.booked_amount.toFixed(2),
+            project.remaining_units ?? '',
+            project.exhausted ? 'exhausted' : 'healthy',
+          ]),
+        );
+        return;
+      case 'users':
+        downloadCsv(
+          'sdkwork-router-user-traffic.csv',
+          ['user_id', 'email', 'project_id', 'request_count', 'total_tokens', 'usage_units', 'amount', 'status'],
+          userRows.map((user) => [
+            user.id,
+            user.email,
+            user.workspace_project_id ?? '',
+            user.filtered_request_count,
+            user.filtered_total_tokens,
+            user.filtered_usage_units,
+            user.filtered_amount.toFixed(4),
+            user.active ? 'active' : 'disabled',
+          ]),
+        );
+        return;
+      case 'projects':
+        downloadCsv(
+          'sdkwork-router-project-hotspots.csv',
+          ['project_id', 'request_count', 'total_tokens', 'total_units', 'total_amount'],
+          projectRows.map((project) => [
+            project.project_id,
+            project.request_count,
+            project.total_tokens,
+            project.total_units,
+            project.total_amount.toFixed(4),
+          ]),
+        );
+        return;
+      case 'usage':
+      default:
+        downloadCsv(
+          'sdkwork-router-usage-records.csv',
+          [
+            'project_id',
+            'model',
+            'provider',
+            'input_tokens',
+            'output_tokens',
+            'total_tokens',
+            'units',
+            'amount',
+            'created_at',
+          ],
+          usageRows.map((record) => [
+            record.project_id,
+            record.model,
+            record.provider,
+            record.input_tokens,
+            record.output_tokens,
+            record.total_tokens,
+            record.units,
+            record.amount.toFixed(4),
+            new Date(record.created_at_ms).toISOString(),
+          ]),
+        );
+    }
   }
 
-  function exportRoutingCsv() {
-    downloadCsv(
-      'sdkwork-router-routing-logs.csv',
-      [
-        'decision_id',
-        'selected_provider_id',
-        'capability',
-        'route_key',
-        'strategy',
-        'selection_reason',
-        'requested_region',
-        'slo_applied',
-        'slo_degraded',
-        'created_at',
-      ],
-      filteredRoutingLogs.map((log) => [
-        log.decision_id,
-        log.selected_provider_id,
-        log.capability,
-        log.route_key,
-        log.strategy ?? '',
-        log.selection_reason ?? '',
-        log.requested_region ?? '',
-        log.slo_applied,
-        log.slo_degraded,
-        formatIsoTimestamp(log.created_at_ms),
-      ]),
-    );
+  let tableRows: TrafficTableRow[] = usageRows;
+  let tableColumns: Array<{ key: string; label: string; render: (row: TrafficTableRow) => ReactNode }> = [
+    { key: 'project', label: t('Project'), render: (row) => row.kind === 'usage' ? row.project_id : '-' },
+    { key: 'model', label: t('Model'), render: (row) => row.kind === 'usage' ? <strong>{row.model}</strong> : '-' },
+    { key: 'provider', label: t('Provider'), render: (row) => row.kind === 'usage' ? row.provider : '-' },
+    { key: 'input_tokens', label: t('Input tokens'), render: (row) => row.kind === 'usage' ? formatAdminNumber(row.input_tokens) : '-' },
+    { key: 'output_tokens', label: t('Output tokens'), render: (row) => row.kind === 'usage' ? formatAdminNumber(row.output_tokens) : '-' },
+    { key: 'total_tokens', label: t('Total tokens'), render: (row) => row.kind === 'usage' ? formatAdminNumber(row.total_tokens) : '-' },
+    { key: 'units', label: t('Units'), render: (row) => row.kind === 'usage' ? formatAdminNumber(row.units) : '-' },
+    { key: 'amount', label: t('Amount'), render: (row) => row.kind === 'usage' ? formatAdminCurrency(row.amount, 4) : '-' },
+    { key: 'time', label: t('Created'), render: (row) => row.kind === 'usage' ? formatAdminDateTime(row.created_at_ms) : '-' },
+  ];
+  let emptyLabel = t('No usage records match the current filter.');
+
+  switch (viewMode) {
+    case 'routing':
+      tableRows = routingRows;
+      tableColumns = [
+        { key: 'provider', label: t('Selected provider'), render: (row) => row.kind === 'routing' ? <strong>{row.selected_provider_id}</strong> : '-' },
+        { key: 'capability', label: t('Capability'), render: (row) => row.kind === 'routing' ? row.capability : '-' },
+        { key: 'route', label: t('Route key'), render: (row) => row.kind === 'routing' ? row.route_key : '-' },
+        { key: 'strategy', label: t('Strategy'), render: (row) => row.kind === 'routing' ? row.strategy ?? '-' : '-' },
+        { key: 'reason', label: t('Reason'), render: (row) => row.kind === 'routing' ? row.selection_reason ?? '-' : '-' },
+        { key: 'time', label: t('Created'), render: (row) => row.kind === 'routing' ? formatAdminDateTime(row.created_at_ms) : '-' },
+      ];
+      emptyLabel = t('No routing decision logs match the current filter.');
+      break;
+    case 'billing':
+      tableRows = billingRows;
+      tableColumns = [
+        { key: 'project', label: t('Project'), render: (row) => row.kind === 'billing' ? <strong>{row.project_id}</strong> : '-' },
+        { key: 'entries', label: t('Entries'), render: (row) => row.kind === 'billing' ? formatAdminNumber(row.entry_count) : '-' },
+        { key: 'units', label: t('Units'), render: (row) => row.kind === 'billing' ? formatAdminNumber(row.used_units) : '-' },
+        { key: 'amount', label: t('Amount'), render: (row) => row.kind === 'billing' ? formatAdminCurrency(row.booked_amount, 2) : '-' },
+        { key: 'remaining', label: t('Remaining'), render: (row) => row.kind === 'billing' ? row.remaining_units ?? '-' : '-' },
+        {
+          key: 'status',
+          label: t('Quota'),
+          render: (row) => row.kind === 'billing' ? (
+            <Pill tone={row.exhausted ? 'danger' : 'live'}>
+              {row.exhausted ? t('exhausted') : t('healthy')}
+            </Pill>
+          ) : '-',
+        },
+      ];
+      emptyLabel = t('No billing records available.');
+      break;
+    case 'users':
+      tableRows = userRows;
+      tableColumns = [
+        {
+          key: 'user',
+          label: t('Portal user'),
+          render: (row) => row.kind === 'users' ? (
+            <div className="adminx-table-cell-stack">
+              <strong>{row.display_name}</strong>
+              <span>{row.email}</span>
+            </div>
+          ) : '-',
+        },
+        { key: 'workspace', label: t('Project'), render: (row) => row.kind === 'users' ? row.workspace_project_id ?? '-' : '-' },
+        { key: 'requests', label: t('Requests'), render: (row) => row.kind === 'users' ? formatAdminNumber(row.filtered_request_count) : '-' },
+        { key: 'tokens', label: t('Tokens'), render: (row) => row.kind === 'users' ? formatAdminNumber(row.filtered_total_tokens) : '-' },
+        { key: 'units', label: t('Units'), render: (row) => row.kind === 'users' ? formatAdminNumber(row.filtered_usage_units) : '-' },
+        { key: 'amount', label: t('Amount'), render: (row) => row.kind === 'users' ? formatAdminCurrency(row.filtered_amount, 4) : '-' },
+        {
+          key: 'status',
+          label: t('Status'),
+          render: (row) => row.kind === 'users' ? (
+            <Pill tone={row.active ? 'live' : 'danger'}>
+              {row.active ? t('active') : t('disabled')}
+            </Pill>
+          ) : '-',
+        },
+      ];
+      emptyLabel = t('No portal users match the current filter.');
+      break;
+    case 'projects':
+      tableRows = projectRows;
+      tableColumns = [
+        { key: 'project', label: t('Project'), render: (row) => row.kind === 'projects' ? <strong>{row.project_id}</strong> : '-' },
+        { key: 'requests', label: t('Requests'), render: (row) => row.kind === 'projects' ? formatAdminNumber(row.request_count) : '-' },
+        { key: 'tokens', label: t('Tokens'), render: (row) => row.kind === 'projects' ? formatAdminNumber(row.total_tokens) : '-' },
+        { key: 'units', label: t('Units'), render: (row) => row.kind === 'projects' ? formatAdminNumber(row.total_units) : '-' },
+        { key: 'amount', label: t('Amount'), render: (row) => row.kind === 'projects' ? formatAdminCurrency(row.total_amount, 4) : '-' },
+      ];
+      emptyLabel = t('No hotspot projects match the current filter.');
+      break;
+    case 'usage':
+    default:
+      break;
   }
 
   return (
     <div className="adminx-page-grid">
-      <section className="adminx-stat-grid">
-        <StatCard
-          label="Filtered requests"
-          value={String(filteredUsageRecords.length)}
-          detail="Usage records matching the current query scope."
-        />
-        <StatCard
-          label="Filtered units"
-          value={String(filteredUnits)}
-          detail="Metered units across the filtered usage result set."
-        />
-        <StatCard
-          label="Filtered tokens"
-          value={String(filteredTokens)}
-          detail="Prompt and completion tokens from the filtered request set."
-        />
-        <StatCard
-          label="Filtered amount"
-          value={filteredAmount.toFixed(2)}
-          detail="Booked amount across matching usage records."
-        />
-        <StatCard
-          label="Decision logs"
-          value={String(filteredRoutingLogs.length)}
-          detail="Routing logs matching the current provider/search/time scope."
-        />
-      </section>
-
       <PageToolbar
-        title="Traffic query workbench"
-        detail="Inspect usage and routing evidence, keep filters on the canvas, and export the exact result set you are reviewing."
+        compact
         actions={(
           <>
-            <InlineButton tone="primary" onClick={exportUsageCsv}>
-              Export usage CSV
+            <InlineButton tone="primary" onClick={exportCurrentCsv}>
+              {t('Export CSV')}
             </InlineButton>
-            <InlineButton onClick={exportRoutingCsv}>Export routing CSV</InlineButton>
+            <InlineButton onClick={clearFilters}>{t('Clear filters')}</InlineButton>
           </>
         )}
-      />
-
-      <Surface
-        title="Request query console"
-        detail="Search and narrow usage or routing data by traffic ownership, provider, model, portal-user scope, and recent time window."
       >
-        <div className="adminx-form-grid">
-          <label className="adminx-field">
-            <span>Search logs and usage</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="project, model, provider, route, reason..."
-            />
-          </label>
-          <label className="adminx-field">
-            <span>View mode</span>
-            <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value as ViewMode)}
-            >
-              <option value="all">Usage and routing</option>
-              <option value="usage">Usage only</option>
-              <option value="routing">Routing only</option>
-            </select>
-          </label>
-          <label className="adminx-field">
-            <span>Recent window</span>
-            <select
-              value={recentWindow}
-              onChange={(event) => setRecentWindow(event.target.value as RecentWindow)}
-            >
-              <option value="all">All time</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-          </label>
-          <label className="adminx-field">
-            <span>Project scope</span>
-            <select
-              value={projectFilter}
-              onChange={(event) => setProjectFilter(event.target.value)}
-            >
-              <option value="all">All projects</option>
-              {projectOptions.map((projectId) => (
-                <option key={projectId} value={projectId}>
-                  {projectId}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="adminx-field">
-            <span>Provider scope</span>
-            <select
-              value={providerFilter}
-              onChange={(event) => setProviderFilter(event.target.value)}
-            >
-              <option value="all">All providers</option>
-              {providerOptions.map((providerId) => (
-                <option key={providerId} value={providerId}>
-                  {providerId}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="adminx-field">
-            <span>Model scope</span>
-            <select
-              value={modelFilter}
-              onChange={(event) => setModelFilter(event.target.value)}
-            >
-              <option value="all">All models</option>
-              {modelOptions.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="adminx-field">
-            <span>Portal user scope</span>
-            <select
-              value={portalUserScope}
-              onChange={(event) => setPortalUserScope(event.target.value)}
-            >
-              <option value="all">All portal users</option>
-              {snapshot.portalUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.display_name} ({user.email})
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="adminx-form-actions">
-            <InlineButton tone="primary" onClick={clearFilters}>
-              Clear filters
-            </InlineButton>
-          </div>
-          <div className="adminx-note">
-            <strong>Query semantics</strong>
-            <p>Project, model, and portal-user scope apply to usage records and the derived leaderboard. Routing logs remain scoped by search text, provider, and recent window because the control plane does not yet attach per-project context to routing decisions.</p>
-          </div>
-        </div>
-      </Surface>
-
-      {mode !== 'routing' ? (
-        <div className="adminx-users-grid">
-          <Surface
-            title="User traffic leaderboard"
-            detail="Portal users ranked by the current filtered request set so operators can isolate heavy traffic owners quickly."
-          >
-            <DataTable
-              columns={[
-                {
-                  key: 'user',
-                  label: 'Portal user',
-                  render: (user) => (
-                    <div className="adminx-table-cell-stack">
-                      <strong>{user.display_name}</strong>
-                      <span>{user.email}</span>
-                    </div>
-                  ),
-                },
-                { key: 'workspace', label: 'Project', render: (user) => user.workspace_project_id ?? '-' },
-                { key: 'requests', label: 'Requests', render: (user) => user.filtered_request_count },
-                { key: 'tokens', label: 'Tokens', render: (user) => user.filtered_total_tokens },
-                { key: 'units', label: 'Units', render: (user) => user.filtered_usage_units },
-                { key: 'amount', label: 'Amount', render: (user) => user.filtered_amount.toFixed(4) },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  render: (user) => (
-                    <Pill tone={user.active ? 'live' : 'danger'}>
-                      {user.active ? 'active' : 'disabled'}
-                    </Pill>
-                  ),
-                },
-              ]}
-              rows={filteredPortalUsers}
-              empty="No portal users match the current filter."
-              getKey={(user) => user.id}
-            />
-          </Surface>
-
-          <Surface
-            title="Project hotspots"
-            detail="Projects ranked from the filtered usage set by matching request volume, token usage, and booked amount."
-          >
-            <DataTable
-              columns={[
-                { key: 'project', label: 'Project', render: (project) => <strong>{project.project_id}</strong> },
-                { key: 'requests', label: 'Requests', render: (project) => project.request_count },
-                { key: 'tokens', label: 'Tokens', render: (project) => project.total_tokens },
-                { key: 'units', label: 'Units', render: (project) => project.total_units },
-                { key: 'amount', label: 'Amount', render: (project) => project.total_amount.toFixed(4) },
-              ]}
-              rows={projectHotspots}
-              empty="No hotspot projects match the current filter."
-              getKey={(project) => project.project_id}
-            />
-          </Surface>
-        </div>
-      ) : null}
-
-      {mode !== 'routing' ? (
-        <Surface title="Usage records" detail="Raw request records grouped by project, model, provider, tokens, metered units, and amount.">
-          <DataTable
-            columns={[
-              { key: 'project', label: 'Project', render: (record) => record.project_id },
-              { key: 'model', label: 'Model', render: (record) => <strong>{record.model}</strong> },
-              { key: 'provider', label: 'Provider', render: (record) => record.provider },
-              { key: 'input_tokens', label: 'Input tokens', render: (record) => record.input_tokens },
-              { key: 'output_tokens', label: 'Output tokens', render: (record) => record.output_tokens },
-              { key: 'total_tokens', label: 'Total tokens', render: (record) => record.total_tokens },
-              { key: 'units', label: 'Units', render: (record) => record.units },
-              { key: 'amount', label: 'Amount', render: (record) => record.amount.toFixed(4) },
-              { key: 'time', label: 'Created', render: (record) => formatTimestamp(record.created_at_ms) },
-            ]}
-            rows={filteredUsageRecords}
-            empty="No usage records match the current filter."
-            getKey={(record, index) => `${record.project_id}:${record.model}:${record.provider}:${record.created_at_ms}:${index}`}
+        <>
+          <ToolbarSearchField
+            label={t('Search logs and usage')}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t('project, model, provider, route, reason...')}
           />
-        </Surface>
-      ) : null}
+          <ToolbarDisclosure>
+            <div className="adminx-form-grid">
+              <ToolbarField label={t('View mode')}>
+                <select
+                  value={viewMode}
+                  onChange={(event) => setViewMode(event.target.value as ViewMode)}
+                >
+                  <option value="usage">{t('Usage records')}</option>
+                  <option value="routing">{t('Routing decision logs')}</option>
+                  <option value="billing">{t('Billing summary by project')}</option>
+                  <option value="users">{t('User traffic leaderboard')}</option>
+                  <option value="projects">{t('Project hotspots')}</option>
+                </select>
+              </ToolbarField>
+              <ToolbarField label={t('Recent window')}>
+                <select
+                  value={recentWindow}
+                  onChange={(event) => setRecentWindow(event.target.value as RecentWindow)}
+                >
+                  <option value="all">{t('All time')}</option>
+                  <option value="24h">{t('Last 24 hours')}</option>
+                  <option value="7d">{t('Last 7 days')}</option>
+                  <option value="30d">{t('Last 30 days')}</option>
+                </select>
+              </ToolbarField>
+            </div>
+          </ToolbarDisclosure>
+        </>
+      </PageToolbar>
 
-      <Surface title="Billing summary by project" detail="Quota and cost posture rolled up by project.">
-        <DataTable
-          columns={[
-            { key: 'project', label: 'Project', render: (project) => <strong>{project.project_id}</strong> },
-            { key: 'entries', label: 'Entries', render: (project) => project.entry_count },
-            { key: 'units', label: 'Units', render: (project) => project.used_units },
-            { key: 'amount', label: 'Amount', render: (project) => project.booked_amount.toFixed(2) },
-            { key: 'remaining', label: 'Remaining', render: (project) => project.remaining_units ?? '-' },
-            {
-              key: 'status',
-              label: 'Quota',
-              render: (project) => (
-                <Pill tone={project.exhausted ? 'danger' : 'live'}>
-                  {project.exhausted ? 'exhausted' : 'healthy'}
-                </Pill>
-              ),
-            },
-          ]}
-          rows={snapshot.billingSummary.projects}
-          empty="No billing records available."
-          getKey={(project) => project.project_id}
-        />
-      </Surface>
-
-      {mode !== 'usage' ? (
-        <Surface title="Routing decision logs" detail="Recent routing selections, strategy, and selection reasons.">
-          <DataTable
-            columns={[
-              { key: 'provider', label: 'Selected provider', render: (log) => <strong>{log.selected_provider_id}</strong> },
-              { key: 'capability', label: 'Capability', render: (log) => log.capability },
-              { key: 'route', label: 'Route key', render: (log) => log.route_key },
-              { key: 'strategy', label: 'Strategy', render: (log) => log.strategy ?? '-' },
-              { key: 'reason', label: 'Reason', render: (log) => log.selection_reason ?? '-' },
-              { key: 'time', label: 'Created', render: (log) => formatTimestamp(log.created_at_ms) },
-            ]}
-            rows={filteredRoutingLogs}
-            empty="No routing decision logs match the current filter."
-            getKey={(log) => log.decision_id}
-          />
-        </Surface>
-      ) : null}
+      <DataTable
+        columns={tableColumns}
+        rows={tableRows}
+        empty={emptyLabel}
+        getKey={rowKey}
+      />
     </div>
   );
 }

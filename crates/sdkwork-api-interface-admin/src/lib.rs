@@ -10,7 +10,7 @@ use axum::{
     http::request::Parts,
     http::StatusCode,
     response::Html,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use sdkwork_api_app_billing::{
@@ -45,10 +45,11 @@ use sdkwork_api_app_gateway::{
 use sdkwork_api_app_identity::{
     change_admin_password, delete_admin_user, delete_gateway_api_key, delete_portal_user,
     list_admin_user_profiles, list_gateway_api_keys, list_portal_user_profiles,
-    load_admin_user_profile, login_admin_user, persist_gateway_api_key, reset_admin_user_password,
-    reset_portal_user_password, set_admin_user_active, set_gateway_api_key_active,
-    set_portal_user_active, upsert_admin_user, upsert_portal_user, verify_jwt, AdminIdentityError,
-    Claims, CreatedGatewayApiKey, PortalIdentityError,
+    load_admin_user_profile, login_admin_user, persist_gateway_api_key,
+    reset_admin_user_password, reset_portal_user_password, set_admin_user_active,
+    set_gateway_api_key_active, set_portal_user_active, update_gateway_api_key_metadata,
+    upsert_admin_user, upsert_portal_user, verify_jwt, AdminIdentityError, Claims,
+    CreatedGatewayApiKey, PortalIdentityError,
 };
 use sdkwork_api_app_routing::{
     create_routing_policy, list_routing_decision_logs, list_routing_policies,
@@ -534,6 +535,20 @@ struct CreateApiKeyRequest {
     environment: String,
     #[serde(default)]
     label: Option<String>,
+    #[serde(default)]
+    notes: Option<String>,
+    #[serde(default)]
+    expires_at_ms: Option<u64>,
+    #[serde(default)]
+    plaintext_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateApiKeyRequest {
+    tenant_id: String,
+    project_id: String,
+    environment: String,
+    label: String,
     #[serde(default)]
     notes: Option<String>,
     #[serde(default)]
@@ -1031,7 +1046,7 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
         )
         .route(
             "/admin/api-keys/{hashed_key}",
-            delete(delete_api_key_handler),
+            put(update_api_key_handler).delete(delete_api_key_handler),
         )
         .route(
             "/admin/channels",
@@ -1843,6 +1858,7 @@ async fn create_api_key_handler(
     let created = if request.label.is_some()
         || request.expires_at_ms.is_some()
         || request.notes.is_some()
+        || request.plaintext_key.is_some()
     {
         sdkwork_api_app_identity::persist_gateway_api_key_with_metadata(
             state.store.as_ref(),
@@ -1851,7 +1867,7 @@ async fn create_api_key_handler(
             &request.environment,
             &metadata_label,
             request.expires_at_ms,
-            None,
+            request.plaintext_key.as_deref(),
             request.notes.as_deref(),
         )
         .await
@@ -1867,6 +1883,32 @@ async fn create_api_key_handler(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     };
     Ok((StatusCode::CREATED, Json(created)))
+}
+
+async fn update_api_key_handler(
+    _claims: AuthenticatedAdminClaims,
+    Path(hashed_key): Path<String>,
+    State(state): State<AdminApiState>,
+    Json(request): Json<UpdateApiKeyRequest>,
+) -> Result<Json<GatewayApiKeyRecord>, (StatusCode, Json<ErrorResponse>)> {
+    match update_gateway_api_key_metadata(
+        state.store.as_ref(),
+        &hashed_key,
+        &request.tenant_id,
+        &request.project_id,
+        &request.environment,
+        &request.label,
+        request.expires_at_ms,
+        request.notes.as_deref(),
+    )
+    .await
+    {
+        Ok(Some(record)) => Ok(Json(record)),
+        Ok(None) => Err(admin_error_response(AdminIdentityError::NotFound(
+            "gateway api key not found".to_owned(),
+        ))),
+        Err(error) => Err(admin_error_response(error)),
+    }
 }
 
 async fn update_api_key_status_handler(

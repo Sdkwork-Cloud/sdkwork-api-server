@@ -15,6 +15,7 @@ const requiredPackages = [
   'sdkwork-router-admin-core',
   'sdkwork-router-admin-shell',
   'sdkwork-router-admin-admin-api',
+  'sdkwork-router-admin-apirouter',
   'sdkwork-router-admin-auth',
   'sdkwork-router-admin-overview',
   'sdkwork-router-admin-users',
@@ -61,6 +62,10 @@ test('shell route manifest includes super-admin management sections', () => {
   assert.match(routes, /users/);
   assert.match(routes, /tenants/);
   assert.match(routes, /coupons/);
+  assert.match(routes, /api-keys/);
+  assert.match(routes, /route-config/);
+  assert.match(routes, /model-mapping/);
+  assert.match(routes, /usage-records/);
   assert.match(routes, /catalog/);
   assert.match(routes, /traffic/);
   assert.match(routes, /operations/);
@@ -110,7 +115,6 @@ test('shell package owns router, theme manager, header, sidebar, and settings pa
   );
   const sidebar = read('packages/sdkwork-router-admin-shell/src/components/Sidebar.tsx');
   const header = read('packages/sdkwork-router-admin-shell/src/components/AppHeader.tsx');
-  const shellStatus = read('packages/sdkwork-router-admin-shell/src/components/ShellStatus.tsx');
   const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const styles = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
 
@@ -125,43 +129,92 @@ test('shell package owns router, theme manager, header, sidebar, and settings pa
   assert.match(routePaths, /ROUTE_PATHS|ADMIN_ROUTE_PATHS/);
   assert.match(sidebar, /toggleSidebar/);
   assert.match(sidebar, /settings/);
-  assert.match(header, /ShellStatus/);
-  assert.match(shellStatus, /status/i);
+  assert.match(header, /data-slot="app-header-leading"/);
+  assert.match(header, /data-slot="app-header-search"/);
+  assert.doesNotMatch(header, /ShellStatus/);
+  assert.doesNotMatch(header, /data-slot="app-header-center"/);
+  assert.doesNotMatch(header, /data-slot="app-header-trailing"/);
   assert.match(routes, /AdminLoginPage/);
   assert.match(routes, /ROUTE_PATHS\.AUTH/);
   assert.match(routes, /ROUTE_PATHS\.REGISTER/);
   assert.match(routes, /ROUTE_PATHS\.FORGOT_PASSWORD/);
   assert.match(routes, /SettingsPage/);
   assert.match(styles, /admin-shell-settings/);
+  assert.match(styles, /adminx-shell-header-main/);
+  assert.doesNotMatch(styles, /\.adminx-shell-header-center\b/);
 });
 
 test('users module exposes delete capabilities for operator and portal identities', () => {
-  const routes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const rootRoutes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const users = read('packages/sdkwork-router-admin-users/src/index.tsx');
   const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
 
   assert.match(adminApi, /deleteOperatorUser/);
   assert.match(adminApi, /deletePortalUser/);
+  assert.match(rootRoutes, /export \{ AppRoutes \} from '\.\/application\/router\/AppRoutes';/);
   assert.match(routes, /onDeleteOperatorUser=/);
   assert.match(routes, /onDeletePortalUser=/);
   assert.match(users, /Delete/);
 });
 
 test('tenants module exposes gateway key issuance workflow', () => {
-  const routes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const rootRoutes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const tenants = read('packages/sdkwork-router-admin-tenants/src/index.tsx');
   const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
 
   assert.match(adminApi, /createApiKey/);
   assert.match(adminApi, /updateApiKeyStatus/);
   assert.match(adminApi, /deleteApiKey/);
+  assert.match(rootRoutes, /export \{ AppRoutes \} from '\.\/application\/router\/AppRoutes';/);
   assert.match(routes, /onCreateApiKey=/);
   assert.match(routes, /onUpdateApiKeyStatus=/);
   assert.match(routes, /onDeleteApiKey=/);
   assert.match(tenants, /Issue gateway key/);
   assert.match(tenants, /revealedApiKey/);
-  assert.match(tenants, /Revoke/);
+  assert.match(tenants, /Api keys/);
   assert.match(tenants, /Delete/);
+});
+
+test('gateway sidebar routes mount the migrated claw apirouter surfaces', () => {
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
+  const routeManifest = read('packages/sdkwork-router-admin-core/src/routes.ts');
+  const routePaths = read('packages/sdkwork-router-admin-core/src/routePaths.ts');
+  const apiRouter = read('packages/sdkwork-router-admin-apirouter/src/index.ts');
+
+  assert.match(apiRouter, /GatewayAccessPage/);
+  assert.match(apiRouter, /GatewayRoutesPage/);
+  assert.match(apiRouter, /GatewayModelMappingsPage/);
+  assert.match(apiRouter, /GatewayUsagePage/);
+  assert.match(routeManifest, /Api Key/);
+  assert.match(routeManifest, /Route Config/);
+  assert.match(routeManifest, /Model Mapping/);
+  assert.match(routeManifest, /Usage Records/);
+  assert.match(routeManifest, /API Router/);
+  assert.match(routePaths, /API_ROUTER_ROOT/);
+  assert.match(routePaths, /API_ROUTER_API_KEYS/);
+  assert.match(routePaths, /API_ROUTER_ROUTE_CONFIG/);
+  assert.match(routePaths, /API_ROUTER_MODEL_MAPPING/);
+  assert.match(routePaths, /API_ROUTER_USAGE_RECORDS/);
+  assert.match(routePaths, /\/api-router'/);
+  assert.match(routePaths, /\/api-router\/api-keys/);
+  assert.match(routePaths, /\/api-router\/route-config/);
+  assert.match(routePaths, /\/api-router\/model-mapping/);
+  assert.match(routePaths, /\/api-router\/usage-records/);
+  assert.match(routes, /API_ROUTER_ROOT/);
+  assert.match(routes, /API_ROUTER_API_KEYS/);
+  assert.match(routes, /GatewayAccessPage/);
+  assert.match(routes, /GatewayRoutesPage/);
+  assert.match(routes, /GatewayModelMappingsPage/);
+  assert.match(routes, /GatewayUsagePage/);
+});
+
+test('admin tauri bridge exposes native Api Key setup commands for quick setup parity', () => {
+  const tauriMain = read('src-tauri/src/main.rs');
+
+  assert.match(tauriMain, /install_api_router_client_setup/);
+  assert.match(tauriMain, /list_api_key_instances/);
 });
 
 test('overview and traffic modules expose hotspot analytics', () => {
@@ -173,23 +226,26 @@ test('overview and traffic modules expose hotspot analytics', () => {
   assert.match(traffic, /User traffic leaderboard/);
   assert.match(traffic, /Project hotspots/);
   assert.match(traffic, /Recent window/);
-  assert.match(traffic, /Export usage CSV/);
-  assert.match(traffic, /Portal user scope/);
+  assert.match(traffic, /Export CSV/);
+  assert.doesNotMatch(traffic, /Portal user scope/);
 });
 
 test('operations module exposes runtime reload controls', () => {
-  const routes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const rootRoutes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const operations = read('packages/sdkwork-router-admin-operations/src/index.tsx');
   const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
 
   assert.match(adminApi, /reloadExtensionRuntimes/);
+  assert.match(rootRoutes, /export \{ AppRoutes \} from '\.\/application\/router\/AppRoutes';/);
   assert.match(routes, /onReloadRuntimes=/);
   assert.match(operations, /Reload runtimes/);
-  assert.match(operations, /Latest reload report/);
+  assert.match(operations, /Targeted reload/);
 });
 
 test('catalog module exposes provider credential lifecycle management', () => {
-  const routes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const rootRoutes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
   const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
   const types = read('packages/sdkwork-router-admin-types/src/index.ts');
@@ -199,10 +255,18 @@ test('catalog module exposes provider credential lifecycle management', () => {
   assert.match(adminApi, /listCredentials/);
   assert.match(adminApi, /saveCredential/);
   assert.match(adminApi, /deleteCredential/);
+  assert.match(rootRoutes, /export \{ AppRoutes \} from '\.\/application\/router\/AppRoutes';/);
   assert.match(routes, /onSaveCredential=/);
   assert.match(routes, /onDeleteCredential=/);
   assert.match(catalog, /Credential inventory/);
   assert.match(catalog, /Rotate secret/);
+});
+
+test('admin API package exposes API key metadata update support for unified-key parity', () => {
+  const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
+
+  assert.match(adminApi, /updateApiKey\(/);
+  assert.match(adminApi, /\/api-keys\/\$\{encodeURIComponent\(hashedKey\)\}/);
 });
 
 test('root app mounts the shell package and keeps shell styling out of the root app', () => {
@@ -210,7 +274,7 @@ test('root app mounts the shell package and keeps shell styling out of the root 
   const main = read('src/main.tsx');
 
   assert.match(app, /sdkwork-router-admin-shell/);
-  assert.doesNotMatch(app, /theme\.css/);
+  assert.doesNotMatch(main, /framework\.css/);
   assert.match(main, /bootstrapShellRuntime/);
   assert.doesNotMatch(app, /console\//);
 });
@@ -219,6 +283,33 @@ test('vite config serves static assets from the /admin/ base path', () => {
   const viteConfig = read('vite.config.ts');
 
   assert.match(viteConfig, /base:\s*'\/admin\/'/);
+});
+
+test('admin root app enables the claw-studio tailwind v4 substrate', () => {
+  const packageJson = JSON.parse(read('package.json'));
+  const viteConfig = read('vite.config.ts');
+  const theme = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
+
+  assert.equal(typeof packageJson.devDependencies?.['@tailwindcss/vite'], 'string');
+  assert.equal(typeof packageJson.devDependencies?.tailwindcss, 'string');
+  assert.equal(typeof packageJson.devDependencies?.['@tailwindcss/typography'], 'string');
+  assert.match(viteConfig, /@tailwindcss\/vite/);
+  assert.match(viteConfig, /plugins:\s*\[react\(\),\s*tailwindcss\(\)\]/);
+  assert.match(theme, /@import "tailwindcss";/);
+  assert.match(theme, /@plugin "@tailwindcss\/typography";/);
+  assert.match(theme, /@source "\.\.\/\.\.\/\.\.\/\.\.\//);
+  assert.match(theme, /@theme\s*\{/);
+});
+
+test('admin commons package exposes radix and shadcn-style dependencies', () => {
+  const packageJson = JSON.parse(read('packages/sdkwork-router-admin-commons/package.json'));
+
+  assert.equal(typeof packageJson.dependencies?.['@radix-ui/react-dialog'], 'string');
+  assert.equal(typeof packageJson.dependencies?.['@radix-ui/react-label'], 'string');
+  assert.equal(typeof packageJson.dependencies?.['@radix-ui/react-slot'], 'string');
+  assert.equal(typeof packageJson.dependencies?.['class-variance-authority'], 'string');
+  assert.equal(typeof packageJson.dependencies?.clsx, 'string');
+  assert.equal(typeof packageJson.dependencies?.['tailwind-merge'], 'string');
 });
 
 test('root workspace wires shell and settings packages into dependencies and tsconfig paths', () => {

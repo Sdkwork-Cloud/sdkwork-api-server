@@ -1,8 +1,7 @@
-import { CheckSquare, LayoutPanelLeft } from 'lucide-react';
-
+import { useAdminI18n } from 'sdkwork-router-admin-commons';
 import { adminRoutes, useAdminAppStore } from 'sdkwork-router-admin-core';
 
-import { SettingsSection } from './Shared';
+import { SettingsInfoCard, SettingsSection } from './Shared';
 
 export function NavigationSettings() {
   const {
@@ -12,117 +11,107 @@ export function NavigationSettings() {
     sidebarWidth,
     toggleSidebarItem,
   } = useAdminAppStore();
+  const { t } = useAdminI18n();
 
   const sidebarRoutes = adminRoutes.filter((route) => route.key !== 'settings');
   const visibleSidebarItems = sidebarRoutes.length - hiddenSidebarItems.length;
 
   return (
-    <div className="admin-shell-settings-stack">
-      <SettingsSection
-        eyebrow="Live rail"
-        title="live rail posture"
-        icon={<LayoutPanelLeft className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-settings-kpi-grid">
-          <div className="admin-shell-settings-kpi">
-            <span>Visible routes</span>
-            <strong>{visibleSidebarItems}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Rail state</span>
-            <strong>{isSidebarCollapsed ? 'collapsed' : 'expanded'}</strong>
-          </div>
-          <div className="admin-shell-settings-kpi">
-            <span>Rail width</span>
-            <strong>{sidebarWidth}px</strong>
-          </div>
-        </div>
-      </SettingsSection>
+    <div className="space-y-8">
+      <div>
+        <h2 className="mb-1 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+          {t('Navigation')}
+        </h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {t('Sidebar visibility and left-rail posture stay aligned with claw-studio.')}
+        </p>
+      </div>
 
-      <SettingsSection
-        eyebrow="Navigation"
-        title="sidebar visibility"
-        icon={<CheckSquare className="admin-shell-settings-card-icon" />}
-      >
-        <div className="admin-shell-sidebar-toggle-grid">
-          {sidebarRoutes.map((route) => (
-            <label key={route.key} className="admin-shell-sidebar-toggle">
+      <div className="space-y-6">
+        <SettingsSection
+          eyebrow={t('Behavior')}
+          title={t('Sidebar behavior')}
+          description={t('Keep the left rail expanded or collapse it into icon-only navigation.')}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
               <input
-                type="checkbox"
-                checked={!hiddenSidebarItems.includes(route.key)}
-                onChange={() => toggleSidebarItem(route.key)}
+                type="radio"
+                checked={!isSidebarCollapsed}
+                onChange={() => setSidebarCollapsed(false)}
+                className="mt-1 h-4 w-4 border-zinc-300 text-primary-600 focus:ring-primary-500"
               />
-              <div>
-                <strong>{route.label}</strong>
-                <span>{route.detail}</span>
-              </div>
+              <span className="grid gap-1">
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {t('Expanded sidebar')}
+                </span>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {t('Keep labels visible across the full left rail.')}
+                </span>
+              </span>
             </label>
-          ))}
-        </div>
-      </SettingsSection>
 
-      <SettingsSection
-        eyebrow="Preview"
-        title="sidebar preview"
-        icon={<LayoutPanelLeft className="admin-shell-settings-card-icon" />}
-        className="admin-shell-settings-preview"
-      >
-        <div className="admin-shell-sidebar-toggle-grid">
-          <label className="admin-shell-sidebar-toggle">
-            <input
-              type="radio"
-              checked={!isSidebarCollapsed}
-              onChange={() => setSidebarCollapsed(false)}
-            />
-            <div>
-              <strong>Expanded rail</strong>
-              <span>Use the full claw-style left navigation rail with labels and badges.</span>
-            </div>
-          </label>
-          <label className="admin-shell-sidebar-toggle">
-            <input
-              type="radio"
-              checked={isSidebarCollapsed}
-              onChange={() => setSidebarCollapsed(true)}
-            />
-            <div>
-              <strong>Collapsed rail</strong>
-              <span>Switch to the compact icon rail while keeping the right canvas untouched.</span>
-            </div>
-          </label>
-        </div>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
+              <input
+                type="radio"
+                checked={isSidebarCollapsed}
+                onChange={() => setSidebarCollapsed(true)}
+                className="mt-1 h-4 w-4 border-zinc-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="grid gap-1">
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {t('Collapsed sidebar')}
+                </span>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {t('Reduce the rail to icon-only navigation without changing the canvas.')}
+                </span>
+              </span>
+            </label>
+          </div>
 
-        <div className="admin-shell-settings-sidebar-preview">
-          <div className={`admin-shell-settings-preview-rail ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
-            <span />
-            <span />
-            <span />
-            <span />
-            <div className="admin-shell-settings-preview-sidebar-footer">
-              <span className="admin-shell-settings-preview-sidebar-avatar" />
-              {!isSidebarCollapsed ? (
-                <>
-                  <div className="admin-shell-settings-preview-sidebar-user">
-                    <span />
-                    <span />
-                  </div>
-                  <span className="admin-shell-settings-preview-sidebar-action" />
-                </>
-              ) : (
-                <span className="admin-shell-settings-preview-sidebar-action" />
-              )}
-            </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <SettingsInfoCard
+              label={t('Visible routes')}
+              value={visibleSidebarItems}
+            />
+            <SettingsInfoCard
+              label={t('Sidebar mode')}
+              value={isSidebarCollapsed ? t('collapsed') : t('expanded')}
+            />
+            <SettingsInfoCard label={t('Sidebar width')} value={`${sidebarWidth}px`} />
           </div>
-          <div className="admin-shell-settings-preview-body">
-            <strong>{isSidebarCollapsed ? 'Collapsed' : 'Expanded'} sidebar</strong>
-            <span>{visibleSidebarItems} visible routes in the live rail</span>
-            <p>
-              The live shell keeps the left rail synchronized with claw-studio while the right
-              content canvas remains the only page-rendering surface.
-            </p>
+        </SettingsSection>
+
+        <SettingsSection
+          eyebrow={t('Navigation')}
+          title={t('sidebar visibility')}
+          description={t('Show or hide modules while keeping the left navigation rail compact and stable.')}
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {sidebarRoutes.map((route) => (
+              <label
+                key={route.key}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
+              >
+                <input
+                  type="checkbox"
+                  checked={!hiddenSidebarItems.includes(route.key)}
+                  onChange={() => toggleSidebarItem(route.key)}
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="grid gap-0.5">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t(route.label)}
+                  </span>
+                  <span className="text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                    {t(route.detail)}
+                  </span>
+                </span>
+              </label>
+            ))}
           </div>
-        </div>
-      </SettingsSection>
+        </SettingsSection>
+      </div>
     </div>
   );
 }
