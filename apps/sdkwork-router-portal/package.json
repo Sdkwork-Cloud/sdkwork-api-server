@@ -8,8 +8,8 @@
     "build": "vite build",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0 --port 4174 --strictPort",
-    "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CMAKE_GENERATOR='Visual Studio 17 2022'; tauri dev\"",
-    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CMAKE_GENERATOR='Visual Studio 17 2022'; tauri build\""
+    "tauri:dev": "node ./scripts/run-tauri.mjs dev",
+    "tauri:build": "node ./scripts/run-tauri.mjs build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

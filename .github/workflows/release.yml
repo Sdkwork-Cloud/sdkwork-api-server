@@ -1,0 +1,181 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'release-*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build and publish assets for
+        required: true
+        type: string
+      git_ref:
+        description: Git ref to checkout; defaults to refs/tags/<release_tag>
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      git_ref: ${{ steps.resolve.outputs.git_ref }}
+    steps:
+      - name: Resolve release target
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+            git_ref="${GITHUB_REF}"
+          else
+            release_tag="${{ github.event.inputs.release_tag }}"
+            git_ref="${{ github.event.inputs.git_ref }}"
+            if [[ -z "$git_ref" ]]; then
+              git_ref="refs/tags/$release_tag"
+            fi
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "git_ref=$git_ref" >> "$GITHUB_OUTPUT"
+
+  release-services:
+    name: Release service binaries (${{ matrix.os }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        env:
+          CMAKE_GENERATOR: Visual Studio 17 2022
+        run: cargo build --release -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service
+
+      - name: Build release binaries on Unix
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: cargo build --release -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service
+
+      - name: Package Windows service binaries
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $tag = "${{ needs.prepare.outputs.release_tag }}"
+          $assetBase = "sdkwork-api-router-services-$tag-$env:RUNNER_OS-$env:RUNNER_ARCH".ToLower()
+          New-Item -ItemType Directory -Force artifacts/package/bin | Out-Null
+          Copy-Item target/release/admin-api-service.exe artifacts/package/bin/
+          Copy-Item target/release/gateway-service.exe artifacts/package/bin/
+          Copy-Item target/release/portal-api-service.exe artifacts/package/bin/
+          Copy-Item target/release/router-web-service.exe artifacts/package/bin/
+          Compress-Archive -Path artifacts/package/* -DestinationPath "$assetBase.zip" -Force
+          $hash = (Get-FileHash "$assetBase.zip" -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "$assetBase.zip.sha256.txt" -Value "$hash  $assetBase.zip"
+
+      - name: Package Unix service binaries
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          tag="${{ needs.prepare.outputs.release_tag }}"
+          asset_base="sdkwork-api-router-services-${tag}-${RUNNER_OS,,}-${RUNNER_ARCH,,}"
+          mkdir -p artifacts/package/bin
+          cp target/release/admin-api-service artifacts/package/bin/
+          cp target/release/gateway-service artifacts/package/bin/
+          cp target/release/portal-api-service artifacts/package/bin/
+          cp target/release/router-web-service artifacts/package/bin/
+          tar -czf "${asset_base}.tar.gz" -C artifacts/package .
+          shasum -a 256 "${asset_base}.tar.gz" > "${asset_base}.tar.gz.sha256.txt"
+
+      - name: Upload service assets to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          files: |
+            sdkwork-api-router-services-*
+          fail_on_unmatched_files: true
+          overwrite_files: true
+
+  release-web-assets:
+    name: Release web assets
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            apps/sdkwork-router-admin/pnpm-lock.yaml
+            apps/sdkwork-router-portal/pnpm-lock.yaml
+            docs/pnpm-lock.yaml
+
+      - name: Install admin dependencies
+        run: pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+
+      - name: Install portal dependencies
+        run: pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
+
+      - name: Install docs dependencies
+        run: pnpm --dir docs install --frozen-lockfile
+
+      - name: Build web assets
+        shell: bash
+        run: |
+          pnpm --dir apps/sdkwork-router-admin build
+          pnpm --dir apps/sdkwork-router-portal build
+          pnpm --dir docs build
+
+      - name: Package web assets
+        shell: bash
+        run: |
+          tag="${{ needs.prepare.outputs.release_tag }}"
+          asset_base="sdkwork-api-router-web-assets-${tag}-linux-x64"
+          mkdir -p artifacts/web/admin artifacts/web/portal artifacts/web/docs
+          cp -R apps/sdkwork-router-admin/dist artifacts/web/admin/dist
+          cp -R apps/sdkwork-router-portal/dist artifacts/web/portal/dist
+          cp -R docs/.vitepress/dist artifacts/web/docs/dist
+          tar -czf "${asset_base}.tar.gz" -C artifacts/web .
+          shasum -a 256 "${asset_base}.tar.gz" > "${asset_base}.tar.gz.sha256.txt"
+
+      - name: Upload web assets to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          files: |
+            sdkwork-api-router-web-assets-*
+          fail_on_unmatched_files: true
+          overwrite_files: true
