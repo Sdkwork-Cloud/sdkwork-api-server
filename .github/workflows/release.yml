@@ -56,7 +56,7 @@ jobs:
           - macos-latest
     steps:
       - name: Checkout release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.git_ref }}
           fetch-depth: 0
@@ -99,7 +99,9 @@ jobs:
         shell: bash
         run: |
           tag="${{ needs.prepare.outputs.release_tag }}"
-          asset_base="sdkwork-api-router-services-${tag}-${RUNNER_OS,,}-${RUNNER_ARCH,,}"
+          runner_os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+          runner_arch="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
+          asset_base="sdkwork-api-router-services-${tag}-${runner_os}-${runner_arch}"
           mkdir -p artifacts/package/bin
           cp target/release/admin-api-service artifacts/package/bin/
           cp target/release/gateway-service artifacts/package/bin/
@@ -123,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.git_ref }}
           fetch-depth: 0
@@ -134,7 +136,7 @@ jobs:
           version: 10.0.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm

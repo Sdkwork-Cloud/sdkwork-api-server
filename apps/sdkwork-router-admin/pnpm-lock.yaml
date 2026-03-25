@@ -105,6 +105,9 @@ importers:
 
   packages/sdkwork-router-admin-apirouter:
     dependencies:
+      '@tauri-apps/api':
+        specifier: ^2.8.0
+        version: 2.10.1
       react:
         specifier: ^19.0.0
         version: 19.2.4
