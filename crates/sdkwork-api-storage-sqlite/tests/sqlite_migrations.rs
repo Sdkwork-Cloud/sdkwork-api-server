@@ -1,8 +1,8 @@
 use sdkwork_api_storage_sqlite::run_migrations;
+use sqlx::SqlitePool;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use sqlx::SqlitePool;
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -84,13 +84,15 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
     let pool = run_migrations(&database_url).await.unwrap();
 
     for legacy_name in legacy_compatibility_names() {
-        let row: (String,) =
-            sqlx::query_as("select type from sqlite_master where name = ?")
-                .bind(legacy_name)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(row.0, "view", "{legacy_name} should be a compatibility view");
+        let row: (String,) = sqlx::query_as("select type from sqlite_master where name = ?")
+            .bind(legacy_name)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            row.0, "view",
+            "{legacy_name} should be a compatibility view"
+        );
     }
 
     let portal_users: Vec<(String, String)> = sqlx::query_as(
@@ -99,14 +101,21 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
     .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(portal_users, vec![("portal-user-1".to_owned(), "tenant-1".to_owned())]);
+    assert_eq!(
+        portal_users,
+        vec![("portal-user-1".to_owned(), "tenant-1".to_owned())]
+    );
 
-    let channels: Vec<(String, String)> =
-        sqlx::query_as("select channel_id, channel_name from ai_channel where channel_id = 'legacy-openai'")
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-    assert_eq!(channels, vec![("legacy-openai".to_owned(), "Legacy OpenAI".to_owned())]);
+    let channels: Vec<(String, String)> = sqlx::query_as(
+        "select channel_id, channel_name from ai_channel where channel_id = 'legacy-openai'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        channels,
+        vec![("legacy-openai".to_owned(), "Legacy OpenAI".to_owned())]
+    );
 
     let providers: Vec<(String, String)> = sqlx::query_as(
         "select proxy_provider_id, primary_channel_id
@@ -203,11 +212,7 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
     .unwrap();
     assert_eq!(
         app_keys,
-        vec![(
-            "hashed-legacy-key".to_owned(),
-            None,
-            "tenant-1".to_owned(),
-        )]
+        vec![("hashed-legacy-key".to_owned(), None, "tenant-1".to_owned(),)]
     );
 
     let legacy_channel_rows: Vec<(String, String)> =
@@ -285,10 +290,12 @@ async fn seed_legacy_schema(database_url: &str) {
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("insert into catalog_channels (id, name) values ('legacy-openai', 'Legacy OpenAI')")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "insert into catalog_channels (id, name) values ('legacy-openai', 'Legacy OpenAI')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
 
     sqlx::query(
         "create table catalog_proxy_providers (

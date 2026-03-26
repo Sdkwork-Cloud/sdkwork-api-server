@@ -1297,8 +1297,16 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
             "provider-openai-official",
         ),
         ("/admin/channels/openai", "/admin/channels", "openai"),
-        ("/admin/projects/project-acme", "/admin/projects", "project-acme"),
-        ("/admin/tenants/tenant-acme", "/admin/tenants", "tenant-acme"),
+        (
+            "/admin/projects/project-acme",
+            "/admin/projects",
+            "project-acme",
+        ),
+        (
+            "/admin/tenants/tenant-acme",
+            "/admin/tenants",
+            "tenant-acme",
+        ),
     ] {
         let deleted = app
             .clone()
@@ -1330,9 +1338,11 @@ async fn delete_catalog_and_workspace_entities_from_admin_api() {
 
         assert_eq!(listed.status(), StatusCode::OK);
         let listed_json = read_json(listed).await;
-        assert!(!listed_json.as_array().unwrap().iter().any(|item| {
-            item["id"] == request.2
-        }));
+        assert!(!listed_json
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| { item["id"] == request.2 }));
     }
 
     let credentials = app
@@ -1539,7 +1549,10 @@ async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
     .await
     .unwrap();
     assert_eq!(stored_row.0, plaintext_key);
-    assert_eq!(stored_row.1.as_deref(), Some("retained for admin inventory"));
+    assert_eq!(
+        stored_row.1.as_deref(),
+        Some("retained for admin inventory")
+    );
     assert_eq!(stored_row.2, Some(4_102_444_800_000));
 }
 

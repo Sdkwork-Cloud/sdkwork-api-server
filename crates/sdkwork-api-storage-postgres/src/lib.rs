@@ -41,7 +41,10 @@ const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
     ("coupon_campaigns", "ai_coupon_campaigns"),
     ("routing_policies", "ai_routing_policies"),
     ("routing_policy_providers", "ai_routing_policy_providers"),
-    ("project_routing_preferences", "ai_project_routing_preferences"),
+    (
+        "project_routing_preferences",
+        "ai_project_routing_preferences",
+    ),
     ("routing_decision_logs", "ai_routing_decision_logs"),
     ("routing_provider_health", "ai_provider_health_records"),
     ("usage_records", "ai_usage_records"),
@@ -50,12 +53,18 @@ const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
     ("extension_installations", "ai_extension_installations"),
     ("extension_instances", "ai_extension_instances"),
     ("service_runtime_nodes", "ai_service_runtime_nodes"),
-    ("extension_runtime_rollouts", "ai_extension_runtime_rollouts"),
+    (
+        "extension_runtime_rollouts",
+        "ai_extension_runtime_rollouts",
+    ),
     (
         "extension_runtime_rollout_participants",
         "ai_extension_runtime_rollout_participants",
     ),
-    ("standalone_config_rollouts", "ai_standalone_config_rollouts"),
+    (
+        "standalone_config_rollouts",
+        "ai_standalone_config_rollouts",
+    ),
     (
         "standalone_config_rollout_participants",
         "ai_standalone_config_rollout_participants",
@@ -198,15 +207,7 @@ type CredentialRow = (
     Option<String>,
 );
 
-type ChannelModelRow = (
-    String,
-    String,
-    String,
-    String,
-    bool,
-    Option<i64>,
-    String,
-);
+type ChannelModelRow = (String, String, String, String, bool, Option<i64>, String);
 
 type ModelPriceRow = (
     String,
@@ -558,9 +559,11 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)")
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_tenants (
             id TEXT PRIMARY KEY NOT NULL,
@@ -616,9 +619,11 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS max_cost DOUBLE PRECISION")
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS max_cost DOUBLE PRECISION",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query("ALTER TABLE ai_routing_policies ADD COLUMN IF NOT EXISTS max_latency_ms BIGINT")
         .execute(&pool)
         .await?;
@@ -675,9 +680,11 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query("ALTER TABLE ai_routing_decision_logs ADD COLUMN IF NOT EXISTS requested_region TEXT")
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "ALTER TABLE ai_routing_decision_logs ADD COLUMN IF NOT EXISTS requested_region TEXT",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_provider_health_records (
             provider_id TEXT NOT NULL,
@@ -1072,16 +1079,12 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     )
     .execute(&pool)
     .await?;
-    sqlx::query(
-        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS last_used_at_ms BIGINT",
-    )
-    .execute(&pool)
-    .await?;
-    sqlx::query(
-        "ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS expires_at_ms BIGINT",
-    )
-    .execute(&pool)
-    .await?;
+    sqlx::query("ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS last_used_at_ms BIGINT")
+        .execute(&pool)
+        .await?;
+    sqlx::query("ALTER TABLE ai_app_api_keys ADD COLUMN IF NOT EXISTS expires_at_ms BIGINT")
+        .execute(&pool)
+        .await?;
     ensure_postgres_column_if_table_exists(
         &pool,
         "catalog_proxy_providers",
@@ -1313,8 +1316,12 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     .execute(&pool)
     .await?;
     for (legacy_table_name, canonical_table_name) in LEGACY_RENAMED_TABLE_MAPPINGS {
-        migrate_postgres_legacy_table_with_common_columns(&pool, legacy_table_name, canonical_table_name)
-            .await?;
+        migrate_postgres_legacy_table_with_common_columns(
+            &pool,
+            legacy_table_name,
+            canonical_table_name,
+        )
+        .await?;
     }
 
     if postgres_relation_kind(&pool, "catalog_channels")
@@ -2884,11 +2891,10 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_tenants(&self) -> Result<Vec<Tenant>> {
-        let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM ai_tenants ORDER BY id",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query_as::<_, (String, String)>("SELECT id, name FROM ai_tenants ORDER BY id")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows
             .into_iter()
             .map(|(id, name)| Tenant { id, name })
@@ -2896,12 +2902,11 @@ impl PostgresAdminStore {
     }
 
     pub async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
-        let row = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM ai_tenants WHERE id = $1",
-        )
-        .bind(tenant_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row =
+            sqlx::query_as::<_, (String, String)>("SELECT id, name FROM ai_tenants WHERE id = $1")
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row.map(|(id, name)| Tenant { id, name }))
     }
 
@@ -3229,8 +3234,16 @@ impl PostgresAdminStore {
         .bind(&record.label)
         .bind(&record.notes)
         .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
-        .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
-        .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
+        .bind(
+            record
+                .last_used_at_ms
+                .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+        )
+        .bind(
+            record
+                .expires_at_ms
+                .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+        )
         .bind(record.active)
         .execute(&self.pool)
         .await?;
@@ -4054,7 +4067,10 @@ impl AdminStore for PostgresAdminStore {
         PostgresAdminStore::delete_model_variant(self, external_name, provider_id).await
     }
 
-    async fn insert_channel_model(&self, record: &ChannelModelRecord) -> Result<ChannelModelRecord> {
+    async fn insert_channel_model(
+        &self,
+        record: &ChannelModelRecord,
+    ) -> Result<ChannelModelRecord> {
         PostgresAdminStore::insert_channel_model(self, record).await
     }
 
@@ -4080,8 +4096,7 @@ impl AdminStore for PostgresAdminStore {
         model_id: &str,
         proxy_provider_id: &str,
     ) -> Result<bool> {
-        PostgresAdminStore::delete_model_price(self, channel_id, model_id, proxy_provider_id)
-            .await
+        PostgresAdminStore::delete_model_price(self, channel_id, model_id, proxy_provider_id).await
     }
 
     async fn insert_routing_policy(&self, policy: &RoutingPolicy) -> Result<RoutingPolicy> {

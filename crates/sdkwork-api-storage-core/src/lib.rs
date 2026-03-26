@@ -281,7 +281,8 @@ pub trait AdminStore: Send + Sync {
     async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>>;
     async fn delete_model(&self, external_name: &str) -> Result<bool>;
     async fn delete_model_variant(&self, external_name: &str, provider_id: &str) -> Result<bool>;
-    async fn insert_channel_model(&self, record: &ChannelModelRecord) -> Result<ChannelModelRecord>;
+    async fn insert_channel_model(&self, record: &ChannelModelRecord)
+        -> Result<ChannelModelRecord>;
     async fn list_channel_models(&self) -> Result<Vec<ChannelModelRecord>>;
     async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool>;
     async fn insert_model_price(&self, record: &ModelPriceRecord) -> Result<ModelPriceRecord>;

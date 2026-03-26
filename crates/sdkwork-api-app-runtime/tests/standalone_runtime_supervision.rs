@@ -19,7 +19,7 @@ use sdkwork_api_app_runtime::{
     StandaloneServiceReloadHandles,
 };
 use sdkwork_api_config::StandaloneConfigLoader;
-use sdkwork_api_domain_catalog::ModelCatalogEntry;
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_ext_provider_native_mock::FIXTURE_EXTENSION_ID;
 use sdkwork_api_extension_core::{
     CompatibilityLevel, ExtensionKind, ExtensionManifest, ExtensionPermission, ExtensionProtocol,
@@ -700,6 +700,23 @@ async fn seed_model_store(database_url: &str, model_id: &str) -> Arc<dyn AdminSt
     }
     let pool = run_migrations(database_url).await.unwrap();
     let store = SqliteAdminStore::new(pool);
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-openai-official",
+                "openai",
+                "openai",
+                "https://api.openai.com/v1",
+                "OpenAI Official",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
     store
         .insert_model(&ModelCatalogEntry::new(
             model_id,

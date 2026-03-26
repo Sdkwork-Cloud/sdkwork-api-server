@@ -29,6 +29,31 @@ use sdkwork_api_extension_host::{
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 use serial_test::serial;
 
+async fn create_store_with_openai_channel() -> SqliteAdminStore {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+}
+
+async fn insert_openai_provider(
+    store: &SqliteAdminStore,
+    provider_id: &str,
+    base_url: &str,
+    display_name: &str,
+) {
+    store
+        .insert_provider(
+            &ProxyProvider::new(provider_id, "openai", "openai", base_url, display_name)
+                .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+}
+
 #[test]
 fn route_simulation_prefers_healthy_low_cost_provider() {
     let decision = simulate_route("chat_completion", "gpt-4.1").unwrap();
@@ -37,8 +62,21 @@ fn route_simulation_prefers_healthy_low_cost_provider() {
 
 #[tokio::test]
 async fn route_simulation_uses_catalog_model_candidates() {
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_openai_channel().await;
+    insert_openai_provider(
+        &store,
+        "provider-openrouter",
+        "https://openrouter.ai/api/v1",
+        "OpenRouter",
+    )
+    .await;
+    insert_openai_provider(
+        &store,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        "OpenAI Official",
+    )
+    .await;
     store
         .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-openrouter"))
         .await
@@ -61,8 +99,21 @@ async fn route_simulation_uses_catalog_model_candidates() {
 
 #[tokio::test]
 async fn route_simulation_prefers_policy_provider_order_over_lexicographic_sort() {
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_openai_channel().await;
+    insert_openai_provider(
+        &store,
+        "provider-openrouter",
+        "https://openrouter.ai/api/v1",
+        "OpenRouter",
+    )
+    .await;
+    insert_openai_provider(
+        &store,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        "OpenAI Official",
+    )
+    .await;
     store
         .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-openrouter"))
         .await
@@ -1114,8 +1165,14 @@ async fn select_route_with_store_persists_routing_decision_log() {
     shutdown_all_connector_runtimes().unwrap();
     shutdown_all_native_dynamic_runtimes().unwrap();
 
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_openai_channel().await;
+    insert_openai_provider(
+        &store,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        "OpenAI Official",
+    )
+    .await;
 
     store
         .insert_model(&ModelCatalogEntry::new(
@@ -1153,8 +1210,14 @@ async fn select_route_with_store_context_persists_requested_region_in_routing_de
     shutdown_all_connector_runtimes().unwrap();
     shutdown_all_native_dynamic_runtimes().unwrap();
 
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_openai_channel().await;
+    insert_openai_provider(
+        &store,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        "OpenAI Official",
+    )
+    .await;
 
     store
         .insert_model(&ModelCatalogEntry::new(

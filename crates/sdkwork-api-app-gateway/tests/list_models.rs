@@ -3,7 +3,31 @@ use sdkwork_api_app_gateway::{
     delete_model, delete_model_from_store, get_model, get_model_from_store, list_models,
     list_models_from_store,
 };
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
+
+async fn create_store_with_registered_provider() -> SqliteAdminStore {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-openai-official",
+                "openai",
+                "openai",
+                "http://127.0.0.1:1",
+                "OpenAI Official",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+    store
+}
 
 #[test]
 fn returns_platform_models() {
@@ -27,10 +51,9 @@ fn deletes_platform_model() {
 
 #[tokio::test]
 async fn returns_catalog_models_from_store() {
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_registered_provider().await;
     store
-        .insert_model(&sdkwork_api_domain_catalog::ModelCatalogEntry::new(
+        .insert_model(&ModelCatalogEntry::new(
             "gpt-4.1",
             "provider-openai-official",
         ))
@@ -45,10 +68,9 @@ async fn returns_catalog_models_from_store() {
 
 #[tokio::test]
 async fn returns_catalog_model_from_store() {
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_registered_provider().await;
     store
-        .insert_model(&sdkwork_api_domain_catalog::ModelCatalogEntry::new(
+        .insert_model(&ModelCatalogEntry::new(
             "gpt-4.1",
             "provider-openai-official",
         ))
@@ -65,10 +87,9 @@ async fn returns_catalog_model_from_store() {
 
 #[tokio::test]
 async fn deletes_catalog_model_from_store() {
-    let pool = run_migrations("sqlite::memory:").await.unwrap();
-    let store = SqliteAdminStore::new(pool);
+    let store = create_store_with_registered_provider().await;
     store
-        .insert_model(&sdkwork_api_domain_catalog::ModelCatalogEntry::new(
+        .insert_model(&ModelCatalogEntry::new(
             "ft:gpt-4.1:sdkwork",
             "provider-openai-official",
         ))

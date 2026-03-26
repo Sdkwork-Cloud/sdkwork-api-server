@@ -5,7 +5,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_identity::hash_gateway_api_key;
-use sdkwork_api_domain_catalog::ModelCatalogEntry;
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
 use sdkwork_api_domain_identity::GatewayApiKeyRecord;
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -202,6 +202,26 @@ async fn memory_pool() -> SqlitePool {
         .unwrap()
 }
 
+async fn seed_openai_provider(store: &SqliteAdminStore) {
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-openai-official",
+                "openai",
+                "openai",
+                "https://api.openai.com/v1",
+                "OpenAI Official",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+}
+
 async fn seeded_gateway_store(model_id: &str, api_key: &str) -> Arc<dyn AdminStore> {
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool);
@@ -214,6 +234,7 @@ async fn seeded_gateway_store(model_id: &str, api_key: &str) -> Arc<dyn AdminSto
         ))
         .await
         .unwrap();
+    seed_openai_provider(&store).await;
     store
         .insert_model(&ModelCatalogEntry::new(
             model_id,
@@ -227,6 +248,7 @@ async fn seeded_gateway_store(model_id: &str, api_key: &str) -> Arc<dyn AdminSto
 #[tokio::test]
 async fn models_route_reads_persisted_catalog_models() {
     let pool = memory_pool().await;
+    seed_openai_provider(&SqliteAdminStore::new(pool.clone())).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
@@ -237,7 +259,6 @@ async fn models_route_reads_persisted_catalog_models() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
-                .header("authorization", format!("Bearer {admin_token}"))
                 .header("authorization", format!("Bearer {admin_token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
@@ -314,6 +335,7 @@ async fn gateway_router_uses_replaced_live_store_for_new_requests() {
 #[tokio::test]
 async fn model_retrieve_route_reads_persisted_catalog_model() {
     let pool = memory_pool().await;
+    seed_openai_provider(&SqliteAdminStore::new(pool.clone())).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
@@ -324,7 +346,6 @@ async fn model_retrieve_route_reads_persisted_catalog_model() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
-                .header("authorization", format!("Bearer {admin_token}"))
                 .header("authorization", format!("Bearer {admin_token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
@@ -356,6 +377,7 @@ async fn model_retrieve_route_reads_persisted_catalog_model() {
 #[tokio::test]
 async fn model_delete_route_removes_persisted_catalog_model() {
     let pool = memory_pool().await;
+    seed_openai_provider(&SqliteAdminStore::new(pool.clone())).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
@@ -366,9 +388,8 @@ async fn model_delete_route_removes_persisted_catalog_model() {
             Request::builder()
                 .method("POST")
                 .uri("/admin/models")
-               .header("authorization", format!("Bearer {admin_token}"))
- .header("authorization", format!("Bearer {admin_token}"))
-.header("content-type", "application/json")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"external_name\":\"ft:gpt-4.1:sdkwork\",\"provider_id\":\"provider-openai-official\"}",
                 ))

@@ -63,7 +63,7 @@ async fn portal_dashboard_and_usage_views_are_project_scoped() {
     let project_id = workspace["project"]["id"].as_str().unwrap().to_owned();
 
     sqlx::query(
-        "INSERT INTO usage_records (project_id, model, provider_id, units, amount, created_at_ms)
+        "INSERT INTO ai_usage_records (project_id, model, provider_id, units, amount, created_at_ms)
          VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&project_id)
@@ -77,7 +77,7 @@ async fn portal_dashboard_and_usage_views_are_project_scoped() {
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO usage_records (project_id, model, provider_id, units, amount, created_at_ms)
+        "INSERT INTO ai_usage_records (project_id, model, provider_id, units, amount, created_at_ms)
          VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind("project-other")
@@ -90,24 +90,28 @@ async fn portal_dashboard_and_usage_views_are_project_scoped() {
     .await
     .unwrap();
 
-    sqlx::query("INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)")
-        .bind(&project_id)
-        .bind(240_i64)
-        .bind(0.42_f64)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-    sqlx::query("INSERT INTO billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)")
-        .bind("project-other")
-        .bind(999_i64)
-        .bind(9.99_f64)
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO ai_billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)",
+    )
+    .bind(&project_id)
+    .bind(240_i64)
+    .bind(0.42_f64)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     sqlx::query(
-        "INSERT INTO billing_quota_policies (policy_id, project_id, max_units, enabled)
+        "INSERT INTO ai_billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)",
+    )
+    .bind("project-other")
+    .bind(999_i64)
+    .bind(9.99_f64)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO ai_billing_quota_policies (policy_id, project_id, max_units, enabled)
          VALUES (?, ?, ?, ?)",
     )
     .bind("quota-portal")

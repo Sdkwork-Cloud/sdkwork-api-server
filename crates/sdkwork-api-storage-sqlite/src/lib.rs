@@ -44,7 +44,10 @@ const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
     ("coupon_campaigns", "ai_coupon_campaigns"),
     ("routing_policies", "ai_routing_policies"),
     ("routing_policy_providers", "ai_routing_policy_providers"),
-    ("project_routing_preferences", "ai_project_routing_preferences"),
+    (
+        "project_routing_preferences",
+        "ai_project_routing_preferences",
+    ),
     ("routing_decision_logs", "ai_routing_decision_logs"),
     ("routing_provider_health", "ai_provider_health_records"),
     ("usage_records", "ai_usage_records"),
@@ -53,12 +56,18 @@ const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
     ("extension_installations", "ai_extension_installations"),
     ("extension_instances", "ai_extension_instances"),
     ("service_runtime_nodes", "ai_service_runtime_nodes"),
-    ("extension_runtime_rollouts", "ai_extension_runtime_rollouts"),
+    (
+        "extension_runtime_rollouts",
+        "ai_extension_runtime_rollouts",
+    ),
     (
         "extension_runtime_rollout_participants",
         "ai_extension_runtime_rollout_participants",
     ),
-    ("standalone_config_rollouts", "ai_standalone_config_rollouts"),
+    (
+        "standalone_config_rollouts",
+        "ai_standalone_config_rollouts",
+    ),
     (
         "standalone_config_rollout_participants",
         "ai_standalone_config_rollout_participants",
@@ -188,9 +197,11 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
         "created_at_ms INTEGER NOT NULL DEFAULT 0",
     )
     .await?;
-    sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)")
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)",
+    )
+    .execute(&pool)
+    .await?;
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_tenants (
             id TEXT PRIMARY KEY NOT NULL,
@@ -688,7 +699,13 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
         "streaming_enabled INTEGER NOT NULL DEFAULT 0",
     )
     .await?;
-    ensure_sqlite_column(&pool, "ai_model", "context_window", "context_window INTEGER").await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_model",
+        "context_window",
+        "context_window INTEGER",
+    )
+    .await?;
     ensure_sqlite_column(
         &pool,
         "ai_model",
@@ -901,13 +918,8 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
         "label TEXT NOT NULL DEFAULT ''",
     )
     .await?;
-    ensure_sqlite_column_if_table_exists(
-        &pool,
-        "identity_gateway_api_keys",
-        "notes",
-        "notes TEXT",
-    )
-    .await?;
+    ensure_sqlite_column_if_table_exists(&pool, "identity_gateway_api_keys", "notes", "notes TEXT")
+        .await?;
     ensure_sqlite_column_if_table_exists(
         &pool,
         "identity_gateway_api_keys",
@@ -1058,11 +1070,19 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     for (legacy_table_name, canonical_table_name) in LEGACY_RENAMED_TABLE_MAPPINGS {
-        migrate_sqlite_legacy_table_with_common_columns(&pool, legacy_table_name, canonical_table_name)
-            .await?;
+        migrate_sqlite_legacy_table_with_common_columns(
+            &pool,
+            legacy_table_name,
+            canonical_table_name,
+        )
+        .await?;
     }
 
-    if sqlite_object_type(&pool, "catalog_channels").await?.as_deref() == Some("table") {
+    if sqlite_object_type(&pool, "catalog_channels")
+        .await?
+        .as_deref()
+        == Some("table")
+    {
         sqlx::query(
             "INSERT OR IGNORE INTO ai_channel (
                 channel_id,
@@ -1237,7 +1257,11 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             .await?;
     }
 
-    if sqlite_object_type(&pool, "catalog_models").await?.as_deref() == Some("table") {
+    if sqlite_object_type(&pool, "catalog_models")
+        .await?
+        .as_deref()
+        == Some("table")
+    {
         sqlx::query(
             "INSERT OR IGNORE INTO ai_model (
                 channel_id,
@@ -1538,7 +1562,11 @@ async fn migrate_sqlite_legacy_table_with_common_columns(
     legacy_table_name: &str,
     canonical_table_name: &str,
 ) -> Result<()> {
-    if sqlite_object_type(pool, legacy_table_name).await?.as_deref() != Some("table") {
+    if sqlite_object_type(pool, legacy_table_name)
+        .await?
+        .as_deref()
+        != Some("table")
+    {
         return Ok(());
     }
 
@@ -1720,15 +1748,7 @@ type CredentialRow = (
     Option<String>,
 );
 
-type ChannelModelRow = (
-    String,
-    String,
-    String,
-    String,
-    i64,
-    Option<i64>,
-    String,
-);
+type ChannelModelRow = (String, String, String, String, i64, Option<i64>, String);
 
 type ModelPriceRow = (
     String,
@@ -2409,13 +2429,12 @@ impl SqliteAdminStore {
         external_name: &str,
         provider_id: &str,
     ) -> Result<bool> {
-        let result = sqlx::query(
-            "DELETE FROM ai_model_price WHERE model_id = ? AND proxy_provider_id = ?",
-        )
-        .bind(external_name)
-        .bind(provider_id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query("DELETE FROM ai_model_price WHERE model_id = ? AND proxy_provider_id = ?")
+                .bind(external_name)
+                .bind(provider_id)
+                .execute(&self.pool)
+                .await?;
         sqlx::query(
             "DELETE FROM ai_model
              WHERE model_id = ?
@@ -3096,11 +3115,10 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_tenants(&self) -> Result<Vec<Tenant>> {
-        let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM ai_tenants ORDER BY id",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query_as::<_, (String, String)>("SELECT id, name FROM ai_tenants ORDER BY id")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows
             .into_iter()
             .map(|(id, name)| Tenant { id, name })
@@ -3108,12 +3126,11 @@ impl SqliteAdminStore {
     }
 
     pub async fn find_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
-        let row = sqlx::query_as::<_, (String, String)>(
-            "SELECT id, name FROM ai_tenants WHERE id = ?",
-        )
-        .bind(tenant_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row =
+            sqlx::query_as::<_, (String, String)>("SELECT id, name FROM ai_tenants WHERE id = ?")
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row.map(|(id, name)| Tenant { id, name }))
     }
 
@@ -3441,8 +3458,16 @@ impl SqliteAdminStore {
         .bind(&record.label)
         .bind(&record.notes)
         .bind(i64::try_from(record.created_at_ms).unwrap_or(i64::MAX))
-        .bind(record.last_used_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
-        .bind(record.expires_at_ms.map(|value| i64::try_from(value).unwrap_or(i64::MAX)))
+        .bind(
+            record
+                .last_used_at_ms
+                .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+        )
+        .bind(
+            record
+                .expires_at_ms
+                .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+        )
         .bind(if record.active { 1_i64 } else { 0_i64 })
         .execute(&self.pool)
         .await?;
@@ -4255,7 +4280,10 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::delete_model_variant(self, external_name, provider_id).await
     }
 
-    async fn insert_channel_model(&self, record: &ChannelModelRecord) -> Result<ChannelModelRecord> {
+    async fn insert_channel_model(
+        &self,
+        record: &ChannelModelRecord,
+    ) -> Result<ChannelModelRecord> {
         SqliteAdminStore::insert_channel_model(self, record).await
     }
 
