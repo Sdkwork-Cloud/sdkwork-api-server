@@ -85,6 +85,20 @@ test('desktop tauri configs enable bundling for native release packaging', () =>
       'icons/icon.ico',
     ],
   );
+  assert.deepEqual(
+    adminTauriConfig.bundle?.resources,
+    {
+      '../dist/': 'embedded-sites/admin/',
+      '../../sdkwork-router-portal/dist/': 'embedded-sites/portal/',
+    },
+  );
+  assert.deepEqual(
+    portalTauriConfig.bundle?.resources,
+    {
+      '../dist/': 'embedded-sites/portal/',
+      '../../sdkwork-router-admin/dist/': 'embedded-sites/admin/',
+    },
+  );
 });
 
 test('release target helpers and desktop release runner resolve explicit target triples', async () => {

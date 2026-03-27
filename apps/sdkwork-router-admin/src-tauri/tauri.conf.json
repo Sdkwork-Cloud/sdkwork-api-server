@@ -19,8 +19,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../dist": "embedded-sites/admin",
-      "../../sdkwork-router-portal/dist": "embedded-sites/portal"
+      "../dist/": "embedded-sites/admin/",
+      "../../sdkwork-router-portal/dist/": "embedded-sites/portal/"
     }
   },
   "app": {
