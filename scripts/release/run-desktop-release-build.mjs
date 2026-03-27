@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { buildDesktopReleaseEnv } from './desktop-targets.mjs';
+import {
+  resolveAvailableNativeBuildRoot,
+  resolveNativeBuildRootCandidates,
+} from './package-release-assets.mjs';
 import { withSupportedWindowsCmakeGenerator } from '../run-tauri-cli.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,6 +60,41 @@ export function createDesktopReleaseBuildPlan({
   };
 }
 
+function truncateText(value, maxLength = 4000) {
+  const text = String(value ?? '').trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 12))}...[truncated]`;
+}
+
+function escapeGitHubActionsCommandValue(value, { property = false } = {}) {
+  let escaped = String(value ?? '');
+  escaped = escaped.replaceAll('%', '%25');
+  escaped = escaped.replaceAll('\r', '%0D');
+  escaped = escaped.replaceAll('\n', '%0A');
+  if (property) {
+    escaped = escaped.replaceAll(':', '%3A');
+    escaped = escaped.replaceAll(',', '%2C');
+  }
+
+  return escaped;
+}
+
+export function buildDesktopReleaseFailureAnnotation({
+  appId = '',
+  targetTriple = '',
+  error,
+} = {}) {
+  const scope = [appId, targetTriple].filter(Boolean).join(' ');
+  const message = truncateText(
+    `${scope ? `[${scope}] ` : ''}${error instanceof Error ? error.message : String(error)}`,
+    8000,
+  );
+  return `::error title=run-desktop-release-build::${escapeGitHubActionsCommandValue(message)}`;
+}
+
 function parseCliArgs(argv) {
   const options = {
     appId: '',
@@ -80,31 +120,163 @@ function parseCliArgs(argv) {
   return options;
 }
 
+function appendBufferedOutput(buffer, chunk, maxLength = 6000) {
+  const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk ?? '');
+  const next = `${buffer}${text}`;
+  if (next.length <= maxLength) {
+    return next;
+  }
+
+  return next.slice(-maxLength);
+}
+
+function describeBuildRootState(root) {
+  if (!existsSync(root)) {
+    return `${root} [missing]`;
+  }
+
+  const entries = readdirSync(root, { withFileTypes: true });
+  if (entries.length === 0) {
+    return `${root} [exists, empty]`;
+  }
+
+  const sample = entries.slice(0, 8).map((entry) => entry.name).join(', ');
+  const remainingCount = entries.length - Math.min(entries.length, 8);
+  const remainingSuffix = remainingCount > 0 ? ` (+${remainingCount} more)` : '';
+  return `${root} [exists: ${sample}${remainingSuffix}]`;
+}
+
+function verifyDesktopBundleOutput({ appId, targetTriple }) {
+  const buildRoots = resolveNativeBuildRootCandidates({
+    appId,
+    targetTriple,
+  });
+  const buildRoot = resolveAvailableNativeBuildRoot({
+    appId,
+    targetTriple,
+    buildRoots,
+  });
+  if (!buildRoot) {
+    throw new Error(
+      `Tauri build completed without bundle output for ${appId}. candidates: ${buildRoots.map((root) => describeBuildRootState(root)).join(' | ')}`,
+    );
+  }
+
+  console.error(`[run-desktop-release-build] bundle root: ${buildRoot}`);
+}
+
+function buildDesktopReleaseFailure({
+  reason,
+  stdoutBuffer,
+  stderrBuffer,
+} = {}) {
+  const details = [reason];
+  const stderrTail = truncateText(stderrBuffer, 2000);
+  const stdoutTail = truncateText(stdoutBuffer, 2000);
+  if (stderrTail) {
+    details.push(`stderr tail:\n${stderrTail}`);
+  }
+  if (stdoutTail) {
+    details.push(`stdout tail:\n${stdoutTail}`);
+  }
+
+  return new Error(details.join('\n'));
+}
+
+function reportDesktopReleaseFailure({ appId, targetTriple, error }) {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    console.error(buildDesktopReleaseFailureAnnotation({
+      appId,
+      targetTriple,
+      error,
+    }));
+  }
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+}
+
 function runCli() {
   const options = parseCliArgs(process.argv.slice(2));
   const plan = createDesktopReleaseBuildPlan({
     appId: options.appId,
     targetTriple: options.targetTriple,
   });
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
   const child = spawn(plan.command, plan.args, {
     cwd: plan.cwd,
     env: plan.env,
-    stdio: 'inherit',
+    stdio: ['inherit', 'pipe', 'pipe'],
     shell: process.platform === 'win32',
   });
 
+  child.stdout?.on('data', (chunk) => {
+    stdoutBuffer = appendBufferedOutput(stdoutBuffer, chunk);
+    process.stdout.write(chunk);
+  });
+
+  child.stderr?.on('data', (chunk) => {
+    stderrBuffer = appendBufferedOutput(stderrBuffer, chunk);
+    process.stderr.write(chunk);
+  });
+
   child.on('error', (error) => {
-    console.error(`[run-desktop-release-build] ${error.message}`);
+    reportDesktopReleaseFailure({
+      appId: options.appId,
+      targetTriple: options.targetTriple,
+      error: buildDesktopReleaseFailure({
+        reason: `[run-desktop-release-build] ${error.message}`,
+        stdoutBuffer,
+        stderrBuffer,
+      }),
+    });
     process.exit(1);
   });
 
   child.on('exit', (code, signal) => {
     if (signal) {
-      console.error(`[run-desktop-release-build] build exited with signal ${signal}`);
+      reportDesktopReleaseFailure({
+        appId: options.appId,
+        targetTriple: options.targetTriple,
+        error: buildDesktopReleaseFailure({
+          reason: `[run-desktop-release-build] build exited with signal ${signal}`,
+          stdoutBuffer,
+          stderrBuffer,
+        }),
+      });
       process.exit(1);
+      return;
     }
 
-    process.exit(code ?? 0);
+    if ((code ?? 0) !== 0) {
+      reportDesktopReleaseFailure({
+        appId: options.appId,
+        targetTriple: options.targetTriple,
+        error: buildDesktopReleaseFailure({
+          reason: `[run-desktop-release-build] build exited with code ${code}`,
+          stdoutBuffer,
+          stderrBuffer,
+        }),
+      });
+      process.exit(code ?? 1);
+      return;
+    }
+
+    try {
+      verifyDesktopBundleOutput({
+        appId: options.appId,
+        targetTriple: options.targetTriple,
+      });
+    } catch (error) {
+      reportDesktopReleaseFailure({
+        appId: options.appId,
+        targetTriple: options.targetTriple,
+        error,
+      });
+      process.exit(1);
+      return;
+    }
+
+    process.exit(0);
   });
 }
 

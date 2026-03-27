@@ -83,6 +83,7 @@ test('release target helpers and desktop release runner resolve explicit target 
   assert.equal(typeof helper.parseDesktopTargetTriple, 'function');
   assert.equal(typeof helper.resolveDesktopReleaseTarget, 'function');
   assert.equal(typeof runner.createDesktopReleaseBuildPlan, 'function');
+  assert.equal(typeof runner.buildDesktopReleaseFailureAnnotation, 'function');
   assert.equal(typeof packager.resolveNativeBuildRoot, 'function');
   assert.equal(typeof packager.resolveNativeBuildRootCandidates, 'function');
   assert.equal(typeof packager.listNativeServiceBinaryNames, 'function');
@@ -227,6 +228,14 @@ test('release target helpers and desktop release runner resolve explicit target 
       archId: 'arm64',
     }),
     'sdkwork-api-router-product-server-linux-arm64',
+  );
+  assert.equal(
+    runner.buildDesktopReleaseFailureAnnotation({
+      appId: 'admin',
+      targetTriple: 'x86_64-unknown-linux-gnu',
+      error: new Error('bundle missing 50%\nnext line'),
+    }),
+    '::error title=run-desktop-release-build::[admin x86_64-unknown-linux-gnu] bundle missing 50%25%0Anext line',
   );
 });
 
