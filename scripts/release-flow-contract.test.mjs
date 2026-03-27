@@ -65,6 +65,26 @@ test('desktop tauri configs enable bundling for native release packaging', () =>
 
   assert.equal(adminTauriConfig.bundle?.active, true);
   assert.equal(portalTauriConfig.bundle?.active, true);
+  assert.deepEqual(
+    adminTauriConfig.bundle?.icon,
+    [
+      'icons/32x32.png',
+      'icons/128x128.png',
+      'icons/128x128@2x.png',
+      'icons/icon.icns',
+      'icons/icon.ico',
+    ],
+  );
+  assert.deepEqual(
+    portalTauriConfig.bundle?.icon,
+    [
+      'icons/32x32.png',
+      'icons/128x128.png',
+      'icons/128x128@2x.png',
+      'icons/icon.icns',
+      'icons/icon.ico',
+    ],
+  );
 });
 
 test('release target helpers and desktop release runner resolve explicit target triples', async () => {
