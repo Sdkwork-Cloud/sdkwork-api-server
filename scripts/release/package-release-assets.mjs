@@ -53,7 +53,7 @@ const desktopBundleRules = {
   },
   macos: {
     directories: new Set(['dmg', 'macos']),
-    suffixes: ['.dmg', '.app.tar.gz', '.app.zip', '.zip'],
+    suffixes: ['.app', '.dmg', '.app.tar.gz', '.app.zip', '.zip'],
   },
 };
 
@@ -115,6 +115,21 @@ export function resolveNativeBuildRoot({ appId, targetTriple = '' } = {}) {
     'release',
     'bundle',
   );
+}
+
+export function resolveNativeBuildRootCandidates({ appId, targetTriple = '' } = {}) {
+  const roots = [];
+  const preferredRoot = resolveNativeBuildRoot({
+    appId,
+    targetTriple,
+  });
+  roots.push(preferredRoot);
+
+  if (String(targetTriple ?? '').trim().length > 0) {
+    roots.push(resolveNativeBuildRoot({ appId }));
+  }
+
+  return [...new Set(roots)];
 }
 
 export function listNativeServiceBinaryNames() {
@@ -266,16 +281,26 @@ function packageServiceBinaries({ platformId, archId, targetTriple, outputDir })
 
 function packageDesktopBundles({ platformId, archId, targetTriple, outputDir }) {
   for (const appId of NATIVE_RELEASE_DESKTOP_APP_IDS) {
-    const buildRoot = resolveNativeBuildRoot({
+    const buildRoots = resolveNativeBuildRootCandidates({
       appId,
       targetTriple,
     });
-    if (!existsSync(buildRoot)) {
-      throw new Error(`Missing desktop bundle output directory: ${buildRoot}`);
+    const buildRoot = buildRoots.find((candidate) => existsSync(candidate));
+    if (!buildRoot) {
+      throw new Error(
+        `Missing desktop bundle output directory for ${appId}: ${buildRoots.join(', ')}`,
+      );
     }
 
-    const bundleFiles = listFilesRecursively(buildRoot)
+    const allBundleFiles = listFilesRecursively(buildRoot);
+    let bundleFiles = allBundleFiles
       .filter((file) => shouldIncludeDesktopBundleFile(platformId, file.relativePath));
+
+    // Tauri bundle layouts vary slightly by platform and updater settings.
+    // If no known distributable suffix matches, archive everything under bundle/.
+    if (bundleFiles.length === 0) {
+      bundleFiles = allBundleFiles;
+    }
 
     if (bundleFiles.length === 0) {
       throw new Error(`No ${platformId} desktop release assets matched under ${buildRoot}`);

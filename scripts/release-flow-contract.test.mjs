@@ -75,6 +75,7 @@ test('release target helpers and desktop release runner resolve explicit target 
   assert.equal(typeof helper.resolveDesktopReleaseTarget, 'function');
   assert.equal(typeof runner.createDesktopReleaseBuildPlan, 'function');
   assert.equal(typeof packager.resolveNativeBuildRoot, 'function');
+  assert.equal(typeof packager.resolveNativeBuildRootCandidates, 'function');
   assert.equal(typeof packager.listNativeServiceBinaryNames, 'function');
   assert.equal(typeof packager.listNativeDesktopAppIds, 'function');
   assert.equal(typeof packager.buildNativeProductServerArchiveBaseName, 'function');
@@ -133,6 +134,33 @@ test('release target helpers and desktop release runner resolve explicit target 
       'release',
       'bundle',
     ).replaceAll('\\', '/'),
+  );
+  assert.deepEqual(
+    packager.resolveNativeBuildRootCandidates({
+      appId: 'admin',
+      targetTriple: 'x86_64-pc-windows-msvc',
+    }).map((entry) => entry.replaceAll('\\', '/')),
+    [
+      path.join(
+        rootDir,
+        'apps',
+        'sdkwork-router-admin',
+        'src-tauri',
+        'target',
+        'x86_64-pc-windows-msvc',
+        'release',
+        'bundle',
+      ).replaceAll('\\', '/'),
+      path.join(
+        rootDir,
+        'apps',
+        'sdkwork-router-admin',
+        'src-tauri',
+        'target',
+        'release',
+        'bundle',
+      ).replaceAll('\\', '/'),
+    ],
   );
   assert.match(
     packager.listNativeServiceBinaryNames().join(','),
