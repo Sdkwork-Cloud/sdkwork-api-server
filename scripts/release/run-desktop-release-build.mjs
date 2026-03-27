@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 import { buildDesktopReleaseEnv } from './desktop-targets.mjs';
 import {
+  buildDesktopTargetTriple,
+  normalizeDesktopPlatform,
+} from './desktop-targets.mjs';
+import {
   resolveAvailableNativeBuildRoot,
   resolveNativeBuildRootCandidates,
 } from './package-release-assets.mjs';
@@ -36,6 +40,7 @@ export function createDesktopReleaseBuildPlan({
   appId,
   appDir = resolveDesktopAppDir(appId),
   platform = process.platform,
+  arch = process.arch,
   env = process.env,
   targetTriple = '',
 } = {}) {
@@ -48,8 +53,21 @@ export function createDesktopReleaseBuildPlan({
       })
     : { ...env };
 
-  if (requestedTargetTriple) {
-    args.push('--', '--target', requestedTargetTriple);
+  if (shouldPassExplicitDesktopReleaseTarget({
+    targetTriple: requestedTargetTriple,
+    platform,
+    arch,
+  })) {
+    args.push('--target', requestedTargetTriple);
+  }
+
+  const bundles = resolveDesktopReleaseBundles({ platform });
+  if (bundles.length > 0) {
+    args.push('--bundles', bundles.join(','));
+  }
+
+  if (String(resolvedEnv.GITHUB_ACTIONS ?? '').trim().toLowerCase() === 'true') {
+    args.push('--verbose');
   }
 
   return {
@@ -58,6 +76,39 @@ export function createDesktopReleaseBuildPlan({
     cwd: appDir,
     env: withSupportedWindowsCmakeGenerator(resolvedEnv, platform),
   };
+}
+
+export function resolveDesktopReleaseBundles({
+  platform = process.platform,
+} = {}) {
+  const normalizedPlatform = normalizeDesktopPlatform(platform);
+
+  if (normalizedPlatform === 'windows') {
+    return ['nsis'];
+  }
+
+  if (normalizedPlatform === 'linux') {
+    return ['deb'];
+  }
+
+  return ['dmg'];
+}
+
+export function shouldPassExplicitDesktopReleaseTarget({
+  targetTriple = '',
+  platform = process.platform,
+  arch = process.arch,
+} = {}) {
+  const requestedTargetTriple = String(targetTriple ?? '').trim();
+  if (!requestedTargetTriple) {
+    return false;
+  }
+
+  const hostTargetTriple = buildDesktopTargetTriple({
+    platform,
+    arch,
+  });
+  return requestedTargetTriple !== hostTargetTriple;
 }
 
 function truncateText(value, maxLength = 4000) {

@@ -118,6 +118,8 @@ test('release target helpers and desktop release runner resolve explicit target 
   assert.equal(typeof helper.resolveDesktopReleaseTarget, 'function');
   assert.equal(typeof runner.createDesktopReleaseBuildPlan, 'function');
   assert.equal(typeof runner.buildDesktopReleaseFailureAnnotation, 'function');
+  assert.equal(typeof runner.resolveDesktopReleaseBundles, 'function');
+  assert.equal(typeof runner.shouldPassExplicitDesktopReleaseTarget, 'function');
   assert.equal(typeof packager.resolveNativeBuildRoot, 'function');
   assert.equal(typeof packager.resolveNativeBuildRootCandidates, 'function');
   assert.equal(typeof packager.listNativeServiceBinaryNames, 'function');
@@ -147,6 +149,7 @@ test('release target helpers and desktop release runner resolve explicit target 
     appId: 'portal',
     appDir: path.join(rootDir, 'apps', 'sdkwork-router-portal'),
     platform: 'win32',
+    arch: 'x64',
     env: {},
     targetTriple: 'aarch64-pc-windows-msvc',
   });
@@ -154,14 +157,47 @@ test('release target helpers and desktop release runner resolve explicit target 
   assert.equal(portalBuildPlan.command, 'pnpm');
   assert.deepEqual(portalBuildPlan.args, [
     'tauri:build',
-    '--',
     '--target',
     'aarch64-pc-windows-msvc',
+    '--bundles',
+    'nsis',
   ]);
   assert.equal(portalBuildPlan.env.CMAKE_GENERATOR, 'Visual Studio 17 2022');
   assert.equal(portalBuildPlan.env.SDKWORK_DESKTOP_TARGET, 'aarch64-pc-windows-msvc');
   assert.equal(portalBuildPlan.env.SDKWORK_DESKTOP_TARGET_PLATFORM, 'windows');
   assert.equal(portalBuildPlan.env.SDKWORK_DESKTOP_TARGET_ARCH, 'arm64');
+  assert.deepEqual(
+    runner.resolveDesktopReleaseBundles({
+      platform: 'darwin',
+    }),
+    ['dmg'],
+  );
+  assert.equal(
+    runner.shouldPassExplicitDesktopReleaseTarget({
+      targetTriple: 'x86_64-unknown-linux-gnu',
+      platform: 'linux',
+      arch: 'x64',
+    }),
+    false,
+  );
+  assert.deepEqual(
+    runner.createDesktopReleaseBuildPlan({
+      appId: 'admin',
+      appDir: path.join(rootDir, 'apps', 'sdkwork-router-admin'),
+      platform: 'linux',
+      arch: 'x64',
+      env: {
+        GITHUB_ACTIONS: 'true',
+      },
+      targetTriple: 'x86_64-unknown-linux-gnu',
+    }).args,
+    [
+      'tauri:build',
+      '--bundles',
+      'deb',
+      '--verbose',
+    ],
+  );
 
   assert.equal(
     packager.resolveNativeBuildRoot({

@@ -23,6 +23,7 @@ test('repository exposes a multi-platform GitHub release workflow for tagged and
   assert.match(workflow, /windows-11-arm/);
   assert.match(workflow, /ubuntu-22\.04/);
   assert.match(workflow, /ubuntu-24\.04-arm/);
+  assert.match(workflow, /macos-15-intel/);
   assert.match(workflow, /macos-14/);
   assert.match(workflow, /arch:\s*x64/);
   assert.match(workflow, /arch:\s*arm64/);
