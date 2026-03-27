@@ -46,6 +46,7 @@ test('tauri package scripts stay portable across admin, portal, and console apps
   const adminPackage = JSON.parse(read('apps/sdkwork-router-admin/package.json'));
   const portalPackage = JSON.parse(read('apps/sdkwork-router-portal/package.json'));
   const consolePackage = JSON.parse(read('console/package.json'));
+  const consoleTauriCargo = read('console/src-tauri/Cargo.toml');
 
   assert.match(adminPackage.scripts['tauri:dev'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs dev/);
   assert.match(adminPackage.scripts['tauri:build'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs build/);
@@ -53,6 +54,7 @@ test('tauri package scripts stay portable across admin, portal, and console apps
   assert.match(portalPackage.scripts['tauri:build'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs build/);
   assert.match(consolePackage.scripts['tauri:dev'], /node \.\.\/scripts\/run-tauri-cli\.mjs dev/);
   assert.match(consolePackage.scripts['tauri:build'], /node \.\.\/scripts\/run-tauri-cli\.mjs build/);
+  assert.match(consoleTauriCargo, /^\[workspace\]$/m);
   assert.doesNotMatch(portalPackage.scripts['tauri:dev'], /powershell/i);
   assert.doesNotMatch(portalPackage.scripts['tauri:build'], /powershell/i);
 });
