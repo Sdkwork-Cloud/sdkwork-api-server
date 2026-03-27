@@ -162,9 +162,14 @@ pub fn classify_request(request_path: &str) -> RuntimeRoute {
     }
 
     if let Some(suffix) = path.strip_prefix("/api/v1") {
+        let request_path = match suffix {
+            "/health" => "/health".to_owned(),
+            "/metrics" => "/metrics".to_owned(),
+            _ => rewrite_proxy_path("/v1", suffix),
+        };
         return RuntimeRoute::Proxy {
             upstream: "gateway".to_owned(),
-            request_path: rewrite_proxy_path("/v1", suffix),
+            request_path,
         };
     }
 

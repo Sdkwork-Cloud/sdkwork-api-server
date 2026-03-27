@@ -10,6 +10,7 @@ This page explains how SDKWork API Server is assembled as a product and as a cod
 | admin | operator control plane | `services/admin-api-service`, `crates/sdkwork-api-interface-admin` |
 | portal | self-service user boundary | `services/portal-api-service`, `crates/sdkwork-api-interface-portal` |
 | web host | Pingora public web delivery and API proxy | `services/router-web-service`, `crates/sdkwork-api-runtime-host` |
+| product host | integrated web + API host for desktop and server mode | `services/router-product-service`, `crates/sdkwork-api-product-runtime` |
 | admin app | browser and Tauri operator experience | `apps/sdkwork-router-admin/` |
 | portal app | browser self-service experience | `apps/sdkwork-router-portal/` |
 | docs | documentation product | `docs/` |
@@ -45,7 +46,10 @@ SDKWork supports both standalone and embedded runtime shapes.
 
 - standalone services bind independent HTTP listeners for gateway, admin, and portal
 - `router-web-service` fronts the admin and portal static sites and proxies `/api/admin/*`, `/api/portal/*`, and `/api/v1/*`
-- the admin Tauri host embeds the same runtime-host layer so desktop mode still exposes browser-facing admin and portal URLs
+- `sdkwork-api-product-runtime` composes the standalone listeners plus the shared runtime host into one product-level runtime
+- `router-product-service` is the deployable server entrypoint for the integrated product runtime
+- the admin and portal Tauri hosts both embed the shared product runtime so desktop mode still exposes browser-facing admin and portal URLs
+- product runtime role slicing supports cluster deployment where `web`, `gateway`, `admin`, and `portal` can live on different nodes
 - extension runtimes can be builtin, connector-based, or native-dynamic
 - runtime configuration, listener rebinding, store swaps, and secret-manager rotation are designed for hot reload instead of full process restarts
 
@@ -90,8 +94,9 @@ Backends currently documented in-repo:
 The frontend control-plane product is intentionally split into two independent applications:
 
 - `apps/sdkwork-router-admin/` owns the super-admin UX, admin API client, and Tauri host
-- `apps/sdkwork-router-portal/` owns the self-service workspace UX and portal API client
+- `apps/sdkwork-router-portal/` owns the self-service workspace UX, portal API client, and server-mode product entrypoint
 - `crates/sdkwork-api-runtime-host` owns the shared Pingora delivery boundary used by server mode and desktop mode
+- `crates/sdkwork-api-product-runtime` owns the shared bootstrap that starts local API listeners and then publishes the integrated web surface
 
 This keeps operator and self-service concerns isolated while preserving a single public delivery contract.
 
@@ -102,6 +107,12 @@ All three standalone services expose:
 - health endpoints
 - Prometheus-style metrics
 - structured request tracing
+
+The integrated product host adds:
+
+- one public bind for `/admin/*`, `/portal/*`, and `/api/*`
+- environment-driven role slicing for cluster topology
+- explicit upstream wiring when `web` is deployed without a colocated API role
 
 The admin control plane additionally owns:
 

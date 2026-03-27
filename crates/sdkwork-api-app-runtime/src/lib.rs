@@ -81,6 +81,10 @@ impl StandaloneListenerHost {
         let listener = TcpListener::bind(&bind)
             .await
             .with_context(|| format!("failed to bind standalone listener to {bind}"))?;
+        let actual_bind = listener
+            .local_addr()
+            .with_context(|| format!("failed to resolve standalone listener bind for {bind}"))?
+            .to_string();
         let (exit_tx, exit_rx) = mpsc::unbounded_channel();
         let inner = Arc::new(StandaloneListenerHostInner {
             router,
@@ -88,7 +92,7 @@ impl StandaloneListenerHost {
             exit_tx,
             next_generation: AtomicU64::new(1),
         });
-        inner.activate_prebound(bind, listener);
+        inner.activate_prebound(actual_bind, listener);
 
         Ok(Self { inner, exit_rx })
     }
@@ -176,10 +180,16 @@ impl StandaloneListenerHandle {
         let listener = TcpListener::bind(&bind)
             .await
             .with_context(|| format!("failed to bind replacement standalone listener to {bind}"))?;
+        let actual_bind = listener
+            .local_addr()
+            .with_context(|| {
+                format!("failed to resolve replacement standalone listener bind for {bind}")
+            })?
+            .to_string();
 
         Ok(Some(PreparedStandaloneListenerRebind {
             inner: self.inner.clone(),
-            bind,
+            bind: actual_bind,
             listener,
         }))
     }

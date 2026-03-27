@@ -1,0 +1,23 @@
+[package]
+name = "sdkwork-api-product-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
+sdkwork-api-app-runtime = { path = "../sdkwork-api-app-runtime" }
+sdkwork-api-config = { path = "../sdkwork-api-config" }
+sdkwork-api-interface-admin = { path = "../sdkwork-api-interface-admin" }
+sdkwork-api-interface-http = { path = "../sdkwork-api-interface-http" }
+sdkwork-api-interface-portal = { path = "../sdkwork-api-interface-portal" }
+sdkwork-api-runtime-host = { path = "../sdkwork-api-runtime-host" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
+tokio.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+
+[lib]
+path = "src/lib.rs"

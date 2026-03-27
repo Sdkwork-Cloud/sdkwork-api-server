@@ -32,6 +32,7 @@ members = [
     "crates/sdkwork-api-provider-ollama",
     "crates/sdkwork-api-provider-openai",
     "crates/sdkwork-api-provider-openrouter",
+    "crates/sdkwork-api-product-runtime",
     "crates/sdkwork-api-runtime-host",
     "crates/sdkwork-api-secret-core",
     "crates/sdkwork-api-secret-keyring",
@@ -48,6 +49,7 @@ members = [
     "services/admin-api-service",
     "services/gateway-service",
     "services/portal-api-service",
+    "services/router-product-service",
     "services/router-web-service",
 ]
 resolver = "2"

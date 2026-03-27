@@ -5,9 +5,15 @@
   "identifier": "com.sdkwork.router.portal",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "node ../../scripts/build-router-desktop-assets.mjs",
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173/portal/"
+    "devUrl": "http://localhost:5174/portal/"
+  },
+  "bundle": {
+    "resources": {
+      "../dist": "embedded-sites/portal",
+      "../../sdkwork-router-admin/dist": "embedded-sites/admin"
+    }
   },
   "app": {
     "windows": [

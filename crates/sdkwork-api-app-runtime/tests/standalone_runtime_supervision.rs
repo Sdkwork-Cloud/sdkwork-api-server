@@ -56,6 +56,22 @@ async fn standalone_listener_host_rebinds_requests_to_new_bind() {
     host.shutdown().await.unwrap();
 }
 
+#[tokio::test]
+async fn standalone_listener_host_reports_actual_ephemeral_bind() {
+    let host =
+        StandaloneListenerHost::bind("127.0.0.1:0", health_router("listener-host-ephemeral"))
+            .await
+            .unwrap();
+
+    let actual_bind = host.current_bind().unwrap();
+    assert_ne!(actual_bind, "127.0.0.1:0");
+    assert!(actual_bind.starts_with("127.0.0.1:"));
+
+    wait_for_health_response(&actual_bind, "listener-host-ephemeral").await;
+
+    host.shutdown().await.unwrap();
+}
+
 #[serial(extension_env)]
 #[tokio::test]
 async fn standalone_runtime_supervision_reloads_extension_runtime_after_config_file_change() {

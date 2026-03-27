@@ -17,6 +17,19 @@ import type {
 
 const portalSessionTokenKey = 'sdkwork.router.portal.session-token';
 const portalSessionExpiredEvent = 'sdkwork.router.portal.session-expired';
+const portalProxyPrefix = '/api/portal';
+
+type TauriWindowLike = Window & {
+  __TAURI__?: unknown;
+  __TAURI_INTERNALS__?: TauriInternalsLike;
+  isTauri?: boolean;
+};
+
+type TauriInternalsLike = {
+  invoke?: <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+};
+
+let cachedPortalDesktopBaseUrl: string | null = null;
 
 export class PortalApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -25,7 +38,69 @@ export class PortalApiError extends Error {
 }
 
 export function portalBaseUrl(): string {
-  return '/api/portal';
+  return cachedPortalDesktopBaseUrl ?? portalProxyPrefix;
+}
+
+function resolveWindow(): TauriWindowLike | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window as TauriWindowLike;
+}
+
+function isDesktopRuntime(): boolean {
+  const currentWindow = resolveWindow();
+  return Boolean(
+    currentWindow?.isTauri ||
+      currentWindow?.__TAURI__ ||
+      currentWindow?.__TAURI_INTERNALS__,
+  );
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/g, '');
+}
+
+function joinUrl(baseUrl: string, path: string): string {
+  const normalizedBase = trimTrailingSlash(baseUrl);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function invokeDesktopCommand<T>(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  const invoke = resolveWindow()?.__TAURI_INTERNALS__?.invoke;
+  if (typeof invoke !== 'function') {
+    throw new Error('Tauri invoke bridge is unavailable.');
+  }
+
+  return invoke<T>(command, args);
+}
+
+async function resolvePortalBaseUrl(): Promise<string> {
+  if (cachedPortalDesktopBaseUrl) {
+    return cachedPortalDesktopBaseUrl;
+  }
+
+  if (!isDesktopRuntime()) {
+    return portalProxyPrefix;
+  }
+
+  try {
+    const runtimeBaseUrl = await invokeDesktopCommand<string>('runtime_base_url');
+    const normalizedBaseUrl = runtimeBaseUrl?.trim();
+    if (normalizedBaseUrl) {
+      cachedPortalDesktopBaseUrl = joinUrl(normalizedBaseUrl, portalProxyPrefix);
+      return cachedPortalDesktopBaseUrl;
+    }
+  } catch {
+    // Fall back to the browser-style relative proxy path when the desktop bridge is unavailable.
+  }
+
+  return portalProxyPrefix;
 }
 
 export function readPortalSessionToken(): string | null {
@@ -76,7 +151,7 @@ function requiredPortalToken(providedToken?: string): string {
 }
 
 async function getJson<T>(path: string, token?: string): Promise<T> {
-  const response = await fetch(`${portalBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolvePortalBaseUrl()}${path}`, {
     headers: token
       ? {
           authorization: `Bearer ${token}`,
@@ -98,7 +173,7 @@ async function postJson<TRequest, TResponse>(
     headers.authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${portalBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolvePortalBaseUrl()}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -113,7 +188,7 @@ async function deleteEmpty(path: string, token?: string): Promise<void> {
     headers.authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${portalBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolvePortalBaseUrl()}${path}`, {
     method: 'DELETE',
     headers,
   });

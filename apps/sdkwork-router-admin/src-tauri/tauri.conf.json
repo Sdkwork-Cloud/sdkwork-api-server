@@ -5,9 +5,15 @@
   "identifier": "com.sdkwork.router.admin",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "node ../../scripts/build-router-desktop-assets.mjs",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173/admin/"
+  },
+  "bundle": {
+    "resources": {
+      "../dist": "embedded-sites/admin",
+      "../../sdkwork-router-portal/dist": "embedded-sites/portal"
+    }
   },
   "app": {
     "windows": [

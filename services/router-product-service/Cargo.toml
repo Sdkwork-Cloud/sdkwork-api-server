@@ -1,0 +1,14 @@
+[package]
+name = "router-product-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4.5", features = ["derive"] }
+sdkwork-api-config = { path = "../../crates/sdkwork-api-config" }
+sdkwork-api-observability = { path = "../../crates/sdkwork-api-observability" }
+sdkwork-api-product-runtime = { path = "../../crates/sdkwork-api-product-runtime" }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["signal"] }

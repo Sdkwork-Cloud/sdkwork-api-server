@@ -365,6 +365,42 @@ fn standalone_config_loader_watch_state_changes_when_config_file_is_created() {
 }
 
 #[test]
+fn standalone_config_loader_with_overrides_preserves_requested_config_file() {
+    let root = temp_config_root("loader-with-overrides");
+    let config_dir = root.join("configs");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("custom.yaml"),
+        r#"
+admin_bind: "127.0.0.1:19081"
+portal_bind: "127.0.0.1:19082"
+"#,
+    )
+    .unwrap();
+
+    let (loader, initial) = StandaloneConfigLoader::from_local_root_and_pairs(
+        &root,
+        [
+            ("SDKWORK_CONFIG_FILE", "configs/custom.yaml"),
+            ("SDKWORK_GATEWAY_BIND", "127.0.0.1:29080"),
+        ],
+    )
+    .unwrap();
+    assert_eq!(initial.admin_bind, "127.0.0.1:19081");
+    assert_eq!(initial.gateway_bind, "127.0.0.1:29080");
+
+    let (overridden_loader, overridden) = loader
+        .with_overrides([("SDKWORK_GATEWAY_BIND", "127.0.0.1:39080")])
+        .unwrap();
+
+    assert_eq!(overridden.gateway_bind, "127.0.0.1:39080");
+    assert_eq!(overridden.admin_bind, "127.0.0.1:19081");
+    assert_eq!(overridden.portal_bind, "127.0.0.1:19082");
+    assert_eq!(overridden_loader.reload().unwrap().gateway_bind, "127.0.0.1:39080");
+    assert_eq!(overridden_loader.reload().unwrap().admin_bind, "127.0.0.1:19081");
+}
+
+#[test]
 fn parses_native_dynamic_shutdown_drain_timeout_from_pairs_and_reload_inputs() {
     let env_config =
         StandaloneConfig::from_pairs([("SDKWORK_NATIVE_DYNAMIC_SHUTDOWN_DRAIN_TIMEOUT_MS", "75")])

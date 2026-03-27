@@ -42,6 +42,17 @@ fn classify_request_rewrites_api_routes_to_service_paths() {
 }
 
 #[test]
+fn classify_request_routes_gateway_health_without_v1_prefix() {
+    assert_eq!(
+        classify_request("/api/v1/health"),
+        RuntimeRoute::Proxy {
+            upstream: "gateway".to_owned(),
+            request_path: "/health".to_owned(),
+        }
+    );
+}
+
+#[test]
 fn classify_request_identifies_static_site_mounts() {
     assert_eq!(
         classify_request("/portal/assets/index.js"),

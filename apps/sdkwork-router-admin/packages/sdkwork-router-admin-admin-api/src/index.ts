@@ -24,6 +24,19 @@ import type {
 } from 'sdkwork-router-admin-types';
 
 const adminSessionTokenKey = 'sdkwork.router.admin.session-token';
+const adminProxyPrefix = '/api/admin';
+
+type TauriWindowLike = Window & {
+  __TAURI__?: unknown;
+  __TAURI_INTERNALS__?: TauriInternalsLike;
+  isTauri?: boolean;
+};
+
+type TauriInternalsLike = {
+  invoke?: <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+};
+
+let cachedAdminDesktopBaseUrl: string | null = null;
 
 export class AdminApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -32,7 +45,69 @@ export class AdminApiError extends Error {
 }
 
 export function adminBaseUrl(): string {
-  return '/api/admin';
+  return cachedAdminDesktopBaseUrl ?? adminProxyPrefix;
+}
+
+function resolveWindow(): TauriWindowLike | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window as TauriWindowLike;
+}
+
+function isDesktopRuntime(): boolean {
+  const currentWindow = resolveWindow();
+  return Boolean(
+    currentWindow?.isTauri ||
+      currentWindow?.__TAURI__ ||
+      currentWindow?.__TAURI_INTERNALS__,
+  );
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/g, '');
+}
+
+function joinUrl(baseUrl: string, path: string): string {
+  const normalizedBase = trimTrailingSlash(baseUrl);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function invokeDesktopCommand<T>(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  const invoke = resolveWindow()?.__TAURI_INTERNALS__?.invoke;
+  if (typeof invoke !== 'function') {
+    throw new Error('Tauri invoke bridge is unavailable.');
+  }
+
+  return invoke<T>(command, args);
+}
+
+async function resolveAdminBaseUrl(): Promise<string> {
+  if (cachedAdminDesktopBaseUrl) {
+    return cachedAdminDesktopBaseUrl;
+  }
+
+  if (!isDesktopRuntime()) {
+    return adminProxyPrefix;
+  }
+
+  try {
+    const runtimeBaseUrl = await invokeDesktopCommand<string>('runtime_base_url');
+    const normalizedBaseUrl = runtimeBaseUrl?.trim();
+    if (normalizedBaseUrl) {
+      cachedAdminDesktopBaseUrl = joinUrl(normalizedBaseUrl, adminProxyPrefix);
+      return cachedAdminDesktopBaseUrl;
+    }
+  } catch {
+    // Fall back to the browser-style relative proxy path when the desktop bridge is unavailable.
+  }
+
+  return adminProxyPrefix;
 }
 
 export function readAdminSessionToken(): string | null {
@@ -71,7 +146,7 @@ function requiredToken(token?: string): string {
 }
 
 async function getJson<T>(path: string, token?: string): Promise<T> {
-  const response = await fetch(`${adminBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolveAdminBaseUrl()}${path}`, {
     headers: {
       authorization: `Bearer ${requiredToken(token)}`,
     },
@@ -84,7 +159,7 @@ async function postJson<TRequest, TResponse>(
   body: TRequest,
   token?: string,
 ): Promise<TResponse> {
-  const response = await fetch(`${adminBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolveAdminBaseUrl()}${path}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -96,7 +171,7 @@ async function postJson<TRequest, TResponse>(
 }
 
 async function deleteEmpty(path: string, token?: string): Promise<void> {
-  const response = await fetch(`${adminBaseUrl()}${path}`, {
+  const response = await fetch(`${await resolveAdminBaseUrl()}${path}`, {
     method: 'DELETE',
     headers: {
       authorization: `Bearer ${requiredToken(token)}`,
@@ -269,21 +344,25 @@ export function updateApiKey(input: {
   notes?: string | null;
   expires_at_ms?: number | null;
 }): Promise<GatewayApiKeyRecord> {
-  return fetch(`${adminBaseUrl()}/api-keys/${encodeURIComponent(input.hashed_key)}`, {
-    method: 'PUT',
-    headers: {
-      authorization: `Bearer ${requiredToken()}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      tenant_id: input.tenant_id,
-      project_id: input.project_id,
-      environment: input.environment,
-      label: input.label,
-      notes: input.notes,
-      expires_at_ms: input.expires_at_ms,
-    }),
-  }).then((response) => readJson<GatewayApiKeyRecord>(response));
+  return resolveAdminBaseUrl()
+    .then((baseUrl) =>
+      fetch(`${baseUrl}/api-keys/${encodeURIComponent(input.hashed_key)}`, {
+        method: 'PUT',
+        headers: {
+          authorization: `Bearer ${requiredToken()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenant_id: input.tenant_id,
+          project_id: input.project_id,
+          environment: input.environment,
+          label: input.label,
+          notes: input.notes,
+          expires_at_ms: input.expires_at_ms,
+        }),
+      }),
+    )
+    .then((response) => readJson<GatewayApiKeyRecord>(response));
 }
 
 export function updateApiKeyStatus(

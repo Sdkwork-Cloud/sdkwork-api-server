@@ -695,6 +695,23 @@ impl StandaloneConfigLoader {
         StandaloneConfig::from_local_root_and_values(self.local_root.clone(), self.values.clone())
     }
 
+    pub fn local_root(&self) -> &Path {
+        &self.local_root
+    }
+
+    pub fn with_overrides<I, K, V>(&self, pairs: I) -> Result<(Self, StandaloneConfig)>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let mut values = self.values.clone();
+        for (key, value) in pairs {
+            values.insert(key.into(), value.into());
+        }
+        Self::from_local_root_and_values(self.local_root.clone(), values)
+    }
+
     pub fn watch_state(&self) -> Result<StandaloneConfigWatchState> {
         StandaloneConfigWatchState::capture(&self.local_root, &self.values)
     }

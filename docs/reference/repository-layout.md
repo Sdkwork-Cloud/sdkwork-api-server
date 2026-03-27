@@ -24,8 +24,9 @@ This page explains how the workspace is organized so contributors can quickly fi
 | `services/admin-api-service` | standalone `/admin/*` control-plane binary |
 | `services/portal-api-service` | standalone `/portal/*` self-service binary |
 | `services/router-web-service` | Pingora public web host for admin and portal static delivery |
+| `services/router-product-service` | integrated product host for server-mode `/admin/*`, `/portal/*`, and `/api/*` |
 | `apps/sdkwork-router-admin/` | standalone admin browser app plus admin-owned Tauri host |
-| `apps/sdkwork-router-portal/` | standalone browser portal app |
+| `apps/sdkwork-router-portal/` | standalone browser portal app plus portal-owned Tauri host and product entrypoint |
 | `docs/` | VitePress documentation site |
 
 ## Backend Layers
@@ -47,6 +48,7 @@ This page explains how the workspace is organized so contributors can quickly fi
 - `services/admin-api-service`
 - `services/portal-api-service`
 - `services/router-web-service`
+- `services/router-product-service`
 
 ## Frontend Layers
 

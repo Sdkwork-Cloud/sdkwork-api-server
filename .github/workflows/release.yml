@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing release tag to build and publish assets for
+        description: Existing release tag to publish
         required: true
         type: string
       git_ref:
-        description: Git ref to checkout; defaults to refs/tags/<release_tag>
+        description: Git ref to build; defaults to refs/tags/<release_tag>
         required: false
         type: string
 
@@ -43,17 +43,38 @@ jobs:
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "git_ref=$git_ref" >> "$GITHUB_OUTPUT"
 
-  release-services:
-    name: Release service binaries (${{ matrix.os }})
+  native-release:
+    name: Native release (${{ matrix.platform }}-${{ matrix.arch }})
     needs: prepare
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
-          - macos-latest
+        include:
+          - runner: windows-2022
+            platform: windows
+            arch: x64
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            platform: windows
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+          - runner: ubuntu-22.04
+            platform: linux
+            arch: x64
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-13
+            platform: macos
+            arch: x64
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            platform: macos
+            arch: arm64
+            target: aarch64-apple-darwin
     steps:
       - name: Checkout release ref
         uses: actions/checkout@v5
@@ -61,66 +82,86 @@ jobs:
           ref: ${{ needs.prepare.outputs.git_ref }}
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/sdkwork-router-admin/pnpm-lock.yaml
+            apps/sdkwork-router-portal/pnpm-lock.yaml
+            console/pnpm-lock.yaml
+            docs/pnpm-lock.yaml
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Build release binaries on Windows
-        if: matrix.os == 'windows-latest'
+      - name: Install Linux desktop dependencies
+        if: matrix.platform == 'linux'
         shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install native workspace dependencies
+        shell: bash
+        run: |
+          pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+          pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
+          pnpm --dir console install --frozen-lockfile
+
+      - name: Build release service binaries on Windows
+        if: matrix.platform == 'windows'
         env:
           CMAKE_GENERATOR: Visual Studio 17 2022
-        run: cargo build --release -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service
-
-      - name: Build release binaries on Unix
-        if: matrix.os != 'windows-latest'
+          HOST_CMAKE_GENERATOR: Visual Studio 17 2022
         shell: bash
-        run: cargo build --release -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service
+        run: cargo build --release --target ${{ matrix.target }} -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service -p router-product-service
 
-      - name: Package Windows service binaries
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          $tag = "${{ needs.prepare.outputs.release_tag }}"
-          $assetBase = "sdkwork-api-router-services-$tag-$env:RUNNER_OS-$env:RUNNER_ARCH".ToLower()
-          New-Item -ItemType Directory -Force artifacts/package/bin | Out-Null
-          Copy-Item target/release/admin-api-service.exe artifacts/package/bin/
-          Copy-Item target/release/gateway-service.exe artifacts/package/bin/
-          Copy-Item target/release/portal-api-service.exe artifacts/package/bin/
-          Copy-Item target/release/router-web-service.exe artifacts/package/bin/
-          Compress-Archive -Path artifacts/package/* -DestinationPath "$assetBase.zip" -Force
-          $hash = (Get-FileHash "$assetBase.zip" -Algorithm SHA256).Hash.ToLower()
-          Set-Content -Path "$assetBase.zip.sha256.txt" -Value "$hash  $assetBase.zip"
-
-      - name: Package Unix service binaries
-        if: matrix.os != 'windows-latest'
+      - name: Build release service binaries on Unix
+        if: matrix.platform != 'windows'
         shell: bash
-        run: |
-          tag="${{ needs.prepare.outputs.release_tag }}"
-          runner_os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
-          runner_arch="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
-          asset_base="sdkwork-api-router-services-${tag}-${runner_os}-${runner_arch}"
-          mkdir -p artifacts/package/bin
-          cp target/release/admin-api-service artifacts/package/bin/
-          cp target/release/gateway-service artifacts/package/bin/
-          cp target/release/portal-api-service artifacts/package/bin/
-          cp target/release/router-web-service artifacts/package/bin/
-          tar -czf "${asset_base}.tar.gz" -C artifacts/package .
-          shasum -a 256 "${asset_base}.tar.gz" > "${asset_base}.tar.gz.sha256.txt"
+        run: cargo build --release --target ${{ matrix.target }} -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service -p router-product-service
 
-      - name: Upload service assets to GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Build admin desktop release
+        shell: bash
+        run: node scripts/release/run-desktop-release-build.mjs --app admin --target ${{ matrix.target }}
+
+      - name: Build portal desktop release
+        shell: bash
+        run: node scripts/release/run-desktop-release-build.mjs --app portal --target ${{ matrix.target }}
+
+      - name: Build console desktop release
+        shell: bash
+        run: node scripts/release/run-desktop-release-build.mjs --app console --target ${{ matrix.target }}
+
+      - name: Collect native release assets
+        shell: bash
+        run: node scripts/release/package-release-assets.mjs native --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --target ${{ matrix.target }} --output-dir artifacts/release
+
+      - name: Upload native release assets
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.prepare.outputs.release_tag }}
-          files: |
-            sdkwork-api-router-services-*
-          fail_on_unmatched_files: true
-          overwrite_files: true
+          name: release-assets-native-${{ matrix.platform }}-${{ matrix.arch }}
+          path: artifacts/release/**/*
+          if-no-files-found: error
 
-  release-web-assets:
-    name: Release web assets
+  web-release:
+    name: Web release assets
     needs: prepare
     runs-on: ubuntu-latest
     steps:
@@ -133,51 +174,68 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.0.0
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: |
             apps/sdkwork-router-admin/pnpm-lock.yaml
             apps/sdkwork-router-portal/pnpm-lock.yaml
+            console/pnpm-lock.yaml
             docs/pnpm-lock.yaml
 
-      - name: Install admin dependencies
-        run: pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+      - name: Install web workspace dependencies
+        shell: bash
+        run: |
+          pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+          pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
+          pnpm --dir console install --frozen-lockfile
+          pnpm --dir docs install --frozen-lockfile
 
-      - name: Install portal dependencies
-        run: pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
-
-      - name: Install docs dependencies
-        run: pnpm --dir docs install --frozen-lockfile
-
-      - name: Build web assets
+      - name: Build web release assets
         shell: bash
         run: |
           pnpm --dir apps/sdkwork-router-admin build
           pnpm --dir apps/sdkwork-router-portal build
+          pnpm --dir console build
           pnpm --dir docs build
 
-      - name: Package web assets
+      - name: Package web release assets
         shell: bash
-        run: |
-          tag="${{ needs.prepare.outputs.release_tag }}"
-          asset_base="sdkwork-api-router-web-assets-${tag}-linux-x64"
-          mkdir -p artifacts/web/admin artifacts/web/portal artifacts/web/docs
-          cp -R apps/sdkwork-router-admin/dist artifacts/web/admin/dist
-          cp -R apps/sdkwork-router-portal/dist artifacts/web/portal/dist
-          cp -R docs/.vitepress/dist artifacts/web/docs/dist
-          tar -czf "${asset_base}.tar.gz" -C artifacts/web .
-          shasum -a 256 "${asset_base}.tar.gz" > "${asset_base}.tar.gz.sha256.txt"
+        run: node scripts/release/package-release-assets.mjs web --release-tag ${{ needs.prepare.outputs.release_tag }} --output-dir artifacts/release
 
-      - name: Upload web assets to GitHub release
+      - name: Upload web release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-web
+          path: artifacts/release/**/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs:
+      - prepare
+      - native-release
+      - web-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
-          files: |
-            sdkwork-api-router-web-assets-*
-          fail_on_unmatched_files: true
+          name: SDKWork API Router ${{ needs.prepare.outputs.release_tag }}
+          generate_release_notes: true
           overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/**/*

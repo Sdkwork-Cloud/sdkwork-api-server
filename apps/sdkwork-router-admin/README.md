@@ -87,6 +87,42 @@ pnpm install
 pnpm typecheck
 pnpm build
 pnpm dev
+pnpm tauri:dev
+pnpm tauri:build
 ```
 
 The Vite dev server proxies `/api/admin/*` to `http://127.0.0.1:8081/admin/*`.
+
+## Desktop Product Host
+
+The admin desktop shell now uses the shared `sdkwork-api-product-runtime` instead of a hard-coded web host bootstrap.
+
+That means the admin desktop app:
+
+- starts the same shared router product runtime used by the portal desktop app
+- serves both bundled admin and portal static sites
+- exposes the same public web host contract as server mode
+- keeps the existing admin IPC commands while resolving the runtime base URL at startup
+
+The admin Tauri bundle includes:
+
+- `embedded-sites/admin`
+- `embedded-sites/portal`
+
+This keeps the super-admin desktop experience aligned with the server-delivered `/admin/*` and `/portal/*` contract.
+
+## Relationship To Server Mode
+
+Server mode is owned by `apps/sdkwork-router-portal` through `pnpm server:start`, which launches `router-product-service`.
+
+Use the admin app when you want:
+
+- a local operator desktop shell
+- bundled admin plus portal assets
+- the full router product running on loopback for local operations
+
+Use server mode when you want:
+
+- browser access to `/admin/*` and `/portal/*`
+- a deployable service process
+- cluster role slicing across `web`, `gateway`, `admin`, and `portal`
