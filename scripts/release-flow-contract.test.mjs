@@ -301,3 +301,17 @@ test('native desktop packager also accepts app-root target bundle roots used by 
     rmSync(stagingRoot, { recursive: true, force: true });
   }
 });
+
+test('native release packager exposes GitHub annotation-safe error formatting for CI failures', async () => {
+  const packagerPath = path.join(rootDir, 'scripts', 'release', 'package-release-assets.mjs');
+  const packager = await import(pathToFileURL(packagerPath).href);
+
+  assert.equal(typeof packager.buildGitHubActionsErrorAnnotation, 'function');
+  assert.equal(
+    packager.buildGitHubActionsErrorAnnotation({
+      title: 'package:release,assets',
+      error: new Error('bundle missing 50%\nnext line\rfinal line'),
+    }),
+    '::error title=package%3Arelease%2Cassets::bundle missing 50%25%0Anext line%0Dfinal line',
+  );
+});

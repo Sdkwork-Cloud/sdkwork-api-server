@@ -299,6 +299,60 @@ function ensureDirectory(directoryPath) {
   mkdirSync(directoryPath, { recursive: true });
 }
 
+function truncateText(value, maxLength = 4000) {
+  const text = String(value ?? '').trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 12))}...[truncated]`;
+}
+
+function escapeGitHubActionsCommandValue(value, { property = false } = {}) {
+  let escaped = String(value ?? '');
+  escaped = escaped.replaceAll('%', '%25');
+  escaped = escaped.replaceAll('\r', '%0D');
+  escaped = escaped.replaceAll('\n', '%0A');
+  if (property) {
+    escaped = escaped.replaceAll(':', '%3A');
+    escaped = escaped.replaceAll(',', '%2C');
+  }
+
+  return escaped;
+}
+
+export function buildGitHubActionsErrorAnnotation({
+  title = 'package-release-assets',
+  error,
+} = {}) {
+  const message = truncateText(
+    error instanceof Error ? error.message : String(error),
+    8000,
+  );
+  const escapedTitle = escapeGitHubActionsCommandValue(title, { property: true });
+  const escapedMessage = escapeGitHubActionsCommandValue(message);
+  return `::error title=${escapedTitle}::${escapedMessage}`;
+}
+
+function describeDirectoryState(sourceDir, maxEntries = 12) {
+  if (!existsSync(sourceDir)) {
+    return `${sourceDir} [missing]`;
+  }
+
+  const files = listFilesRecursively(sourceDir);
+  if (files.length === 0) {
+    return `${sourceDir} [exists, empty]`;
+  }
+
+  const sample = files
+    .slice(0, maxEntries)
+    .map((file) => file.relativePath.replaceAll('\\', '/'))
+    .join(', ');
+  const remainingCount = files.length - Math.min(files.length, maxEntries);
+  const remainingSuffix = remainingCount > 0 ? ` (+${remainingCount} more)` : '';
+  return `${sourceDir} [${files.length} files: ${sample}${remainingSuffix}]`;
+}
+
 function writeSha256File(filePath) {
   const checksum = createHash('sha256').update(readFileSync(filePath)).digest('hex');
   writeFileSync(
@@ -320,7 +374,9 @@ function copyServiceBinaries({ platformId, targetTriple, targetDir, writeChecksu
     const fileName = withExecutable(binaryName, platformId);
     const sourcePath = path.join(serviceReleaseRoot, fileName);
     if (!existsSync(sourcePath)) {
-      throw new Error(`Missing release service binary: ${sourcePath}`);
+      throw new Error(
+        `Missing release service binary: ${sourcePath}\nservice release root: ${describeDirectoryState(serviceReleaseRoot)}`,
+      );
     }
 
     const targetPath = path.join(targetDir, fileName);
@@ -351,7 +407,7 @@ function packageDesktopBundles({ platformId, archId, targetTriple, outputDir }) 
     });
     if (!buildRoot) {
       throw new Error(
-        `Missing desktop bundle output directory for ${appId}: ${buildRoots.join(', ')}`,
+        `Missing desktop bundle output directory for ${appId}. candidates: ${buildRoots.map((root) => describeDirectoryState(root)).join(' | ')}`,
       );
     }
 
@@ -366,7 +422,9 @@ function packageDesktopBundles({ platformId, archId, targetTriple, outputDir }) 
     }
 
     if (bundleFiles.length === 0) {
-      throw new Error(`No ${platformId} desktop release assets matched under ${buildRoot}`);
+      throw new Error(
+        `No ${platformId} desktop release assets matched under ${buildRoot}\nbundle root: ${describeDirectoryState(buildRoot)}`,
+      );
     }
 
     const appOutputDir = path.join(outputDir, 'native', platformId, archId, 'desktop', appId);
@@ -411,7 +469,9 @@ function writeProductServerBundleReadme({ archiveRoot, platformId, archId, targe
 function packageProductServerBundle({ platformId, archId, targetTriple, outputDir }) {
   for (const [label, sourceDir] of Object.entries(productServerSiteAssetRoots)) {
     if (!existsSync(sourceDir)) {
-      throw new Error(`Missing product server site assets for ${label}: ${sourceDir}`);
+      throw new Error(
+        `Missing product server site assets for ${label}: ${sourceDir}\nsite asset root: ${describeDirectoryState(sourceDir)}`,
+      );
     }
   }
 
@@ -507,15 +567,22 @@ function packageNativeAssets({ platform, arch, target, outputDir }) {
 function runTarCommand(archivePath, workingDirectory, entryName) {
   const result = spawnSync('tar', ['-czf', archivePath, '-C', workingDirectory, entryName], {
     cwd: rootDir,
-    stdio: 'inherit',
     shell: process.platform === 'win32',
+    encoding: 'utf8',
   });
 
   if (result.error) {
     throw new Error(`tar failed while packaging ${archivePath}: ${result.error.message}`);
   }
   if (result.status !== 0) {
-    throw new Error(`tar failed while packaging ${archivePath} with exit code ${result.status ?? 'unknown'}`);
+    const stdout = truncateText(result.stdout, 2000);
+    const stderr = truncateText(result.stderr, 2000);
+    const output = [stdout && `stdout: ${stdout}`, stderr && `stderr: ${stderr}`]
+      .filter(Boolean)
+      .join('\n');
+    throw new Error(
+      `tar failed while packaging ${archivePath} with exit code ${result.status ?? 'unknown'}${output ? `\n${output}` : ''}`,
+    );
   }
 }
 
@@ -586,7 +653,10 @@ if (path.resolve(process.argv[1] ?? '') === __filename) {
   try {
     main();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.error(buildGitHubActionsErrorAnnotation({ error }));
+    }
+    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
     process.exit(1);
   }
 }
