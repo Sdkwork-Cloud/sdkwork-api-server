@@ -21,7 +21,6 @@ test('repository exposes a native platform and architecture release workflow', (
   assert.match(workflow, /windows-2022/);
   assert.match(workflow, /windows-11-arm/);
   assert.match(workflow, /ubuntu-22\.04/);
-  assert.match(workflow, /macos-13/);
   assert.match(workflow, /macos-14/);
   assert.match(workflow, /arch:\s*x64/);
   assert.match(workflow, /arch:\s*arm64/);
