@@ -95,15 +95,27 @@ export function createRouterProductLaunchPlan({
       cwd: workspaceRoot,
       env,
       shell,
+      windowsHide: platform === 'win32',
     });
   }
 
   let launchArgs;
   let label;
+  let launchEnv = env;
   switch (mode) {
     case 'desktop':
       label = 'portal desktop runtime';
       launchArgs = appendForwardArgs(['--dir', portalRelativeDir, 'tauri:dev'], extraArgs);
+      break;
+    case 'service':
+      label = 'portal service runtime';
+      launchArgs = appendForwardArgs(['--dir', portalRelativeDir, 'tauri:dev'], extraArgs);
+      launchEnv = {
+        ...env,
+        SDKWORK_ROUTER_BACKGROUND: '1',
+        SDKWORK_ROUTER_PORTAL_START_HIDDEN: '1',
+        SDKWORK_ROUTER_SERVICE_MODE: '1',
+      };
       break;
     case 'server':
       label = 'portal product server';
@@ -135,7 +147,7 @@ export function createRouterProductLaunchPlan({
       break;
     default:
       throw new Error(
-        `Unsupported router product mode: ${mode}. Expected one of desktop, server, plan, check, browser.`,
+        `Unsupported router product mode: ${mode}. Expected one of desktop, service, server, plan, check, browser.`,
       );
   }
 
@@ -144,8 +156,9 @@ export function createRouterProductLaunchPlan({
     command: pnpm,
     args: launchArgs,
     cwd: workspaceRoot,
-    env,
+    env: launchEnv,
     shell,
+    windowsHide: platform === 'win32',
   });
 
   return plan;
@@ -158,6 +171,7 @@ Start the sdkwork-router-portal product as a desktop runtime or server runtime.
 
 Modes:
   desktop  Start the Tauri desktop host and embedded router product runtime (default)
+  service  Start the desktop host in tray-managed service mode
   server   Start router-product-service through the portal product entrypoint
   plan     Print the resolved server deployment plan through the portal entrypoint
   check    Run the integrated product verification flow
@@ -170,6 +184,7 @@ Options:
 
 Examples:
   node scripts/run-router-product.mjs
+  node scripts/run-router-product.mjs service
   node scripts/run-router-product.mjs server --roles web --gateway-upstream 10.0.0.21:8080
   node scripts/run-router-product.mjs plan --roles web
   node scripts/run-router-product.mjs check
@@ -183,6 +198,7 @@ async function runStep(step) {
       env: step.env,
       stdio: 'inherit',
       shell: step.shell ?? false,
+      windowsHide: step.windowsHide ?? process.platform === 'win32',
     });
 
     child.on('error', reject);

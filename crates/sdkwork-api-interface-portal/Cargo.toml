@@ -7,12 +7,15 @@ license.workspace = true
 [dependencies]
 axum.workspace = true
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
+sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
+sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
@@ -20,6 +23,7 @@ sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde.workspace = true
 sqlx.workspace = true
+tower-http.workspace = true
 
 [dev-dependencies]
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }

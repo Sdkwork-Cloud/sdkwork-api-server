@@ -58,7 +58,7 @@ test('portal header behaves like a claw-style desktop titlebar without a centere
   assert.doesNotMatch(header, /Sparkles/);
 });
 
-test('portal shell sidebar keeps claw-style collapse rhythm without custom resize affordances', () => {
+test('portal shell sidebar keeps claw-studio collapse rhythm with resize and edge affordances', () => {
   const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
   const packageJson = read('packages/sdkwork-router-portal-core/package.json');
   const store = read('packages/sdkwork-router-portal-core/src/store/usePortalShellStore.ts');
@@ -66,23 +66,29 @@ test('portal shell sidebar keeps claw-style collapse rhythm without custom resiz
   const preferences = read('packages/sdkwork-router-portal-core/src/lib/portalPreferences.ts');
 
   assert.match(packageJson, /"motion"/);
-  assert.match(sidebar, /from 'motion\/react'/);
   assert.match(store, /isSidebarCollapsed/);
   assert.match(store, /sidebarWidth/);
+  assert.match(store, /sidebarCollapsePreference/);
+  assert.match(store, /resolveAutoSidebarCollapsed/);
   assert.match(store, /hiddenSidebarItems/);
-  assert.match(sidebar, /motion\.(div|aside)/);
   assert.match(sidebar, /w-full items-center overflow-hidden whitespace-nowrap/);
   assert.match(sidebar, /SDKWork Router/);
   assert.match(sidebar, /Developer portal/);
   assert.match(sidebar, /M12 2v2/);
   assert.match(sidebar, /M15 12a3 3 0 1 1-6 0/);
   assert.match(sidebar, /toggleSidebar/);
-  assert.doesNotMatch(sidebar, /sidebar-resize-handle/);
-  assert.doesNotMatch(sidebar, /cursor-col-resize/);
+  assert.match(sidebar, /const \[isSidebarHovered, setIsSidebarHovered\] = useState\(false\)/);
+  assert.match(sidebar, /const \[isSidebarResizing, setIsSidebarResizing\] = useState\(false\)/);
+  assert.match(sidebar, /showEdgeAffordances = !isSidebarCollapsed && \(isSidebarHovered \|\| isSidebarResizing\)/);
+  assert.match(sidebar, /data-slot="sidebar-edge-control"/);
+  assert.match(sidebar, /data-slot="sidebar-resize-handle"/);
+  assert.match(sidebar, /cursor-col-resize/);
+  assert.match(sidebar, /onPointerDown=\{startSidebarResize\}/);
   assert.doesNotMatch(sidebar, /Active workspace/);
-  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 60/);
-  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 240/);
-  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 240/);
+  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72/);
+  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 252/);
+  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 220/);
+  assert.match(preferences, /PORTAL_MAX_SIDEBAR_WIDTH = 360/);
   assert.match(configCenter, /hiddenSidebarItems/);
   assert.match(configCenter, /themeColor/);
 });
@@ -146,8 +152,8 @@ test('portal shell exposes a dedicated WindowControls component and desktop host
   assert.equal(existsSync(tauriIconPath), true);
   assert.match(packageJson, /"tauri:dev"/);
   assert.match(packageJson, /"tauri:build"/);
-  assert.match(packageJson, /CMAKE_GENERATOR/);
-  assert.match(packageJson, /Visual Studio 17 2022/);
+  assert.match(packageJson, /run-tauri-cli\.mjs dev/);
+  assert.match(packageJson, /run-tauri-cli\.mjs build/);
   assert.match(packageJson, /@tauri-apps\/cli/);
 
   const tauriConfig = readFileSync(tauriConfigPath, 'utf8');

@@ -35,6 +35,35 @@ pub fn record_usage_with_tokens(
         .with_token_usage(input_tokens, output_tokens, total_tokens))
 }
 
+pub fn record_usage_with_tokens_and_facts(
+    project_id: &str,
+    model: &str,
+    provider: &str,
+    units: u64,
+    amount: f64,
+    input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
+    api_key_hash: Option<&str>,
+    channel_id: Option<&str>,
+    latency_ms: Option<u64>,
+    reference_amount: Option<f64>,
+) -> Result<UsageRecord> {
+    Ok(
+        record_usage_with_tokens(
+            project_id,
+            model,
+            provider,
+            units,
+            amount,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+        )?
+        .with_request_facts(api_key_hash, channel_id, latency_ms, reference_amount),
+    )
+}
+
 pub async fn persist_usage_record(
     store: &dyn AdminStore,
     project_id: &str,
@@ -67,6 +96,38 @@ pub async fn persist_usage_record_with_tokens(
         input_tokens,
         output_tokens,
         total_tokens,
+    )?;
+    store.insert_usage_record(&usage).await
+}
+
+pub async fn persist_usage_record_with_tokens_and_facts(
+    store: &dyn AdminStore,
+    project_id: &str,
+    model: &str,
+    provider: &str,
+    units: u64,
+    amount: f64,
+    input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
+    api_key_hash: Option<&str>,
+    channel_id: Option<&str>,
+    latency_ms: Option<u64>,
+    reference_amount: Option<f64>,
+) -> Result<UsageRecord> {
+    let usage = record_usage_with_tokens_and_facts(
+        project_id,
+        model,
+        provider,
+        units,
+        amount,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        api_key_hash,
+        channel_id,
+        latency_ms,
+        reference_amount,
     )?;
     store.insert_usage_record(&usage).await
 }

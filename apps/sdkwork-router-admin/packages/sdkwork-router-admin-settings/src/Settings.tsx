@@ -1,9 +1,9 @@
-import { LayoutPanelLeft, Monitor, PanelsTopLeft, Search, ShieldCheck } from 'lucide-react';
+import { LayoutPanelLeft, Monitor, PanelsTopLeft, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { Input, useAdminI18n } from 'sdkwork-router-admin-commons';
+import { SearchInput, useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { AppearanceSettings } from './AppearanceSettings';
 import { GeneralSettings } from './GeneralSettings';
@@ -92,16 +92,12 @@ export function SettingsPage() {
           <h1 className="mb-6 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             {t('Settings')}
           </h1>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
-            <Input
-              type="text"
-              placeholder={t('Search settings')}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="py-2.5 pl-9 pr-4 text-[13px]"
-            />
-          </div>
+          <SearchInput
+            placeholder={t('Search settings')}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            inputClassName="h-10 pr-4 text-[13px]"
+          />
         </div>
 
         <nav className="scrollbar-hide flex-1 space-y-1.5 overflow-y-auto px-4 pb-6">

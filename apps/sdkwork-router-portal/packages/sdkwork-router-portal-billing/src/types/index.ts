@@ -1,4 +1,7 @@
 import type {
+  PortalCommerceMembership,
+  PortalCommerceOrder,
+  PortalCommerceQuote,
   PortalRouteKey,
   ProjectBillingSummary,
   RechargePack,
@@ -34,4 +37,10 @@ export interface BillingRecommendation {
 export interface BillingPageData {
   summary: ProjectBillingSummary;
   usage_records: UsageRecord[];
+  plans: SubscriptionPlan[];
+  packs: RechargePack[];
+  orders: PortalCommerceOrder[];
+  membership: PortalCommerceMembership | null;
 }
+
+export type BillingCheckoutPreview = PortalCommerceQuote;

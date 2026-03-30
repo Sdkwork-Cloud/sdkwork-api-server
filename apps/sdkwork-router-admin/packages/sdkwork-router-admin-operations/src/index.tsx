@@ -9,11 +9,14 @@ import {
   DialogFooter,
   DialogTrigger,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
   ToolbarDisclosure,
   ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
   useAdminI18n,
 } from 'sdkwork-router-admin-commons';
@@ -197,7 +200,7 @@ export function OperationsPage({
                 >
                   <form className="adminx-form-grid" onSubmit={(event) => void handleReload(event)}>
                     <FormField label="Extension id" hint="Leave blank to keep the reload scope open.">
-                      <input
+                      <Input
                         value={reloadDraft.extension_id}
                         onChange={(event) =>
                           setReloadDraft((current) => ({
@@ -208,7 +211,7 @@ export function OperationsPage({
                       />
                     </FormField>
                     <FormField label="Instance id" hint="Use this only when one runtime instance needs intervention.">
-                      <input
+                      <Input
                         value={reloadDraft.instance_id}
                         onChange={(event) =>
                           setReloadDraft((current) => ({
@@ -231,7 +234,7 @@ export function OperationsPage({
           </>
         )}
       >
-        <>
+        <ToolbarInline>
           <ToolbarSearchField
             label={t('Search operations')}
             value={search}
@@ -239,19 +242,19 @@ export function OperationsPage({
             placeholder="provider, runtime, instance, message"
           />
           <ToolbarDisclosure>
-            <div className="adminx-form-grid">
+            <ToolbarInline className="adminx-toolbar-inline-disclosure">
               <ToolbarField label={t('View mode')}>
-                <select
+                <Select
                   value={viewMode}
                   onChange={(event) => setViewMode(event.target.value as ViewMode)}
                 >
                   <option value="runtimes">{t('Managed runtimes')}</option>
                   <option value="providers">{t('Provider health')}</option>
-                </select>
+                </Select>
               </ToolbarField>
-            </div>
+            </ToolbarInline>
           </ToolbarDisclosure>
-        </>
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable

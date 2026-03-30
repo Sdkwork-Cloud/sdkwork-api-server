@@ -851,9 +851,9 @@ async fn stateful_thread_run_usage_uses_thread_route_key_for_provider_selection(
     let usage_json = read_json(usage).await;
     let usage_records = usage_json.as_array().unwrap();
     assert_eq!(usage_records.len(), 2);
-    assert_eq!(usage_records[0]["model"], "run_1");
+    assert_eq!(usage_records[0]["model"], "step_1");
     assert_eq!(usage_records[0]["provider"], "provider-thread");
-    assert_eq!(usage_records[1]["model"], "step_1");
+    assert_eq!(usage_records[1]["model"], "run_1");
     assert_eq!(usage_records[1]["provider"], "provider-thread");
 
     let logs = admin_app

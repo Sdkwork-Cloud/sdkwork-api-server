@@ -23,6 +23,7 @@
     "sdkwork-router-portal-commons": "workspace:*",
     "sdkwork-router-portal-credits": "workspace:*",
     "sdkwork-router-portal-dashboard": "workspace:*",
+    "sdkwork-router-portal-gateway": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
     "sdkwork-router-portal-routing": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*",

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::{Client, RequestBuilder};
@@ -53,7 +55,7 @@ use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookR
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
-    ProviderStreamOutput,
+    ProviderRequestOptions, ProviderStreamOutput,
 };
 use serde_json::Value;
 
@@ -65,6 +67,7 @@ pub fn map_model_object(model: &str) -> ModelCatalogEntry {
 pub struct OpenAiProviderAdapter {
     base_url: String,
     client: Client,
+    request_headers: HashMap<String, String>,
 }
 
 impl OpenAiProviderAdapter {
@@ -72,7 +75,13 @@ impl OpenAiProviderAdapter {
         Self {
             base_url: base_url.into().trim_end_matches('/').to_owned(),
             client: Client::new(),
+            request_headers: HashMap::new(),
         }
+    }
+
+    pub fn with_request_headers(mut self, headers: &HashMap<String, String>) -> Self {
+        self.request_headers = headers.clone();
+        self
     }
 
     pub async fn chat_completions(
@@ -1445,10 +1454,13 @@ impl OpenAiProviderAdapter {
         path: &str,
         api_key: &str,
     ) -> RequestBuilder {
-        let builder = self
+        let mut builder = self
             .client
             .request(method, format!("{}{}", self.base_url, path))
             .bearer_auth(api_key);
+        for (name, value) in &self.request_headers {
+            builder = builder.header(name, value);
+        }
 
         self.apply_openai_compat_headers(path, builder)
     }
@@ -2004,6 +2016,20 @@ impl ProviderExecutionAdapter for OpenAiProviderAdapter {
                 self.delete_webhook(api_key, webhook_id).await?,
             )),
         }
+    }
+
+    async fn execute_with_options(
+        &self,
+        api_key: &str,
+        request: ProviderRequest<'_>,
+        options: &ProviderRequestOptions,
+    ) -> Result<ProviderOutput> {
+        let adapter = if options.is_empty() {
+            self.clone()
+        } else {
+            self.clone().with_request_headers(options.headers())
+        };
+        adapter.execute(api_key, request).await
     }
 }
 

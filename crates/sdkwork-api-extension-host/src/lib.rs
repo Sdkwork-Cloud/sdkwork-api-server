@@ -34,7 +34,7 @@ use sdkwork_api_extension_core::{
 };
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
-    ProviderStreamOutput,
+    ProviderRequestOptions, ProviderStreamOutput,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -1315,6 +1315,37 @@ impl ProviderExecutionAdapter for NativeDynamicProviderAdapter {
             ProviderInvocationResult::Error { message } => Err(anyhow!("{message}")),
         }
     }
+
+    async fn execute_with_options(
+        &self,
+        api_key: &str,
+        request: ProviderRequest<'_>,
+        options: &ProviderRequestOptions,
+    ) -> AnyhowResult<ProviderOutput> {
+        let invocation = provider_invocation_from_request_with_options(
+            request,
+            api_key,
+            &self.base_url,
+            options,
+        )?;
+        if invocation.expects_stream {
+            let stream =
+                execute_native_dynamic_stream_invocation(Arc::clone(&self.runtime), &invocation)
+                    .await?;
+            return Ok(ProviderOutput::Stream(stream));
+        }
+        let result = execute_native_dynamic_invocation(&self.runtime, &invocation)?;
+        match result {
+            ProviderInvocationResult::Json { body } => Ok(ProviderOutput::Json(body)),
+            ProviderInvocationResult::Unsupported { message } => Err(anyhow!(
+                "{}",
+                message.unwrap_or_else(
+                    || "native dynamic provider reported unsupported operation".to_owned()
+                )
+            )),
+            ProviderInvocationResult::Error { message } => Err(anyhow!("{message}")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2106,6 +2137,16 @@ fn provider_invocation_from_request(
     api_key: &str,
     base_url: &str,
 ) -> Result<ProviderInvocation, ExtensionHostError> {
+    let options = ProviderRequestOptions::default();
+    provider_invocation_from_request_with_options(request, api_key, base_url, &options)
+}
+
+fn provider_invocation_from_request_with_options(
+    request: ProviderRequest<'_>,
+    api_key: &str,
+    base_url: &str,
+    options: &ProviderRequestOptions,
+) -> Result<ProviderInvocation, ExtensionHostError> {
     macro_rules! invocation_with_body {
         ($operation:expr, [$($param:expr),*], $body:expr, $expects_stream:expr) => {
             ProviderInvocation::new(
@@ -2116,6 +2157,7 @@ fn provider_invocation_from_request(
                 serialize_json_body($body, $operation)?,
                 $expects_stream,
             )
+            .with_headers(options.headers().clone())
         };
     }
 
@@ -2129,6 +2171,7 @@ fn provider_invocation_from_request(
                 Value::Null,
                 $expects_stream,
             )
+            .with_headers(options.headers().clone())
         };
     }
 
@@ -3120,10 +3163,11 @@ fn parse_http_health_url(health_url: &str) -> Result<(SocketAddr, String), Exten
 #[cfg(test)]
 mod tests {
     use super::provider_invocation_from_request;
+    use super::provider_invocation_from_request_with_options;
     use sdkwork_api_contract_openai::audio::CreateSpeechRequest;
     use sdkwork_api_contract_openai::responses::CreateResponseRequest;
     use sdkwork_api_contract_openai::uploads::CompleteUploadRequest;
-    use sdkwork_api_provider_core::ProviderRequest;
+    use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions};
 
     #[test]
     fn upload_complete_invocation_preserves_upload_id_as_path_param() {
@@ -3203,5 +3247,37 @@ mod tests {
 
         assert_eq!(invocation.operation, "videos.content");
         assert!(invocation.expects_stream);
+    }
+
+    #[test]
+    fn provider_invocation_preserves_compatibility_headers_when_requested() {
+        let request = CreateResponseRequest {
+            model: "gpt-4.1".to_owned(),
+            input: serde_json::Value::String("hello".to_owned()),
+            stream: None,
+        };
+        let options = ProviderRequestOptions::new()
+            .with_header("anthropic-version", "2023-06-01")
+            .with_header("anthropic-beta", "tools-2024-04-04");
+
+        let invocation = provider_invocation_from_request_with_options(
+            ProviderRequest::Responses(&request),
+            "sk-native",
+            "https://example.com/v1",
+            &options,
+        )
+        .expect("provider invocation");
+
+        assert_eq!(
+            invocation
+                .headers
+                .get("anthropic-version")
+                .map(String::as_str),
+            Some("2023-06-01")
+        );
+        assert_eq!(
+            invocation.headers.get("anthropic-beta").map(String::as_str),
+            Some("tools-2024-04-04")
+        );
     }
 }

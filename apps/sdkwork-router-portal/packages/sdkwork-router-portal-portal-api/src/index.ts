@@ -2,8 +2,19 @@ import type {
   CreatedGatewayApiKey,
   GatewayApiKeyRecord,
   LedgerEntry,
+  PortalCommerceCheckoutSession,
+  PortalCommercePaymentEventRequest,
+  PortalCommerceQuote,
+  PortalCommerceOrder,
+  PortalCommerceMembership,
+  PortalCommerceQuoteRequest,
+  PortalCommerceCatalog,
+  PortalDesktopRuntimeSnapshot,
+  PortalRuntimeHealthSnapshot,
+  PortalRuntimeServiceHealth,
   PortalAuthSession,
   PortalDashboardSummary,
+  PortalGatewayRateLimitSnapshot,
   PortalRoutingDecision,
   PortalRoutingDecisionLog,
   PortalRoutingPreferences,
@@ -18,6 +29,9 @@ import type {
 const portalSessionTokenKey = 'sdkwork.router.portal.session-token';
 const portalSessionExpiredEvent = 'sdkwork.router.portal.session-expired';
 const portalProxyPrefix = '/api/portal';
+const gatewayProxyPrefix = '/api';
+const standalonePortalDevPorts = new Set(['4174', '5174']);
+const standaloneGatewayBaseUrl = 'http://127.0.0.1:8080';
 
 type TauriWindowLike = Window & {
   __TAURI__?: unknown;
@@ -30,6 +44,8 @@ type TauriInternalsLike = {
 };
 
 let cachedPortalDesktopBaseUrl: string | null = null;
+let cachedGatewayDesktopBaseUrl: string | null = null;
+let cachedDesktopRuntimeSnapshot: PortalDesktopRuntimeSnapshot | null | undefined = undefined;
 
 export class PortalApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -68,6 +84,12 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+function bindAddrUrl(bindAddr: string, path: string): string {
+  const normalized = bindAddr.trim();
+  const baseUrl = /^https?:\/\//.test(normalized) ? normalized : `http://${normalized}`;
+  return joinUrl(baseUrl, path);
+}
+
 async function invokeDesktopCommand<T>(
   command: string,
   args?: Record<string, unknown>,
@@ -101,6 +123,229 @@ async function resolvePortalBaseUrl(): Promise<string> {
   }
 
   return portalProxyPrefix;
+}
+
+export async function resolveGatewayBaseUrl(): Promise<string> {
+  if (cachedGatewayDesktopBaseUrl) {
+    return cachedGatewayDesktopBaseUrl;
+  }
+
+  if (isDesktopRuntime()) {
+    try {
+      const runtimeBaseUrl = await invokeDesktopCommand<string>('runtime_base_url');
+      const normalizedBaseUrl = runtimeBaseUrl?.trim();
+      if (normalizedBaseUrl) {
+        cachedGatewayDesktopBaseUrl = joinUrl(normalizedBaseUrl, gatewayProxyPrefix);
+        return cachedGatewayDesktopBaseUrl;
+      }
+    } catch {
+      // Fall back to the local standalone gateway bind when the desktop bridge is unavailable.
+    }
+  }
+
+  const currentWindow = resolveWindow();
+  const currentOrigin = currentWindow?.location?.origin?.trim();
+  const currentPort = currentWindow?.location?.port?.trim();
+
+  if (currentOrigin && currentPort && standalonePortalDevPorts.has(currentPort)) {
+    return standaloneGatewayBaseUrl;
+  }
+
+  if (currentOrigin) {
+    return joinUrl(currentOrigin, gatewayProxyPrefix);
+  }
+
+  return standaloneGatewayBaseUrl;
+}
+
+export async function getDesktopRuntimeSnapshot(): Promise<PortalDesktopRuntimeSnapshot | null> {
+  if (cachedDesktopRuntimeSnapshot !== undefined) {
+    return cachedDesktopRuntimeSnapshot;
+  }
+
+  if (!isDesktopRuntime()) {
+    cachedDesktopRuntimeSnapshot = null;
+    return cachedDesktopRuntimeSnapshot;
+  }
+
+  try {
+    cachedDesktopRuntimeSnapshot = await invokeDesktopCommand<PortalDesktopRuntimeSnapshot>(
+      'runtime_desktop_snapshot',
+    );
+    return cachedDesktopRuntimeSnapshot;
+  } catch {
+    cachedDesktopRuntimeSnapshot = null;
+    return cachedDesktopRuntimeSnapshot;
+  }
+}
+
+export async function restartDesktopRuntime(): Promise<PortalDesktopRuntimeSnapshot> {
+  const snapshot = await invokeDesktopCommand<PortalDesktopRuntimeSnapshot>(
+    'restart_product_runtime',
+  );
+
+  cachedDesktopRuntimeSnapshot = snapshot;
+
+  const runtimeBaseUrl = snapshot.publicBaseUrl?.trim();
+  if (runtimeBaseUrl) {
+    cachedPortalDesktopBaseUrl = joinUrl(runtimeBaseUrl, portalProxyPrefix);
+    cachedGatewayDesktopBaseUrl = joinUrl(runtimeBaseUrl, gatewayProxyPrefix);
+  } else {
+    cachedPortalDesktopBaseUrl = null;
+    cachedGatewayDesktopBaseUrl = null;
+  }
+
+  return snapshot;
+}
+
+type ProductHealthTarget = {
+  id: PortalRuntimeServiceHealth['id'];
+  label: string;
+  healthUrl: string;
+  detail: string;
+};
+
+function desktopHealthTargets(snapshot: PortalDesktopRuntimeSnapshot): ProductHealthTarget[] {
+  const publicBaseUrl =
+    snapshot.publicBaseUrl?.trim()
+    || (snapshot.publicBindAddr ? bindAddrUrl(snapshot.publicBindAddr, '/') : null)
+    || resolveWindow()?.location?.origin?.trim()
+    || 'http://127.0.0.1';
+
+  return [
+    {
+      id: 'web',
+      label: 'Web entrypoint',
+      healthUrl: joinUrl(publicBaseUrl, '/'),
+      detail:
+        'The public web host is serving the integrated router product shell and public entrypoint.',
+    },
+    {
+      id: 'gateway',
+      label: 'Gateway',
+      healthUrl: snapshot.gatewayBindAddr
+        ? bindAddrUrl(snapshot.gatewayBindAddr, '/health')
+        : joinUrl(publicBaseUrl, '/api/health'),
+      detail:
+        'The gateway role is responding directly on its runtime health route.',
+    },
+    {
+      id: 'admin',
+      label: 'Admin control plane',
+      healthUrl: snapshot.adminBindAddr
+        ? bindAddrUrl(snapshot.adminBindAddr, '/admin/health')
+        : joinUrl(publicBaseUrl, '/api/admin/health'),
+      detail:
+        'The admin role is reachable and can accept operator traffic on the current runtime.',
+    },
+    {
+      id: 'portal',
+      label: 'Portal API',
+      healthUrl: snapshot.portalBindAddr
+        ? bindAddrUrl(snapshot.portalBindAddr, '/portal/health')
+        : joinUrl(publicBaseUrl, '/api/portal/health'),
+      detail:
+        'The portal role is reachable for authentication, workspace reads, and commerce workflows.',
+    },
+  ];
+}
+
+async function browserHealthTargets(): Promise<ProductHealthTarget[]> {
+  const currentOrigin = resolveWindow()?.location?.origin?.trim() ?? 'http://127.0.0.1:3001';
+  const gatewayBaseUrl = await resolveGatewayBaseUrl();
+
+  return [
+    {
+      id: 'web',
+      label: 'Web entrypoint',
+      healthUrl: joinUrl(currentOrigin, '/'),
+      detail:
+        'The public product entrypoint is serving the router shell for hosted or browser sessions.',
+    },
+    {
+      id: 'gateway',
+      label: 'Gateway',
+      healthUrl: joinUrl(gatewayBaseUrl, '/health'),
+      detail:
+        'Gateway health is checked through the current public or standalone gateway surface.',
+    },
+    {
+      id: 'admin',
+      label: 'Admin control plane',
+      healthUrl: joinUrl(currentOrigin, '/api/admin/health'),
+      detail:
+        'The admin role is checked through the public product host when the desktop bridge is unavailable.',
+    },
+    {
+      id: 'portal',
+      label: 'Portal API',
+      healthUrl: joinUrl(currentOrigin, '/api/portal/health'),
+      detail:
+        'The portal role is checked through the public product host when the desktop bridge is unavailable.',
+    },
+  ];
+}
+
+async function probeProductHealthTarget(
+  target: ProductHealthTarget,
+): Promise<PortalRuntimeServiceHealth> {
+  const startedAt = Date.now();
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = controller
+    ? globalThis.setTimeout(() => controller.abort(), 2_000)
+    : null;
+
+  try {
+    const response = await fetch(target.healthUrl, {
+      method: 'GET',
+      signal: controller?.signal,
+    });
+    if (timeoutId !== null) {
+      globalThis.clearTimeout(timeoutId);
+    }
+
+    return {
+      id: target.id,
+      label: target.label,
+      status: response.ok ? 'healthy' : 'degraded',
+      healthUrl: target.healthUrl,
+      detail: response.ok
+        ? target.detail
+        : `${target.label} returned HTTP ${response.status} on its health route.`,
+      httpStatus: response.status,
+      responseTimeMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    if (timeoutId !== null) {
+      globalThis.clearTimeout(timeoutId);
+    }
+
+    return {
+      id: target.id,
+      label: target.label,
+      status: 'unreachable',
+      healthUrl: target.healthUrl,
+      detail:
+        error instanceof Error
+          ? `${target.label} is unreachable from the current session: ${error.message}`
+          : `${target.label} is unreachable from the current session.`,
+      httpStatus: null,
+      responseTimeMs: null,
+    };
+  }
+}
+
+export async function getProductRuntimeHealthSnapshot(): Promise<PortalRuntimeHealthSnapshot> {
+  const desktopRuntime = await getDesktopRuntimeSnapshot();
+  const targets = desktopRuntime
+    ? desktopHealthTargets(desktopRuntime)
+    : await browserHealthTargets();
+
+  return {
+    mode: desktopRuntime?.mode ?? 'browser',
+    checkedAtMs: Date.now(),
+    services: await Promise.all(targets.map((target) => probeProductHealthTarget(target))),
+  };
 }
 
 export function readPortalSessionToken(): string | null {
@@ -246,6 +491,15 @@ export function getPortalDashboard(token?: string): Promise<PortalDashboardSumma
   return getJson<PortalDashboardSummary>('/dashboard', requiredPortalToken(token));
 }
 
+export function getPortalGatewayRateLimitSnapshot(
+  token?: string,
+): Promise<PortalGatewayRateLimitSnapshot> {
+  return getJson<PortalGatewayRateLimitSnapshot>(
+    '/gateway/rate-limit-snapshot',
+    requiredPortalToken(token),
+  );
+}
+
 export function listPortalApiKeys(token?: string): Promise<GatewayApiKeyRecord[]> {
   return getJson<GatewayApiKeyRecord[]>('/api-keys', requiredPortalToken(token));
 }
@@ -297,6 +551,89 @@ export function getPortalBillingSummary(token?: string): Promise<ProjectBillingS
 
 export function listPortalBillingLedger(token?: string): Promise<LedgerEntry[]> {
   return getJson<LedgerEntry[]>('/billing/ledger', requiredPortalToken(token));
+}
+
+export function getPortalCommerceCatalog(token?: string): Promise<PortalCommerceCatalog> {
+  return getJson<PortalCommerceCatalog>('/commerce/catalog', requiredPortalToken(token));
+}
+
+export function previewPortalCommerceQuote(
+  input: PortalCommerceQuoteRequest,
+  token?: string,
+): Promise<PortalCommerceQuote> {
+  return postJson<PortalCommerceQuoteRequest, PortalCommerceQuote>(
+    '/commerce/quote',
+    input,
+    requiredPortalToken(token),
+  );
+}
+
+export function createPortalCommerceOrder(
+  input: PortalCommerceQuoteRequest,
+  token?: string,
+): Promise<PortalCommerceOrder> {
+  return postJson<PortalCommerceQuoteRequest, PortalCommerceOrder>(
+    '/commerce/orders',
+    input,
+    requiredPortalToken(token),
+  );
+}
+
+export function settlePortalCommerceOrder(
+  orderId: string,
+  token?: string,
+): Promise<PortalCommerceOrder> {
+  return postJson<Record<string, never>, PortalCommerceOrder>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/settle`,
+    {},
+    requiredPortalToken(token),
+  );
+}
+
+export function cancelPortalCommerceOrder(
+  orderId: string,
+  token?: string,
+): Promise<PortalCommerceOrder> {
+  return postJson<Record<string, never>, PortalCommerceOrder>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/cancel`,
+    {},
+    requiredPortalToken(token),
+  );
+}
+
+export function sendPortalCommercePaymentEvent(
+  orderId: string,
+  input: PortalCommercePaymentEventRequest,
+  token?: string,
+): Promise<PortalCommerceOrder> {
+  return postJson<PortalCommercePaymentEventRequest, PortalCommerceOrder>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/payment-events`,
+    input,
+    requiredPortalToken(token),
+  );
+}
+
+export function getPortalCommerceCheckoutSession(
+  orderId: string,
+  token?: string,
+): Promise<PortalCommerceCheckoutSession> {
+  return getJson<PortalCommerceCheckoutSession>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/checkout-session`,
+    requiredPortalToken(token),
+  );
+}
+
+export function listPortalCommerceOrders(token?: string): Promise<PortalCommerceOrder[]> {
+  return getJson<PortalCommerceOrder[]>('/commerce/orders', requiredPortalToken(token));
+}
+
+export function getPortalCommerceMembership(
+  token?: string,
+): Promise<PortalCommerceMembership | null> {
+  return getJson<PortalCommerceMembership | null>(
+    '/commerce/membership',
+    requiredPortalToken(token),
+  );
 }
 
 export function getPortalRoutingSummary(token?: string): Promise<PortalRoutingSummary> {

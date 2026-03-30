@@ -10,13 +10,17 @@ import {
   User,
 } from 'lucide-react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAdminI18n } from 'sdkwork-router-admin-commons';
+import { Button, Label, LeadingIconInput, useAdminI18n } from 'sdkwork-router-admin-commons';
 
 import { ADMIN_ROUTE_PATHS } from 'sdkwork-router-admin-core';
 
 type AuthMode = 'login' | 'register' | 'forgot';
 
 const DEFAULT_LOGIN_STATUS = 'Authenticate to open the super-admin workspace.';
+const DEV_ADMIN_CREDENTIALS = {
+  email: 'admin@sdkwork.local',
+  password: 'ChangeMe123!',
+};
 
 function resolveAuthMode(pathname: string): AuthMode {
   if (pathname === ADMIN_ROUTE_PATHS.REGISTER) {
@@ -101,10 +105,15 @@ export function AdminLoginPage({
   const [searchParams] = useSearchParams();
   const mode = resolveAuthMode(location.pathname);
   const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(
+    import.meta.env.DEV && mode === 'login' ? DEV_ADMIN_CREDENTIALS.email : '',
+  );
+  const [password, setPassword] = useState(
+    import.meta.env.DEV && mode === 'login' ? DEV_ADMIN_CREDENTIALS.password : '',
+  );
   const [name, setName] = useState('');
   const [modeNotice, setModeNotice] = useState('');
+  const showDevCredentials = import.meta.env.DEV && mode === 'login';
 
   useEffect(() => {
     const nextEmail = searchParams.get('email');
@@ -116,6 +125,15 @@ export function AdminLoginPage({
   useEffect(() => {
     setModeNotice('');
   }, [mode]);
+
+  useEffect(() => {
+    if (!showDevCredentials) {
+      return;
+    }
+
+    setEmail((current) => current.trim() || DEV_ADMIN_CREDENTIALS.email);
+    setPassword((current) => current || DEV_ADMIN_CREDENTIALS.password);
+  }, [showDevCredentials]);
 
   const withRedirect = (pathname: string) => {
     const params = new URLSearchParams();
@@ -208,79 +226,84 @@ export function AdminLoginPage({
           <form onSubmit={handleSubmit} className="adminx-auth-form">
             {mode === 'register' ? (
               <div className="adminx-auth-form-group">
-                <label className="adminx-auth-label">{t('Full Name')}</label>
-                <div className="adminx-auth-input-shell">
-                  <div className="adminx-auth-input-icon-wrap">
-                    <User className="adminx-auth-input-icon" />
-                  </div>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder={t('John Doe')}
-                    autoComplete="name"
-                    required
-                  />
-                </div>
+                <Label className="adminx-auth-label">{t('Full Name')}</Label>
+                <LeadingIconInput
+                  className="adminx-auth-input-shell"
+                  icon={<User className="adminx-auth-input-icon" />}
+                  iconClassName="text-[#a1a1aa]"
+                  inputClassName="adminx-auth-input-element"
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder={t('John Doe')}
+                  autoComplete="name"
+                  required
+                />
               </div>
             ) : null}
 
             <div className="adminx-auth-form-group">
-              <label className="adminx-auth-label">{t('Email Address')}</label>
-              <div className="adminx-auth-input-shell">
-                <div className="adminx-auth-input-icon-wrap">
-                  <Mail className="adminx-auth-input-icon" />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder={t('you@example.com')}
-                  autoComplete="email"
-                  required
-                />
-              </div>
+              <Label className="adminx-auth-label">{t('Email Address')}</Label>
+              <LeadingIconInput
+                className="adminx-auth-input-shell"
+                icon={<Mail className="adminx-auth-input-icon" />}
+                iconClassName="text-[#a1a1aa]"
+                inputClassName="adminx-auth-input-element"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={t('you@example.com')}
+                autoComplete="email"
+                required
+              />
             </div>
 
             {mode !== 'forgot' ? (
               <div className="adminx-auth-form-group">
                 <div className="adminx-auth-label-row">
-                  <label className="adminx-auth-label">{t('Password')}</label>
+                  <Label className="adminx-auth-label">{t('Password')}</Label>
                   {mode === 'login' ? (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.FORGOT_PASSWORD))}
-                      className="adminx-auth-link-button"
+                      className="adminx-auth-link-button h-auto rounded-none px-0 py-0 shadow-none hover:bg-transparent"
+                      variant="ghost"
                     >
                       {t('Forgot password')}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
-                <div className="adminx-auth-input-shell">
-                  <div className="adminx-auth-input-icon-wrap">
-                    <Lock className="adminx-auth-input-icon" />
-                  </div>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder={t('Enter your password')}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                    required
-                  />
-                </div>
+                <LeadingIconInput
+                  className="adminx-auth-input-shell"
+                  icon={<Lock className="adminx-auth-input-icon" />}
+                  iconClassName="text-[#a1a1aa]"
+                  inputClassName="adminx-auth-input-element"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={t('Enter your password')}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  required
+                />
               </div>
             ) : null}
 
-            <button
+            <Button
               type="submit"
               disabled={mode === 'login' ? loading : false}
-              className="adminx-auth-primary-button"
+              className="adminx-auth-primary-button h-auto rounded-xl px-4 py-3"
+              variant="default"
             >
               <span>{t(submitLabelByMode(mode, loading))}</span>
               <ArrowRight className="adminx-auth-primary-button-icon" />
-            </button>
+            </Button>
           </form>
+
+          {showDevCredentials ? (
+            <div className="adminx-auth-inline-notice">
+              {t('Local dev credentials are prefilled: {email} / {password}.', DEV_ADMIN_CREDENTIALS)}
+            </div>
+          ) : null}
 
           {authNotice ? <div className="adminx-auth-inline-notice">{authNotice}</div> : null}
 
@@ -292,9 +315,10 @@ export function AdminLoginPage({
               </div>
 
               <div className="adminx-auth-provider-grid">
-                <button
+                <Button
                   type="button"
                   className="adminx-auth-provider-button"
+                  variant="secondary"
                   onClick={() =>
                     setModeNotice(
                       'Use the operator email and password flow for admin access. External SSO remains disabled in this workspace.',
@@ -303,10 +327,11 @@ export function AdminLoginPage({
                 >
                   <Github className="adminx-auth-provider-icon" />
                   <span>{t('GitHub')}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   className="adminx-auth-provider-button"
+                  variant="secondary"
                   onClick={() =>
                     setModeNotice(
                       'Use the operator email and password flow for admin access. External SSO remains disabled in this workspace.',
@@ -315,7 +340,7 @@ export function AdminLoginPage({
                 >
                   <Chrome className="adminx-auth-provider-icon" />
                   <span>{t('Google')}</span>
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
@@ -324,46 +349,50 @@ export function AdminLoginPage({
             {mode === 'login' ? (
               <>
                 <span>{t("Don't have an account?")}</span>{' '}
-                <button
+                <Button
                   type="button"
                   onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.REGISTER))}
-                  className="adminx-auth-mode-link"
+                  className="adminx-auth-mode-link h-auto rounded-none px-0 py-0 shadow-none hover:bg-transparent"
+                  variant="ghost"
                 >
                   {t('Sign Up')}
-                </button>
+                </Button>
               </>
             ) : mode === 'register' ? (
               <>
                 <span>{t('Already have an account?')}</span>{' '}
-                <button
+                <Button
                   type="button"
                   onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.LOGIN))}
-                  className="adminx-auth-mode-link"
+                  className="adminx-auth-mode-link h-auto rounded-none px-0 py-0 shadow-none hover:bg-transparent"
+                  variant="ghost"
                 >
                   {t('Sign In')}
-                </button>
+                </Button>
               </>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.LOGIN))}
-                className="adminx-auth-back-link"
+                className="adminx-auth-back-link h-auto rounded-none px-0 py-0 shadow-none hover:bg-transparent"
+                variant="ghost"
               >
                 <ArrowRight className="adminx-auth-back-link-icon" />
                 <span>{t('Back to login')}</span>
-              </button>
+              </Button>
             )}
           </div>
 
           {mode === 'forgot' ? (
             <div className="adminx-auth-secondary-switch">
-              <button
+              <Button
                 type="button"
                 onClick={() => navigate(withRedirect(ADMIN_ROUTE_PATHS.REGISTER))}
-                className="adminx-auth-mode-link"
+                className="adminx-auth-mode-link h-auto rounded-none px-0 py-0 shadow-none hover:bg-transparent"
+                variant="ghost"
               >
                 {t('Sign Up')}
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>

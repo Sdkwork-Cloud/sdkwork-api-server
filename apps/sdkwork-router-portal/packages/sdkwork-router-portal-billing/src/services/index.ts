@@ -1,4 +1,3 @@
-import { listRechargePacks, listSubscriptionPlans } from 'sdkwork-router-portal-commerce';
 import { formatUnits } from 'sdkwork-router-portal-commons';
 import type {
   ProjectBillingSummary,
@@ -133,22 +132,24 @@ function buildRecommendedBundle(
 
 export function recommendBillingChange(
   summary: ProjectBillingSummary,
+  plans: SubscriptionPlan[],
+  packs: RechargePack[],
   usageRecords: UsageRecord[] = [],
 ): BillingRecommendation {
-  const plans = listSubscriptionPlans();
-  const packs = listRechargePacks();
   const runway = buildRunway(summary, usageRecords);
   const projectedMonthlyUnits = runway.daily_units
     ? runway.daily_units * 30
     : Math.max(summary.used_units, 1);
-  const recommendedPlan =
-    plans.find((plan) => plan.included_units >= projectedMonthlyUnits) ?? plans[plans.length - 1];
-  const recommendedPack =
-    packs.find((pack) => pack.points >= Math.max(10_000, Math.round(projectedMonthlyUnits / 4))) ??
-    packs[packs.length - 1];
+  const recommendedPlan = plans.length
+    ? (plans.find((plan) => plan.included_units >= projectedMonthlyUnits) ?? plans[plans.length - 1])
+    : null;
+  const recommendedPack = packs.length
+    ? (packs.find((pack) => pack.points >= Math.max(10_000, Math.round(projectedMonthlyUnits / 4))) ??
+      packs[packs.length - 1])
+    : null;
   const bundle = buildRecommendedBundle(summary, recommendedPlan, recommendedPack);
 
-  if (summary.exhausted) {
+  if (summary.exhausted && recommendedPlan && recommendedPack) {
     return {
       title: 'Quota is exhausted',
       detail: `Move to ${recommendedPlan.name} or add ${recommendedPack.label} to restore headroom immediately.`,
@@ -159,7 +160,7 @@ export function recommendBillingChange(
     };
   }
 
-  if ((summary.remaining_units ?? 0) < 10_000) {
+  if ((summary.remaining_units ?? 0) < 10_000 && recommendedPlan && recommendedPack) {
     return {
       title: 'Headroom is getting tight',
       detail: `Add ${recommendedPack.label} for near-term coverage, or move to ${recommendedPlan.name} for a steadier monthly posture.`,
@@ -171,8 +172,10 @@ export function recommendBillingChange(
   }
 
   return {
-    title: 'Current workspace is stable',
-    detail: `Based on a projected monthly demand of ${formatUnits(projectedMonthlyUnits)} units, ${recommendedPlan.name} is the cleanest next subscription step when traffic grows.`,
+    title: recommendedPlan ? 'Current workspace is stable' : 'Billing catalog unavailable',
+    detail: recommendedPlan
+      ? `Based on a projected monthly demand of ${formatUnits(projectedMonthlyUnits)} units, ${recommendedPlan.name} is the cleanest next subscription step when traffic grows.`
+      : 'The portal could not load a live commerce catalog for this workspace.',
     plan: recommendedPlan,
     pack: recommendedPack,
     runway,

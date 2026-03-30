@@ -9,5 +9,9 @@ anyhow.workspace = true
 sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 
+[dev-dependencies]
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+tokio.workspace = true
+
 [lib]
 path = "src/lib.rs"

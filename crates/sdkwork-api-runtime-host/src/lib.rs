@@ -16,6 +16,13 @@ use pingora_core::{
 use pingora_http::ResponseHeader;
 use pingora_proxy::{http_proxy_service, ProxyHttp, Session};
 
+const BROWSER_CORS_ALLOW_ORIGIN: &str = "*";
+const BROWSER_CORS_ALLOW_METHODS: &str = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD";
+const BROWSER_CORS_ALLOW_HEADERS: &str =
+    "authorization, content-type, x-api-key, anthropic-version, anthropic-beta, x-request-id";
+const BROWSER_CORS_EXPOSE_HEADERS: &str = "content-length, content-type, location";
+const BROWSER_CORS_MAX_AGE: &str = "86400";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeSite {
     Admin,
@@ -324,6 +331,17 @@ impl ProxyHttp for RuntimeHostProxy {
         let route = classify_request(&request_path);
         ctx.route = route.clone();
 
+        if matches!(route, RuntimeRoute::Proxy { .. })
+            && session
+                .req_header()
+                .method
+                .as_str()
+                .eq_ignore_ascii_case("OPTIONS")
+        {
+            respond_browser_cors_preflight(session).await?;
+            return Ok(true);
+        }
+
         match route {
             RuntimeRoute::Redirect(location) => {
                 write_redirect_response(session, &location).await?;
@@ -376,6 +394,35 @@ impl ProxyHttp for RuntimeHostProxy {
 
         Ok(Box::new(HttpPeer::new(target, false, String::new())))
     }
+
+    async fn response_filter(
+        &self,
+        _session: &mut Session,
+        upstream_response: &mut ResponseHeader,
+        ctx: &mut Self::CTX,
+    ) -> PingoraResult<()> {
+        if matches!(ctx.route, RuntimeRoute::Proxy { .. }) {
+            apply_browser_cors_headers(upstream_response)?;
+        }
+
+        Ok(())
+    }
+}
+
+fn apply_browser_cors_headers(header: &mut ResponseHeader) -> PingoraResult<()> {
+    header.insert_header("access-control-allow-origin", BROWSER_CORS_ALLOW_ORIGIN)?;
+    header.insert_header("access-control-allow-methods", BROWSER_CORS_ALLOW_METHODS)?;
+    header.insert_header("access-control-allow-headers", BROWSER_CORS_ALLOW_HEADERS)?;
+    header.insert_header("access-control-expose-headers", BROWSER_CORS_EXPOSE_HEADERS)?;
+    header.insert_header("access-control-max-age", BROWSER_CORS_MAX_AGE)?;
+    header.insert_header("vary", "origin")?;
+    Ok(())
+}
+
+async fn respond_browser_cors_preflight(session: &mut Session) -> PingoraResult<()> {
+    let mut header = ResponseHeader::build(204, Some(0))?;
+    apply_browser_cors_headers(&mut header)?;
+    session.write_response_header(Box::new(header), true).await
 }
 
 async fn write_redirect_response(session: &mut Session, location: &str) -> PingoraResult<()> {
@@ -477,7 +524,12 @@ fn wait_for_listener(bind_addr: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::build_redirect_response_header;
+    use super::{
+        apply_browser_cors_headers, build_redirect_response_header, BROWSER_CORS_ALLOW_HEADERS,
+        BROWSER_CORS_ALLOW_METHODS, BROWSER_CORS_ALLOW_ORIGIN, BROWSER_CORS_EXPOSE_HEADERS,
+        BROWSER_CORS_MAX_AGE,
+    };
+    use pingora_http::ResponseHeader;
 
     #[test]
     fn redirect_headers_set_zero_content_length() {
@@ -487,5 +539,32 @@ mod tests {
         assert_eq!(header.headers.get("location").unwrap(), "/portal/");
         assert_eq!(header.headers.get("content-length").unwrap(), "0");
         assert_eq!(header.headers.get("cache-control").unwrap(), "no-cache");
+    }
+
+    #[test]
+    fn browser_cors_headers_are_added_to_proxy_responses() {
+        let mut header = ResponseHeader::build(200, Some(0)).unwrap();
+        apply_browser_cors_headers(&mut header).unwrap();
+
+        assert_eq!(
+            header.headers.get("access-control-allow-origin").unwrap(),
+            BROWSER_CORS_ALLOW_ORIGIN
+        );
+        assert_eq!(
+            header.headers.get("access-control-allow-methods").unwrap(),
+            BROWSER_CORS_ALLOW_METHODS
+        );
+        assert_eq!(
+            header.headers.get("access-control-allow-headers").unwrap(),
+            BROWSER_CORS_ALLOW_HEADERS
+        );
+        assert_eq!(
+            header.headers.get("access-control-expose-headers").unwrap(),
+            BROWSER_CORS_EXPOSE_HEADERS
+        );
+        assert_eq!(
+            header.headers.get("access-control-max-age").unwrap(),
+            BROWSER_CORS_MAX_AGE
+        );
     }
 }

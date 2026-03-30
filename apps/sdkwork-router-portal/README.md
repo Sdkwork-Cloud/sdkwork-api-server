@@ -8,7 +8,7 @@
 - product-grade self-service portal rather than a legacy `console` sub-page
 - follows `ARCHITECT.md` package ownership and dependency direction
 - combines live `/portal/*` data with explicit commerce repository seams where backend payment
-  integration is not ready yet
+  integration is not ready yet, while exposing a backend-readable commerce catalog and desktop runtime evidence
 
 ## Workspace Layout
 
@@ -46,6 +46,7 @@ packages/sdkwork-router-portal-<module>/src/
 
 ### Business
 
+- `sdkwork-router-portal-gateway`
 - `sdkwork-router-portal-auth`
 - `sdkwork-router-portal-dashboard`
 - `sdkwork-router-portal-routing`
@@ -58,9 +59,19 @@ packages/sdkwork-router-portal-<module>/src/
 
 ## Product Surface
 
+`Gateway`
+handles compatibility posture, local versus server deployment modes, role-sliced topology, and launch readiness.
+
 `User` handles profile and password rotation.
 `Account` handles cash balance, credits, billing ledger, and runway posture.
 
+- `Gateway`
+  - compatibility matrix for Codex, Claude Code, OpenCode, Gemini CLI, Gemini-compatible clients, and OpenClaw
+  - live desktop runtime evidence for web, gateway, admin, and portal binds
+  - desktop mode versus server mode switchboard
+  - role-sliced topology playbooks
+  - Commerce catalog for plans, recharge packs, and coupon inventory
+  - launch readiness links into API keys, routing, and billing
 - `Dashboard`
   - workspace identity
   - points and quota posture
@@ -110,6 +121,7 @@ packages/sdkwork-router-portal-<module>/src/
   - auth session
   - workspace summary
   - dashboard summary
+  - commerce catalog
   - routing summary, preferences, preview, and decision logs
   - usage records and summary
   - billing summary and ledger
@@ -129,10 +141,12 @@ pnpm build
 pnpm preview
 pnpm dev
 pnpm product:start
+pnpm product:service
 pnpm server:start
 pnpm server:plan
 pnpm product:check
 pnpm tauri:dev
+pnpm tauri:dev:service
 pnpm tauri:build
 ```
 
@@ -143,10 +157,14 @@ The Vite dev server proxies `/api/portal/*` to `http://127.0.0.1:8082/portal/*`.
 `sdkwork-router-portal` is now the product entrypoint for both desktop mode and server mode.
 
 - desktop mode uses the Tauri shell in `src-tauri/`
+- service mode uses the same Tauri shell but starts hidden in tray-managed background mode
 - server mode starts `router-product-service`
 - `pnpm product:start` is the unified launcher for desktop, server, plan, and check workflows
+- `pnpm product:service` starts the desktop shell in hidden service mode for background operation
 - both modes use the shared `sdkwork-api-product-runtime`
 - both modes serve the public web host plus router APIs together
+- the in-product `Gateway` route makes compatibility, topology, and launch posture visible without leaving the portal shell
+- the desktop shell now exposes a live runtime snapshot over Tauri IPC so the `Gateway` route can show the exact local bind topology
 
 ### Desktop Mode
 
@@ -162,8 +180,10 @@ Useful commands:
 ```bash
 pnpm product:start
 pnpm product:start -- desktop
+pnpm product:service
 pnpm desktop:build-assets
 pnpm tauri:dev
+pnpm tauri:dev:service
 pnpm tauri:build
 ```
 

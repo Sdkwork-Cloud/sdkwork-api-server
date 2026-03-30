@@ -34,6 +34,8 @@ async fn creates_canonical_ai_tables_with_only_ai_prefixed_physical_tables() {
         "ai_model",
         "ai_model_price",
         "ai_app_api_keys",
+        "ai_gateway_rate_limit_policies",
+        "ai_gateway_rate_limit_windows",
     ] {
         let row: (String,) =
             sqlx::query_as("select name from sqlite_master where type = 'table' and name = ?")
@@ -42,6 +44,22 @@ async fn creates_canonical_ai_tables_with_only_ai_prefixed_physical_tables() {
                 .await
                 .unwrap();
         assert_eq!(row.0, table_name);
+    }
+
+    for index_name in [
+        "idx_ai_proxy_provider_primary_channel",
+        "idx_ai_model_model_streaming",
+        "idx_ai_model_price_provider_active",
+        "idx_ai_model_price_channel_active",
+        "idx_ai_model_price_model_active",
+    ] {
+        let row: (String,) =
+            sqlx::query_as("select name from sqlite_master where type = 'index' and name = ?")
+                .bind(index_name)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(row.0, index_name);
     }
 
     for legacy_name in legacy_compatibility_names() {

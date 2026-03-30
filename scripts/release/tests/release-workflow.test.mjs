@@ -53,12 +53,14 @@ test('portal package exposes unified product launchers and all desktop scripts u
 
   assert.equal(existsSync(runnerPath), true, 'missing shared scripts/run-tauri-cli.mjs');
   assert.match(packageJson.scripts['product:start'], /node \.\.\/\.\.\/scripts\/run-router-product\.mjs/);
+  assert.match(packageJson.scripts['product:service'], /node \.\.\/\.\.\/scripts\/run-router-product\.mjs service/);
   assert.match(packageJson.scripts['server:start'], /node \.\.\/\.\.\/scripts\/run-router-product-service\.mjs/);
   assert.match(packageJson.scripts['server:plan'], /node \.\.\/\.\.\/scripts\/run-router-product-service\.mjs --dry-run --plan-format json/);
   assert.match(packageJson.scripts['product:check'], /node \.\.\/\.\.\/scripts\/check-router-product\.mjs/);
   assert.match(adminPackage.scripts['tauri:dev'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs dev/);
   assert.match(adminPackage.scripts['tauri:build'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs build/);
   assert.match(packageJson.scripts['tauri:dev'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs dev/);
+  assert.match(packageJson.scripts['tauri:dev:service'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs dev -- --service/);
   assert.match(packageJson.scripts['tauri:build'], /node \.\.\/\.\.\/scripts\/run-tauri-cli\.mjs build/);
   assert.match(consolePackage.scripts['tauri:dev'], /node \.\.\/scripts\/run-tauri-cli\.mjs dev/);
   assert.match(consolePackage.scripts['tauri:build'], /node \.\.\/scripts\/run-tauri-cli\.mjs build/);
@@ -88,6 +90,12 @@ test('shared tauri runner only injects the Visual Studio generator on Windows an
     platform: 'linux',
     env: {},
   });
+  const backgroundDevPlan = runner.createTauriCliPlan({
+    commandName: 'dev',
+    args: ['--', '--service'],
+    platform: 'linux',
+    env: {},
+  });
 
   assert.equal(windowsPlan.command, 'tauri.cmd');
   assert.deepEqual(windowsPlan.args, ['build', '--target', 'aarch64-pc-windows-msvc']);
@@ -96,6 +104,7 @@ test('shared tauri runner only injects the Visual Studio generator on Windows an
   assert.equal(windowsPlan.env.SDKWORK_DESKTOP_TARGET, 'aarch64-pc-windows-msvc');
   assert.equal(windowsPlan.env.SDKWORK_DESKTOP_TARGET_PLATFORM, 'windows');
   assert.equal(windowsPlan.env.SDKWORK_DESKTOP_TARGET_ARCH, 'arm64');
+  assert.equal(windowsPlan.windowsHide, true);
 
   assert.equal(linuxPlan.command, 'tauri');
   assert.deepEqual(linuxPlan.args, ['build', '--target', 'x86_64-unknown-linux-gnu']);
@@ -103,4 +112,39 @@ test('shared tauri runner only injects the Visual Studio generator on Windows an
   assert.equal(linuxPlan.env.SDKWORK_DESKTOP_TARGET_PLATFORM, 'linux');
   assert.equal(linuxPlan.env.SDKWORK_DESKTOP_TARGET_ARCH, 'x64');
   assert.equal(Object.hasOwn(linuxPlan.env, 'CMAKE_GENERATOR'), false);
+  assert.equal(backgroundDevPlan.detached, true);
+  assert.equal(backgroundDevPlan.windowsHide, false);
+});
+
+test('shared tauri runner prepends the local cargo bin directory on Windows', async () => {
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  const runner = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'run-tauri-cli.mjs'),
+    ).href,
+  );
+
+  const plan = runner.createTauriCliPlan({
+    commandName: 'dev',
+    platform: 'win32',
+    env: {
+      USERPROFILE: process.env.USERPROFILE ?? '',
+      PATH: '',
+    },
+  });
+
+  const expectedCargoBin = path.join(process.env.USERPROFILE ?? '', '.cargo', 'bin').toLowerCase();
+  assert.ok(
+    String(plan.env.PATH ?? '')
+      .toLowerCase()
+      .startsWith(expectedCargoBin),
+    'cargo bin should be the first PATH entry for tauri commands',
+  );
+  assert.match(
+    String(plan.env.CARGO_TARGET_DIR ?? ''),
+    /sdkwork-tauri-target/i,
+  );
 });

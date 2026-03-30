@@ -15,6 +15,8 @@ import type {
   ProjectRecord,
   ProviderHealthSnapshot,
   ProxyProviderRecord,
+  RateLimitPolicyRecord,
+  RateLimitWindowRecord,
   RoutingDecisionLogRecord,
   RuntimeReloadReport,
   RuntimeStatusRecord,
@@ -528,6 +530,33 @@ export function getBillingSummary(token?: string): Promise<BillingSummary> {
 
 export function listRoutingDecisionLogs(token?: string): Promise<RoutingDecisionLogRecord[]> {
   return getJson<RoutingDecisionLogRecord[]>('/routing/decision-logs', token);
+}
+
+export function listRateLimitPolicies(token?: string): Promise<RateLimitPolicyRecord[]> {
+  return getJson<RateLimitPolicyRecord[]>('/gateway/rate-limit-policies', token);
+}
+
+export function createRateLimitPolicy(input: {
+  policy_id: string;
+  project_id: string;
+  requests_per_window: number;
+  window_seconds: number;
+  burst_requests: number;
+  enabled: boolean;
+  route_key?: string | null;
+  api_key_hash?: string | null;
+  model_name?: string | null;
+  notes?: string | null;
+}): Promise<RateLimitPolicyRecord> {
+  return postJson<typeof input, RateLimitPolicyRecord>(
+    '/gateway/rate-limit-policies',
+    input,
+    requiredToken(),
+  );
+}
+
+export function listRateLimitWindows(token?: string): Promise<RateLimitWindowRecord[]> {
+  return getJson<RateLimitWindowRecord[]>('/gateway/rate-limit-windows', token);
 }
 
 export function listProviderHealthSnapshots(

@@ -30,4 +30,6 @@ test('router product service wrapper strips pnpm forwarding separator before pas
     module.normalizeRouterProductServiceArgs(['--bind', '0.0.0.0:3001']),
     ['--bind', '0.0.0.0:3001'],
   );
+  const plan = module.createRouterProductServiceRunPlan({ platform: 'win32', env: {} });
+  assert.equal(plan.windowsHide, true);
 });

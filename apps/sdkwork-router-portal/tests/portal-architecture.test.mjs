@@ -14,6 +14,7 @@ const requiredPackages = [
   'sdkwork-router-portal-commons',
   'sdkwork-router-portal-core',
   'sdkwork-router-portal-portal-api',
+  'sdkwork-router-portal-gateway',
   'sdkwork-router-portal-auth',
   'sdkwork-router-portal-dashboard',
   'sdkwork-router-portal-routing',
@@ -26,6 +27,7 @@ const requiredPackages = [
 ];
 
 const requiredBusinessPackages = [
+  'sdkwork-router-portal-gateway',
   'sdkwork-router-portal-auth',
   'sdkwork-router-portal-dashboard',
   'sdkwork-router-portal-routing',
@@ -81,7 +83,12 @@ test('business packages follow the ARCHITECT directory convention', () => {
 
 test('shell route manifest includes the portal product sections', () => {
   const routes = read('packages/sdkwork-router-portal-core/src/routes.ts');
+  const routePaths = read('packages/sdkwork-router-portal-core/src/application/router/routePaths.ts');
+  const portalTypes = read('packages/sdkwork-router-portal-types/src/index.ts');
 
+  assert.match(portalTypes, /'gateway'/);
+  assert.match(routes, /gateway/);
+  assert.match(routes, /Gateway/);
   assert.match(routes, /dashboard/);
   assert.match(routes, /routing/);
   assert.match(routes, /api-keys/);
@@ -90,6 +97,7 @@ test('shell route manifest includes the portal product sections', () => {
   assert.match(routes, /credits/);
   assert.match(routes, /billing/);
   assert.match(routes, /account/);
+  assert.match(routePaths, /gateway: '\/gateway'/);
 });
 
 test('portal core follows the shell-oriented application structure', () => {

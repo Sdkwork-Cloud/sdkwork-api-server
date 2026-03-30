@@ -50,6 +50,9 @@ use sdkwork_api_app_identity::{
     set_portal_user_active, update_gateway_api_key_metadata, upsert_admin_user, upsert_portal_user,
     verify_jwt, AdminIdentityError, Claims, CreatedGatewayApiKey, PortalIdentityError,
 };
+use sdkwork_api_app_rate_limit::{
+    create_rate_limit_policy, list_rate_limit_policies, persist_rate_limit_policy,
+};
 use sdkwork_api_app_routing::{
     create_routing_policy, list_routing_decision_logs, list_routing_policies,
     persist_routing_policy, select_route_with_store_context, CreateRoutingPolicyInput,
@@ -76,6 +79,7 @@ use sdkwork_api_domain_catalog::{
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserProfile, GatewayApiKeyRecord, PortalUserProfile};
+use sdkwork_api_domain_rate_limit::{RateLimitPolicy, RateLimitWindowSnapshot};
 use sdkwork_api_domain_routing::{
     ProviderHealthSnapshot, RoutingDecisionLog, RoutingDecisionSource, RoutingPolicy,
     RoutingStrategy,
@@ -610,6 +614,27 @@ struct CreateQuotaPolicyRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct CreateRateLimitPolicyRequest {
+    policy_id: String,
+    project_id: String,
+    requests_per_window: u64,
+    #[serde(default = "default_window_seconds")]
+    window_seconds: u64,
+    #[serde(default)]
+    burst_requests: u64,
+    #[serde(default = "default_true")]
+    enabled: bool,
+    #[serde(default)]
+    route_key: Option<String>,
+    #[serde(default)]
+    api_key_hash: Option<String>,
+    #[serde(default)]
+    model_name: Option<String>,
+    #[serde(default)]
+    notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct RoutingSimulationRequest {
     capability: String,
     model: String,
@@ -880,6 +905,10 @@ pub fn admin_router() -> Router {
             "/admin/billing/quota-policies",
             get(|| async { "billing-quota-policies" }),
         )
+        .route(
+            "/admin/gateway/rate-limit-policies",
+            get(|| async { "gateway-rate-limit-policies" }),
+        )
         .route("/admin/routing/policies", get(|| async { "policies" }))
         .route(
             "/admin/routing/health-snapshots",
@@ -1140,6 +1169,14 @@ pub fn admin_router_with_state(state: AdminApiState) -> Router {
         .route(
             "/admin/billing/quota-policies",
             get(list_quota_policies_handler).post(create_quota_policy_handler),
+        )
+        .route(
+            "/admin/gateway/rate-limit-policies",
+            get(list_rate_limit_policies_handler).post(create_rate_limit_policy_handler),
+        )
+        .route(
+            "/admin/gateway/rate-limit-windows",
+            get(list_rate_limit_window_snapshots_handler),
         )
         .route(
             "/admin/routing/policies",
@@ -2464,6 +2501,52 @@ async fn create_quota_policy_handler(
     Ok((StatusCode::CREATED, Json(policy)))
 }
 
+async fn list_rate_limit_policies_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<RateLimitPolicy>>, StatusCode> {
+    list_rate_limit_policies(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn list_rate_limit_window_snapshots_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+) -> Result<Json<Vec<RateLimitWindowSnapshot>>, StatusCode> {
+    state
+        .store
+        .list_rate_limit_window_snapshots()
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn create_rate_limit_policy_handler(
+    _claims: AuthenticatedAdminClaims,
+    State(state): State<AdminApiState>,
+    Json(request): Json<CreateRateLimitPolicyRequest>,
+) -> Result<(StatusCode, Json<RateLimitPolicy>), StatusCode> {
+    let policy = create_rate_limit_policy(
+        &request.policy_id,
+        &request.project_id,
+        request.requests_per_window,
+        request.window_seconds,
+        request.burst_requests,
+        request.enabled,
+        request.route_key.as_deref(),
+        request.api_key_hash.as_deref(),
+        request.model_name.as_deref(),
+        request.notes.as_deref(),
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let policy = persist_rate_limit_policy(state.store.as_ref(), &policy)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(policy)))
+}
+
 fn provider_bindings_from_request(request: &CreateProviderRequest) -> Vec<ProviderChannelBinding> {
     let mut bindings = if request.channel_bindings.is_empty() {
         vec![ProviderChannelBinding::primary(
@@ -2500,4 +2583,8 @@ fn provider_bindings_from_request(request: &CreateProviderRequest) -> Vec<Provid
 
 fn default_true() -> bool {
     true
+}
+
+fn default_window_seconds() -> u64 {
+    60
 }

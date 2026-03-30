@@ -6,8 +6,10 @@ import {
   formatAdminDateTime,
   InlineButton,
   PageToolbar,
+  Select,
   ToolbarDisclosure,
   ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
   useAdminI18n,
 } from 'sdkwork-router-admin-commons';
@@ -177,7 +179,7 @@ export function GatewayUsagePage({
           </>
         )}
       >
-        <>
+        <ToolbarInline>
           <ToolbarSearchField
             label={t('Search usage')}
             value={search}
@@ -188,9 +190,9 @@ export function GatewayUsagePage({
             placeholder={t('project, model, provider...')}
           />
           <ToolbarDisclosure>
-            <div className="adminx-form-grid">
+            <ToolbarInline className="adminx-toolbar-inline-disclosure">
               <ToolbarField label={t('Api key')}>
-                <select
+                <Select
                   value={selectedKey}
                   onChange={(event) => {
                     setSelectedKey(event.target.value);
@@ -203,10 +205,10 @@ export function GatewayUsagePage({
                       {key.label || key.project_id} ({key.environment})
                     </option>
                   ))}
-                </select>
+                </Select>
               </ToolbarField>
               <ToolbarField label={t('Time range')}>
-                <select
+                <Select
                   value={timeRange}
                   onChange={(event) => {
                     setTimeRange(event.target.value as TimeRangePreset);
@@ -217,11 +219,11 @@ export function GatewayUsagePage({
                   <option value="24h">{t('Last 24 hours')}</option>
                   <option value="7d">{t('Last 7 days')}</option>
                   <option value="30d">{t('Last 30 days')}</option>
-                </select>
+                </Select>
               </ToolbarField>
-            </div>
+            </ToolbarInline>
           </ToolbarDisclosure>
-        </>
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable

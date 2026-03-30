@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use reqwest::Client;
 use sdkwork_api_config::StandaloneConfigLoader;
 use sdkwork_api_product_runtime::{
-    ProductSiteDirs, ProductRuntimeRole, RouterProductRuntime, RouterProductRuntimeOptions,
+    ProductRuntimeRole, ProductSiteDirs, RouterProductRuntime, RouterProductRuntimeOptions,
 };
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -44,7 +44,40 @@ async fn desktop_product_runtime_serves_static_sites_and_all_api_health_routes()
     .unwrap();
 
     let base_url = runtime.public_base_url().unwrap().to_owned();
+    let snapshot = runtime.snapshot();
     let client = http_client();
+
+    assert_eq!(snapshot.mode, "desktop");
+    assert_eq!(
+        snapshot.roles,
+        vec![
+            "web".to_owned(),
+            "gateway".to_owned(),
+            "admin".to_owned(),
+            "portal".to_owned()
+        ]
+    );
+    assert_eq!(snapshot.public_base_url.as_deref(), Some(base_url.as_str()));
+    assert!(snapshot
+        .public_bind_addr
+        .as_deref()
+        .unwrap()
+        .starts_with("127.0.0.1:"));
+    assert!(snapshot
+        .gateway_bind_addr
+        .as_deref()
+        .unwrap()
+        .starts_with("127.0.0.1:"));
+    assert!(snapshot
+        .admin_bind_addr
+        .as_deref()
+        .unwrap()
+        .starts_with("127.0.0.1:"));
+    assert!(snapshot
+        .portal_bind_addr
+        .as_deref()
+        .unwrap()
+        .starts_with("127.0.0.1:"));
 
     assert_eq!(
         client
@@ -79,28 +112,24 @@ async fn desktop_product_runtime_serves_static_sites_and_all_api_health_routes()
             .unwrap(),
         "ok"
     );
-    assert!(
-        client
-            .get(format!("{base_url}/admin/"))
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap()
-            .contains("admin desktop site")
-    );
-    assert!(
-        client
-            .get(format!("{base_url}/portal/"))
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap()
-            .contains("portal desktop site")
-    );
+    assert!(client
+        .get(format!("{base_url}/admin/"))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap()
+        .contains("admin desktop site"));
+    assert!(client
+        .get(format!("{base_url}/portal/"))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap()
+        .contains("portal desktop site"));
 }
 
 #[tokio::test]

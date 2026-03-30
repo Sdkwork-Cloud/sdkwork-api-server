@@ -64,6 +64,7 @@ pub struct GatewayRequestContext {
     pub tenant_id: String,
     pub project_id: String,
     pub environment: String,
+    pub api_key_hash: String,
 }
 
 impl GatewayRequestContext {
@@ -73,6 +74,10 @@ impl GatewayRequestContext {
 
     pub fn project_id(&self) -> &str {
         &self.project_id
+    }
+
+    pub fn api_key_hash(&self) -> &str {
+        &self.api_key_hash
     }
 }
 
@@ -750,6 +755,7 @@ pub async fn resolve_gateway_request_context(
         tenant_id: record.tenant_id,
         project_id: record.project_id,
         environment: record.environment,
+        api_key_hash: hashed_key,
     }))
 }
 

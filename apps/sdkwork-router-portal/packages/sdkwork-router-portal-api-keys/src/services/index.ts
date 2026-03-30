@@ -72,6 +72,16 @@ export function rememberPortalApiKeyPlaintextReveal(
   writeRevealCache(next);
 }
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/g, '');
+}
+
+function joinUrl(baseUrl: string, path: string): string {
+  const normalizedBase = trimTrailingSlash(baseUrl);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 export function readPortalApiKeyPlaintextReveal(hashedKey: string): string | null {
   const reveal = readRevealCache()[hashedKey];
   return reveal?.plaintext_key?.trim() || null;
@@ -154,12 +164,15 @@ function buildEnvironmentStrategy(keys: GatewayApiKeyRecord[]): ApiKeyEnvironmen
   });
 }
 
-function buildQuickstartSnippet(createdKey: CreatedGatewayApiKey | null): string | null {
+function buildQuickstartSnippet(
+  createdKey: CreatedGatewayApiKey | null,
+  gatewayBaseUrl: string,
+): string | null {
   if (!createdKey) {
     return null;
   }
 
-  return `curl http://127.0.0.1:8080/v1/models \\\n  -H "Authorization: Bearer ${createdKey.plaintext}"`;
+  return `curl ${joinUrl(gatewayBaseUrl, '/v1/models')} \\\n  -H "Authorization: Bearer ${createdKey.plaintext}"`;
 }
 
 function buildRotationChecklist(
@@ -355,6 +368,7 @@ export function resolvePortalApiKeyNotes(
 export function buildPortalApiKeyUsagePreview(
   key: GatewayApiKeyRecord,
   plaintext: string | null,
+  gatewayBaseUrl: string,
 ): PortalApiKeyUsagePreview {
 
   return {
@@ -364,7 +378,7 @@ export function buildPortalApiKeyUsagePreview(
       : 'This key is already stored in write-only mode. If you need the plaintext again, rotate it by creating a replacement credential.',
     authorizationHeader: plaintext ? `Authorization: Bearer ${plaintext}` : null,
     curlExample: plaintext
-      ? `curl http://127.0.0.1:8080/v1/models \\\n  -H "Authorization: Bearer ${plaintext}"`
+      ? `curl ${joinUrl(gatewayBaseUrl, '/v1/models')} \\\n  -H "Authorization: Bearer ${plaintext}"`
       : null,
   };
 }
@@ -373,6 +387,7 @@ export function buildPortalApiKeysViewModel(
   keys: GatewayApiKeyRecord[],
   createdKey: CreatedGatewayApiKey | null,
   filters: PortalApiKeyFilterState,
+  gatewayBaseUrl = 'http://127.0.0.1:8080',
 ): PortalApiKeysPageViewModel {
   return {
     keys: sortKeys(keys),
@@ -383,6 +398,6 @@ export function buildPortalApiKeysViewModel(
     rotation_checklist: buildRotationChecklist(keys, createdKey),
     guardrails: buildGuardrails(keys),
     created_key: createdKey,
-    quickstart_snippet: buildQuickstartSnippet(createdKey),
+    quickstart_snippet: buildQuickstartSnippet(createdKey, gatewayBaseUrl),
   };
 }

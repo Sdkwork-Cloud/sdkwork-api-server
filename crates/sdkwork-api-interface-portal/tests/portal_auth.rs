@@ -107,6 +107,39 @@ async fn portal_register_login_and_me_flow_works() {
 }
 
 #[tokio::test]
+async fn portal_login_preflight_includes_cors_headers() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/portal/auth/login")
+                .header("origin", "http://localhost:5174")
+                .header("access-control-request-method", "POST")
+                .header("access-control-request-headers", "content-type")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("access-control-allow-origin")
+            .and_then(|value| value.to_str().ok()),
+        Some("*")
+    );
+    assert!(response
+        .headers()
+        .get("access-control-allow-methods")
+        .is_some());
+}
+
+#[tokio::test]
 async fn portal_login_rejects_invalid_password() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);

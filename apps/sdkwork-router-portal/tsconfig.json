@@ -26,6 +26,7 @@
       "sdkwork-router-portal-core": ["packages/sdkwork-router-portal-core/src/index.tsx"],
       "sdkwork-router-portal-credits": ["packages/sdkwork-router-portal-credits/src/index.tsx"],
       "sdkwork-router-portal-dashboard": ["packages/sdkwork-router-portal-dashboard/src/index.tsx"],
+      "sdkwork-router-portal-gateway": ["packages/sdkwork-router-portal-gateway/src/index.tsx"],
       "sdkwork-router-portal-portal-api": ["packages/sdkwork-router-portal-portal-api/src/index.ts"],
       "sdkwork-router-portal-types": ["packages/sdkwork-router-portal-types/src/index.ts"],
       "sdkwork-router-portal-usage": ["packages/sdkwork-router-portal-usage/src/index.tsx"]

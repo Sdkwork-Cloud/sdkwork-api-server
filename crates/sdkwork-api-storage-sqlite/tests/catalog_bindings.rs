@@ -40,3 +40,35 @@ async fn sqlite_store_persists_provider_bindings_and_model_metadata() {
     assert!(models[0].streaming);
     assert_eq!(models[0].context_window, Some(128_000));
 }
+
+#[tokio::test]
+async fn sqlite_store_lists_provider_bindings_for_model_without_drop() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let provider = ProxyProvider::new(
+        "provider-openrouter-main",
+        "openrouter",
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        "OpenRouter Main",
+    )
+    .with_channel_binding(ProviderChannelBinding::new(
+        "provider-openrouter-main",
+        "openai",
+    ));
+
+    store.insert_provider(&provider).await.unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "gpt-4.1",
+            "provider-openrouter-main",
+        ))
+        .await
+        .unwrap();
+
+    let providers = store.list_providers_for_model("gpt-4.1").await.unwrap();
+    assert_eq!(providers.len(), 1);
+    assert_eq!(providers[0].channel_bindings.len(), 2);
+    assert_eq!(providers[0].channel_bindings[1].channel_id, "openai");
+}

@@ -42,6 +42,13 @@ The control plane also exposes:
 
 ## Agent Client Compatibility
 
+OpenAI-compatible tool access is the default path for:
+
+- Codex
+- OpenCode
+- OpenClaw provider manifests
+- general OpenAI SDK and CLI clients using `/v1/models`, `/v1/chat/completions`, and `/v1/responses`
+
 Two translated gateway surfaces are now first-class:
 
 - Anthropic Messages compatibility for Claude Code and other Anthropic clients on `POST /v1/messages` and `POST /v1/messages/count_tokens`
@@ -53,6 +60,13 @@ Stateful deployments accept the compatibility-native auth inputs in addition to 
 
 - Anthropic surface: `Authorization: Bearer ...` or `x-api-key`
 - Gemini surface: `Authorization: Bearer ...`, `x-goog-api-key`, or `?key=...`
+
+Compatibility-specific transport details that are now preserved explicitly:
+
+- Anthropic Messages relay keeps `anthropic-version` and `anthropic-beta` when the request fans out to upstream runtime adapters
+- Gemini CLI quick setup is aligned with the current official client path that uses `GOOGLE_GEMINI_BASE_URL` and `GEMINI_API_KEY_AUTH_MECHANISM=bearer`
+
+Inside `sdkwork-router-portal`, the `Gateway` workspace route now surfaces this compatibility story directly in-product so operators can see the relationship between client setup, deployment mode, and billing posture without switching to the docs first.
 
 ## How To Read Compatibility
 

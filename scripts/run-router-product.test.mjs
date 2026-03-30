@@ -36,8 +36,10 @@ test('router product launcher defaults to desktop mode and installs dependencies
   assert.deepEqual(plan[0].args, ['--dir', 'apps/sdkwork-router-portal', 'install']);
   assert.equal(plan[0].command, 'pnpm.cmd');
   assert.equal(plan[0].shell, true);
+  assert.equal(plan[0].windowsHide, true);
   assert.equal(plan[1].label, 'portal desktop runtime');
   assert.deepEqual(plan[1].args, ['--dir', 'apps/sdkwork-router-portal', 'tauri:dev']);
+  assert.equal(plan[1].windowsHide, true);
 });
 
 test('router product launcher forwards cluster arguments into server mode', async () => {
@@ -68,6 +70,30 @@ test('router product launcher forwards cluster arguments into server mode', asyn
     '10.0.0.21:8080',
   ]);
   assert.equal(plan[0].shell, false);
+  assert.equal(plan[0].windowsHide, false);
+});
+
+test('router product launcher enables hidden tray service mode for desktop startup', async () => {
+  const module = await import(
+    pathToFileURL(path.join(workspaceRoot, 'scripts', 'run-router-product.mjs')).href
+  );
+
+  const plan = module.createRouterProductLaunchPlan({
+    workspaceRoot,
+    mode: 'service',
+    install: false,
+    platform: 'linux',
+    env: {},
+    extraArgs: [],
+  });
+
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].label, 'portal service runtime');
+  assert.equal(plan[0].env.SDKWORK_ROUTER_BACKGROUND, '1');
+  assert.equal(plan[0].env.SDKWORK_ROUTER_PORTAL_START_HIDDEN, '1');
+  assert.equal(plan[0].env.SDKWORK_ROUTER_SERVICE_MODE, '1');
+  assert.deepEqual(plan[0].args, ['--dir', 'apps/sdkwork-router-portal', 'tauri:dev']);
+  assert.equal(plan[0].windowsHide, false);
 });
 
 test('router product launcher exposes machine-readable plan mode through the unified entrypoint', async () => {

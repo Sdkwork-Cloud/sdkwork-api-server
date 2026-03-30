@@ -1,9 +1,10 @@
+import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx, type ClassValue } from 'clsx';
-import { Search as SearchIcon, X } from 'lucide-react';
+import { Check, Search as SearchIcon, X } from 'lucide-react';
 import {
   createContext,
   forwardRef,
@@ -215,6 +216,7 @@ const adminMessages: Record<Exclude<AdminLocale, 'en-US'>, Record<string, string
     'Operator account requests stay inside the control plane. Ask an existing admin to provision {name} access from Users.': '操作员账户申请仍在控制平面内处理。请联系现有管理员在“用户”页为 {name} 开通访问。',
     'Password resets are managed by an authenticated admin in Users. Contact the platform owner to rotate your credential safely.': '密码重置由已登录的管理员在“用户”页处理。请联系平台负责人安全轮换凭据。',
     'Use the operator email and password flow for admin access. External SSO remains disabled in this workspace.': '管理员访问请使用邮箱和密码登录，本工作区暂未启用外部 SSO。',
+    'Local dev credentials are prefilled: {email} / {password}.': '本地开发环境已预填测试账号：{email} / {password}。',
   },
 };
 
@@ -434,14 +436,24 @@ export function SectionHero({
   actions?: ReactNode;
 }) {
   return (
-    <div className="adminx-hero">
-      <div>
-        <p className="adminx-eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
-        <p className="adminx-hero-detail">{detail}</p>
+    <section className="rounded-3xl border border-zinc-200/80 bg-white/92 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/85">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+            {eyebrow}
+          </p>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">
+              {title}
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+              {detail}
+            </p>
+          </div>
+        </div>
+        {actions ? <div className="flex flex-wrap gap-3 lg:justify-end">{actions}</div> : null}
       </div>
-      {actions ? <div className="adminx-hero-actions">{actions}</div> : null}
-    </div>
+    </section>
   );
 }
 
@@ -459,38 +471,60 @@ export function PageToolbar({
   compact?: boolean;
 }) {
   const hasCopy = Boolean(title || detail);
+  const surfaceClassName =
+    'rounded-[28px] border border-zinc-200/80 bg-white/92 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/85';
 
   if (compact) {
     return (
-      <section className="adminx-page-toolbar is-compact">
-        <div className="adminx-page-toolbar-row">
+      <section className={cn(surfaceClassName, 'p-4')}>
+        <div className="flex flex-col gap-3">
           {hasCopy ? (
-            <div className="adminx-page-toolbar-copy">
-              {title ? <h2>{title}</h2> : null}
-              {detail ? <p>{detail}</p> : null}
+            <div className="min-w-0 space-y-1">
+              {title ? (
+                <h2 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  {title}
+                </h2>
+              ) : null}
+              {detail ? (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{detail}</p>
+              ) : null}
             </div>
           ) : null}
-          {actions ? <div className="adminx-page-toolbar-actions">{actions}</div> : null}
-          {children ? <div className="adminx-page-toolbar-body">{children}</div> : null}
+          <div className="flex min-w-0 items-center gap-3 overflow-x-auto">
+            {children ? <div className="min-w-0 flex-1">{children}</div> : null}
+            {actions ? (
+              <div className="ml-auto flex shrink-0 items-center justify-end gap-2.5 whitespace-nowrap">
+                {actions}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="adminx-page-toolbar">
+    <section className={cn(surfaceClassName, 'p-5')}>
       {hasCopy || actions ? (
-        <div className="adminx-page-toolbar-head">
+        <div className="flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 md:flex-row md:items-start md:justify-between">
           {hasCopy ? (
-            <div className="adminx-page-toolbar-copy">
-              {title ? <h2>{title}</h2> : null}
-              {detail ? <p>{detail}</p> : null}
+            <div className="min-w-0 space-y-1">
+              {title ? (
+                <h2 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  {title}
+                </h2>
+              ) : null}
+              {detail ? (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{detail}</p>
+              ) : null}
             </div>
           ) : null}
-          {actions ? <div className="adminx-page-toolbar-actions">{actions}</div> : null}
+          {actions ? <div className="flex flex-wrap gap-2.5">{actions}</div> : null}
         </div>
       ) : null}
-      {children ? <div className="adminx-page-toolbar-body">{children}</div> : null}
+      {children ? (
+        <div className={cn('flex flex-col gap-3', hasCopy || actions ? 'pt-4' : '')}>{children}</div>
+      ) : null}
     </section>
   );
 }
@@ -507,13 +541,17 @@ export function Surface({
   children: ReactNode;
 }) {
   return (
-    <section className="adminx-surface">
-      <div className="adminx-surface-heading">
-        <div>
-          <h2>{title}</h2>
-          {detail ? <p>{detail}</p> : null}
+    <section className="rounded-[28px] border border-zinc-200/80 bg-white/92 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/85">
+      <div className="mb-5 flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            {title}
+          </h2>
+          {detail ? (
+            <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{detail}</p>
+          ) : null}
         </div>
-        {actions ? <div className="adminx-surface-actions">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap gap-2.5">{actions}</div> : null}
       </div>
       {children}
     </section>
@@ -530,10 +568,14 @@ export function StatCard({
   detail: string;
 }) {
   return (
-    <article className="adminx-stat-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{detail}</p>
+    <article className="rounded-3xl border border-zinc-200/80 bg-white/92 p-5 shadow-sm backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/85">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+        {label}
+      </span>
+      <strong className="mt-3 block text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+        {value}
+      </strong>
+      <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">{detail}</p>
     </article>
   );
 }
@@ -556,36 +598,61 @@ export function DataTable<T>({
 }: {
   columns: Array<{ key: string; label: string; render: (row: T) => ReactNode }>;
   rows: T[];
-  empty: string;
+  empty: ReactNode;
   getKey: (row: T, index: number) => string;
 }) {
   return (
-    <div className="adminx-table-wrap">
-      <table className="adminx-table">
-        <thead>
-          <tr>
+    <div
+      className="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white/92 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/85"
+      data-slot="table-container"
+    >
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-0 text-left text-sm" data-slot="table">
+          <thead data-slot="table-header">
+          <tr data-slot="table-header-row">
             {columns.map((column) => (
-              <th key={column.key}>{column.label}</th>
+              <th
+                className="sticky top-0 z-10 whitespace-nowrap border-b border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/85 dark:text-zinc-400"
+                data-slot="table-head"
+                key={column.key}
+              >
+                {column.label}
+              </th>
             ))}
           </tr>
-        </thead>
-        <tbody>
+          </thead>
+          <tbody data-slot="table-body">
           {rows.map((row, index) => (
-            <tr key={getKey(row, index)} className="adminx-table-row">
+            <tr
+              data-slot="table-row"
+              key={getKey(row, index)}
+              className="transition-colors hover:bg-zinc-50/80 dark:hover:bg-zinc-900/70"
+            >
               {columns.map((column) => (
-                <td key={column.key}>{column.render(row)}</td>
+                <td
+                  className="border-b border-zinc-200/70 px-4 py-3 align-top text-sm text-zinc-700 dark:border-zinc-800/80 dark:text-zinc-200"
+                  data-slot="table-cell"
+                  key={column.key}
+                >
+                  {column.render(row)}
+                </td>
               ))}
             </tr>
           ))}
           {!rows.length ? (
-            <tr>
-              <td colSpan={columns.length} className="adminx-empty">
+            <tr data-slot="table-empty-row">
+              <td
+                colSpan={columns.length}
+                className="px-4 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400"
+                data-slot="table-empty"
+              >
                 {empty}
               </td>
             </tr>
           ) : null}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -645,7 +712,7 @@ export const Input = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'inpu
       ref={ref}
       type={type}
       className={cn(
-        'flex h-11 w-full rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg-input)] px-3 py-2 text-sm text-[var(--admin-text)] shadow-sm transition placeholder:text-[var(--admin-text-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950',
+        'flex h-11 w-full rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg-input)] px-3 py-2 text-sm text-[var(--admin-text)] shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[var(--admin-text-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-zinc-950',
         className,
       )}
       {...props}
@@ -659,7 +726,7 @@ export const Select = forwardRef<HTMLSelectElement, ComponentPropsWithoutRef<'se
     <select
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg-input)] px-3 py-2 text-sm text-[var(--admin-text)] shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950',
+        'flex h-11 w-full appearance-none rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg-input)] px-3 py-2 text-sm text-[var(--admin-text)] shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-zinc-950',
         className,
       )}
       {...props}
@@ -667,6 +734,55 @@ export const Select = forwardRef<HTMLSelectElement, ComponentPropsWithoutRef<'se
   ),
 );
 Select.displayName = 'Select';
+
+export const Textarea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'>>(
+  ({ className, ...props }, ref) => (
+    <textarea
+      ref={ref}
+      className={cn(
+        'flex min-h-[96px] w-full rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg-input)] px-3 py-2 text-sm text-[var(--admin-text)] shadow-sm transition-colors placeholder:text-[var(--admin-text-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-zinc-950',
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+Textarea.displayName = 'Textarea';
+
+type AdminCheckboxEvent = {
+  target: { checked: boolean };
+  currentTarget: { checked: boolean };
+};
+
+export const Checkbox = forwardRef<
+  ElementRef<typeof CheckboxPrimitive.Root>,
+  Omit<ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>, 'onChange' | 'onCheckedChange'> & {
+    onChange?: (event: AdminCheckboxEvent) => void;
+    onCheckedChange?: (checked: boolean) => void;
+  }
+>(({ className, onChange, onCheckedChange, ...props }, ref) => (
+  <CheckboxPrimitive.Root
+    ref={ref}
+    className={cn(
+      'peer flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[var(--admin-border)] bg-[var(--admin-bg-input)] shadow-sm ring-offset-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary-600 data-[state=checked]:bg-primary-600 data-[state=checked]:text-white dark:ring-offset-zinc-950 dark:data-[state=checked]:border-primary-500 dark:data-[state=checked]:bg-primary-500',
+      className,
+    )}
+    onCheckedChange={(checked) => {
+      const resolvedChecked = checked === true;
+      onCheckedChange?.(resolvedChecked);
+      onChange?.({
+        target: { checked: resolvedChecked },
+        currentTarget: { checked: resolvedChecked },
+      });
+    }}
+    {...props}
+  >
+    <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">
+      <Check className="h-4 w-4" />
+    </CheckboxPrimitive.Indicator>
+  </CheckboxPrimitive.Root>
+));
+Checkbox.displayName = CheckboxPrimitive.Root.displayName;
 
 export const Label = forwardRef<
   ElementRef<typeof LabelPrimitive.Root>,
@@ -699,6 +815,75 @@ export function ToolbarField({
   );
 }
 
+export function ToolbarInline({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn('adminx-toolbar-inline', className)}>{children}</div>;
+}
+
+export function LeadingIconInput({
+  className,
+  inputClassName,
+  iconClassName,
+  icon,
+  style,
+  type,
+  ...props
+}: Omit<ComponentPropsWithoutRef<'input'>, 'className'> & {
+  className?: string;
+  inputClassName?: string;
+  iconClassName?: string;
+  icon: ReactNode;
+}) {
+  return (
+    <span className={cn('relative block w-full', className)}>
+      <span
+        className={cn(
+          'pointer-events-none absolute left-3.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-[var(--admin-text-soft)]',
+          iconClassName,
+        )}
+      >
+        {icon}
+      </span>
+      <Input
+        className={inputClassName}
+        style={{ ...style, paddingLeft: '2.75rem' }}
+        type={type ?? 'text'}
+        {...props}
+      />
+    </span>
+  );
+}
+
+export function SearchInput({
+  className,
+  inputClassName,
+  iconClassName,
+  style,
+  type,
+  ...props
+}: Omit<ComponentPropsWithoutRef<'input'>, 'className'> & {
+  className?: string;
+  inputClassName?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <LeadingIconInput
+      className={className}
+      icon={<SearchIcon className="h-4 w-4" />}
+      iconClassName={iconClassName}
+      inputClassName={inputClassName}
+      style={style}
+      type={type}
+      {...props}
+    />
+  );
+}
+
 export function ToolbarSearchField({
   label,
   className,
@@ -710,19 +895,16 @@ export function ToolbarSearchField({
   inputClassName?: string;
 }) {
   return (
-    <ToolbarField
-      label={label}
-      className={cn('adminx-toolbar-field-search', className)}
-      controlClassName="adminx-toolbar-search-control"
-    >
-      <span className="adminx-toolbar-search-input">
-        <SearchIcon className="adminx-toolbar-search-icon" />
-        <Input
-          className={cn('adminx-toolbar-search-input-element', inputClassName)}
+    <label className={cn('adminx-toolbar-field adminx-toolbar-field-search', className)}>
+      <span className="sr-only">{label}</span>
+      <span className="adminx-toolbar-field-control adminx-toolbar-search-control">
+        <SearchInput
+          aria-label={label}
+          inputClassName={inputClassName}
           {...props}
         />
       </span>
-    </ToolbarField>
+    </label>
   );
 }
 
@@ -802,9 +984,9 @@ export const DialogOverlay = forwardRef<
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const dialogSizeClassNames = {
-  small: 'adminx-dialog-panel-small',
-  medium: 'adminx-dialog-panel-medium',
-  large: 'adminx-dialog-panel-large',
+  small: 'max-w-md',
+  medium: 'max-w-2xl',
+  large: 'max-w-4xl',
 } as const;
 
 export const DialogContent = forwardRef<
@@ -818,16 +1000,20 @@ export const DialogContent = forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      className={cn('adminx-dialog-panel', dialogSizeClassNames[size], className)}
+      className={cn(
+        'fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[28px] border border-zinc-200/80 bg-white/92 p-6 shadow-2xl shadow-zinc-950/12 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900/92 dark:shadow-black/30',
+        dialogSizeClassNames[size],
+        className,
+      )}
       {...props}
     >
       {children}
       {showCloseButton ? (
-        <DialogPrimitive.Close
-          className="adminx-dialog-close"
-          aria-label={translateAdminText('Close dialog')}
-        >
-          <X className="h-4 w-4" />
+        <DialogPrimitive.Close asChild>
+          <DialogIconCloseButton
+            className="absolute right-4 top-4 disabled:pointer-events-none"
+            label={translateAdminText('Close dialog')}
+          />
         </DialogPrimitive.Close>
       ) : null}
     </DialogPrimitive.Content>
@@ -842,7 +1028,7 @@ export function DialogHeader({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn('adminx-dialog-header', className)}>{children}</div>;
+  return <div className={cn('flex flex-col gap-1.5 text-center sm:text-left', className)}>{children}</div>;
 }
 
 export const DialogTitle = forwardRef<
@@ -851,7 +1037,7 @@ export const DialogTitle = forwardRef<
 >(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('adminx-dialog-title', className)}
+    className={cn('text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50', className)}
     {...props}
   >
     {children}
@@ -865,7 +1051,7 @@ export const DialogDescription = forwardRef<
 >(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('adminx-dialog-description', className)}
+    className={cn('text-sm text-zinc-500 dark:text-zinc-400', className)}
     {...props}
   >
     {children}
@@ -880,7 +1066,31 @@ export function DialogFooter({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn('adminx-dialog-actions', className)}>{children}</div>;
+  return <div className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}>{children}</div>;
+}
+
+function DialogIconCloseButton({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  return (
+    <Button
+      aria-label={label}
+      className={cn(
+        'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200',
+        className,
+      )}
+      size="icon"
+      type="button"
+      variant="ghost"
+    >
+      <X className="h-4 w-4" />
+      <span className="sr-only">{label}</span>
+    </Button>
+  );
 }
 
 export function AdminDialog({
@@ -896,15 +1106,72 @@ export function AdminDialog({
 }) {
   return (
     <>
-      <DialogHeader>
-        <div className="adminx-dialog-copy">
+      <DialogHeader className="border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80">
+        <div className="grid gap-1.5">
           <DialogTitle>{title}</DialogTitle>
           {detail ? <DialogDescription>{detail}</DialogDescription> : null}
         </div>
       </DialogHeader>
-      <div className="adminx-dialog-body">{children}</div>
-      {actions ? <DialogFooter>{actions}</DialogFooter> : null}
+      <div className="grid gap-5">{children}</div>
+      {actions ? (
+        <DialogFooter className="border-t border-zinc-200/80 pt-4 dark:border-zinc-800/80">
+          {actions}
+        </DialogFooter>
+      ) : null}
     </>
+  );
+}
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}
+
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  className,
+}: ModalProps) {
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        size="small"
+        showCloseButton={false}
+        className={cn('max-w-md border-zinc-200/70 p-0 dark:border-zinc-800/70', className)}
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-zinc-100 px-6 py-5 text-left dark:border-zinc-800">
+          <div className="grid gap-1.5">
+            <DialogTitle className="text-xl font-semibold tracking-tight">{title}</DialogTitle>
+            {description ? <DialogDescription>{description}</DialogDescription> : null}
+          </div>
+          <DialogClose asChild>
+            <DialogIconCloseButton label={translateAdminText('Close dialog')} />
+          </DialogClose>
+        </DialogHeader>
+        <div className="overflow-y-auto p-6">{children}</div>
+        {footer ? (
+          <DialogFooter className="border-t border-zinc-100 px-6 py-5 dark:border-zinc-800">
+            {footer}
+          </DialogFooter>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -920,10 +1187,10 @@ export function FormField({
   className?: string;
 }) {
   return (
-    <label className={cn('adminx-field', className)}>
-      <span>{label}</span>
+    <label className={cn('adminx-field grid gap-2', className)}>
+      <Label>{label}</Label>
       {children}
-      {hint ? <small className="adminx-field-hint">{hint}</small> : null}
+      {hint ? <small className="text-xs text-[var(--admin-text-soft)]">{hint}</small> : null}
     </label>
   );
 }

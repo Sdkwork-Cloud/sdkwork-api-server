@@ -1,5 +1,6 @@
 export type PortalAnonymousRouteKey = 'login' | 'register' | 'forgot-password';
 export type PortalRouteKey =
+  | 'gateway'
   | 'dashboard'
   | 'routing'
   | 'api-keys'
@@ -92,9 +93,13 @@ export interface UsageRecord {
   provider: string;
   units: number;
   amount: number;
+  api_key_hash?: string | null;
+  channel_id?: string | null;
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  latency_ms?: number | null;
+  reference_amount?: number | null;
   created_at_ms: number;
 }
 
@@ -119,10 +124,58 @@ export interface ProjectBillingSummary {
   exhausted: boolean;
 }
 
+export interface PortalRateLimitPolicySnapshot {
+  policy_id: string;
+  project_id: string;
+  api_key_hash?: string | null;
+  route_key?: string | null;
+  model_name?: string | null;
+  requests_per_window: number;
+  window_seconds: number;
+  burst_requests: number;
+  limit_requests: number;
+  enabled: boolean;
+  notes?: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface PortalRateLimitWindowSnapshot {
+  policy_id: string;
+  project_id: string;
+  api_key_hash?: string | null;
+  route_key?: string | null;
+  model_name?: string | null;
+  requests_per_window: number;
+  window_seconds: number;
+  burst_requests: number;
+  limit_requests: number;
+  request_count: number;
+  remaining_requests: number;
+  window_start_ms: number;
+  window_end_ms: number;
+  updated_at_ms: number;
+  enabled: boolean;
+  exceeded: boolean;
+}
+
 export interface LedgerEntry {
   project_id: string;
   units: number;
   amount: number;
+}
+
+export interface PortalGatewayRateLimitSnapshot {
+  project_id: string;
+  policy_count: number;
+  active_policy_count: number;
+  window_count: number;
+  exceeded_window_count: number;
+  headline: string;
+  detail: string;
+  generated_at_ms: number;
+  policies: PortalRateLimitPolicySnapshot[];
+  windows: PortalRateLimitWindowSnapshot[];
 }
 
 export interface PortalDashboardSummary {
@@ -215,6 +268,37 @@ export interface PortalRoutingSummary {
   provider_options: PortalRoutingProviderOption[];
 }
 
+export type PortalProductRuntimeRole = 'web' | 'gateway' | 'admin' | 'portal';
+export type PortalProductRuntimeMode = 'desktop' | 'server';
+
+export interface PortalDesktopRuntimeSnapshot {
+  mode: PortalProductRuntimeMode;
+  roles: PortalProductRuntimeRole[];
+  publicBaseUrl?: string | null;
+  publicBindAddr?: string | null;
+  gatewayBindAddr?: string | null;
+  adminBindAddr?: string | null;
+  portalBindAddr?: string | null;
+}
+
+export type PortalRuntimeHealthStatus = 'healthy' | 'degraded' | 'unreachable';
+
+export interface PortalRuntimeServiceHealth {
+  id: PortalProductRuntimeRole;
+  label: string;
+  status: PortalRuntimeHealthStatus;
+  healthUrl: string;
+  detail: string;
+  httpStatus?: number | null;
+  responseTimeMs?: number | null;
+}
+
+export interface PortalRuntimeHealthSnapshot {
+  mode: PortalProductRuntimeMode | 'browser';
+  checkedAtMs: number;
+  services: PortalRuntimeServiceHealth[];
+}
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -243,4 +327,134 @@ export interface CouponOffer {
   description: string;
   bonus_units: number;
   source: PortalDataSource;
+}
+
+export interface PortalCommerceCoupon {
+  id: string;
+  code: string;
+  discount_label: string;
+  audience: string;
+  remaining: number;
+  active: boolean;
+  note: string;
+  expires_on: string;
+  source: PortalDataSource;
+  discount_percent?: number | null;
+  bonus_units: number;
+}
+
+export interface PortalCommerceCatalog {
+  plans: SubscriptionPlan[];
+  packs: RechargePack[];
+  coupons: PortalCommerceCoupon[];
+}
+
+export type PortalCommerceQuoteKind =
+  | 'subscription_plan'
+  | 'recharge_pack'
+  | 'coupon_redemption';
+
+export interface PortalCommerceQuoteRequest {
+  target_kind: PortalCommerceQuoteKind;
+  target_id: string;
+  coupon_code?: string | null;
+  current_remaining_units?: number | null;
+}
+
+export interface PortalAppliedCoupon {
+  code: string;
+  discount_label: string;
+  source: PortalDataSource;
+  discount_percent?: number | null;
+  bonus_units: number;
+}
+
+export interface PortalCommerceQuote {
+  target_kind: PortalCommerceQuoteKind;
+  target_id: string;
+  target_name: string;
+  list_price_cents: number;
+  payable_price_cents: number;
+  list_price_label: string;
+  payable_price_label: string;
+  granted_units: number;
+  bonus_units: number;
+  projected_remaining_units?: number | null;
+  applied_coupon?: PortalAppliedCoupon | null;
+  source: PortalDataSource;
+}
+
+export type PortalCommerceOrderStatus =
+  | 'pending_payment'
+  | 'fulfilled'
+  | 'canceled'
+  | 'failed';
+
+export type PortalCommerceCheckoutSessionStatus =
+  | 'open'
+  | 'settled'
+  | 'canceled'
+  | 'failed'
+  | 'not_required'
+  | 'closed';
+
+export type PortalCommercePaymentEventType = 'settled' | 'failed' | 'canceled';
+
+export interface PortalCommercePaymentEventRequest {
+  event_type: PortalCommercePaymentEventType;
+}
+
+export interface PortalCommerceCheckoutSessionMethod {
+  id: string;
+  label: string;
+  detail: string;
+  action: 'settle_order' | 'cancel_order' | 'provider_handoff';
+  availability: 'available' | 'planned' | 'closed';
+}
+
+export interface PortalCommerceCheckoutSession {
+  order_id: string;
+  order_status: PortalCommerceOrderStatus;
+  session_status: PortalCommerceCheckoutSessionStatus;
+  provider: string;
+  mode: string;
+  reference: string;
+  payable_price_label: string;
+  guidance: string;
+  methods: PortalCommerceCheckoutSessionMethod[];
+}
+
+export interface PortalCommerceOrder {
+  order_id: string;
+  project_id: string;
+  user_id: string;
+  target_kind: PortalCommerceQuoteKind;
+  target_id: string;
+  target_name: string;
+  list_price_cents: number;
+  payable_price_cents: number;
+  list_price_label: string;
+  payable_price_label: string;
+  granted_units: number;
+  bonus_units: number;
+  applied_coupon_code?: string | null;
+  status: PortalCommerceOrderStatus;
+  source: PortalDataSource;
+  created_at_ms: number;
+}
+
+export interface PortalCommerceMembership {
+  membership_id: string;
+  project_id: string;
+  user_id: string;
+  plan_id: string;
+  plan_name: string;
+  price_cents: number;
+  price_label: string;
+  cadence: string;
+  included_units: number;
+  status: string;
+  source: PortalDataSource;
+  activated_at_ms: number;
+  updated_at_ms: number;
 }

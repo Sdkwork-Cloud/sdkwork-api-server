@@ -10,9 +10,9 @@ export function CouponImpactCard({
   return (
     <div className="portalx-insight-card">
       <Pill tone="positive">Redemption impact</Pill>
-      <strong>{preview.offer.title}</strong>
+      <strong>{preview.coupon.code}</strong>
       <p>{preview.status}</p>
-      <span>{formatUnits(preview.offer.bonus_units)} bonus units</span>
+      <span>{formatUnits(preview.quote.bonus_units)} bonus units</span>
     </div>
   );
 }

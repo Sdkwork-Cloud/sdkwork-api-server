@@ -396,8 +396,14 @@ portal_bind: "127.0.0.1:19082"
     assert_eq!(overridden.gateway_bind, "127.0.0.1:39080");
     assert_eq!(overridden.admin_bind, "127.0.0.1:19081");
     assert_eq!(overridden.portal_bind, "127.0.0.1:19082");
-    assert_eq!(overridden_loader.reload().unwrap().gateway_bind, "127.0.0.1:39080");
-    assert_eq!(overridden_loader.reload().unwrap().admin_bind, "127.0.0.1:19081");
+    assert_eq!(
+        overridden_loader.reload().unwrap().gateway_bind,
+        "127.0.0.1:39080"
+    );
+    assert_eq!(
+        overridden_loader.reload().unwrap().admin_bind,
+        "127.0.0.1:19081"
+    );
 }
 
 #[test]

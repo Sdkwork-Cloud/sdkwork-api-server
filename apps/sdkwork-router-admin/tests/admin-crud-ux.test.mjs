@@ -89,3 +89,92 @@ test('operations page uses a targeted reload dialog instead of leaving a persist
   assert.match(operations, /Reload runtimes/);
   assert.doesNotMatch(operations, /title="Reload runtimes"/);
 });
+
+test('admin dialog and workbench forms reuse shared Input, Select, and Textarea primitives instead of raw html controls', () => {
+  const formHeavyFiles = [
+    'packages/sdkwork-router-admin-users/src/index.tsx',
+    'packages/sdkwork-router-admin-coupons/src/index.tsx',
+    'packages/sdkwork-router-admin-tenants/src/index.tsx',
+    'packages/sdkwork-router-admin-operations/src/index.tsx',
+    'packages/sdkwork-router-admin-catalog/src/index.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayRoutesPage.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayModelMappingsPage.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx',
+  ];
+
+  for (const relativePath of formHeavyFiles) {
+    const source = read(relativePath);
+
+    assert.match(source, /sdkwork-router-admin-commons/);
+    assert.match(source, /Input/);
+    assert.match(source, /Select/);
+    assert.doesNotMatch(source, /<input/);
+    assert.doesNotMatch(source, /<select/);
+    assert.doesNotMatch(source, /<textarea/);
+  }
+});
+
+test('admin auth, settings, and analytics filters also avoid raw html form controls outside shared primitives', () => {
+  const coverage = [
+    {
+      relativePath: 'packages/sdkwork-router-admin-auth/src/index.tsx',
+      requiredTokens: ['Input'],
+    },
+    {
+      relativePath: 'packages/sdkwork-router-admin-traffic/src/index.tsx',
+      requiredTokens: ['Select'],
+    },
+    {
+      relativePath: 'packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx',
+      requiredTokens: ['Select'],
+    },
+    {
+      relativePath: 'packages/sdkwork-router-admin-settings/src/NavigationSettings.tsx',
+      requiredTokens: ['Checkbox'],
+    },
+  ];
+
+  for (const { relativePath, requiredTokens } of coverage) {
+    const source = read(relativePath);
+
+    assert.match(source, /sdkwork-router-admin-commons/);
+    for (const token of requiredTokens) {
+      assert.match(source, new RegExp(token));
+    }
+    assert.doesNotMatch(source, /<input/);
+    assert.doesNotMatch(source, /<select/);
+    assert.doesNotMatch(source, /<textarea/);
+  }
+});
+
+test('admin compact list toolbars keep search first, actions right, and filters out of the row layout', () => {
+  const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
+  const stylesheet = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
+  const listPages = [
+    'packages/sdkwork-router-admin-users/src/index.tsx',
+    'packages/sdkwork-router-admin-coupons/src/index.tsx',
+    'packages/sdkwork-router-admin-traffic/src/index.tsx',
+    'packages/sdkwork-router-admin-tenants/src/index.tsx',
+    'packages/sdkwork-router-admin-operations/src/index.tsx',
+    'packages/sdkwork-router-admin-catalog/src/index.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayRoutesPage.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayModelMappingsPage.tsx',
+    'packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx',
+  ];
+
+  assert.match(commons, /export function ToolbarInline/);
+  assert.match(stylesheet, /\.adminx-toolbar-inline\s*\{/);
+  assert.match(stylesheet, /flex-wrap:\s*nowrap/);
+  assert.match(stylesheet, /\.adminx-toolbar-disclosure-panel[\s\S]*position:\s*absolute/);
+  assert.match(
+    stylesheet,
+    /\.adminx-toolbar-search-input\s+\.adminx-toolbar-search-input-element[\s\S]*padding-left:\s*48px/,
+  );
+
+  for (const relativePath of listPages) {
+    const source = read(relativePath);
+
+    assert.match(source, /ToolbarInline/);
+  }
+});

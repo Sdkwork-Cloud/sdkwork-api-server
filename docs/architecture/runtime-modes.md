@@ -22,6 +22,7 @@ Characteristics:
 - the Tauri shell under `console/src-tauri/` can start or call into the embedded runtime
 - the admin console build can be opened in a normal browser or hosted inside Tauri
 - the portal now ships as a separate browser-first app under `apps/sdkwork-router-portal/`
+- the portal now includes a `Gateway` command center that explains compatibility, desktop mode, server mode, and role-sliced rollout posture from inside the product
 - loopback binding is the default trust boundary
 - SQLite is the preferred local persistence strategy
 - OS keyring is the preferred secret backend when available
@@ -36,6 +37,7 @@ The current repository includes:
 - a Tauri shell scaffold with an initial runtime command
 - a live landing plus admin console with browser and Tauri-friendly entry points under `console/`
 - a standalone portal app with dedicated dashboard, usage, credits, billing, API key, and account modules
+- a standalone portal `Gateway` module that turns compatibility, topology, and launch-readiness into a first-class product surface
 - a public portal API surface for self-service registration, login, workspace inspection, dashboard, usage, billing, and scoped API key issuance
 - a package-bounded portal frontend split across SDK, auth, and user dashboard modules
 - a standalone `portal-api-service` with dedicated JWT signing config and bind address

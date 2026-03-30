@@ -35,6 +35,9 @@ const PortalCreditsPage = lazy(async () => ({
 const PortalDashboardPage = lazy(async () => ({
   default: (await import('sdkwork-router-portal-dashboard')).PortalDashboardPage,
 }));
+const PortalGatewayPage = lazy(async () => ({
+  default: (await import('sdkwork-router-portal-gateway')).PortalGatewayPage,
+}));
 const PortalRoutingPage = lazy(async () => ({
   default: (await import('sdkwork-router-portal-routing')).PortalRoutingPage,
 }));
@@ -118,6 +121,8 @@ export function AppRoutes({
 
   function renderProtectedRoute(routeKey: PortalRouteKey) {
     switch (routeKey) {
+      case 'gateway':
+        return <PortalGatewayPage onNavigate={navigateToRoute} />;
       case 'dashboard':
         return (
           <PortalDashboardPage
@@ -204,6 +209,7 @@ export function AppRoutes({
         />
         {(
           [
+            'gateway',
             'dashboard',
             'routing',
             'api-keys',

@@ -86,6 +86,8 @@ test('core store exposes theme and sidebar shell state', () => {
   assert.match(store, /themeColor/);
   assert.match(store, /sidebarWidth/);
   assert.match(store, /toggleSidebar/);
+  assert.match(store, /sidebarCollapsePreference/);
+  assert.match(store, /resolveAutoSidebarCollapsed/);
   assert.match(store, /hiddenSidebarItems/);
   assert.match(core, /useAdminAppStore/);
   assert.match(routePaths, /SETTINGS/);
@@ -124,6 +126,7 @@ test('shell package owns router, theme manager, header, sidebar, and settings pa
   assert.match(bootstrap, /Promise\.resolve|async function bootstrapShellRuntime/);
   assert.match(providers, /BrowserRouter/);
   assert.match(themeManager, /data-theme/);
+  assert.doesNotMatch(themeManager, /data-sidebar-collapsed/);
   assert.match(layout, /Sidebar/);
   assert.match(layout, /AppHeader/);
   assert.match(routePaths, /ROUTE_PATHS|ADMIN_ROUTE_PATHS/);
@@ -243,7 +246,7 @@ test('operations module exposes runtime reload controls', () => {
   assert.match(operations, /Targeted reload/);
 });
 
-test('catalog module exposes provider credential lifecycle management', () => {
+test('catalog module exposes unified directory workbench and provider credential lifecycle management', () => {
   const rootRoutes = read('packages/sdkwork-router-admin-shell/src/AppRoutes.tsx');
   const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
   const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
@@ -258,7 +261,10 @@ test('catalog module exposes provider credential lifecycle management', () => {
   assert.match(rootRoutes, /export \{ AppRoutes \} from '\.\/application\/router\/AppRoutes';/);
   assert.match(routes, /onSaveCredential=/);
   assert.match(routes, /onDeleteCredential=/);
-  assert.match(catalog, /Credential inventory/);
+  assert.match(catalog, /Catalog lane/);
+  assert.match(catalog, /Channel focus/);
+  assert.match(catalog, /Catalog workbench/);
+  assert.match(catalog, /Manage channel models/);
   assert.match(catalog, /Rotate secret/);
 });
 
@@ -359,6 +365,7 @@ test('shell stylesheet defines claw-studio theme tokens and shell selectors', ()
   assert.match(theme, /data-theme="zinc"/);
   assert.match(theme, /data-theme="violet"/);
   assert.match(theme, /data-theme="rose"/);
-  assert.match(theme, /data-sidebar-collapsed/);
+  assert.match(theme, /adminx-shell-sidebar-resize-handle/);
+  assert.match(theme, /adminx-shell-sidebar-toggle/);
   assert.match(theme, /admin-shell-settings/);
 });

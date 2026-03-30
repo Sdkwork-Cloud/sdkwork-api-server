@@ -40,7 +40,7 @@ use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookR
 use sdkwork_api_domain_catalog::ModelCatalogEntry;
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
-    ProviderStreamOutput,
+    ProviderRequestOptions, ProviderStreamOutput,
 };
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use serde_json::Value;
@@ -753,5 +753,16 @@ impl ProviderAdapter for OpenRouterProviderAdapter {
 impl ProviderExecutionAdapter for OpenRouterProviderAdapter {
     async fn execute(&self, api_key: &str, request: ProviderRequest<'_>) -> Result<ProviderOutput> {
         self.delegate.execute(api_key, request).await
+    }
+
+    async fn execute_with_options(
+        &self,
+        api_key: &str,
+        request: ProviderRequest<'_>,
+        options: &ProviderRequestOptions,
+    ) -> Result<ProviderOutput> {
+        self.delegate
+            .execute_with_options(api_key, request, options)
+            .await
     }
 }

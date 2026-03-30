@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -9,9 +10,13 @@ use sdkwork_api_domain_catalog::{
     normalize_provider_extension_id, Channel, ChannelModelRecord, ModelCapability,
     ModelCatalogEntry, ModelPriceRecord, ProviderChannelBinding, ProxyProvider,
 };
+use sdkwork_api_domain_commerce::{CommerceOrderRecord, ProjectMembershipRecord};
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserRecord, GatewayApiKeyRecord, PortalUserRecord};
+use sdkwork_api_domain_rate_limit::{
+    RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,
+};
 use sdkwork_api_domain_routing::{
     ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingCandidateAssessment,
     RoutingDecisionLog, RoutingDecisionSource, RoutingPolicy, RoutingStrategy,
@@ -36,7 +41,7 @@ const BUILTIN_CHANNEL_SEEDS: [(&str, &str, i64); 5] = [
     ("ollama", "Ollama", 50),
 ];
 
-const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
+const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 22] = [
     ("identity_users", "ai_portal_users"),
     ("admin_users", "ai_admin_users"),
     ("tenant_records", "ai_tenants"),
@@ -53,6 +58,8 @@ const LEGACY_RENAMED_TABLE_MAPPINGS: [(&str, &str); 20] = [
     ("usage_records", "ai_usage_records"),
     ("billing_ledger_entries", "ai_billing_ledger_entries"),
     ("billing_quota_policies", "ai_billing_quota_policies"),
+    ("commerce_orders", "ai_commerce_orders"),
+    ("project_memberships", "ai_project_memberships"),
     ("extension_installations", "ai_extension_installations"),
     ("extension_instances", "ai_extension_instances"),
     ("service_runtime_nodes", "ai_service_runtime_nodes"),
@@ -240,6 +247,12 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_coupon_campaigns_active_remaining_created
+         ON ai_coupon_campaigns (active, remaining, created_at_ms DESC, code)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_routing_policies (
             policy_id TEXT PRIMARY KEY NOT NULL,
             capability TEXT NOT NULL,
@@ -285,6 +298,24 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_policy_providers_policy_position
+         ON ai_routing_policy_providers (policy_id, position, provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_policy_providers_provider_position
+         ON ai_routing_policy_providers (provider_id, position, policy_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_policies_capability_priority
+         ON ai_routing_policies (capability, enabled, priority DESC, policy_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_project_routing_preferences (
             project_id TEXT PRIMARY KEY NOT NULL,
             preset_id TEXT NOT NULL DEFAULT '',
@@ -322,6 +353,24 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_decision_logs_project_created_at
+         ON ai_routing_decision_logs (project_id, created_at_ms DESC, decision_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_decision_logs_provider_created_at
+         ON ai_routing_decision_logs (selected_provider_id, created_at_ms DESC, decision_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_routing_decision_logs_capability_created_at
+         ON ai_routing_decision_logs (capability, created_at_ms DESC, decision_id)",
+    )
+    .execute(&pool)
+    .await?;
     ensure_sqlite_column(
         &pool,
         "ai_routing_decision_logs",
@@ -344,6 +393,18 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_provider_health_records_provider_observed_at
+         ON ai_provider_health_records (provider_id, observed_at_ms DESC, runtime)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_provider_health_records_extension_runtime_observed_at
+         ON ai_provider_health_records (extension_id, runtime, observed_at_ms DESC, provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_usage_records (
             project_id TEXT NOT NULL,
             model TEXT NOT NULL,
@@ -353,8 +414,24 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             input_tokens INTEGER NOT NULL DEFAULT 0,
             output_tokens INTEGER NOT NULL DEFAULT 0,
             total_tokens INTEGER NOT NULL DEFAULT 0,
+            api_key_hash TEXT,
+            channel_id TEXT,
+            latency_ms INTEGER,
+            reference_amount REAL,
             created_at_ms INTEGER NOT NULL DEFAULT 0
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_usage_records_project_created_at
+         ON ai_usage_records (project_id, created_at_ms DESC, provider_id, model)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_usage_records_created_at
+         ON ai_usage_records (created_at_ms DESC, project_id, provider_id, model)",
     )
     .execute(&pool)
     .await?;
@@ -396,16 +473,70 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     ensure_sqlite_column(
         &pool,
         "ai_usage_records",
+        "api_key_hash",
+        "api_key_hash TEXT",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_usage_records",
+        "channel_id",
+        "channel_id TEXT",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_usage_records",
+        "latency_ms",
+        "latency_ms INTEGER",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_usage_records",
+        "reference_amount",
+        "reference_amount REAL",
+    )
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_usage_records",
         "created_at_ms",
         "created_at_ms INTEGER NOT NULL DEFAULT 0",
     )
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_usage_records_project_fact_filters
+         ON ai_usage_records (project_id, created_at_ms DESC, api_key_hash, channel_id, model)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_billing_ledger_entries (
             project_id TEXT NOT NULL,
             units INTEGER NOT NULL,
-            amount REAL NOT NULL
+            amount REAL NOT NULL,
+            created_at_ms INTEGER NOT NULL DEFAULT 0
         )",
+    )
+    .execute(&pool)
+    .await?;
+    ensure_sqlite_column(
+        &pool,
+        "ai_billing_ledger_entries",
+        "created_at_ms",
+        "created_at_ms INTEGER NOT NULL DEFAULT 0",
+    )
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_billing_ledger_entries_project_created_at
+         ON ai_billing_ledger_entries (project_id, created_at_ms DESC)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_billing_ledger_entries_created_at
+         ON ai_billing_ledger_entries (created_at_ms DESC, project_id)",
     )
     .execute(&pool)
     .await?;
@@ -416,6 +547,118 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             max_units INTEGER NOT NULL,
             enabled INTEGER NOT NULL DEFAULT 1
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_billing_quota_policies_project_enabled
+         ON ai_billing_quota_policies (project_id, enabled, policy_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_gateway_rate_limit_policies (
+            policy_id TEXT PRIMARY KEY NOT NULL,
+            project_id TEXT NOT NULL,
+            api_key_hash TEXT,
+            route_key TEXT,
+            model_name TEXT,
+            requests_per_window INTEGER NOT NULL,
+            window_seconds INTEGER NOT NULL DEFAULT 60,
+            burst_requests INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            created_at_ms INTEGER NOT NULL DEFAULT 0,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_gateway_rate_limit_policies_project_enabled
+         ON ai_gateway_rate_limit_policies (project_id, enabled, policy_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_gateway_rate_limit_policies_project_scope
+         ON ai_gateway_rate_limit_policies (project_id, api_key_hash, route_key, model_name, enabled, policy_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_gateway_rate_limit_windows (
+            policy_id TEXT NOT NULL,
+            window_start_ms INTEGER NOT NULL,
+            request_count INTEGER NOT NULL DEFAULT 0,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (policy_id, window_start_ms)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_commerce_orders (
+            order_id TEXT PRIMARY KEY NOT NULL,
+            project_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            target_kind TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            target_name TEXT NOT NULL,
+            list_price_cents INTEGER NOT NULL DEFAULT 0,
+            payable_price_cents INTEGER NOT NULL DEFAULT 0,
+            list_price_label TEXT NOT NULL DEFAULT '$0.00',
+            payable_price_label TEXT NOT NULL DEFAULT '$0.00',
+            granted_units INTEGER NOT NULL DEFAULT 0,
+            bonus_units INTEGER NOT NULL DEFAULT 0,
+            applied_coupon_code TEXT,
+            status TEXT NOT NULL DEFAULT 'fulfilled',
+            source TEXT NOT NULL DEFAULT 'workspace_seed',
+            created_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_commerce_orders_project_created_at
+         ON ai_commerce_orders (project_id, created_at_ms DESC, status, order_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_commerce_orders_user_created_at
+         ON ai_commerce_orders (user_id, created_at_ms DESC, status, order_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_project_memberships (
+            project_id TEXT PRIMARY KEY NOT NULL,
+            membership_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            plan_id TEXT NOT NULL,
+            plan_name TEXT NOT NULL,
+            price_cents INTEGER NOT NULL DEFAULT 0,
+            price_label TEXT NOT NULL DEFAULT '$0.00',
+            cadence TEXT NOT NULL DEFAULT '',
+            included_units INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active',
+            source TEXT NOT NULL DEFAULT 'workspace_seed',
+            activated_at_ms INTEGER NOT NULL DEFAULT 0,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_project_memberships_project_updated_at
+         ON ai_project_memberships (project_id, updated_at_ms DESC, status)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_project_memberships_user_updated_at
+         ON ai_project_memberships (user_id, updated_at_ms DESC, status)",
     )
     .execute(&pool)
     .await?;
@@ -449,6 +692,12 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_proxy_provider_primary_channel
+         ON ai_proxy_provider (primary_channel_id, is_active, proxy_provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_proxy_provider_channel (
             proxy_provider_id TEXT NOT NULL,
             channel_id TEXT NOT NULL,
@@ -457,6 +706,12 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             updated_at_ms INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (proxy_provider_id, channel_id)
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_proxy_provider_channel_channel_provider
+         ON ai_proxy_provider_channel (channel_id, proxy_provider_id, is_primary)",
     )
     .execute(&pool)
     .await?;
@@ -479,6 +734,18 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_router_credential_records_tenant_updated
+         ON ai_router_credential_records (tenant_id, updated_at_ms DESC, proxy_provider_id, key_reference)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_router_credential_records_provider_updated
+         ON ai_router_credential_records (proxy_provider_id, updated_at_ms DESC, tenant_id, key_reference)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_model (
             channel_id TEXT NOT NULL,
             model_id TEXT NOT NULL,
@@ -491,6 +758,12 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             updated_at_ms INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (channel_id, model_id)
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_model_model_streaming
+         ON ai_model (model_id, streaming_enabled, channel_id)",
     )
     .execute(&pool)
     .await?;
@@ -515,6 +788,24 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_model_price_provider_active
+         ON ai_model_price (proxy_provider_id, is_active, channel_id, model_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_model_price_channel_active
+         ON ai_model_price (channel_id, model_id, is_active, proxy_provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_model_price_model_active
+         ON ai_model_price (model_id, is_active, channel_id, proxy_provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_app_api_keys (
             hashed_key TEXT PRIMARY KEY NOT NULL,
             raw_key TEXT,
@@ -528,6 +819,18 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
             expires_at_ms INTEGER,
             active INTEGER NOT NULL
         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_app_api_keys_project_active
+         ON ai_app_api_keys (project_id, active, created_at_ms DESC, hashed_key)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_app_api_keys_tenant_environment
+         ON ai_app_api_keys (tenant_id, environment, active, created_at_ms DESC)",
     )
     .execute(&pool)
     .await?;
@@ -1673,6 +1976,62 @@ async fn load_provider_channel_bindings(
         .collect())
 }
 
+async fn load_provider_channel_bindings_for_providers(
+    pool: &SqlitePool,
+    providers: &[(String, String)],
+) -> Result<HashMap<String, Vec<ProviderChannelBinding>>> {
+    let mut bindings_by_provider = providers
+        .iter()
+        .map(|(provider_id, _)| (provider_id.clone(), Vec::new()))
+        .collect::<HashMap<_, _>>();
+
+    if providers.is_empty() {
+        return Ok(bindings_by_provider);
+    }
+
+    let mut query = String::from(
+        "SELECT proxy_provider_id, channel_id, is_primary
+         FROM ai_proxy_provider_channel
+         WHERE proxy_provider_id IN (",
+    );
+    for (index, _) in providers.iter().enumerate() {
+        if index > 0 {
+            query.push_str(", ");
+        }
+        query.push('?');
+    }
+    query.push_str(") ORDER BY proxy_provider_id, is_primary DESC, channel_id");
+
+    let mut statement = sqlx::query_as::<_, (String, String, i64)>(&query);
+    for (provider_id, _) in providers {
+        statement = statement.bind(provider_id);
+    }
+    let rows = statement.fetch_all(pool).await?;
+
+    for (provider_id, channel_id, is_primary) in rows {
+        bindings_by_provider
+            .entry(provider_id.clone())
+            .or_default()
+            .push(ProviderChannelBinding {
+                provider_id,
+                channel_id,
+                is_primary: is_primary != 0,
+            });
+    }
+
+    for (provider_id, channel_id) in providers {
+        let bindings = bindings_by_provider.entry(provider_id.clone()).or_default();
+        if bindings.is_empty() {
+            bindings.push(ProviderChannelBinding::primary(
+                provider_id.clone(),
+                channel_id.clone(),
+            ));
+        }
+    }
+
+    Ok(bindings_by_provider)
+}
+
 fn encode_model_capabilities(capabilities: &[ModelCapability]) -> Result<String> {
     Ok(serde_json::to_string(capabilities)?)
 }
@@ -2043,10 +2402,64 @@ impl SqliteAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
+        let provider_keys = rows
+            .iter()
+            .map(|(id, channel_id, _, _, _, _)| (id.clone(), channel_id.clone()))
+            .collect::<Vec<_>>();
+        let bindings_by_provider =
+            load_provider_channel_bindings_for_providers(&self.pool, &provider_keys).await?;
         let mut providers = Vec::with_capacity(rows.len());
         for (id, channel_id, extension_id, adapter_kind, base_url, display_name) in rows {
-            let channel_bindings =
-                load_provider_channel_bindings(&self.pool, &id, &channel_id).await?;
+            let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
+                vec![ProviderChannelBinding::primary(
+                    id.clone(),
+                    channel_id.clone(),
+                )]
+            });
+            providers.push(ProxyProvider {
+                id,
+                channel_id,
+                extension_id: normalize_provider_extension_id(extension_id, &adapter_kind),
+                adapter_kind,
+                base_url,
+                display_name,
+                channel_bindings,
+            });
+        }
+        Ok(providers)
+    }
+
+    pub async fn list_providers_for_model(&self, model: &str) -> Result<Vec<ProxyProvider>> {
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, String)>(
+            "SELECT DISTINCT providers.proxy_provider_id, providers.primary_channel_id, providers.extension_id, providers.adapter_kind, providers.base_url, providers.display_name
+             FROM ai_model models
+             INNER JOIN ai_model_price prices
+                 ON prices.channel_id = models.channel_id
+                AND prices.model_id = models.model_id
+             INNER JOIN ai_proxy_provider providers
+                 ON providers.proxy_provider_id = prices.proxy_provider_id
+             WHERE models.model_id = ?
+               AND prices.is_active != 0
+               AND providers.is_active != 0
+             ORDER BY providers.proxy_provider_id",
+        )
+        .bind(model)
+        .fetch_all(&self.pool)
+        .await?;
+        let provider_keys = rows
+            .iter()
+            .map(|(id, channel_id, _, _, _, _)| (id.clone(), channel_id.clone()))
+            .collect::<Vec<_>>();
+        let bindings_by_provider =
+            load_provider_channel_bindings_for_providers(&self.pool, &provider_keys).await?;
+        let mut providers = Vec::with_capacity(rows.len());
+        for (id, channel_id, extension_id, adapter_kind, base_url, display_name) in rows {
+            let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
+                vec![ProviderChannelBinding::primary(
+                    id.clone(),
+                    channel_id.clone(),
+                )]
+            });
             providers.push(ProxyProvider {
                 id,
                 channel_id,
@@ -2215,6 +2628,38 @@ impl SqliteAdminStore {
         Ok(rows.into_iter().map(decode_credential_row).collect())
     }
 
+    pub async fn list_credentials_for_tenant(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        let rows = sqlx::query_as::<_, CredentialRow>(
+            "SELECT tenant_id, proxy_provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id
+             FROM ai_router_credential_records
+             WHERE tenant_id = ?
+             ORDER BY updated_at_ms DESC, proxy_provider_id, key_reference",
+        )
+        .bind(tenant_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(decode_credential_row).collect())
+    }
+
+    pub async fn list_credentials_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        let rows = sqlx::query_as::<_, CredentialRow>(
+            "SELECT tenant_id, proxy_provider_id, key_reference, secret_backend, secret_local_file, secret_keyring_service, secret_master_key_id
+             FROM ai_router_credential_records
+             WHERE proxy_provider_id = ?
+             ORDER BY updated_at_ms DESC, tenant_id, key_reference",
+        )
+        .bind(provider_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(decode_credential_row).collect())
+    }
+
     pub async fn find_credential(
         &self,
         tenant_id: &str,
@@ -2375,6 +2820,75 @@ impl SqliteAdminStore {
             });
         }
         Ok(models)
+    }
+
+    pub async fn list_models_for_external_name(
+        &self,
+        external_name: &str,
+    ) -> Result<Vec<ModelCatalogEntry>> {
+        let rows = sqlx::query_as::<_, (String, String, String, i64, Option<i64>)>(
+            "SELECT
+                models.model_id,
+                prices.proxy_provider_id,
+                models.capabilities_json,
+                models.streaming_enabled,
+                models.context_window
+             FROM ai_model models
+             INNER JOIN ai_model_price prices
+                 ON prices.channel_id = models.channel_id
+                AND prices.model_id = models.model_id
+             WHERE models.model_id = ?
+               AND prices.is_active != 0
+             ORDER BY prices.proxy_provider_id",
+        )
+        .bind(external_name)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut models = Vec::with_capacity(rows.len());
+        for (external_name, provider_id, capabilities, streaming, context_window) in rows {
+            models.push(ModelCatalogEntry {
+                external_name,
+                provider_id,
+                capabilities: decode_model_capabilities(&capabilities)?,
+                streaming: streaming != 0,
+                context_window: context_window.map(u64::try_from).transpose()?,
+            });
+        }
+        Ok(models)
+    }
+
+    pub async fn find_any_model(&self) -> Result<Option<ModelCatalogEntry>> {
+        let row = sqlx::query_as::<_, (String, String, String, i64, Option<i64>)>(
+            "SELECT
+                models.model_id,
+                prices.proxy_provider_id,
+                models.capabilities_json,
+                models.streaming_enabled,
+                models.context_window
+             FROM ai_model models
+             INNER JOIN ai_model_price prices
+                 ON prices.channel_id = models.channel_id
+                AND prices.model_id = models.model_id
+             WHERE prices.is_active != 0
+             ORDER BY models.model_id, prices.proxy_provider_id
+             LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(match row {
+            Some((external_name, provider_id, capabilities, streaming, context_window)) => {
+                Some(ModelCatalogEntry {
+                    external_name,
+                    provider_id,
+                    capabilities: decode_model_capabilities(&capabilities)?,
+                    streaming: streaming != 0,
+                    context_window: context_window.map(u64::try_from).transpose()?,
+                })
+            }
+            None => None,
+        })
     }
 
     pub async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>> {
@@ -2913,6 +3427,160 @@ impl SqliteAdminStore {
             .collect()
     }
 
+    pub async fn list_routing_decision_logs_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RoutingDecisionLog>> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                String,
+                String,
+                Option<String>,
+                String,
+                Option<i64>,
+                Option<String>,
+                Option<String>,
+                i64,
+                i64,
+                i64,
+                String,
+            ),
+        >(
+            "SELECT decision_id, decision_source, tenant_id, project_id, capability, route_key, selected_provider_id, matched_policy_id, strategy, selection_seed, selection_reason, requested_region, slo_applied, slo_degraded, created_at_ms, assessments_json
+             FROM ai_routing_decision_logs
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, decision_id DESC",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(
+                |(
+                    decision_id,
+                    decision_source,
+                    tenant_id,
+                    project_id,
+                    capability,
+                    route_key,
+                    selected_provider_id,
+                    matched_policy_id,
+                    strategy,
+                    selection_seed,
+                    selection_reason,
+                    requested_region,
+                    slo_applied,
+                    slo_degraded,
+                    created_at_ms,
+                    assessments_json,
+                )| {
+                    Ok(RoutingDecisionLog::new(
+                        decision_id,
+                        RoutingDecisionSource::from_str(&decision_source)
+                            .unwrap_or(RoutingDecisionSource::Gateway),
+                        capability,
+                        route_key,
+                        selected_provider_id,
+                        strategy,
+                        u64::try_from(created_at_ms)?,
+                    )
+                    .with_tenant_id_option(tenant_id)
+                    .with_project_id_option(project_id)
+                    .with_matched_policy_id_option(matched_policy_id)
+                    .with_selection_seed_option(selection_seed.map(u64::try_from).transpose()?)
+                    .with_selection_reason_option(selection_reason)
+                    .with_requested_region_option(requested_region)
+                    .with_slo_state(slo_applied != 0, slo_degraded != 0)
+                    .with_assessments(decode_routing_assessments(&assessments_json)?))
+                },
+            )
+            .collect()
+    }
+
+    pub async fn find_latest_routing_decision_log_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<RoutingDecisionLog>> {
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                String,
+                String,
+                Option<String>,
+                String,
+                Option<i64>,
+                Option<String>,
+                Option<String>,
+                i64,
+                i64,
+                i64,
+                String,
+            ),
+        >(
+            "SELECT decision_id, decision_source, tenant_id, project_id, capability, route_key, selected_provider_id, matched_policy_id, strategy, selection_seed, selection_reason, requested_region, slo_applied, slo_degraded, created_at_ms, assessments_json
+             FROM ai_routing_decision_logs
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, decision_id DESC
+             LIMIT 1",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(
+            |(
+                decision_id,
+                decision_source,
+                tenant_id,
+                project_id,
+                capability,
+                route_key,
+                selected_provider_id,
+                matched_policy_id,
+                strategy,
+                selection_seed,
+                selection_reason,
+                requested_region,
+                slo_applied,
+                slo_degraded,
+                created_at_ms,
+                assessments_json,
+            )| {
+                Ok(RoutingDecisionLog::new(
+                    decision_id,
+                    RoutingDecisionSource::from_str(&decision_source)
+                        .unwrap_or(RoutingDecisionSource::Gateway),
+                    capability,
+                    route_key,
+                    selected_provider_id,
+                    strategy,
+                    u64::try_from(created_at_ms)?,
+                )
+                .with_tenant_id_option(tenant_id)
+                .with_project_id_option(project_id)
+                .with_matched_policy_id_option(matched_policy_id)
+                .with_selection_seed_option(selection_seed.map(u64::try_from).transpose()?)
+                .with_selection_reason_option(selection_reason)
+                .with_requested_region_option(requested_region)
+                .with_slo_state(slo_applied != 0, slo_degraded != 0)
+                .with_assessments(decode_routing_assessments(&assessments_json)?))
+            },
+        )
+        .transpose()
+    }
+
     pub async fn insert_provider_health_snapshot(
         &self,
         snapshot: &ProviderHealthSnapshot,
@@ -2974,8 +3642,22 @@ impl SqliteAdminStore {
 
     pub async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord> {
         sqlx::query(
-            "INSERT INTO ai_usage_records (project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO ai_usage_records (
+                project_id,
+                model,
+                provider_id,
+                units,
+                amount,
+                input_tokens,
+                output_tokens,
+                total_tokens,
+                api_key_hash,
+                channel_id,
+                latency_ms,
+                reference_amount,
+                created_at_ms
+             )
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.project_id)
         .bind(&record.model)
@@ -2985,6 +3667,10 @@ impl SqliteAdminStore {
         .bind(i64::try_from(record.input_tokens)?)
         .bind(i64::try_from(record.output_tokens)?)
         .bind(i64::try_from(record.total_tokens)?)
+        .bind(record.api_key_hash.as_deref())
+        .bind(record.channel_id.as_deref())
+        .bind(record.latency_ms.map(i64::try_from).transpose()?)
+        .bind(record.reference_amount)
         .bind(i64::try_from(record.created_at_ms)?)
         .execute(&self.pool)
         .await?;
@@ -2992,10 +3678,27 @@ impl SqliteAdminStore {
     }
 
     pub async fn list_usage_records(&self) -> Result<Vec<UsageRecord>> {
-        let rows = sqlx::query_as::<_, (String, String, String, i64, f64, i64, i64, i64, i64)>(
-            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, created_at_ms
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                i64,
+                f64,
+                i64,
+                i64,
+                i64,
+                Option<String>,
+                Option<String>,
+                Option<i64>,
+                Option<f64>,
+                i64,
+            ),
+        >(
+            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, api_key_hash, channel_id, latency_ms, reference_amount, created_at_ms
              FROM ai_usage_records
-             ORDER BY rowid",
+             ORDER BY created_at_ms DESC, rowid DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -3011,6 +3714,10 @@ impl SqliteAdminStore {
                     input_tokens,
                     output_tokens,
                     total_tokens,
+                    api_key_hash,
+                    channel_id,
+                    latency_ms,
+                    reference_amount,
                     created_at_ms,
                 )|
                  -> Result<UsageRecord> {
@@ -3023,6 +3730,10 @@ impl SqliteAdminStore {
                         input_tokens: u64::try_from(input_tokens)?,
                         output_tokens: u64::try_from(output_tokens)?,
                         total_tokens: u64::try_from(total_tokens)?,
+                        api_key_hash,
+                        channel_id,
+                        latency_ms: latency_ms.map(u64::try_from).transpose()?,
+                        reference_amount,
                         created_at_ms: u64::try_from(created_at_ms)?,
                     })
                 },
@@ -3030,13 +3741,151 @@ impl SqliteAdminStore {
             .collect::<Result<Vec<_>>>()?)
     }
 
+    pub async fn list_usage_records_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<UsageRecord>> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                i64,
+                f64,
+                i64,
+                i64,
+                i64,
+                Option<String>,
+                Option<String>,
+                Option<i64>,
+                Option<f64>,
+                i64,
+            ),
+        >(
+            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, api_key_hash, channel_id, latency_ms, reference_amount, created_at_ms
+             FROM ai_usage_records
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, rowid DESC",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    project_id,
+                    model,
+                    provider,
+                    units,
+                    amount,
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    api_key_hash,
+                    channel_id,
+                    latency_ms,
+                    reference_amount,
+                    created_at_ms,
+                )|
+                 -> Result<UsageRecord> {
+                    Ok(UsageRecord {
+                        project_id,
+                        model,
+                        provider,
+                        units: u64::try_from(units)?,
+                        amount,
+                        input_tokens: u64::try_from(input_tokens)?,
+                        output_tokens: u64::try_from(output_tokens)?,
+                        total_tokens: u64::try_from(total_tokens)?,
+                        api_key_hash,
+                        channel_id,
+                        latency_ms: latency_ms.map(u64::try_from).transpose()?,
+                        reference_amount,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>>>()?)
+    }
+
+    pub async fn find_latest_usage_record_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<UsageRecord>> {
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                i64,
+                f64,
+                i64,
+                i64,
+                i64,
+                Option<String>,
+                Option<String>,
+                Option<i64>,
+                Option<f64>,
+                i64,
+            ),
+        >(
+            "SELECT project_id, model, provider_id, units, amount, input_tokens, output_tokens, total_tokens, api_key_hash, channel_id, latency_ms, reference_amount, created_at_ms
+             FROM ai_usage_records
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, rowid DESC
+             LIMIT 1",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(
+            |(
+                project_id,
+                model,
+                provider,
+                units,
+                amount,
+                input_tokens,
+                output_tokens,
+                total_tokens,
+                api_key_hash,
+                channel_id,
+                latency_ms,
+                reference_amount,
+                created_at_ms,
+            )| {
+                Ok(UsageRecord {
+                    project_id,
+                    model,
+                    provider,
+                    units: u64::try_from(units)?,
+                    amount,
+                    input_tokens: u64::try_from(input_tokens)?,
+                    output_tokens: u64::try_from(output_tokens)?,
+                    total_tokens: u64::try_from(total_tokens)?,
+                    api_key_hash,
+                    channel_id,
+                    latency_ms: latency_ms.map(u64::try_from).transpose()?,
+                    reference_amount,
+                    created_at_ms: u64::try_from(created_at_ms)?,
+                })
+            },
+        )
+        .transpose()
+    }
+
     pub async fn insert_ledger_entry(&self, entry: &LedgerEntry) -> Result<LedgerEntry> {
         sqlx::query(
-            "INSERT INTO ai_billing_ledger_entries (project_id, units, amount) VALUES (?, ?, ?)",
+            "INSERT INTO ai_billing_ledger_entries (project_id, units, amount, created_at_ms) VALUES (?, ?, ?, ?)",
         )
         .bind(&entry.project_id)
         .bind(i64::try_from(entry.units)?)
         .bind(entry.amount)
+        .bind(current_timestamp_ms())
         .execute(&self.pool)
         .await?;
         Ok(entry.clone())
@@ -3044,8 +3893,34 @@ impl SqliteAdminStore {
 
     pub async fn list_ledger_entries(&self) -> Result<Vec<LedgerEntry>> {
         let rows = sqlx::query_as::<_, (String, i64, f64)>(
-            "SELECT project_id, units, amount FROM ai_billing_ledger_entries ORDER BY rowid",
+            "SELECT project_id, units, amount FROM ai_billing_ledger_entries ORDER BY created_at_ms DESC, rowid DESC",
         )
+        .fetch_all(&self.pool)
+        .await?;
+        let entries = rows
+            .into_iter()
+            .map(|(project_id, units, amount)| {
+                Ok(LedgerEntry {
+                    project_id,
+                    units: u64::try_from(units)?,
+                    amount,
+                })
+            })
+            .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?;
+        Ok(entries)
+    }
+
+    pub async fn list_ledger_entries_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<LedgerEntry>> {
+        let rows = sqlx::query_as::<_, (String, i64, f64)>(
+            "SELECT project_id, units, amount
+             FROM ai_billing_ledger_entries
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, rowid DESC",
+        )
+        .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
         let entries = rows
@@ -3100,6 +3975,371 @@ impl SqliteAdminStore {
             })
             .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?;
         Ok(policies)
+    }
+
+    pub async fn list_quota_policies_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<QuotaPolicy>> {
+        let rows = sqlx::query_as::<_, (String, String, i64, i64)>(
+            "SELECT policy_id, project_id, max_units, enabled
+             FROM ai_billing_quota_policies
+             WHERE project_id = ?
+             ORDER BY policy_id",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let policies = rows
+            .into_iter()
+            .map(|(policy_id, project_id, max_units, enabled)| {
+                Ok(QuotaPolicy {
+                    policy_id,
+                    project_id,
+                    max_units: u64::try_from(max_units)?,
+                    enabled: enabled != 0,
+                })
+            })
+            .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?;
+        Ok(policies)
+    }
+
+    pub async fn insert_rate_limit_policy(
+        &self,
+        policy: &RateLimitPolicy,
+    ) -> Result<RateLimitPolicy> {
+        sqlx::query(
+            "INSERT INTO ai_gateway_rate_limit_policies (
+                policy_id, project_id, api_key_hash, route_key, model_name,
+                requests_per_window, window_seconds, burst_requests, enabled,
+                notes, created_at_ms, updated_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(policy_id) DO UPDATE SET
+             project_id = excluded.project_id,
+             api_key_hash = excluded.api_key_hash,
+             route_key = excluded.route_key,
+             model_name = excluded.model_name,
+             requests_per_window = excluded.requests_per_window,
+             window_seconds = excluded.window_seconds,
+             burst_requests = excluded.burst_requests,
+             enabled = excluded.enabled,
+             notes = excluded.notes,
+             created_at_ms = excluded.created_at_ms,
+             updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&policy.policy_id)
+        .bind(&policy.project_id)
+        .bind(&policy.api_key_hash)
+        .bind(&policy.route_key)
+        .bind(&policy.model_name)
+        .bind(i64::try_from(policy.requests_per_window)?)
+        .bind(i64::try_from(policy.window_seconds)?)
+        .bind(i64::try_from(policy.burst_requests)?)
+        .bind(if policy.enabled { 1_i64 } else { 0_i64 })
+        .bind(&policy.notes)
+        .bind(i64::try_from(policy.created_at_ms)?)
+        .bind(i64::try_from(policy.updated_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(policy.clone())
+    }
+
+    pub async fn list_rate_limit_policies(&self) -> Result<Vec<RateLimitPolicy>> {
+        let rows = sqlx::query_as::<_, (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+            i64,
+            i64,
+            Option<String>,
+            i64,
+            i64,
+        )>(
+            "SELECT policy_id, project_id, api_key_hash, route_key, model_name, requests_per_window, window_seconds, burst_requests, enabled, notes, created_at_ms, updated_at_ms
+             FROM ai_gateway_rate_limit_policies
+             ORDER BY project_id, enabled DESC, policy_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    policy_id,
+                    project_id,
+                    api_key_hash,
+                    route_key,
+                    model_name,
+                    requests_per_window,
+                    window_seconds,
+                    burst_requests,
+                    enabled,
+                    notes,
+                    created_at_ms,
+                    updated_at_ms,
+                )| {
+                    Ok(RateLimitPolicy {
+                        policy_id,
+                        project_id,
+                        api_key_hash,
+                        route_key,
+                        model_name,
+                        requests_per_window: u64::try_from(requests_per_window)?,
+                        window_seconds: u64::try_from(window_seconds)?,
+                        burst_requests: u64::try_from(burst_requests)?,
+                        enabled: enabled != 0,
+                        notes,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                        updated_at_ms: u64::try_from(updated_at_ms)?,
+                    })
+                },
+            )
+            .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?)
+    }
+
+    pub async fn list_rate_limit_policies_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RateLimitPolicy>> {
+        let rows = sqlx::query_as::<_, (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+            i64,
+            i64,
+            Option<String>,
+            i64,
+            i64,
+        )>(
+            "SELECT policy_id, project_id, api_key_hash, route_key, model_name, requests_per_window, window_seconds, burst_requests, enabled, notes, created_at_ms, updated_at_ms
+             FROM ai_gateway_rate_limit_policies
+             WHERE project_id = ?
+             ORDER BY enabled DESC, policy_id",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    policy_id,
+                    project_id,
+                    api_key_hash,
+                    route_key,
+                    model_name,
+                    requests_per_window,
+                    window_seconds,
+                    burst_requests,
+                    enabled,
+                    notes,
+                    created_at_ms,
+                    updated_at_ms,
+                )| {
+                    Ok(RateLimitPolicy {
+                        policy_id,
+                        project_id,
+                        api_key_hash,
+                        route_key,
+                        model_name,
+                        requests_per_window: u64::try_from(requests_per_window)?,
+                        window_seconds: u64::try_from(window_seconds)?,
+                        burst_requests: u64::try_from(burst_requests)?,
+                        enabled: enabled != 0,
+                        notes,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                        updated_at_ms: u64::try_from(updated_at_ms)?,
+                    })
+                },
+            )
+            .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?)
+    }
+
+    pub async fn list_rate_limit_window_snapshots(&self) -> Result<Vec<RateLimitWindowSnapshot>> {
+        let rows = sqlx::query_as::<_, (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+            i64,
+            i64,
+            i64,
+            i64,
+            i64,
+        )>(
+            "SELECT
+                p.policy_id,
+                p.project_id,
+                p.api_key_hash,
+                p.route_key,
+                p.model_name,
+                p.requests_per_window,
+                p.window_seconds,
+                p.burst_requests,
+                w.request_count,
+                w.window_start_ms,
+                w.updated_at_ms,
+                p.enabled
+             FROM ai_gateway_rate_limit_windows w
+             INNER JOIN ai_gateway_rate_limit_policies p ON p.policy_id = w.policy_id
+             ORDER BY p.project_id, w.updated_at_ms DESC, p.policy_id, w.window_start_ms DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    policy_id,
+                    project_id,
+                    api_key_hash,
+                    route_key,
+                    model_name,
+                    requests_per_window,
+                    window_seconds,
+                    burst_requests,
+                    request_count,
+                    window_start_ms,
+                    updated_at_ms,
+                    enabled,
+                )| {
+                    let requests_per_window = u64::try_from(requests_per_window)?;
+                    let window_seconds = u64::try_from(window_seconds)?;
+                    let burst_requests = u64::try_from(burst_requests)?;
+                    let request_count = u64::try_from(request_count)?;
+                    let window_start_ms = u64::try_from(window_start_ms)?;
+                    let updated_at_ms = u64::try_from(updated_at_ms)?;
+                    let limit_requests = match burst_requests {
+                        0 => requests_per_window,
+                        burst => burst.max(requests_per_window),
+                    };
+                    let remaining_requests = limit_requests.saturating_sub(request_count);
+
+                    Ok(RateLimitWindowSnapshot {
+                        policy_id,
+                        project_id,
+                        api_key_hash,
+                        route_key,
+                        model_name,
+                        requests_per_window,
+                        window_seconds,
+                        burst_requests,
+                        limit_requests,
+                        request_count,
+                        remaining_requests,
+                        window_start_ms,
+                        window_end_ms: window_start_ms
+                            .saturating_add(window_seconds.saturating_mul(1000)),
+                        updated_at_ms,
+                        enabled: enabled != 0,
+                        exceeded: request_count > limit_requests,
+                    })
+                },
+            )
+            .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?)
+    }
+
+    pub async fn check_and_consume_rate_limit(
+        &self,
+        policy_id: &str,
+        requested_requests: u64,
+        limit_requests: u64,
+        window_seconds: u64,
+        now_ms: u64,
+    ) -> Result<RateLimitCheckResult> {
+        let window_seconds = window_seconds.max(1);
+        let window_ms = window_seconds.saturating_mul(1000);
+        let window_start_ms = now_ms - (now_ms % window_ms);
+        let requested = i64::try_from(requested_requests)?;
+        let limit = i64::try_from(limit_requests)?;
+        let window_start = i64::try_from(window_start_ms)?;
+        let now = i64::try_from(now_ms)?;
+
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            "INSERT INTO ai_gateway_rate_limit_windows (policy_id, window_start_ms, request_count, updated_at_ms)
+             VALUES (?, ?, 0, ?)
+             ON CONFLICT(policy_id, window_start_ms) DO NOTHING",
+        )
+        .bind(policy_id)
+        .bind(window_start)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        loop {
+            let used_before = sqlx::query_as::<_, (i64,)>(
+                "SELECT request_count
+                 FROM ai_gateway_rate_limit_windows
+                 WHERE policy_id = ? AND window_start_ms = ?",
+            )
+            .bind(policy_id)
+            .bind(window_start)
+            .fetch_one(&mut *tx)
+            .await?
+            .0;
+
+            if used_before.saturating_add(requested) > limit {
+                tx.rollback().await?;
+                return Ok(RateLimitCheckResult {
+                    allowed: false,
+                    policy_id: Some(policy_id.to_owned()),
+                    requested_requests,
+                    used_requests: u64::try_from(used_before)?,
+                    limit_requests: Some(limit_requests),
+                    remaining_requests: Some(
+                        limit_requests.saturating_sub(u64::try_from(used_before)?),
+                    ),
+                    window_seconds: Some(window_seconds),
+                    window_start_ms: Some(window_start_ms),
+                    window_end_ms: Some(window_start_ms.saturating_add(window_ms)),
+                });
+            }
+
+            let updated = sqlx::query(
+                "UPDATE ai_gateway_rate_limit_windows
+                 SET request_count = request_count + ?, updated_at_ms = ?
+                 WHERE policy_id = ? AND window_start_ms = ? AND request_count = ?",
+            )
+            .bind(requested)
+            .bind(now)
+            .bind(policy_id)
+            .bind(window_start)
+            .bind(used_before)
+            .execute(&mut *tx)
+            .await?;
+
+            if updated.rows_affected() == 1 {
+                tx.commit().await?;
+                return Ok(RateLimitCheckResult {
+                    allowed: true,
+                    policy_id: Some(policy_id.to_owned()),
+                    requested_requests,
+                    used_requests: u64::try_from(used_before)?,
+                    limit_requests: Some(limit_requests),
+                    remaining_requests: Some(limit_requests.saturating_sub(
+                        u64::try_from(used_before)?.saturating_add(requested_requests),
+                    )),
+                    window_seconds: Some(window_seconds),
+                    window_start_ms: Some(window_start_ms),
+                    window_end_ms: Some(window_start_ms.saturating_add(window_ms)),
+                });
+            }
+        }
     }
 
     pub async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant> {
@@ -3250,6 +4490,24 @@ impl SqliteAdminStore {
             .collect()
     }
 
+    pub async fn list_active_coupons(&self) -> Result<Vec<CouponCampaign>> {
+        let rows = sqlx::query_as::<_, CouponRow>(
+            "SELECT id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms
+             FROM ai_coupon_campaigns
+             WHERE active != 0 AND remaining > 0
+             ORDER BY remaining DESC, created_at_ms DESC, code ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(|row| decode_coupon_row(Some(row)))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .map(|row| row.ok_or_else(|| anyhow::anyhow!("coupon row decode returned empty")))
+            .collect()
+    }
+
     pub async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>> {
         let row = sqlx::query_as::<_, CouponRow>(
             "SELECT id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms
@@ -3268,6 +4526,321 @@ impl SqliteAdminStore {
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn insert_commerce_order(
+        &self,
+        order: &CommerceOrderRecord,
+    ) -> Result<CommerceOrderRecord> {
+        sqlx::query(
+            "INSERT INTO ai_commerce_orders (
+                order_id,
+                project_id,
+                user_id,
+                target_kind,
+                target_id,
+                target_name,
+                list_price_cents,
+                payable_price_cents,
+                list_price_label,
+                payable_price_label,
+                granted_units,
+                bonus_units,
+                applied_coupon_code,
+                status,
+                source,
+                created_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(order_id) DO UPDATE SET
+                project_id = excluded.project_id,
+                user_id = excluded.user_id,
+                target_kind = excluded.target_kind,
+                target_id = excluded.target_id,
+                target_name = excluded.target_name,
+                list_price_cents = excluded.list_price_cents,
+                payable_price_cents = excluded.payable_price_cents,
+                list_price_label = excluded.list_price_label,
+                payable_price_label = excluded.payable_price_label,
+                granted_units = excluded.granted_units,
+                bonus_units = excluded.bonus_units,
+                applied_coupon_code = excluded.applied_coupon_code,
+                status = excluded.status,
+                source = excluded.source,
+                created_at_ms = excluded.created_at_ms",
+        )
+        .bind(&order.order_id)
+        .bind(&order.project_id)
+        .bind(&order.user_id)
+        .bind(&order.target_kind)
+        .bind(&order.target_id)
+        .bind(&order.target_name)
+        .bind(i64::try_from(order.list_price_cents)?)
+        .bind(i64::try_from(order.payable_price_cents)?)
+        .bind(&order.list_price_label)
+        .bind(&order.payable_price_label)
+        .bind(i64::try_from(order.granted_units)?)
+        .bind(i64::try_from(order.bonus_units)?)
+        .bind(&order.applied_coupon_code)
+        .bind(&order.status)
+        .bind(&order.source)
+        .bind(i64::try_from(order.created_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(order.clone())
+    }
+
+    pub async fn list_commerce_orders(&self) -> Result<Vec<CommerceOrderRecord>> {
+        let rows = sqlx::query_as::<_, (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            i64,
+            i64,
+            String,
+            String,
+            i64,
+            i64,
+            Option<String>,
+            String,
+            String,
+            i64,
+        )>(
+            "SELECT order_id, project_id, user_id, target_kind, target_id, target_name, list_price_cents, payable_price_cents, list_price_label, payable_price_label, granted_units, bonus_units, applied_coupon_code, status, source, created_at_ms
+             FROM ai_commerce_orders
+             ORDER BY created_at_ms DESC, order_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    order_id,
+                    project_id,
+                    user_id,
+                    target_kind,
+                    target_id,
+                    target_name,
+                    list_price_cents,
+                    payable_price_cents,
+                    list_price_label,
+                    payable_price_label,
+                    granted_units,
+                    bonus_units,
+                    applied_coupon_code,
+                    status,
+                    source,
+                    created_at_ms,
+                )| CommerceOrderRecord {
+                    order_id,
+                    project_id,
+                    user_id,
+                    target_kind,
+                    target_id,
+                    target_name,
+                    list_price_cents: list_price_cents as u64,
+                    payable_price_cents: payable_price_cents as u64,
+                    list_price_label,
+                    payable_price_label,
+                    granted_units: granted_units as u64,
+                    bonus_units: bonus_units as u64,
+                    applied_coupon_code,
+                    status,
+                    source,
+                    created_at_ms: created_at_ms as u64,
+                },
+            )
+            .collect())
+    }
+
+    pub async fn list_commerce_orders_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<CommerceOrderRecord>> {
+        let rows = sqlx::query_as::<_, (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            i64,
+            i64,
+            String,
+            String,
+            i64,
+            i64,
+            Option<String>,
+            String,
+            String,
+            i64,
+        )>(
+            "SELECT order_id, project_id, user_id, target_kind, target_id, target_name, list_price_cents, payable_price_cents, list_price_label, payable_price_label, granted_units, bonus_units, applied_coupon_code, status, source, created_at_ms
+             FROM ai_commerce_orders
+             WHERE project_id = ?
+             ORDER BY created_at_ms DESC, order_id DESC",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    order_id,
+                    project_id,
+                    user_id,
+                    target_kind,
+                    target_id,
+                    target_name,
+                    list_price_cents,
+                    payable_price_cents,
+                    list_price_label,
+                    payable_price_label,
+                    granted_units,
+                    bonus_units,
+                    applied_coupon_code,
+                    status,
+                    source,
+                    created_at_ms,
+                )| CommerceOrderRecord {
+                    order_id,
+                    project_id,
+                    user_id,
+                    target_kind,
+                    target_id,
+                    target_name,
+                    list_price_cents: list_price_cents as u64,
+                    payable_price_cents: payable_price_cents as u64,
+                    list_price_label,
+                    payable_price_label,
+                    granted_units: granted_units as u64,
+                    bonus_units: bonus_units as u64,
+                    applied_coupon_code,
+                    status,
+                    source,
+                    created_at_ms: created_at_ms as u64,
+                },
+            )
+            .collect())
+    }
+
+    pub async fn upsert_project_membership(
+        &self,
+        membership: &ProjectMembershipRecord,
+    ) -> Result<ProjectMembershipRecord> {
+        sqlx::query(
+            "INSERT INTO ai_project_memberships (
+                project_id,
+                membership_id,
+                user_id,
+                plan_id,
+                plan_name,
+                price_cents,
+                price_label,
+                cadence,
+                included_units,
+                status,
+                source,
+                activated_at_ms,
+                updated_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(project_id) DO UPDATE SET
+                membership_id = excluded.membership_id,
+                user_id = excluded.user_id,
+                plan_id = excluded.plan_id,
+                plan_name = excluded.plan_name,
+                price_cents = excluded.price_cents,
+                price_label = excluded.price_label,
+                cadence = excluded.cadence,
+                included_units = excluded.included_units,
+                status = excluded.status,
+                source = excluded.source,
+                activated_at_ms = excluded.activated_at_ms,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&membership.project_id)
+        .bind(&membership.membership_id)
+        .bind(&membership.user_id)
+        .bind(&membership.plan_id)
+        .bind(&membership.plan_name)
+        .bind(i64::try_from(membership.price_cents)?)
+        .bind(&membership.price_label)
+        .bind(&membership.cadence)
+        .bind(i64::try_from(membership.included_units)?)
+        .bind(&membership.status)
+        .bind(&membership.source)
+        .bind(i64::try_from(membership.activated_at_ms)?)
+        .bind(i64::try_from(membership.updated_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(membership.clone())
+    }
+
+    pub async fn find_project_membership(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectMembershipRecord>> {
+        let row = sqlx::query_as::<_, (
+            String,
+            String,
+            String,
+            String,
+            String,
+            i64,
+            String,
+            String,
+            i64,
+            String,
+            String,
+            i64,
+            i64,
+        )>(
+            "SELECT membership_id, project_id, user_id, plan_id, plan_name, price_cents, price_label, cadence, included_units, status, source, activated_at_ms, updated_at_ms
+             FROM ai_project_memberships
+             WHERE project_id = ?",
+        )
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(
+            |(
+                membership_id,
+                project_id,
+                user_id,
+                plan_id,
+                plan_name,
+                price_cents,
+                price_label,
+                cadence,
+                included_units,
+                status,
+                source,
+                activated_at_ms,
+                updated_at_ms,
+            )| {
+                Ok(ProjectMembershipRecord {
+                    membership_id,
+                    project_id,
+                    user_id,
+                    plan_id,
+                    plan_name,
+                    price_cents: u64::try_from(price_cents)?,
+                    price_label,
+                    cadence,
+                    included_units: u64::try_from(included_units)?,
+                    status,
+                    source,
+                    activated_at_ms: u64::try_from(activated_at_ms)?,
+                    updated_at_ms: u64::try_from(updated_at_ms)?,
+                })
+            },
+        )
+        .transpose()
     }
 
     pub async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord> {
@@ -4197,6 +5770,10 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_providers(self).await
     }
 
+    async fn list_providers_for_model(&self, model: &str) -> Result<Vec<ProxyProvider>> {
+        SqliteAdminStore::list_providers_for_model(self, model).await
+    }
+
     async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>> {
         SqliteAdminStore::find_provider(self, provider_id).await
     }
@@ -4222,6 +5799,20 @@ impl AdminStore for SqliteAdminStore {
 
     async fn list_credentials(&self) -> Result<Vec<UpstreamCredential>> {
         SqliteAdminStore::list_credentials(self).await
+    }
+
+    async fn list_credentials_for_tenant(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        SqliteAdminStore::list_credentials_for_tenant(self, tenant_id).await
+    }
+
+    async fn list_credentials_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        SqliteAdminStore::list_credentials_for_provider(self, provider_id).await
     }
 
     async fn find_credential(
@@ -4266,6 +5857,17 @@ impl AdminStore for SqliteAdminStore {
 
     async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>> {
         SqliteAdminStore::list_models(self).await
+    }
+
+    async fn list_models_for_external_name(
+        &self,
+        external_name: &str,
+    ) -> Result<Vec<ModelCatalogEntry>> {
+        SqliteAdminStore::list_models_for_external_name(self, external_name).await
+    }
+
+    async fn find_any_model(&self) -> Result<Option<ModelCatalogEntry>> {
+        SqliteAdminStore::find_any_model(self).await
     }
 
     async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>> {
@@ -4345,6 +5947,20 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_routing_decision_logs(self).await
     }
 
+    async fn list_routing_decision_logs_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RoutingDecisionLog>> {
+        SqliteAdminStore::list_routing_decision_logs_for_project(self, project_id).await
+    }
+
+    async fn find_latest_routing_decision_log_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<RoutingDecisionLog>> {
+        SqliteAdminStore::find_latest_routing_decision_log_for_project(self, project_id).await
+    }
+
     async fn insert_provider_health_snapshot(
         &self,
         snapshot: &ProviderHealthSnapshot,
@@ -4364,6 +5980,17 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_usage_records(self).await
     }
 
+    async fn list_usage_records_for_project(&self, project_id: &str) -> Result<Vec<UsageRecord>> {
+        SqliteAdminStore::list_usage_records_for_project(self, project_id).await
+    }
+
+    async fn find_latest_usage_record_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<UsageRecord>> {
+        SqliteAdminStore::find_latest_usage_record_for_project(self, project_id).await
+    }
+
     async fn insert_ledger_entry(&self, entry: &LedgerEntry) -> Result<LedgerEntry> {
         SqliteAdminStore::insert_ledger_entry(self, entry).await
     }
@@ -4372,12 +5999,58 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_ledger_entries(self).await
     }
 
+    async fn list_ledger_entries_for_project(&self, project_id: &str) -> Result<Vec<LedgerEntry>> {
+        SqliteAdminStore::list_ledger_entries_for_project(self, project_id).await
+    }
+
     async fn insert_quota_policy(&self, policy: &QuotaPolicy) -> Result<QuotaPolicy> {
         SqliteAdminStore::insert_quota_policy(self, policy).await
     }
 
     async fn list_quota_policies(&self) -> Result<Vec<QuotaPolicy>> {
         SqliteAdminStore::list_quota_policies(self).await
+    }
+
+    async fn list_quota_policies_for_project(&self, project_id: &str) -> Result<Vec<QuotaPolicy>> {
+        SqliteAdminStore::list_quota_policies_for_project(self, project_id).await
+    }
+
+    async fn insert_rate_limit_policy(&self, policy: &RateLimitPolicy) -> Result<RateLimitPolicy> {
+        SqliteAdminStore::insert_rate_limit_policy(self, policy).await
+    }
+
+    async fn list_rate_limit_policies(&self) -> Result<Vec<RateLimitPolicy>> {
+        SqliteAdminStore::list_rate_limit_policies(self).await
+    }
+
+    async fn list_rate_limit_window_snapshots(&self) -> Result<Vec<RateLimitWindowSnapshot>> {
+        SqliteAdminStore::list_rate_limit_window_snapshots(self).await
+    }
+
+    async fn list_rate_limit_policies_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RateLimitPolicy>> {
+        SqliteAdminStore::list_rate_limit_policies_for_project(self, project_id).await
+    }
+
+    async fn check_and_consume_rate_limit(
+        &self,
+        policy_id: &str,
+        requested_requests: u64,
+        limit_requests: u64,
+        window_seconds: u64,
+        now_ms: u64,
+    ) -> Result<RateLimitCheckResult> {
+        SqliteAdminStore::check_and_consume_rate_limit(
+            self,
+            policy_id,
+            requested_requests,
+            limit_requests,
+            window_seconds,
+            now_ms,
+        )
+        .await
     }
 
     async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant> {
@@ -4420,12 +6093,48 @@ impl AdminStore for SqliteAdminStore {
         SqliteAdminStore::list_coupons(self).await
     }
 
+    async fn list_active_coupons(&self) -> Result<Vec<CouponCampaign>> {
+        SqliteAdminStore::list_active_coupons(self).await
+    }
+
     async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>> {
         SqliteAdminStore::find_coupon(self, coupon_id).await
     }
 
     async fn delete_coupon(&self, coupon_id: &str) -> Result<bool> {
         SqliteAdminStore::delete_coupon(self, coupon_id).await
+    }
+
+    async fn insert_commerce_order(
+        &self,
+        order: &CommerceOrderRecord,
+    ) -> Result<CommerceOrderRecord> {
+        SqliteAdminStore::insert_commerce_order(self, order).await
+    }
+
+    async fn list_commerce_orders(&self) -> Result<Vec<CommerceOrderRecord>> {
+        SqliteAdminStore::list_commerce_orders(self).await
+    }
+
+    async fn list_commerce_orders_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<CommerceOrderRecord>> {
+        SqliteAdminStore::list_commerce_orders_for_project(self, project_id).await
+    }
+
+    async fn upsert_project_membership(
+        &self,
+        membership: &ProjectMembershipRecord,
+    ) -> Result<ProjectMembershipRecord> {
+        SqliteAdminStore::upsert_project_membership(self, membership).await
+    }
+
+    async fn find_project_membership(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectMembershipRecord>> {
+        SqliteAdminStore::find_project_membership(self, project_id).await
     }
 
     async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord> {

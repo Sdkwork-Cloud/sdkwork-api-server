@@ -90,6 +90,11 @@ test('portal auth visuals follow the claw-style split card layout instead of the
   assert.match(authPage, /Smartphone/);
   assert.match(authPage, /Button/);
   assert.match(authPage, /Input/);
+  assert.match(authPage, /LeadingIconInput/);
+  assert.match(authPage, /DEV_PORTAL_CREDENTIALS/);
+  assert.match(authPage, /import\.meta\.env\.DEV/);
+  assert.match(authPage, /portal@sdkwork\.local/);
+  assert.match(authPage, /ChangeMe123!/);
   assert.match(authPage, /Label/);
   assert.match(authPage, /max-w-4xl/);
   assert.match(authPage, /rounded-3xl/);
@@ -99,6 +104,8 @@ test('portal auth visuals follow the claw-style split card layout instead of the
   assert.match(authPage, /md:w-2\/5/);
   assert.match(authPage, /md:w-3\/5/);
   assert.match(authPage, /withRedirect\('/);
+  assert.doesNotMatch(authPage, /className="h-10 pl-10 pr-3"/);
+  assert.doesNotMatch(authPage, /<button/);
   assert.doesNotMatch(authPage, /AuthShell/);
   assert.doesNotMatch(appRoutes, /function AuthLayout/);
 });

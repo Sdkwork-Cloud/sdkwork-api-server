@@ -6,7 +6,10 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
+  Button,
+  DataTable,
   EmptyState,
   formatCurrency,
   formatDateTime,
@@ -49,6 +52,26 @@ const chartPalette = [
 
 type WorkbenchTab = 'requests' | 'routing' | 'modules' | 'actions';
 type RequestFilter = 'all' | 'high_spend' | 'latest';
+
+type DashboardWorkbenchRow = {
+  id: string;
+  primary: ReactNode;
+  secondary: ReactNode;
+  detail: ReactNode;
+  status: ReactNode;
+  action: ReactNode;
+};
+
+type DashboardWorkbenchConfig = {
+  primaryLabel: string;
+  secondaryLabel: string;
+  detailLabel: string;
+  statusLabel: string;
+  actionLabel: string;
+  emptyTitle: string;
+  emptyDetail: string;
+  rows: DashboardWorkbenchRow[];
+};
 
 function buildTrafficHeadline(viewModel: PortalDashboardPageViewModel): {
   title: string;
@@ -223,6 +246,133 @@ export function PortalDashboardPage({
     return rows;
   }, [requestAverageAmount, requestFilter, snapshot]);
   const actionCards = useMemo(() => buildActionCards(viewModel), [viewModel]);
+  const workbenchConfig = useMemo<DashboardWorkbenchConfig>(() => {
+    if (activeWorkbenchTab === 'routing') {
+      return {
+        primaryLabel: 'Signal',
+        secondaryLabel: 'Timeline',
+        detailLabel: 'Detail',
+        statusLabel: 'Status',
+        actionLabel: 'Action',
+        emptyTitle: 'Preparing routing evidence',
+        emptyDetail: 'Routing evidence will appear once project routing data becomes available.',
+        rows: routingEvidence.map((row) => ({
+          id: row.id,
+          primary: (
+            <span className="font-semibold text-zinc-950 dark:text-zinc-50">{row.title}</span>
+          ),
+          secondary: row.timestamp_label,
+          detail: row.detail,
+          status: <DashboardStatusPill label={row.title} tone={row.tone} />,
+          action:
+            row.route && row.action_label ? (
+              <InlineButton onClick={() => onNavigate(row.route!)} tone="ghost">
+                {row.action_label}
+              </InlineButton>
+            ) : (
+              '-'
+            ),
+        })),
+      };
+    }
+
+    if (activeWorkbenchTab === 'modules') {
+      return {
+        primaryLabel: 'Module',
+        secondaryLabel: 'Status detail',
+        detailLabel: 'Operational detail',
+        statusLabel: 'Status',
+        actionLabel: 'Action',
+        emptyTitle: 'Preparing module posture',
+        emptyDetail: 'Module posture will appear after the dashboard finishes loading.',
+        rows: (viewModel?.modules ?? []).map((row) => ({
+          id: row.route,
+          primary: (
+            <span className="font-semibold text-zinc-950 dark:text-zinc-50">{row.title}</span>
+          ),
+          secondary: row.status_label,
+          detail: row.detail,
+          status: <DashboardStatusPill label={row.status_label} tone={row.tone} />,
+          action: (
+            <InlineButton onClick={() => onNavigate(row.route)} tone="ghost">
+              {row.action_label}
+            </InlineButton>
+          ),
+        })),
+      };
+    }
+
+    if (activeWorkbenchTab === 'actions') {
+      return {
+        primaryLabel: 'Next action',
+        secondaryLabel: 'Priority',
+        detailLabel: 'Action detail',
+        statusLabel: 'Status',
+        actionLabel: 'Action',
+        emptyTitle: 'Preparing next actions',
+        emptyDetail: 'Next actions will appear when workspace data finishes loading.',
+        rows: actionCards.map((item, index) => ({
+          id: item.id,
+          primary: (
+            <span className="font-semibold text-zinc-950 dark:text-zinc-50">{item.title}</span>
+          ),
+          secondary: `Priority ${index + 1}`,
+          detail: item.detail,
+          status: <DashboardStatusPill label={item.title} tone={item.tone} />,
+          action:
+            item.route && item.action_label ? (
+              <InlineButton onClick={() => onNavigate(item.route!)} tone={actionTone(index)}>
+                {item.action_label}
+              </InlineButton>
+            ) : (
+              '-'
+            ),
+        })),
+      };
+    }
+
+    return {
+      primaryLabel: 'Request',
+      secondaryLabel: 'Provider',
+      detailLabel: 'Token detail',
+      statusLabel: 'Request posture',
+      actionLabel: 'Booked spend',
+      emptyTitle: 'No recent requests yet',
+      emptyDetail:
+        'Once gateway requests start flowing through your project, token usage and booked amount will appear here.',
+      rows: requestRows.map((row) => {
+        const posture = requestPosture(row.amount, requestAverageAmount);
+
+        return {
+          id: `${row.project_id}-${row.model}-${row.created_at_ms}`,
+          primary: (
+            <div className="space-y-1">
+              <span className="font-semibold text-zinc-950 dark:text-zinc-50">{row.model}</span>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {formatDateTime(row.created_at_ms)}
+              </p>
+            </div>
+          ),
+          secondary: row.provider,
+          detail: `${formatUnits(row.input_tokens)} in / ${formatUnits(row.output_tokens)} out / ${formatUnits(row.total_tokens)} total`,
+          status: <DashboardStatusPill label={posture.label} tone={posture.tone} />,
+          action: (
+            <span className="font-semibold text-zinc-950 dark:text-zinc-50">
+              {formatCurrency(row.amount)}
+            </span>
+          ),
+        };
+      }),
+    };
+  }, [
+    actionCards,
+    activeWorkbenchTab,
+    onNavigate,
+    requestAverageAmount,
+    requestRows,
+    routingEvidence,
+    viewModel,
+  ]);
 
   if (error && !snapshot) {
     return (
@@ -439,73 +589,63 @@ export function PortalDashboardPage({
               />
               <div className="mt-6 grid gap-5 2xl:grid-cols-[minmax(320px,0.88fr)_1.12fr]">
                 {viewModel?.provider_share_series.length ? (
-                  <>
-                    <DashboardDistributionRingChart
-                      rows={viewModel.provider_share_series.map((row) => ({
-                        id: row.name,
-                        ...row,
-                      }))}
-                      sliceClassNames={chartPalette.map((item) => item.sliceClassName)}
-                      centerLabel="Requests"
-                      centerValue={formatUnits(snapshot?.usage_summary.total_requests ?? 0)}
-                      ariaLabel="Provider distribution"
-                      valueAccessor={(row) => row.value}
-                    />
-
-                    <div className={chartFrameClass}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[34rem] border-collapse text-left">
-                          <thead className="bg-zinc-50/80 dark:bg-zinc-900/85">
-                            <tr>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Provider
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Requests
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Projects
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Share
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/70 dark:divide-white/6">
-                            {viewModel.provider_mix.map((row, index) => (
-                              <tr key={row.id} className="bg-white/70 dark:bg-zinc-950/35">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <span
-                                      className={`h-2.5 w-2.5 rounded-full ${chartPalette[index % chartPalette.length]!.dotClassName}`}
-                                    />
-                                    <div className="font-semibold text-zinc-950 dark:text-zinc-50">
-                                      {row.label}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.value_label}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.secondary_label}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.share}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
+                  <DashboardDistributionRingChart
+                    rows={viewModel.provider_share_series.map((row) => ({
+                      id: row.name,
+                      ...row,
+                    }))}
+                    sliceClassNames={chartPalette.map((item) => item.sliceClassName)}
+                    centerLabel="Requests"
+                    centerValue={formatUnits(snapshot?.usage_summary.total_requests ?? 0)}
+                    ariaLabel="Provider distribution"
+                    valueAccessor={(row) => row.value}
+                  />
                 ) : (
                   <EmptyState
                     detail="Provider share appears after the first request passes through the gateway."
                     title="No provider traffic yet"
                   />
                 )}
+
+                <DataTable
+                  columns={[
+                    {
+                      key: 'provider',
+                      label: 'Provider',
+                      render: (row) => {
+                        const palette =
+                          chartPalette[
+                            (viewModel?.provider_mix.findIndex((item) => item.id === row.id) ?? 0)
+                            % chartPalette.length
+                          ] ?? chartPalette[0]!;
+
+                        return (
+                          <div className="flex items-center gap-3">
+                            <span className={`h-2.5 w-2.5 rounded-full ${palette.dotClassName}`} />
+                            <div className="font-semibold text-zinc-950 dark:text-zinc-50">
+                              {row.label}
+                            </div>
+                          </div>
+                        );
+                      },
+                    },
+                    { key: 'requests', label: 'Requests', render: (row) => row.value_label },
+                    { key: 'projects', label: 'Projects', render: (row) => row.secondary_label },
+                    { key: 'share', label: 'Share', render: (row) => `${row.share}%` },
+                  ]}
+                  empty={(
+                    <div className="mx-auto flex max-w-[28rem] flex-col items-center gap-2 text-center">
+                      <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                        No provider traffic yet
+                      </strong>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Provider share appears after the first request passes through the gateway.
+                      </p>
+                    </div>
+                  )}
+                  getKey={(row) => row.id}
+                  rows={viewModel?.provider_mix ?? []}
+                />
               </div>
             </section>
           </div>
@@ -561,73 +701,63 @@ export function PortalDashboardPage({
               />
               <div className="mt-6 grid gap-5 2xl:grid-cols-[minmax(320px,0.88fr)_1.12fr]">
                 {viewModel?.model_demand_series.length ? (
-                  <>
-                    <DashboardModelDistributionChart
-                      rows={viewModel.model_demand_series.map((row) => ({
-                        id: row.name,
-                        ...row,
-                      }))}
-                      sliceClassNames={chartPalette.map((item) => item.sliceClassName)}
-                      centerLabel="Models"
-                      centerValue={formatUnits(snapshot?.usage_summary.model_count ?? 0)}
-                      ariaLabel="Model distribution"
-                      valueAccessor={(row) => row.requests}
-                    />
-
-                    <div className={chartFrameClass}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[34rem] border-collapse text-left">
-                          <thead className="bg-zinc-50/80 dark:bg-zinc-900/85">
-                            <tr>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Model
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Requests
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Providers
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Share
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/70 dark:divide-white/6">
-                            {viewModel.model_mix.map((row, index) => (
-                              <tr key={row.id} className="bg-white/70 dark:bg-zinc-950/35">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <span
-                                      className={`h-2.5 w-2.5 rounded-full ${chartPalette[index % chartPalette.length]!.dotClassName}`}
-                                    />
-                                    <div className="font-semibold text-zinc-950 dark:text-zinc-50">
-                                      {row.label}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.value_label}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.secondary_label}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {row.share}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
+                  <DashboardModelDistributionChart
+                    rows={viewModel.model_demand_series.map((row) => ({
+                      id: row.name,
+                      ...row,
+                    }))}
+                    sliceClassNames={chartPalette.map((item) => item.sliceClassName)}
+                    centerLabel="Models"
+                    centerValue={formatUnits(snapshot?.usage_summary.model_count ?? 0)}
+                    ariaLabel="Model distribution"
+                    valueAccessor={(row) => row.requests}
+                  />
                 ) : (
                   <EmptyState
                     detail="Model demand appears after the first request passes through the gateway."
                     title="No model demand yet"
                   />
                 )}
+
+                <DataTable
+                  columns={[
+                    {
+                      key: 'model',
+                      label: 'Model',
+                      render: (row) => {
+                        const palette =
+                          chartPalette[
+                            (viewModel?.model_mix.findIndex((item) => item.id === row.id) ?? 0)
+                            % chartPalette.length
+                          ] ?? chartPalette[0]!;
+
+                        return (
+                          <div className="flex items-center gap-3">
+                            <span className={`h-2.5 w-2.5 rounded-full ${palette.dotClassName}`} />
+                            <div className="font-semibold text-zinc-950 dark:text-zinc-50">
+                              {row.label}
+                            </div>
+                          </div>
+                        );
+                      },
+                    },
+                    { key: 'requests', label: 'Requests', render: (row) => row.value_label },
+                    { key: 'providers', label: 'Providers', render: (row) => row.secondary_label },
+                    { key: 'share', label: 'Share', render: (row) => `${row.share}%` },
+                  ]}
+                  empty={(
+                    <div className="mx-auto flex max-w-[28rem] flex-col items-center gap-2 text-center">
+                      <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                        No model demand yet
+                      </strong>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Model demand appears after the first request passes through the gateway.
+                      </p>
+                    </div>
+                  )}
+                  getKey={(row) => row.id}
+                  rows={viewModel?.model_mix ?? []}
+                />
               </div>
             </section>
           </div>
@@ -651,353 +781,143 @@ export function PortalDashboardPage({
                 const isActive = activeWorkbenchTab === tab.id;
 
                 return (
-                  <button
+                  <Button
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveWorkbenchTab(tab.id)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    className={`h-auto rounded-full px-4 py-2 text-sm font-semibold shadow-none transition-colors ${
                       isActive
                         ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
                         : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
                     }`}
+                    variant="ghost"
                   >
                     {tab.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 space-y-4">
               {activeWorkbenchTab === 'requests' ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: 'all' as const, label: 'All requests' },
-                      { id: 'high_spend' as const, label: 'High spend' },
-                      { id: 'latest' as const, label: 'Latest first' },
-                    ].map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => setRequestFilter(option.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors ${
-                          requestFilter === option.id
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'all' as const, label: 'All requests' },
+                  { id: 'high_spend' as const, label: 'High spend' },
+                  { id: 'latest' as const, label: 'Latest first' },
+                ].map((option) => (
+                    <Button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setRequestFilter(option.id)}
+                      className={`h-auto rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] shadow-none transition-colors ${
+                        requestFilter === option.id
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                      }`}
+                      variant="ghost"
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+
+              {activeWorkbenchTab === 'routing' && viewModel?.routing_posture ? (
+                <>
+                  <div className="grid gap-4 lg:grid-cols-4">
+                    <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+                        Strategy
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                        {viewModel.routing_posture.strategy_label}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+                        Selected provider
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                        {viewModel.routing_posture.selected_provider}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+                        Preferred region
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                        {viewModel.routing_posture.preferred_region}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+                        Evidence count
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                        {viewModel.routing_posture.evidence_count}
+                      </div>
+                    </div>
                   </div>
 
-                  {requestRows.length ? (
-                    <div className={chartFrameClass}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[72rem] border-collapse text-left">
-                          <thead className="bg-zinc-50/80 dark:bg-zinc-900/85">
-                            <tr>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Time
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Model
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Provider
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Input
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Output
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Total
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Booked
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Posture
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/70 dark:divide-white/6">
-                            {requestRows.map((row) => {
-                              const posture = requestPosture(
-                                row.amount,
-                                requestAverageAmount,
-                              );
-
-                              return (
-                                <tr
-                                  key={`${row.project_id}-${row.model}-${row.created_at_ms}`}
-                                  className="bg-white/70 dark:bg-zinc-950/35"
-                                >
-                                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                    {formatDateTime(row.created_at_ms)}
-                                  </td>
-                                  <td className="px-4 py-3 font-semibold text-zinc-950 dark:text-zinc-50">
-                                    {row.model}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                    {row.provider}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                    {formatUnits(row.input_tokens)}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                    {formatUnits(row.output_tokens)}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                    {formatUnits(row.total_tokens)}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                                    {formatCurrency(row.amount)}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <DashboardStatusPill
-                                      label={posture.label}
-                                      tone={posture.tone}
-                                    />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                  <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 px-4 py-4 dark:border-white/6 dark:bg-zinc-950/35">
+                    <div className="flex items-center justify-between gap-3">
+                      <DashboardStatusPill
+                        label={viewModel.routing_posture.title}
+                        tone={viewModel.routing_posture.tone}
+                      />
+                      <InlineButton onClick={() => onNavigate('routing')} tone="ghost">
+                        {viewModel.routing_posture.action_label}
+                      </InlineButton>
                     </div>
-                  ) : (
-                    <EmptyState
-                      detail="Once gateway requests start flowing through your project, token usage and booked amount will appear here."
-                      title="No recent requests yet"
-                    />
-                  )}
-                </div>
+                    <p className="mt-3 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                      {viewModel.routing_posture.latest_reason}
+                    </p>
+                  </div>
+                </>
               ) : null}
 
-              {activeWorkbenchTab === 'routing' ? (
-                <div className="space-y-4">
-                  {viewModel?.routing_posture ? (
-                    <>
-                      <div className="grid gap-4 lg:grid-cols-4">
-                        <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                            Strategy
-                          </div>
-                          <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                            {viewModel.routing_posture.strategy_label}
-                          </div>
-                        </div>
-                        <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                            Selected provider
-                          </div>
-                          <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                            {viewModel.routing_posture.selected_provider}
-                          </div>
-                        </div>
-                        <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                            Preferred region
-                          </div>
-                          <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                            {viewModel.routing_posture.preferred_region}
-                          </div>
-                        </div>
-                        <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                            Evidence count
-                          </div>
-                          <div className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                            {viewModel.routing_posture.evidence_count}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 px-4 py-4 dark:border-white/6 dark:bg-zinc-950/35">
-                        <div className="flex items-center justify-between gap-3">
-                          <DashboardStatusPill
-                            label={viewModel.routing_posture.title}
-                            tone={viewModel.routing_posture.tone}
-                          />
-                          <InlineButton
-                            onClick={() => onNavigate('routing')}
-                            tone="ghost"
-                          >
-                            {viewModel.routing_posture.action_label}
-                          </InlineButton>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                          {viewModel.routing_posture.latest_reason}
-                        </p>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {routingEvidence.length ? (
-                    <div className={chartFrameClass}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[60rem] border-collapse text-left">
-                          <thead className="bg-zinc-50/80 dark:bg-zinc-900/85">
-                            <tr>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Time
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Signal
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Detail
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Route
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Status
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/70 dark:divide-white/6">
-                            {routingEvidence.map((item) => (
-                              <tr key={item.id} className="bg-white/70 dark:bg-zinc-950/35">
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {item.timestamp_label}
-                                </td>
-                                <td className="px-4 py-3 font-semibold text-zinc-950 dark:text-zinc-50">
-                                  {item.title}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {item.detail}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {item.route && item.action_label ? (
-                                    <InlineButton
-                                      onClick={() => onNavigate(item.route!)}
-                                      tone="ghost"
-                                    >
-                                      {item.action_label}
-                                    </InlineButton>
-                                  ) : null}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <DashboardStatusPill
-                                    label={item.title}
-                                    tone={item.tone}
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : (
-                    <EmptyState
-                      detail="Routing evidence will appear once project routing data becomes available."
-                      title="Preparing routing evidence"
-                    />
-                  )}
-                </div>
-              ) : null}
-
-              {activeWorkbenchTab === 'modules' ? (
-                <div className="space-y-4">
-                  {viewModel?.modules.length ? (
-                    <div className={chartFrameClass}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[52rem] border-collapse text-left">
-                          <thead className="bg-zinc-50/80 dark:bg-zinc-900/85">
-                            <tr>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Module
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Detail
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Status
-                              </th>
-                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                                Action
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/70 dark:divide-white/6">
-                            {viewModel.modules.map((item) => (
-                              <tr key={item.route} className="bg-white/70 dark:bg-zinc-950/35">
-                                <td className="px-4 py-3 font-semibold text-zinc-950 dark:text-zinc-50">
-                                  {item.title}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                                  {item.detail}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <DashboardStatusPill
-                                    label={item.status_label}
-                                    tone={item.tone}
-                                  />
-                                </td>
-                                <td className="px-4 py-3">
-                                  <InlineButton
-                                    onClick={() => onNavigate(item.route)}
-                                    tone="ghost"
-                                  >
-                                    {item.action_label}
-                                  </InlineButton>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : (
-                    <EmptyState
-                      detail="Module posture will appear after the dashboard finishes loading."
-                      title="Preparing module posture"
-                    />
-                  )}
-                </div>
-              ) : null}
-
-              {activeWorkbenchTab === 'actions' ? (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {actionCards.length ? (
-                    actionCards.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="rounded-[1.5rem] border border-zinc-200/70 bg-zinc-50/70 p-5 dark:border-white/6 dark:bg-zinc-950/35"
-                      >
-                        <DashboardStatusPill label={item.title} tone={item.tone} />
-                        <h3 className="mt-4 text-base font-semibold text-zinc-950 dark:text-zinc-50">
-                          {item.title}
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                          {item.detail}
-                        </p>
-                        {item.route && item.action_label ? (
-                          <div className="mt-4">
-                            <InlineButton
-                              onClick={() => onNavigate(item.route!)}
-                              tone={actionTone(index)}
-                            >
-                              {item.action_label}
-                            </InlineButton>
-                          </div>
-                        ) : null}
-                      </div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      detail="Next actions will appear when workspace data finishes loading."
-                      title="Preparing next actions"
-                    />
-                  )}
-                </div>
-              ) : null}
+              <DataTable
+                columns={[
+                  {
+                    key: 'primary',
+                    label: workbenchConfig.primaryLabel,
+                    render: (row) => row.primary,
+                  },
+                  {
+                    key: 'secondary',
+                    label: workbenchConfig.secondaryLabel,
+                    render: (row) => row.secondary,
+                  },
+                  {
+                    key: 'detail',
+                    label: workbenchConfig.detailLabel,
+                    render: (row) => row.detail,
+                  },
+                  {
+                    key: 'status',
+                    label: workbenchConfig.statusLabel,
+                    render: (row) => row.status,
+                  },
+                  {
+                    key: 'action',
+                    label: workbenchConfig.actionLabel,
+                    render: (row) => row.action,
+                  },
+                ]}
+                empty={(
+                  <div className="mx-auto flex max-w-[32rem] flex-col items-center gap-2 text-center">
+                    <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                      {workbenchConfig.emptyTitle}
+                    </strong>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {workbenchConfig.emptyDetail}
+                    </p>
+                  </div>
+                )}
+                getKey={(row) => row.id}
+                rows={workbenchConfig.rows}
+              />
             </div>
           </section>
 

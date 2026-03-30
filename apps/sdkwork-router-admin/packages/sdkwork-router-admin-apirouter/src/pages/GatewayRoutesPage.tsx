@@ -3,15 +3,20 @@ import type { FormEvent } from 'react';
 
 import {
   AdminDialog,
+  Checkbox,
   ConfirmDialog,
   DataTable,
   Dialog,
   DialogContent,
   DialogFooter,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
+  Surface,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type {
@@ -190,12 +195,14 @@ export function GatewayRoutesPage({
           </>
         )}
       >
-        <ToolbarSearchField
-          label="Search providers"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="provider, base url, channel..."
-        />
+        <ToolbarInline>
+          <ToolbarSearchField
+            label="Search providers"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="provider, base url, channel..."
+          />
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable
@@ -279,7 +286,7 @@ export function GatewayRoutesPage({
           >
             <form className="adminx-form-grid" onSubmit={(event) => void handleProviderSubmit(event)}>
               <FormField label="Provider id">
-                <input
+                <Input
                   value={providerDraft.id}
                   onChange={(event) =>
                     setProviderDraft((current) => ({ ...current, id: event.target.value }))
@@ -289,7 +296,7 @@ export function GatewayRoutesPage({
                 />
               </FormField>
               <FormField label="Display name">
-                <input
+                <Input
                   value={providerDraft.display_name}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -301,7 +308,7 @@ export function GatewayRoutesPage({
                 />
               </FormField>
               <FormField label="Adapter kind">
-                <input
+                <Input
                   value={providerDraft.adapter_kind}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -313,7 +320,7 @@ export function GatewayRoutesPage({
                 />
               </FormField>
               <FormField label="Base URL">
-                <input
+                <Input
                   value={providerDraft.base_url}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -325,7 +332,7 @@ export function GatewayRoutesPage({
                 />
               </FormField>
               <FormField label="Extension id">
-                <input
+                <Input
                   value={providerDraft.extension_id}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -336,7 +343,7 @@ export function GatewayRoutesPage({
                 />
               </FormField>
               <FormField label="Primary channel">
-                <select
+                <Select
                   value={providerDraft.primary_channel_id}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -353,23 +360,19 @@ export function GatewayRoutesPage({
                       {channel.name} ({channel.id})
                     </option>
                   ))}
-                </select>
+                </Select>
               </FormField>
-              <div className="adminx-surface">
-                <div className="adminx-surface-heading">
-                  <div>
-                    <h2>Bound channels</h2>
-                    <p>Expose the provider on one or more public API channels.</p>
-                  </div>
-                </div>
+              <Surface
+                title="Bound channels"
+                detail="Expose the provider on one or more public API channels."
+              >
                 <div className="adminx-form-grid">
                   {snapshot.channels.map((channel) => {
                     const checked = providerDraft.bound_channel_ids.includes(channel.id);
                     return (
                       <label key={channel.id} className="adminx-field">
                         <span>{channel.name}</span>
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
                           onChange={(event) =>
                             setProviderDraft((current) => ({
@@ -384,7 +387,7 @@ export function GatewayRoutesPage({
                     );
                   })}
                 </div>
-              </div>
+              </Surface>
               <DialogFooter>
                 <InlineButton onClick={resetProviderDialog}>Cancel</InlineButton>
                 <InlineButton tone="primary" type="submit">

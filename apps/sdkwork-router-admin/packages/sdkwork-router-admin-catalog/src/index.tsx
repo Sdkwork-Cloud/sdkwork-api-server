@@ -1,17 +1,23 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 
 import {
   AdminDialog,
+  Checkbox,
   ConfirmDialog,
   DataTable,
   Dialog,
   DialogContent,
   DialogFooter,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
+  Textarea,
+  ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type {
@@ -150,6 +156,52 @@ type ModelPriceDraft = {
   is_active: boolean;
 };
 
+type CatalogLane = 'channels' | 'providers' | 'credentials' | 'variants';
+
+type CatalogWorkbenchRow =
+  | (AdminPageProps['snapshot']['channels'][number] & { kind: 'channel' })
+  | (ProxyProviderRecord & { kind: 'provider' })
+  | (CredentialRecord & { kind: 'credential' })
+  | (AdminPageProps['snapshot']['models'][number] & { kind: 'variant' });
+
+const PRICE_UNIT_OPTIONS: Array<{ value: string; label: string; detail: string }> = [
+  {
+    value: 'per_1m_tokens',
+    label: 'Million tokens',
+    detail: 'Default large-model billing unit for most LLM providers.',
+  },
+  {
+    value: 'per_1k_tokens',
+    label: 'Thousand tokens',
+    detail: 'Useful when an upstream provider publishes smaller token-rate ladders.',
+  },
+  {
+    value: 'per_request',
+    label: 'Request',
+    detail: 'Use when the upstream API charges a flat amount for each call.',
+  },
+  {
+    value: 'per_image',
+    label: 'Image generated',
+    detail: 'Use for image generation, edits, and visual asset APIs.',
+  },
+  {
+    value: 'per_second_audio',
+    label: 'Audio second',
+    detail: 'Use for speech, audio transcription, or realtime audio billing.',
+  },
+  {
+    value: 'per_minute_video',
+    label: 'Video minute',
+    detail: 'Use for video generation, processing, or hosted streaming workloads.',
+  },
+  {
+    value: 'per_track',
+    label: 'Music track',
+    detail: 'Use for music generation or composition-style APIs.',
+  },
+];
+
 function createDraftId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -174,6 +226,14 @@ function parseOptionalNumber(value: string): number | null {
 function parseRequiredNumber(value: string): number {
   const parsed = Number(value.trim() || '0');
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function priceUnitLabel(value: string): string {
+  return PRICE_UNIT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+function priceUnitDetail(value: string): string {
+  return PRICE_UNIT_OPTIONS.find((option) => option.value === value)?.detail ?? value;
 }
 
 function credentialStorageLabel(credential: CredentialRecord): string {
@@ -362,6 +422,7 @@ export function CatalogPage({
   );
   const [editingModelPriceKey, setEditingModelPriceKey] = useState<string | null>(null);
   const [activeChannelId, setActiveChannelId] = useState<string>(defaultChannelId);
+  const [catalogLane, setCatalogLane] = useState<CatalogLane>('channels');
   const [search, setSearch] = useState('');
   const [pricingTarget, setPricingTarget] = useState<{
     channel_id: string;
@@ -449,6 +510,285 @@ export function CatalogPage({
       String(record.input_price),
       String(record.output_price),
     ].join(' ').toLowerCase().includes(normalizedSearch));
+  const activeSelectedModelPrices = selectedModelPrices.filter((record) => record.is_active);
+  const pricingUnitCoverage = Array.from(
+    new Set(selectedModelPrices.map((record) => priceUnitLabel(record.price_unit))),
+  );
+  const activeCredentialCount = snapshot.credentials.length;
+  const catalogLaneLabel =
+    catalogLane === 'channels'
+      ? 'Channels'
+      : catalogLane === 'providers'
+        ? 'Providers'
+        : catalogLane === 'credentials'
+          ? 'Credentials'
+          : 'Variants';
+  const catalogWorkbenchDetail =
+    catalogLane === 'channels'
+      ? 'Manage public channel surfaces and open channel-level model maintenance from one directory.'
+      : catalogLane === 'providers'
+        ? 'Review proxy provider bindings, adapters, and credential rotation coverage in one place.'
+        : catalogLane === 'credentials'
+          ? 'Track encrypted router secret coverage by tenant, provider, and storage backend.'
+          : 'Inspect provider-scoped model variants before channel exposure and downstream pricing are attached.';
+  let catalogRows: CatalogWorkbenchRow[] = filteredChannels.map((channel) => ({
+    ...channel,
+    kind: 'channel',
+  }));
+  let catalogEmpty = 'No channels available.';
+  let catalogHealthLabel = `${filteredChannels.length} visible`;
+  let catalogHealthTone: 'default' | 'live' | 'seed' | 'danger' = 'default';
+  let catalogColumns: Array<{
+    key: string;
+    label: string;
+    render: (row: CatalogWorkbenchRow) => ReactNode;
+  }> = [
+    {
+      key: 'id',
+      label: 'Channel id',
+      render: (row) =>
+        row.kind === 'channel' ? <strong>{row.id}</strong> : null,
+    },
+    {
+      key: 'name',
+      label: 'Channel name',
+      render: (row) => (row.kind === 'channel' ? row.name : null),
+    },
+    {
+      key: 'models',
+      label: 'Models',
+      render: (row) =>
+        row.kind === 'channel' ? (
+          <Pill tone={channelsWithModels.has(row.id) ? 'live' : 'default'}>
+            {snapshot.channelModels.filter((model) => model.channel_id === row.id).length}
+          </Pill>
+        ) : null,
+    },
+    {
+      key: 'providers',
+      label: 'Providers',
+      render: (row) =>
+        row.kind === 'channel' ? (
+          <Pill tone={channelsWithProviders.has(row.id) ? 'seed' : 'default'}>
+            {snapshot.providers.filter((provider) => providerChannelIds(provider).includes(row.id)).length}
+          </Pill>
+        ) : null,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row) =>
+        row.kind === 'channel' ? (
+          <div className="adminx-row">
+            <InlineButton onClick={() => openEditChannelDialog(row.id)}>
+              Edit channel
+            </InlineButton>
+            <InlineButton onClick={() => openChannelModelsDialog(row.id)}>
+              Manage models
+            </InlineButton>
+            <InlineButton
+              tone="danger"
+              disabled={channelsWithProviders.has(row.id)}
+              onClick={() =>
+                setPendingDelete({
+                  kind: 'channel',
+                  label: `${row.name} (${row.id})`,
+                  channelId: row.id,
+                })
+              }
+            >
+              Delete
+            </InlineButton>
+          </div>
+        ) : null,
+    },
+  ];
+
+  if (catalogLane === 'providers') {
+    catalogRows = filteredProviders.map((provider) => ({
+      ...provider,
+      kind: 'provider',
+    }));
+    catalogEmpty = 'No proxy providers available.';
+    catalogHealthLabel = `${filteredProviders.length} visible`;
+    catalogHealthTone = filteredProviders.length ? 'seed' : 'default';
+    catalogColumns = [
+      {
+        key: 'id',
+        label: 'Provider id',
+        render: (row) => (row.kind === 'provider' ? <strong>{row.id}</strong> : null),
+      },
+      {
+        key: 'display_name',
+        label: 'Display name',
+        render: (row) => (row.kind === 'provider' ? row.display_name : null),
+      },
+      {
+        key: 'primary_channel',
+        label: 'Primary channel',
+        render: (row) => (row.kind === 'provider' ? row.channel_id : null),
+      },
+      {
+        key: 'bound_channels',
+        label: 'Bound channels',
+        render: (row) => (row.kind === 'provider' ? providerChannelIds(row).join(', ') : null),
+      },
+      {
+        key: 'adapter_kind',
+        label: 'Adapter',
+        render: (row) => (row.kind === 'provider' ? row.adapter_kind : null),
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (row) =>
+          row.kind === 'provider' ? (
+            <div className="adminx-row">
+              <InlineButton onClick={() => openEditProviderDialog(row.id)}>
+                Edit provider
+              </InlineButton>
+              <InlineButton onClick={() => openNewCredentialDialog(row.id)}>
+                Rotate credential
+              </InlineButton>
+              <InlineButton
+                tone="danger"
+                onClick={() =>
+                  setPendingDelete({
+                    kind: 'provider',
+                    label: `${row.display_name} (${row.id})`,
+                    providerId: row.id,
+                  })
+                }
+              >
+                Delete
+              </InlineButton>
+            </div>
+          ) : null,
+      },
+    ];
+  } else if (catalogLane === 'credentials') {
+    catalogRows = filteredCredentials.map((credential) => ({
+      ...credential,
+      kind: 'credential',
+    }));
+    catalogEmpty = 'No router credentials available.';
+    catalogHealthLabel = `${filteredCredentials.length} visible`;
+    catalogHealthTone = filteredCredentials.length ? 'live' : 'default';
+    catalogColumns = [
+      {
+        key: 'tenant',
+        label: 'Tenant',
+        render: (row) =>
+          row.kind === 'credential' ? <strong>{row.tenant_id}</strong> : null,
+      },
+      {
+        key: 'provider',
+        label: 'Proxy provider',
+        render: (row) =>
+          row.kind === 'credential'
+            ? providerNameById.get(row.provider_id) ?? row.provider_id
+            : null,
+      },
+      {
+        key: 'reference',
+        label: 'Key reference',
+        render: (row) => (row.kind === 'credential' ? row.key_reference : null),
+      },
+      {
+        key: 'backend',
+        label: 'Backend',
+        render: (row) => (row.kind === 'credential' ? row.secret_backend : null),
+      },
+      {
+        key: 'storage',
+        label: 'Storage',
+        render: (row) =>
+          row.kind === 'credential' ? credentialStorageLabel(row) : null,
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (row) =>
+          row.kind === 'credential' ? (
+            <div className="adminx-row">
+              <InlineButton onClick={() => openEditCredentialDialog(row)}>
+                Rotate credential
+              </InlineButton>
+              <InlineButton
+                tone="danger"
+                onClick={() =>
+                  setPendingDelete({
+                    kind: 'credential',
+                    label: row.key_reference,
+                    tenantId: row.tenant_id,
+                    providerId: row.provider_id,
+                    keyReference: row.key_reference,
+                  })
+                }
+              >
+                Delete
+              </InlineButton>
+            </div>
+          ) : null,
+      },
+    ];
+  } else if (catalogLane === 'variants') {
+    catalogRows = filteredModels.map((model) => ({
+      ...model,
+      kind: 'variant',
+    }));
+    catalogEmpty = 'No provider-scoped model variants available.';
+    catalogHealthLabel = `${filteredModels.length} visible`;
+    catalogHealthTone = filteredModels.length ? 'seed' : 'default';
+    catalogColumns = [
+      {
+        key: 'model',
+        label: 'Model',
+        render: (row) => (row.kind === 'variant' ? <strong>{row.external_name}</strong> : null),
+      },
+      {
+        key: 'provider',
+        label: 'Provider',
+        render: (row) =>
+          row.kind === 'variant'
+            ? providerNameById.get(row.provider_id) ?? row.provider_id
+            : null,
+      },
+      {
+        key: 'capabilities',
+        label: 'Capabilities',
+        render: (row) =>
+          row.kind === 'variant' ? row.capabilities.join(', ') || '-' : null,
+      },
+      {
+        key: 'streaming',
+        label: 'Streaming',
+        render: (row) => (row.kind === 'variant' ? String(row.streaming) : null),
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (row) =>
+          row.kind === 'variant' ? (
+            <div className="adminx-row">
+              <InlineButton
+                tone="danger"
+                onClick={() =>
+                  setPendingDelete({
+                    kind: 'model',
+                    label: `${row.external_name} / ${row.provider_id}`,
+                    externalName: row.external_name,
+                    providerId: row.provider_id,
+                  })
+                }
+              >
+                Delete variant
+              </InlineButton>
+            </div>
+          ) : null,
+      },
+    ];
+  }
 
   function resetChannelDialog() {
     setEditingChannelId(null);
@@ -773,15 +1113,43 @@ export function CatalogPage({
             <InlineButton onClick={() => openNewCredentialDialog()}>
               Rotate secret
             </InlineButton>
+            <InlineButton onClick={() => openChannelModelsDialog(activeChannelId)}>
+              Manage channel models
+            </InlineButton>
           </>
         }
       >
-        <ToolbarSearchField
-          label="Search catalog"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="channel, provider, model, credential"
-        />
+        <ToolbarInline>
+          <ToolbarSearchField
+            label="Search catalog"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="channel, provider, model, credential"
+          />
+          <ToolbarField label="Catalog lane">
+            <Select
+              value={catalogLane}
+              onChange={(event) => setCatalogLane(event.target.value as CatalogLane)}
+            >
+              <option value="channels">Channels</option>
+              <option value="providers">Providers</option>
+              <option value="credentials">Credentials</option>
+              <option value="variants">Variants</option>
+            </Select>
+          </ToolbarField>
+          <ToolbarField label="Channel focus">
+            <Select
+              value={activeChannelId}
+              onChange={(event) => setActiveChannelId(event.target.value)}
+            >
+              {snapshot.channels.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name}
+                </option>
+              ))}
+            </Select>
+          </ToolbarField>
+        </ToolbarInline>
       </PageToolbar>
 
       <Dialog
@@ -800,7 +1168,7 @@ export function CatalogPage({
                 label="Channel id"
                 hint="Stable lowercase identifiers are recommended."
               >
-                <input
+                <Input
                   value={channelDraft.id}
                   onChange={(event) =>
                     setChannelDraft((current) => ({
@@ -813,7 +1181,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Channel name">
-                <input
+                <Input
                   value={channelDraft.name}
                   onChange={(event) =>
                     setChannelDraft((current) => ({
@@ -849,7 +1217,7 @@ export function CatalogPage({
                     </InlineButton>
                   </div>
                   <FormField label="Model ID">
-                    <input
+                    <Input
                       value={draft.model_id}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -863,7 +1231,7 @@ export function CatalogPage({
                     />
                   </FormField>
                   <FormField label="Model display name">
-                    <input
+                    <Input
                       value={draft.model_display_name}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -877,7 +1245,7 @@ export function CatalogPage({
                     />
                   </FormField>
                   <FormField label="Capabilities">
-                    <input
+                    <Input
                       value={draft.capabilities}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -891,7 +1259,7 @@ export function CatalogPage({
                     />
                   </FormField>
                   <FormField label="Context window">
-                    <input
+                    <Input
                       value={draft.context_window}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -906,7 +1274,7 @@ export function CatalogPage({
                     />
                   </FormField>
                   <FormField label="Streaming">
-                    <select
+                    <Select
                       value={draft.streaming ? 'true' : 'false'}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -920,10 +1288,11 @@ export function CatalogPage({
                     >
                       <option value="true">Enabled</option>
                       <option value="false">Disabled</option>
-                    </select>
+                    </Select>
                   </FormField>
                   <FormField label="Description">
-                    <input
+                    <Textarea
+                      rows={3}
                       value={draft.description}
                       onChange={(event) =>
                         setChannelSeedModels((current) =>
@@ -969,7 +1338,7 @@ export function CatalogPage({
           >
             <form className="adminx-form-grid" onSubmit={(event) => void handleProviderSubmit(event)}>
               <FormField label="Provider id">
-                <input
+                <Input
                   value={providerDraft.id}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -982,7 +1351,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Display name">
-                <input
+                <Input
                   value={providerDraft.display_name}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -994,7 +1363,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Adapter kind">
-                <input
+                <Input
                   value={providerDraft.adapter_kind}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -1006,7 +1375,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Base URL">
-                <input
+                <Input
                   value={providerDraft.base_url}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -1018,7 +1387,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Extension id">
-                <input
+                <Input
                   value={providerDraft.extension_id}
                   onChange={(event) =>
                     setProviderDraft((current) => ({
@@ -1030,7 +1399,7 @@ export function CatalogPage({
               </FormField>
               <FormField label="Primary channel">
                 {snapshot.channels.length ? (
-                  <select
+                  <Select
                     value={providerDraft.primary_channel_id}
                     onChange={(event) =>
                       setProviderDraft((current) => ({
@@ -1047,9 +1416,9 @@ export function CatalogPage({
                         {channel.name} ({channel.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={providerDraft.primary_channel_id}
                     onChange={(event) =>
                       setProviderDraft((current) => ({
@@ -1072,7 +1441,7 @@ export function CatalogPage({
                 <div className="adminx-form-grid">
                   {snapshot.channels.map((channel) => (
                     <label key={channel.id} className="adminx-row">
-                      <input
+                      <Checkbox
                         checked={providerDraft.bound_channel_ids.includes(channel.id)}
                         onChange={(event) =>
                           setProviderDraft((current) => ({
@@ -1086,7 +1455,6 @@ export function CatalogPage({
                                 ),
                           }))
                         }
-                        type="checkbox"
                       />
                       <span>
                         {channel.name} ({channel.id})
@@ -1120,7 +1488,7 @@ export function CatalogPage({
             <form className="adminx-form-grid" onSubmit={(event) => void handleCredentialSubmit(event)}>
               <FormField label="Tenant">
                 {snapshot.tenants.length ? (
-                  <select
+                  <Select
                     value={credentialDraft.tenant_id}
                     onChange={(event) =>
                       setCredentialDraft((current) => ({
@@ -1134,9 +1502,9 @@ export function CatalogPage({
                         {tenant.name} ({tenant.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={credentialDraft.tenant_id}
                     onChange={(event) =>
                       setCredentialDraft((current) => ({
@@ -1150,7 +1518,7 @@ export function CatalogPage({
               </FormField>
               <FormField label="Proxy provider">
                 {snapshot.providers.length ? (
-                  <select
+                  <Select
                     value={credentialDraft.provider_id}
                     onChange={(event) =>
                       setCredentialDraft((current) => ({
@@ -1164,9 +1532,9 @@ export function CatalogPage({
                         {provider.display_name} ({provider.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={credentialDraft.provider_id}
                     onChange={(event) =>
                       setCredentialDraft((current) => ({
@@ -1179,7 +1547,7 @@ export function CatalogPage({
                 )}
               </FormField>
               <FormField label="Key reference">
-                <input
+                <Input
                   value={credentialDraft.key_reference}
                   onChange={(event) =>
                     setCredentialDraft((current) => ({
@@ -1194,7 +1562,7 @@ export function CatalogPage({
                 label="Secret value"
                 hint="Only encrypted ciphertext and secret metadata are retained in storage."
               >
-                <input
+                <Input
                   value={credentialDraft.secret_value}
                   onChange={(event) =>
                     setCredentialDraft((current) => ({
@@ -1219,258 +1587,31 @@ export function CatalogPage({
 
       <section className="adminx-page-grid">
         <div className="adminx-row">
-          <strong>Channel registry</strong>
+          <div className="adminx-row">
+            <strong>Catalog workbench</strong>
+            <Pill tone="default">{catalogLaneLabel}</Pill>
+            <Pill tone={catalogHealthTone}>{catalogHealthLabel}</Pill>
+          </div>
+          <Pill tone={activeCredentialCount ? 'live' : 'danger'}>
+            {activeCredentialCount} credentials
+          </Pill>
         </div>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {catalogWorkbenchDetail}
+        </p>
         <DataTable
-          columns={[
-            {
-              key: 'id',
-              label: 'Channel id',
-              render: (channel) => <strong>{channel.id}</strong>,
-            },
-            { key: 'name', label: 'Channel name', render: (channel) => channel.name },
-            {
-              key: 'models',
-              label: 'Models',
-              render: (channel) => (
-                <Pill tone={channelsWithModels.has(channel.id) ? 'live' : 'default'}>
-                  {
-                    snapshot.channelModels.filter(
-                      (model) => model.channel_id === channel.id,
-                    ).length
-                  }
-                </Pill>
-              ),
-            },
-            {
-              key: 'providers',
-              label: 'Providers',
-              render: (channel) => (
-                <Pill tone={channelsWithProviders.has(channel.id) ? 'seed' : 'default'}>
-                  {
-                    snapshot.providers.filter((provider) =>
-                      providerChannelIds(provider).includes(channel.id),
-                    ).length
-                  }
-                </Pill>
-              ),
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (channel) => (
-                <div className="adminx-row">
-                  <InlineButton onClick={() => openEditChannelDialog(channel.id)}>
-                    Edit channel
-                  </InlineButton>
-                  <InlineButton onClick={() => openChannelModelsDialog(channel.id)}>
-                    Manage models
-                  </InlineButton>
-                  <InlineButton
-                    tone="danger"
-                    disabled={channelsWithProviders.has(channel.id)}
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: 'channel',
-                        label: `${channel.name} (${channel.id})`,
-                        channelId: channel.id,
-                      })
-                    }
-                  >
-                    Delete
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredChannels}
-          empty="No channels available."
-          getKey={(channel) => channel.id}
-        />
-      </section>
-
-      <section className="adminx-page-grid">
-        <div className="adminx-row">
-          <strong>Proxy provider registry</strong>
-        </div>
-        <DataTable
-          columns={[
-            {
-              key: 'id',
-              label: 'Provider id',
-              render: (provider) => <strong>{provider.id}</strong>,
-            },
-            {
-              key: 'display_name',
-              label: 'Display name',
-              render: (provider) => provider.display_name,
-            },
-            {
-              key: 'primary_channel',
-              label: 'Primary channel',
-              render: (provider) => provider.channel_id,
-            },
-            {
-              key: 'bound_channels',
-              label: 'Bound channels',
-              render: (provider) => providerChannelIds(provider).join(', '),
-            },
-            {
-              key: 'adapter_kind',
-              label: 'Adapter',
-              render: (provider) => provider.adapter_kind,
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (provider) => (
-                <div className="adminx-row">
-                  <InlineButton onClick={() => openEditProviderDialog(provider.id)}>
-                    Edit provider
-                  </InlineButton>
-                  <InlineButton onClick={() => openNewCredentialDialog(provider.id)}>
-                    Rotate credential
-                  </InlineButton>
-                  <InlineButton
-                    tone="danger"
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: 'provider',
-                        label: `${provider.display_name} (${provider.id})`,
-                        providerId: provider.id,
-                      })
-                    }
-                  >
-                    Delete
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredProviders}
-          empty="No proxy providers available."
-          getKey={(provider) => provider.id}
-        />
-      </section>
-
-      <section className="adminx-page-grid">
-        <div className="adminx-row">
-          <strong>Credential inventory</strong>
-        </div>
-        <DataTable
-          columns={[
-            {
-              key: 'tenant',
-              label: 'Tenant',
-              render: (credential) => <strong>{credential.tenant_id}</strong>,
-            },
-            {
-              key: 'provider',
-              label: 'Proxy provider',
-              render: (credential) =>
-                providerNameById.get(credential.provider_id) ?? credential.provider_id,
-            },
-            {
-              key: 'reference',
-              label: 'Key reference',
-              render: (credential) => credential.key_reference,
-            },
-            {
-              key: 'backend',
-              label: 'Backend',
-              render: (credential) => credential.secret_backend,
-            },
-            {
-              key: 'storage',
-              label: 'Storage',
-              render: (credential) => credentialStorageLabel(credential),
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (credential) => (
-                <div className="adminx-row">
-                  <InlineButton onClick={() => openEditCredentialDialog(credential)}>
-                    Rotate credential
-                  </InlineButton>
-                  <InlineButton
-                    tone="danger"
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: 'credential',
-                        label: credential.key_reference,
-                        tenantId: credential.tenant_id,
-                        providerId: credential.provider_id,
-                        keyReference: credential.key_reference,
-                      })
-                    }
-                  >
-                    Delete
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredCredentials}
-          empty="No router credentials available."
-          getKey={(credential) =>
-            `${credential.tenant_id}:${credential.provider_id}:${credential.key_reference}`
+          columns={catalogColumns}
+          rows={catalogRows}
+          empty={catalogEmpty}
+          getKey={(row) =>
+            row.kind === 'channel'
+              ? row.id
+              : row.kind === 'provider'
+                ? row.id
+                : row.kind === 'credential'
+                  ? `${row.tenant_id}:${row.provider_id}:${row.key_reference}`
+                  : `${row.external_name}:${row.provider_id}`
           }
-        />
-      </section>
-
-      <section className="adminx-page-grid">
-        <div className="adminx-row">
-          <strong>Provider variant inventory</strong>
-        </div>
-        <DataTable
-          columns={[
-            {
-              key: 'model',
-              label: 'Model',
-              render: (model) => <strong>{model.external_name}</strong>,
-            },
-            {
-              key: 'provider',
-              label: 'Provider',
-              render: (model) =>
-                providerNameById.get(model.provider_id) ?? model.provider_id,
-            },
-            {
-              key: 'capabilities',
-              label: 'Capabilities',
-              render: (model) => model.capabilities.join(', ') || '-',
-            },
-            {
-              key: 'streaming',
-              label: 'Streaming',
-              render: (model) => String(model.streaming),
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (model) => (
-                <div className="adminx-row">
-                  <InlineButton
-                    tone="danger"
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: 'model',
-                        label: `${model.external_name} / ${model.provider_id}`,
-                        externalName: model.external_name,
-                        providerId: model.provider_id,
-                      })
-                    }
-                  >
-                    Delete variant
-                  </InlineButton>
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredModels}
-          empty="No provider-scoped model variants available."
-          getKey={(model) => `${model.external_name}:${model.provider_id}`}
         />
       </section>
 
@@ -1486,65 +1627,81 @@ export function CatalogPage({
                   New channel model
                 </InlineButton>
               </div>
-              <DataTable
-                columns={[
-                  {
-                    key: 'model_id',
-                    label: 'Model ID',
-                    render: (model) => <strong>{model.model_id}</strong>,
-                  },
-                  {
-                    key: 'display_name',
-                    label: 'Display name',
-                    render: (model) => model.model_display_name,
-                  },
-                  {
-                    key: 'capabilities',
-                    label: 'Capabilities',
-                    render: (model) => model.capabilities.join(', ') || '-',
-                  },
-                  {
-                    key: 'pricing',
-                    label: 'Pricing rows',
-                    render: (model) =>
-                      snapshot.modelPrices.filter(
-                        (record) =>
-                          record.channel_id === model.channel_id &&
-                          record.model_id === model.model_id,
-                      ).length,
-                  },
-                  {
-                    key: 'actions',
-                    label: 'Actions',
-                    render: (model) => (
-                      <div className="adminx-row">
-                        <InlineButton onClick={() => openEditChannelModelDialog(model)}>
-                          Edit
-                        </InlineButton>
-                        <InlineButton onClick={() => openPricingDialog(model)}>
-                          Manage pricing
-                        </InlineButton>
-                        <InlineButton
-                          tone="danger"
-                          onClick={() =>
-                            setPendingDelete({
-                              kind: 'channel-model',
-                              label: `${model.model_display_name} (${model.model_id})`,
-                              channelId: model.channel_id,
-                              modelId: model.model_id,
-                            })
-                          }
-                        >
-                          Delete
-                        </InlineButton>
-                      </div>
-                    ),
-                  },
-                ]}
-                rows={filteredSelectedChannelModels}
-                empty="No channel models have been configured for this channel."
-                getKey={(model) => `${model.channel_id}:${model.model_id}`}
-              />
+              <section className="adminx-page-grid">
+                <div className="adminx-row">
+                  <strong>Channel model roster</strong>
+                  <Pill tone="default">{filteredSelectedChannelModels.length} models</Pill>
+                </div>
+
+                {filteredSelectedChannelModels.length ? (
+                  filteredSelectedChannelModels.map((model) => {
+                    const modelPricingCount = snapshot.modelPrices.filter(
+                      (record) =>
+                        record.channel_id === model.channel_id && record.model_id === model.model_id,
+                    ).length;
+
+                    return (
+                      <article
+                        key={`${model.channel_id}:${model.model_id}`}
+                        className="rounded-[24px] border border-zinc-200/80 bg-zinc-50/80 p-5 dark:border-zinc-800/80 dark:bg-zinc-900/70"
+                      >
+                        <div className="flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <h3 className="text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                              {model.model_display_name}
+                            </h3>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                              {model.model_id}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Pill tone="seed">{model.capabilities.join(', ') || '-'}</Pill>
+                            <Pill tone={modelPricingCount ? 'live' : 'danger'}>
+                              {modelPricingCount} pricing rows
+                            </Pill>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                              Capabilities
+                            </span>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                              {model.capabilities.join(', ') || 'No capabilities declared'}
+                            </p>
+                          </div>
+                          <div className="adminx-row">
+                            <InlineButton onClick={() => openEditChannelModelDialog(model)}>
+                              Edit
+                            </InlineButton>
+                            <InlineButton onClick={() => openPricingDialog(model)}>
+                              Manage pricing
+                            </InlineButton>
+                            <InlineButton
+                              tone="danger"
+                              onClick={() =>
+                                setPendingDelete({
+                                  kind: 'channel-model',
+                                  label: `${model.model_display_name} (${model.model_id})`,
+                                  channelId: model.channel_id,
+                                  modelId: model.model_id,
+                                })
+                              }
+                            >
+                              Delete
+                            </InlineButton>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-zinc-200/80 bg-zinc-50/50 p-6 text-sm text-zinc-500 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:text-zinc-400">
+                    Add a channel model to start exposing this channel through the catalog workbench.
+                  </div>
+                )}
+              </section>
             </div>
           </AdminDialog>
         </DialogContent>
@@ -1567,7 +1724,7 @@ export function CatalogPage({
             >
               <FormField label="Channel">
                 {snapshot.channels.length ? (
-                  <select
+                  <Select
                     value={channelModelDraft.channel_id}
                     onChange={(event) =>
                       setChannelModelDraft((current) => ({
@@ -1581,9 +1738,9 @@ export function CatalogPage({
                         {channel.name} ({channel.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={channelModelDraft.channel_id}
                     onChange={(event) =>
                       setChannelModelDraft((current) => ({
@@ -1596,7 +1753,7 @@ export function CatalogPage({
                 )}
               </FormField>
               <FormField label="Model ID">
-                <input
+                <Input
                   value={channelModelDraft.model_id}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1609,7 +1766,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Model display name">
-                <input
+                <Input
                   value={channelModelDraft.model_display_name}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1621,7 +1778,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Capabilities">
-                <input
+                <Input
                   value={channelModelDraft.capabilities}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1633,7 +1790,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Context window">
-                <input
+                <Input
                   value={channelModelDraft.context_window}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1645,7 +1802,7 @@ export function CatalogPage({
                 />
               </FormField>
               <FormField label="Streaming">
-                <select
+                <Select
                   value={channelModelDraft.streaming ? 'true' : 'false'}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1656,10 +1813,11 @@ export function CatalogPage({
                 >
                   <option value="true">Enabled</option>
                   <option value="false">Disabled</option>
-                </select>
+                </Select>
               </FormField>
               <FormField label="Description">
-                <input
+                <Textarea
+                  rows={3}
                   value={channelModelDraft.description}
                   onChange={(event) =>
                     setChannelModelDraft((current) => ({
@@ -1691,72 +1849,151 @@ export function CatalogPage({
             detail="Maintain provider-specific pricing for input, output, cache, and per-request cost dimensions."
           >
             <div className="adminx-page-grid">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <article className="rounded-3xl border border-zinc-200/80 bg-white/92 p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/85">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                    Default large-model billing unit
+                  </span>
+                  <strong className="mt-3 block text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                    Million tokens
+                  </strong>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                    Use token-scale pricing for most text and reasoning models unless the provider
+                    publishes a different meter.
+                  </p>
+                </article>
+                <article className="rounded-3xl border border-zinc-200/80 bg-white/92 p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/85">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                    Pricing rows
+                  </span>
+                  <strong className="mt-3 block text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                    {selectedModelPrices.length}
+                  </strong>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                    Provider-specific price mappings currently registered for this channel model.
+                  </p>
+                </article>
+                <article className="rounded-3xl border border-zinc-200/80 bg-white/92 p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/85">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                    Active provider prices
+                  </span>
+                  <strong className="mt-3 block text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                    {activeSelectedModelPrices.length}
+                  </strong>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                    Active rows are eligible for downstream billing, quoting, and cost analytics.
+                  </p>
+                </article>
+                <article className="rounded-3xl border border-zinc-200/80 bg-white/92 p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/85">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                    Charge dimensions
+                  </span>
+                  <strong className="mt-3 block text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                    {pricingUnitCoverage.join(', ') || 'Pending pricing'}
+                  </strong>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                    Input, output, cache, and per-request charges can be mixed under one provider row.
+                  </p>
+                </article>
+              </div>
               <div className="adminx-row">
                 <InlineButton tone="primary" onClick={openNewModelPriceDialog}>
                   New model pricing
                 </InlineButton>
               </div>
-              <DataTable
-                columns={[
-                  {
-                    key: 'provider',
-                    label: 'Proxy provider',
-                    render: (record) =>
-                      providerNameById.get(record.proxy_provider_id) ??
-                      record.proxy_provider_id,
-                  },
-                  { key: 'currency', label: 'Currency', render: (record) => record.currency_code },
-                  { key: 'unit', label: 'Unit', render: (record) => record.price_unit },
-                  { key: 'input', label: 'Input', render: (record) => record.input_price },
-                  { key: 'output', label: 'Output', render: (record) => record.output_price },
-                  {
-                    key: 'cache',
-                    label: 'Cache read/write',
-                    render: (record) =>
-                      `${record.cache_read_price} / ${record.cache_write_price}`,
-                  },
-                  { key: 'request', label: 'Request', render: (record) => record.request_price },
-                  {
-                    key: 'status',
-                    label: 'Status',
-                    render: (record) => (
-                      <Pill tone={record.is_active ? 'live' : 'danger'}>
-                        {record.is_active ? 'active' : 'inactive'}
-                      </Pill>
-                    ),
-                  },
-                  {
-                    key: 'actions',
-                    label: 'Actions',
-                    render: (record) => (
-                      <div className="adminx-row">
-                        <InlineButton onClick={() => openEditModelPriceDialog(record)}>
-                          Edit
-                        </InlineButton>
-                        <InlineButton
-                          tone="danger"
-                          onClick={() =>
-                            setPendingDelete({
-                              kind: 'model-price',
-                              label: `${record.model_id} / ${record.proxy_provider_id}`,
-                              channelId: record.channel_id,
-                              modelId: record.model_id,
-                              proxyProviderId: record.proxy_provider_id,
-                            })
-                          }
-                        >
-                          Delete
-                        </InlineButton>
+              <section className="adminx-page-grid">
+                <div className="adminx-row">
+                  <strong>Pricing roster</strong>
+                  <Pill tone="default">{filteredSelectedModelPrices.length} price rows</Pill>
+                </div>
+
+                {filteredSelectedModelPrices.length ? (
+                  filteredSelectedModelPrices.map((record) => (
+                    <article
+                      key={`${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`}
+                      className="rounded-[24px] border border-zinc-200/80 bg-zinc-50/80 p-5 dark:border-zinc-800/80 dark:bg-zinc-900/70"
+                    >
+                      <div className="flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                            {providerNameById.get(record.proxy_provider_id) ?? record.proxy_provider_id}
+                          </h3>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {record.currency_code} / {priceUnitLabel(record.price_unit)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Pill tone={record.is_active ? 'live' : 'danger'}>
+                            {record.is_active ? 'active' : 'inactive'}
+                          </Pill>
+                          <Pill tone="seed">{record.price_unit}</Pill>
+                        </div>
                       </div>
-                    ),
-                  },
-                ]}
-                rows={filteredSelectedModelPrices}
-                empty="No provider pricing rows exist for this channel model."
-                getKey={(record) =>
-                  `${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`
-                }
-              />
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                            Input / Output
+                          </span>
+                          <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {record.input_price} / {record.output_price}
+                          </strong>
+                        </div>
+                        <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                            Cache read / write
+                          </span>
+                          <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {record.cache_read_price} / {record.cache_write_price}
+                          </strong>
+                        </div>
+                        <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                            Request price
+                          </span>
+                          <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {record.request_price}
+                          </strong>
+                        </div>
+                        <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                            Billing unit
+                          </span>
+                          <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {priceUnitLabel(record.price_unit)}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex justify-end">
+                        <div className="adminx-row">
+                          <InlineButton onClick={() => openEditModelPriceDialog(record)}>
+                            Edit
+                          </InlineButton>
+                          <InlineButton
+                            tone="danger"
+                            onClick={() =>
+                              setPendingDelete({
+                                kind: 'model-price',
+                                label: `${record.model_id} / ${record.proxy_provider_id}`,
+                                channelId: record.channel_id,
+                                modelId: record.model_id,
+                                proxyProviderId: record.proxy_provider_id,
+                              })
+                            }
+                          >
+                            Delete
+                          </InlineButton>
+                        </div>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-zinc-200/80 bg-zinc-50/50 p-6 text-sm text-zinc-500 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:text-zinc-400">
+                    Add provider-specific pricing to activate billing and commercial visibility for this channel model.
+                  </div>
+                )}
+              </section>
             </div>
           </AdminDialog>
         </DialogContent>
@@ -1778,14 +2015,14 @@ export function CatalogPage({
               onSubmit={(event) => void handleModelPriceSubmit(event)}
             >
               <FormField label="Channel">
-                <input value={modelPriceDraft.channel_id} disabled />
+                <Input value={modelPriceDraft.channel_id} disabled />
               </FormField>
               <FormField label="Model">
-                <input value={modelPriceDraft.model_id} disabled />
+                <Input value={modelPriceDraft.model_id} disabled />
               </FormField>
               <FormField label="Proxy provider">
                 {snapshot.providers.length ? (
-                  <select
+                  <Select
                     value={modelPriceDraft.proxy_provider_id}
                     onChange={(event) =>
                       setModelPriceDraft((current) => ({
@@ -1800,9 +2037,9 @@ export function CatalogPage({
                         {provider.display_name} ({provider.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={modelPriceDraft.proxy_provider_id}
                     onChange={(event) =>
                       setModelPriceDraft((current) => ({
@@ -1815,7 +2052,7 @@ export function CatalogPage({
                 )}
               </FormField>
               <FormField label="Currency code">
-                <input
+                <Input
                   value={modelPriceDraft.currency_code}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1826,8 +2063,11 @@ export function CatalogPage({
                   required
                 />
               </FormField>
-              <FormField label="Price unit">
-                <input
+              <FormField
+                label="Price unit"
+                hint={`${priceUnitDetail(modelPriceDraft.price_unit)} Default large-model billing unit is Million tokens.`}
+              >
+                <Select
                   value={modelPriceDraft.price_unit}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1836,10 +2076,19 @@ export function CatalogPage({
                     }))
                   }
                   required
-                />
+                >
+                  {PRICE_UNIT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
               </FormField>
-              <FormField label="Input price">
-                <input
+              <FormField
+                label="Input price"
+                hint="Charge applied to inbound prompt tokens or the equivalent upstream input meter."
+              >
+                <Input
                   value={modelPriceDraft.input_price}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1852,8 +2101,11 @@ export function CatalogPage({
                   required
                 />
               </FormField>
-              <FormField label="Output price">
-                <input
+              <FormField
+                label="Output price"
+                hint="Charge applied to generated tokens or the equivalent upstream output meter."
+              >
+                <Input
                   value={modelPriceDraft.output_price}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1866,8 +2118,11 @@ export function CatalogPage({
                   required
                 />
               </FormField>
-              <FormField label="Cache read price">
-                <input
+              <FormField
+                label="Cache read price"
+                hint="Use when a provider exposes discounted read pricing for prompt cache hits."
+              >
+                <Input
                   value={modelPriceDraft.cache_read_price}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1880,8 +2135,11 @@ export function CatalogPage({
                   required
                 />
               </FormField>
-              <FormField label="Cache write price">
-                <input
+              <FormField
+                label="Cache write price"
+                hint="Use when cache population is billed separately from normal input tokens."
+              >
+                <Input
                   value={modelPriceDraft.cache_write_price}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1894,8 +2152,11 @@ export function CatalogPage({
                   required
                 />
               </FormField>
-              <FormField label="Request price">
-                <input
+              <FormField
+                label="Request price"
+                hint="Optional flat surcharge for hosted inference calls, media jobs, or routing overhead."
+              >
+                <Input
                   value={modelPriceDraft.request_price}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1908,8 +2169,19 @@ export function CatalogPage({
                   required
                 />
               </FormField>
+              <div className="rounded-3xl border border-zinc-200/80 bg-white/92 p-5 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/85 md:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                  Charge dimensions
+                </p>
+                <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  Input, output, cache, and per-request charges can be mixed under one provider row.
+                  Use token-based units for mainstream LLM pricing, then switch to Image generated,
+                  Audio second, Video minute, or Music track when the upstream API is media-metered
+                  instead of token-metered.
+                </p>
+              </div>
               <FormField label="Status">
-                <select
+                <Select
                   value={modelPriceDraft.is_active ? 'active' : 'inactive'}
                   onChange={(event) =>
                     setModelPriceDraft((current) => ({
@@ -1920,7 +2192,7 @@ export function CatalogPage({
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                </select>
+                </Select>
               </FormField>
               <DialogFooter>
                 <InlineButton onClick={resetModelPriceEditor}>Cancel</InlineButton>

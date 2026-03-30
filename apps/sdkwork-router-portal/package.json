@@ -9,11 +9,13 @@
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0 --port 4174 --strictPort",
     "product:start": "node ../../scripts/run-router-product.mjs",
+    "product:service": "node ../../scripts/run-router-product.mjs service",
     "server:start": "node ../../scripts/run-router-product-service.mjs",
     "server:plan": "node ../../scripts/run-router-product-service.mjs --dry-run --plan-format json",
     "product:check": "node ../../scripts/check-router-product.mjs",
     "desktop:build-assets": "node ../../scripts/build-router-desktop-assets.mjs",
     "tauri:dev": "node ../../scripts/run-tauri-cli.mjs dev",
+    "tauri:dev:service": "node ../../scripts/run-tauri-cli.mjs dev -- --service",
     "tauri:build": "node ../../scripts/run-tauri-cli.mjs build"
   },
   "dependencies": {
@@ -37,6 +39,7 @@
     "sdkwork-router-portal-core": "workspace:*",
     "sdkwork-router-portal-credits": "workspace:*",
     "sdkwork-router-portal-dashboard": "workspace:*",
+    "sdkwork-router-portal-gateway": "workspace:*",
     "sdkwork-router-portal-portal-api": "workspace:*",
     "sdkwork-router-portal-routing": "workspace:*",
     "sdkwork-router-portal-types": "workspace:*",

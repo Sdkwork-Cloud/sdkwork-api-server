@@ -1,10 +1,13 @@
 use sdkwork_api_domain_billing::QuotaPolicy;
-use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
+use sdkwork_api_domain_catalog::{
+    Channel, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
+};
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_routing::{
     ProviderHealthSnapshot, RoutingCandidateAssessment, RoutingDecisionLog, RoutingDecisionSource,
     RoutingPolicy, RoutingStrategy,
 };
+use sdkwork_api_domain_usage::UsageRecord;
 use sdkwork_api_secret_core::encrypt;
 use sdkwork_api_storage_postgres::{run_migrations, PostgresAdminStore};
 
@@ -15,7 +18,7 @@ async fn postgres_store_persists_catalog_and_credentials_when_url_is_provided() 
     };
 
     let pool = run_migrations(&database_url).await.unwrap();
-    let store = PostgresAdminStore::new(pool);
+    let store = PostgresAdminStore::new(pool.clone());
 
     let channel = store
         .insert_channel(&Channel::new("openai", "OpenAI"))
@@ -61,6 +64,21 @@ async fn postgres_store_persists_catalog_and_credentials_when_url_is_provided() 
     let models = store.list_models().await.unwrap();
     assert_eq!(models.len(), 1);
     assert_eq!(models[0].provider_id, "provider-openai-official");
+
+    let index_names: Vec<(String,)> = sqlx::query_as(
+        "select indexname
+         from pg_indexes
+         where tablename = 'ai_model_price'
+         order by indexname",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let index_names = index_names
+        .into_iter()
+        .map(|(name,)| name)
+        .collect::<std::collections::HashSet<_>>();
+    assert!(index_names.contains("idx_ai_model_price_model_active"));
 }
 
 #[tokio::test]
@@ -243,4 +261,209 @@ async fn postgres_store_persists_quota_policies_when_url_is_provided() {
 
     let policies = store.list_quota_policies().await.unwrap();
     assert!(policies.iter().any(|entry| entry == &policy));
+}
+
+#[tokio::test]
+async fn postgres_store_finds_latest_project_routing_log_and_usage_record_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+    let store = PostgresAdminStore::new(pool);
+
+    store
+        .insert_routing_decision_log(
+            &RoutingDecisionLog::new(
+                "decision-old",
+                RoutingDecisionSource::Gateway,
+                "chat_completion",
+                "gpt-4.1",
+                "provider-a",
+                "deterministic_priority",
+                100,
+            )
+            .with_project_id("project-1"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_routing_decision_log(
+            &RoutingDecisionLog::new(
+                "decision-new",
+                RoutingDecisionSource::Gateway,
+                "chat_completion",
+                "gpt-4.1",
+                "provider-b",
+                "deterministic_priority",
+                200,
+            )
+            .with_project_id("project-1"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_usage_record(&UsageRecord {
+            project_id: "project-1".to_owned(),
+            model: "gpt-4.1".to_owned(),
+            provider: "provider-a".to_owned(),
+            units: 1,
+            amount: 0.01,
+            input_tokens: 1,
+            output_tokens: 2,
+            total_tokens: 3,
+            created_at_ms: 100,
+            api_key_hash: None,
+            channel_id: None,
+            latency_ms: None,
+            reference_amount: None,
+        })
+        .await
+        .unwrap();
+    store
+        .insert_usage_record(&UsageRecord {
+            project_id: "project-1".to_owned(),
+            model: "gpt-4.1-mini".to_owned(),
+            provider: "provider-b".to_owned(),
+            units: 2,
+            amount: 0.02,
+            input_tokens: 4,
+            output_tokens: 5,
+            total_tokens: 9,
+            created_at_ms: 200,
+            api_key_hash: None,
+            channel_id: None,
+            latency_ms: None,
+            reference_amount: None,
+        })
+        .await
+        .unwrap();
+
+    let latest_log = store
+        .find_latest_routing_decision_log_for_project("project-1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(latest_log.decision_id, "decision-new");
+
+    let latest_usage = store
+        .find_latest_usage_record_for_project("project-1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(latest_usage.model, "gpt-4.1-mini");
+}
+
+#[tokio::test]
+async fn postgres_store_finds_any_model_without_full_scan_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+    let store = PostgresAdminStore::new(pool);
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(&ProxyProvider::new(
+            "provider-openai-official",
+            "openai",
+            "openai",
+            "https://api.openai.com",
+            "OpenAI Official",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "z-model",
+            "provider-openai-official",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "a-model",
+            "provider-openai-official",
+        ))
+        .await
+        .unwrap();
+
+    let model = store.find_any_model().await.unwrap().unwrap();
+    assert_eq!(model.external_name, "a-model");
+}
+
+#[tokio::test]
+async fn postgres_store_lists_providers_for_model_without_full_scan_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+    let store = PostgresAdminStore::new(pool);
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(&ProxyProvider::new(
+            "provider-openai-official",
+            "openai",
+            "openai",
+            "https://api.openai.com",
+            "OpenAI Official",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "a-model",
+            "provider-openai-official",
+        ))
+        .await
+        .unwrap();
+
+    let providers = store.list_providers_for_model("a-model").await.unwrap();
+    assert_eq!(providers.len(), 1);
+    assert_eq!(providers[0].id, "provider-openai-official");
+}
+
+#[tokio::test]
+async fn postgres_store_lists_provider_bindings_for_model_without_drop_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+    let store = PostgresAdminStore::new(pool);
+
+    let provider = ProxyProvider::new(
+        "provider-openrouter-main",
+        "openrouter",
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        "OpenRouter Main",
+    )
+    .with_channel_binding(ProviderChannelBinding::new(
+        "provider-openrouter-main",
+        "openai",
+    ));
+
+    store.insert_provider(&provider).await.unwrap();
+    store
+        .insert_model(&ModelCatalogEntry::new(
+            "gpt-4.1",
+            "provider-openrouter-main",
+        ))
+        .await
+        .unwrap();
+
+    let providers = store.list_providers_for_model("gpt-4.1").await.unwrap();
+    assert_eq!(providers.len(), 1);
+    assert_eq!(providers[0].channel_bindings.len(), 2);
+    assert_eq!(providers[0].channel_bindings[1].channel_id, "openai");
 }

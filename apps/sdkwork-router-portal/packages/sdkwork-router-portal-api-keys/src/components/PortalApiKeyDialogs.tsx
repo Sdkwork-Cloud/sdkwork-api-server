@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 import { KeyRound, Link2 } from 'lucide-react';
 import {
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -232,7 +233,7 @@ export function PortalApiKeyDialogs({
                               <div className="mt-3 grid gap-2">
                                 {openClawInstances.map((instance) => (
                                   <label key={instance.id} className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                                    <input
+                                    <Checkbox
                                       checked={selectedInstanceIds.includes(instance.id)}
                                       onChange={(event) =>
                                         onChangeInstanceSelection(
@@ -241,7 +242,6 @@ export function PortalApiKeyDialogs({
                                             : selectedInstanceIds.filter((item) => item !== instance.id),
                                         )
                                       }
-                                      type="checkbox"
                                     />
                                     <span>
                                       {instance.label}

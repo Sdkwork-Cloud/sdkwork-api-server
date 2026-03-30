@@ -65,6 +65,7 @@ export function createProductCheckPlan({
       cwd: portalAppDir,
       env: baseEnv,
       shell: platform === 'win32',
+      windowsHide: platform === 'win32',
     },
     {
       label: 'admin typecheck',
@@ -73,6 +74,7 @@ export function createProductCheckPlan({
       cwd: adminAppDir,
       env: baseEnv,
       shell: platform === 'win32',
+      windowsHide: platform === 'win32',
     },
     {
       label: 'desktop assets build',
@@ -81,6 +83,7 @@ export function createProductCheckPlan({
       cwd: workspaceRoot,
       env: baseEnv,
       shell: false,
+      windowsHide: platform === 'win32',
     },
     {
       label: 'server cargo check',
@@ -89,6 +92,7 @@ export function createProductCheckPlan({
       cwd: workspaceRoot,
       env: baseEnv,
       shell: rustRunner.shell,
+      windowsHide: platform === 'win32',
     },
     {
       label: 'server deployment plan',
@@ -102,6 +106,7 @@ export function createProductCheckPlan({
       cwd: portalAppDir,
       env: baseEnv,
       shell: false,
+      windowsHide: platform === 'win32',
     },
   ];
 }
@@ -113,6 +118,7 @@ async function runStep(step) {
       env: step.env,
       stdio: 'inherit',
       shell: step.shell ?? false,
+      windowsHide: step.windowsHide ?? process.platform === 'win32',
     });
 
     child.on('error', reject);

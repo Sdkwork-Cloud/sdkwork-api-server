@@ -1,0 +1,1 @@
+export { PortalGatewayPage } from './pages';

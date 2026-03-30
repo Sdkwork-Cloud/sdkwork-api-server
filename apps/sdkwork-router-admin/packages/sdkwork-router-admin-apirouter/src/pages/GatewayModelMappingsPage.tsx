@@ -9,9 +9,15 @@ import {
   DialogContent,
   DialogFooter,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
+  Surface,
+  Textarea,
+  ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps } from 'sdkwork-router-admin-types';
@@ -270,12 +276,26 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
           </>
         )}
       >
-        <ToolbarSearchField
-          label="Search mappings"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="name, model, channel..."
-        />
+        <ToolbarInline>
+          <ToolbarSearchField
+            label="Search mappings"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="name, model, channel..."
+          />
+          <ToolbarField label="Mapping status">
+            <Select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as 'all' | GatewayModelMappingStatus)
+              }
+            >
+              <option value="all">All mappings</option>
+              <option value="active">Active mappings</option>
+              <option value="disabled">Disabled mappings</option>
+            </Select>
+          </ToolbarField>
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable
@@ -354,7 +374,7 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
           >
             <form className="adminx-form-grid" onSubmit={(event) => void handleSubmit(event)}>
               <FormField label="Mapping name">
-                <input
+                <Input
                   value={mappingDraft.name}
                   onChange={(event) =>
                     setMappingDraft((current) => ({ ...current, name: event.target.value }))
@@ -363,7 +383,7 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                 />
               </FormField>
               <FormField label="Description">
-                <textarea
+                <Textarea
                   rows={3}
                   value={mappingDraft.description}
                   onChange={(event) =>
@@ -375,7 +395,7 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                 />
               </FormField>
               <FormField label="Status">
-                <select
+                <Select
                   value={mappingDraft.status}
                   onChange={(event) =>
                     setMappingDraft((current) => ({
@@ -386,10 +406,10 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                 >
                   <option value="active">Active</option>
                   <option value="disabled">Disabled</option>
-                </select>
+                </Select>
               </FormField>
               <FormField label="Effective from">
-                <input
+                <Input
                   type="date"
                   value={mappingDraft.effective_from}
                   onChange={(event) =>
@@ -402,7 +422,7 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                 />
               </FormField>
               <FormField label="Effective to">
-                <input
+                <Input
                   type="date"
                   value={mappingDraft.effective_to}
                   onChange={(event) =>
@@ -414,26 +434,27 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                 />
               </FormField>
 
-              <div className="adminx-surface">
-                <div className="adminx-surface-heading">
-                  <div>
-                    <h2>Rule builder</h2>
-                    <p>Choose a source model and a target model for each translation rule.</p>
-                  </div>
-                  <div className="adminx-surface-actions">
-                    <InlineButton onClick={addRule}>Add rule</InlineButton>
-                  </div>
-                </div>
-
+              <Surface
+                title="Rule builder"
+                detail="Choose a source model and a target model for each translation rule."
+                actions={<InlineButton onClick={addRule}>Add rule</InlineButton>}
+              >
                 <div className="adminx-page-grid">
                   {mappingDraft.rules.map((rule, index) => (
-                    <div key={rule.id} className="adminx-page-toolbar">
-                      <div className="adminx-page-toolbar-head">
-                        <div className="adminx-page-toolbar-copy">
-                          <h2>Rule {index + 1}</h2>
-                          <p>Map one client-facing model shape onto a target channel model.</p>
+                    <div
+                      key={rule.id}
+                      className="rounded-[24px] border border-zinc-200/80 bg-zinc-50/80 p-5 dark:border-zinc-800/80 dark:bg-zinc-900/70"
+                    >
+                      <div className="flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                            Rule {index + 1}
+                          </h3>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            Map one client-facing model shape onto a target channel model.
+                          </p>
                         </div>
-                        <div className="adminx-page-toolbar-actions">
+                        <div className="flex flex-wrap gap-2.5">
                           <InlineButton
                             tone="danger"
                             onClick={() => removeRule(rule.id)}
@@ -443,9 +464,9 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                           </InlineButton>
                         </div>
                       </div>
-                      <div className="adminx-form-grid">
+                      <div className="adminx-form-grid pt-4">
                         <FormField label="Source model">
-                          <select
+                          <Select
                             value={rule.source_value}
                             onChange={(event) => updateRule(rule.id, 'source_value', event.target.value)}
                           >
@@ -454,10 +475,10 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                                 {item.label}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </FormField>
                         <FormField label="Target model">
-                          <select
+                          <Select
                             value={rule.target_value}
                             onChange={(event) => updateRule(rule.id, 'target_value', event.target.value)}
                           >
@@ -466,13 +487,13 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
                                 {item.label}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </FormField>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </Surface>
 
               <DialogFooter>
                 <InlineButton onClick={resetEditor}>Cancel</InlineButton>
@@ -499,37 +520,56 @@ export function GatewayModelMappingsPage({ snapshot }: AdminPageProps) {
             }
           >
             {selectedMapping ? (
-              <DataTable
-                columns={[
-                  {
-                    key: 'source',
-                    label: 'Source model',
-                    render: (rule) => (
-                      <div className="adminx-table-cell-stack">
-                        <strong>{rule.source_model_name}</strong>
-                        <span>
-                          {rule.source_channel_name} / {rule.source_model_id}
-                        </span>
+              <div className="adminx-page-grid">
+                {selectedMapping.rules.map((rule, index) => (
+                  <article
+                    key={rule.id}
+                    className="rounded-[24px] border border-zinc-200/80 bg-zinc-50/80 p-5 dark:border-zinc-800/80 dark:bg-zinc-900/70"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                          Rule {index + 1}
+                        </h3>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                          Source-to-target translation stays readable without opening a second table.
+                        </p>
                       </div>
-                    ),
-                  },
-                  {
-                    key: 'target',
-                    label: 'Target model',
-                    render: (rule) => (
-                      <div className="adminx-table-cell-stack">
-                        <strong>{rule.target_model_name}</strong>
-                        <span>
-                          {rule.target_channel_name} / {rule.target_model_id}
-                        </span>
+                      <Pill tone="seed">Model translation</Pill>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                            Source model
+                          </span>
+                          <strong className="block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {rule.source_model_name}
+                          </strong>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {rule.source_channel_name} / {rule.source_model_id}
+                          </p>
+                        </div>
                       </div>
-                    ),
-                  },
-                ]}
-                rows={selectedMapping.rules}
-                empty="No mapping rules available."
-                getKey={(rule) => rule.id}
-              />
+
+                      <div className="rounded-[20px] border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                            Target model
+                          </span>
+                          <strong className="block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+                            {rule.target_model_name}
+                          </strong>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {rule.target_channel_name} / {rule.target_model_id}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             ) : null}
           </AdminDialog>
         </DialogContent>

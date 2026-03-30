@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
-import { cn } from 'sdkwork-router-admin-commons';
+import { Button, cn } from 'sdkwork-router-admin-commons';
 
 export function SettingsShellCard({
   children,
@@ -100,15 +100,17 @@ export function SettingsNavButton({
   const Icon = icon;
 
   return (
-    <button
+    <Button
       type="button"
       data-settings-tab={tabId}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-all duration-200 ${
+      className={cn(
+        'h-auto w-full justify-start gap-3 rounded-xl border px-3 py-2.5 text-[14px] font-medium shadow-none',
         active
           ? 'border-zinc-200/50 bg-white text-primary-600 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800 dark:text-primary-400'
-          : 'border-transparent text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100'
-      }`}
+          : 'border-transparent text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100',
+      )}
       onClick={onClick}
+      variant="ghost"
     >
       <Icon
         className={
@@ -118,6 +120,6 @@ export function SettingsNavButton({
         }
       />
       {label}
-    </button>
+    </Button>
   );
 }

@@ -31,7 +31,8 @@
         "width": 1440,
         "height": 960,
         "resizable": true,
-        "decorations": false
+        "decorations": false,
+        "visible": false
       }
     ]
   }

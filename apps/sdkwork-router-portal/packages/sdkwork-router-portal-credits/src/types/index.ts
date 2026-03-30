@@ -1,17 +1,23 @@
-import type { CouponOffer, LedgerEntry, PortalRouteKey, ProjectBillingSummary } from 'sdkwork-router-portal-types';
+import type {
+  LedgerEntry,
+  PortalCommerceCoupon,
+  PortalCommerceQuote,
+  PortalRouteKey,
+  ProjectBillingSummary,
+} from 'sdkwork-router-portal-types';
 
 export interface PortalCreditsPageProps {
   onNavigate: (route: PortalRouteKey) => void;
 }
 
 export interface CouponImpactPreview {
-  offer: CouponOffer;
-  projected_remaining_units: number | null;
+  coupon: PortalCommerceCoupon;
+  quote: PortalCommerceQuote;
   status: string;
 }
 
 export interface RecommendedCouponOffer {
-  offer: CouponOffer;
+  offer: PortalCommerceCoupon;
   rationale: string;
   preview: CouponImpactPreview;
 }
@@ -26,4 +32,5 @@ export interface CreditsGuardrail {
 export interface CreditsPageData {
   summary: ProjectBillingSummary;
   ledger: LedgerEntry[];
+  coupons: PortalCommerceCoupon[];
 }

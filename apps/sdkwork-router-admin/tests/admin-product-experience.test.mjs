@@ -21,20 +21,49 @@ test('shared admin commons expose page toolbar, dialog primitives, and form fiel
   assert.match(commons, /DialogFooter/);
   assert.match(commons, /ConfirmDialog/);
   assert.match(commons, /FormField/);
+  assert.match(commons, /rounded-\[28px\] border border-zinc-200\/80 bg-white\/92/);
+  assert.match(commons, /backdrop-blur-xl/);
+  assert.match(commons, /data-slot="table-container"/);
   assert.match(theme, /adminx-toolbar-field/);
   assert.match(theme, /adminx-toolbar-field-label/);
-  assert.match(commons, /adminx-page-toolbar-row/);
-  assert.match(theme, /adminx-page-toolbar/);
-  assert.match(theme, /adminx-page-toolbar-row/);
   assert.match(theme, /adminx-dialog-backdrop/);
   assert.match(theme, /adminx-dialog-panel/);
   assert.match(theme, /adminx-confirm-dialog/);
 });
 
+test('admin form primitives keep a shadcn-style contract and settings or auth pages consume the shared shells', () => {
+  const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
+  const auth = read('packages/sdkwork-router-admin-auth/src/index.tsx');
+  const generalSettings = read('packages/sdkwork-router-admin-settings/src/GeneralSettings.tsx');
+  const navigationSettings = read('packages/sdkwork-router-admin-settings/src/NavigationSettings.tsx');
+  const settingsPage = read('packages/sdkwork-router-admin-settings/src/Settings.tsx');
+
+  assert.match(commons, /file:border-0 file:bg-transparent file:text-sm file:font-medium/);
+  assert.match(commons, /disabled:cursor-not-allowed disabled:opacity-50/);
+  assert.match(commons, /appearance-none/);
+  assert.match(commons, /export function SearchInput/);
+  assert.match(commons, /paddingLeft:\s*['"]2\.75rem['"]/);
+  assert.match(auth, /Label/);
+  assert.doesNotMatch(auth, /<label className="adminx-auth-label">/);
+  assert.match(generalSettings, /FormField/);
+  assert.doesNotMatch(generalSettings, /<label className="grid gap-2">/);
+  assert.match(navigationSettings, /Label/);
+  assert.match(settingsPage, /SearchInput/);
+  assert.doesNotMatch(settingsPage, /<Search className="absolute left-3 top-1\/2/);
+});
+
 test('users workbench separates create and edit flows into dedicated dialogs', () => {
   const users = read('packages/sdkwork-router-admin-users/src/index.tsx');
+  const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
+  const theme = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
 
   assert.match(users, /PageToolbar/);
+  assert.match(users, /<ToolbarInline className="adminx-toolbar-inline-users">[\s\S]*?<ToolbarSearchField[\s\S]*?<ToolbarDisclosure>/);
+  assert.match(users, /<ToolbarInline className="adminx-toolbar-inline-users-filters">[\s\S]*?<ToolbarField label="User type">[\s\S]*?<ToolbarField label="Status">/);
+  assert.doesNotMatch(users, /<ToolbarDisclosure>[\s\S]*?adminx-form-grid/);
+  assert.match(commons, /ml-auto flex shrink-0 items-center justify-end gap-2\.5 whitespace-nowrap/);
+  assert.match(theme, /\.adminx-toolbar-inline-users > \.adminx-toolbar-field-search\s*\{/);
+  assert.match(theme, /\.adminx-toolbar-inline-users-filters > \.adminx-toolbar-field\s*\{/);
   assert.match(users, /Dialog/);
   assert.match(users, /DialogContent/);
   assert.match(users, /New operator/);
@@ -89,6 +118,20 @@ test('coupon workbench uses a focused campaign dialog instead of inline form edi
   assert.match(coupons, /pendingDeleteCoupon/);
 });
 
+test('coupon workbench exposes campaign posture, audience coverage, and risk signals while staying table-first', () => {
+  const coupons = read('packages/sdkwork-router-admin-coupons/src/index.tsx');
+  const tableCount = coupons.match(/<DataTable/g)?.length ?? 0;
+
+  assert.equal(tableCount, 1);
+  assert.match(coupons, /adminx-stat-grid/);
+  assert.match(coupons, /Campaign posture/);
+  assert.match(coupons, /Audience coverage/);
+  assert.match(coupons, /Remaining coupon quota/);
+  assert.match(coupons, /Expiring soon/);
+  assert.match(coupons, /Quota health/);
+  assert.match(coupons, /ToolbarField/);
+});
+
 test('catalog workbench keeps registries primary and moves maintenance into dialogs', () => {
   const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
 
@@ -102,6 +145,41 @@ test('catalog workbench keeps registries primary and moves maintenance into dial
   assert.match(catalog, /New model/);
   assert.doesNotMatch(catalog, /Channel maintenance/);
   assert.doesNotMatch(catalog, /Provider maintenance/);
+});
+
+test('catalog pricing workbench exposes standardized price units and billing-dimension guidance for commercial operations', () => {
+  const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
+
+  assert.match(catalog, /Manage pricing/);
+  assert.match(catalog, /Default large-model billing unit/);
+  assert.match(catalog, /Million tokens/);
+  assert.match(catalog, /Thousand tokens/);
+  assert.match(catalog, /Image generated/);
+  assert.match(catalog, /Audio second/);
+  assert.match(catalog, /Video minute/);
+  assert.match(catalog, /Music track/);
+  assert.match(catalog, /Charge dimensions/);
+  assert.match(catalog, /Input, output, cache, and per-request charges can be mixed/);
+});
+
+test('catalog workbench collapses registry sprawl into a single switchable directory table', () => {
+  const catalog = read('packages/sdkwork-router-admin-catalog/src/index.tsx');
+  const tableCount = catalog.match(/<DataTable/g)?.length ?? 0;
+
+  assert.match(catalog, /Catalog lane/);
+  assert.match(catalog, /Channel focus/);
+  assert.match(catalog, /Catalog workbench/);
+  assert.match(catalog, /Manage channel models/);
+  assert.match(catalog, /ToolbarField/);
+  assert.equal(tableCount, 1);
+  assert.match(catalog, /Channel model roster/);
+  assert.match(catalog, /Pricing roster/);
+  assert.doesNotMatch(catalog, /No channel models available\./);
+  assert.doesNotMatch(catalog, /No pricing rows available\./);
+  assert.doesNotMatch(catalog, /Channel registry/);
+  assert.doesNotMatch(catalog, /Proxy provider registry/);
+  assert.doesNotMatch(catalog, /Credential inventory/);
+  assert.doesNotMatch(catalog, /Provider variant inventory/);
 });
 
 test('operations workbench uses targeted dialogs and preserves runtime status as the primary surface', () => {
@@ -154,6 +232,7 @@ test('api router workbenches stay table-first and avoid extra registry layers ab
   const routesPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayRoutesPage.tsx');
   const mappingsPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayModelMappingsPage.tsx');
   const usagePage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx');
+  const mappingsTableCount = mappingsPage.match(/<DataTable/g)?.length ?? 0;
 
   assert.doesNotMatch(accessPage, /All statuses|All tenants|All projects/);
   assert.doesNotMatch(routesPage, /Credential registry/);
@@ -161,6 +240,13 @@ test('api router workbenches stay table-first and avoid extra registry layers ab
   assert.doesNotMatch(routesPage, /All channels|Health posture/);
   assert.doesNotMatch(mappingsPage, /Rule preview:/);
   assert.doesNotMatch(mappingsPage, /All statuses/);
+  assert.equal(mappingsTableCount, 1);
+  assert.match(mappingsPage, /ToolbarField/);
+  assert.match(mappingsPage, /Mapping status/);
+  assert.match(mappingsPage, /All mappings/);
+  assert.match(mappingsPage, /Active mappings/);
+  assert.match(mappingsPage, /Disabled mappings/);
+  assert.doesNotMatch(mappingsPage, /No mapping rules available\./);
   assert.doesNotMatch(
     usagePage,
     /All providers|All models|<span>Sort by<\/span>|<span>Page size<\/span>|<span>Start date<\/span>|<span>End date<\/span>/,
@@ -205,6 +291,34 @@ test('admin shell adds i18n infrastructure and collapsible extra filters for den
   assert.match(usersPage, /ToolbarSearchField/);
   assert.match(tenantsPage, /ToolbarSearchField/);
   assert.match(routesPage, /ToolbarSearchField/);
+});
+
+test('admin disclosure filters stay on a single compact row instead of falling back to form grids', () => {
+  const stylesheet = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
+  const trafficPage = read('packages/sdkwork-router-admin-traffic/src/index.tsx');
+  const operationsPage = read('packages/sdkwork-router-admin-operations/src/index.tsx');
+  const usagePage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx');
+
+  assert.match(stylesheet, /\.adminx-toolbar-inline-disclosure\s*\{/);
+  assert.match(stylesheet, /\.adminx-toolbar-inline-disclosure > \.adminx-toolbar-field\s*\{/);
+
+  assert.match(
+    trafficPage,
+    /<ToolbarDisclosure>[\s\S]*?<ToolbarInline className="adminx-toolbar-inline-disclosure">[\s\S]*?<ToolbarField label=\{t\('View mode'\)\}>[\s\S]*?<ToolbarField label=\{t\('Recent window'\)\}>/,
+  );
+  assert.doesNotMatch(trafficPage, /<ToolbarDisclosure>[\s\S]*?adminx-form-grid/);
+
+  assert.match(
+    operationsPage,
+    /<ToolbarDisclosure>[\s\S]*?<ToolbarInline className="adminx-toolbar-inline-disclosure">[\s\S]*?<ToolbarField label=\{t\('View mode'\)\}>/,
+  );
+  assert.doesNotMatch(operationsPage, /<ToolbarDisclosure>[\s\S]*?adminx-form-grid/);
+
+  assert.match(
+    usagePage,
+    /<ToolbarDisclosure>[\s\S]*?<ToolbarInline className="adminx-toolbar-inline-disclosure">[\s\S]*?<ToolbarField label=\{t\('Api key'\)\}>[\s\S]*?<ToolbarField label=\{t\('Time range'\)\}>/,
+  );
+  assert.doesNotMatch(usagePage, /<ToolbarDisclosure>[\s\S]*?adminx-form-grid/);
 });
 
 test('traffic workbench stays on a single switchable table instead of stacked analytics grids', () => {

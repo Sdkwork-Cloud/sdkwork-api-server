@@ -20,6 +20,10 @@ pub async fn list_coupons(store: &dyn AdminStore) -> Result<Vec<CouponCampaign>>
     store.list_coupons().await
 }
 
+pub async fn list_active_coupons(store: &dyn AdminStore) -> Result<Vec<CouponCampaign>> {
+    store.list_active_coupons().await
+}
+
 pub async fn delete_coupon(store: &dyn AdminStore, coupon_id: &str) -> Result<bool> {
     let coupon_id = coupon_id.trim();
     if coupon_id.is_empty() {

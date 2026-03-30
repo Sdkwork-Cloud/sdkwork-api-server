@@ -1,5 +1,6 @@
 import {
   ADMIN_LOCALE_OPTIONS,
+  FormField,
   Select,
   useAdminI18n,
 } from 'sdkwork-router-admin-commons';
@@ -39,10 +40,7 @@ export function GeneralSettings() {
           )}
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {t('Language')}
-              </span>
+            <FormField label={t('Language')}>
               <Select
                 value={locale}
                 onChange={(event) => setLocale(event.target.value as typeof locale)}
@@ -53,7 +51,7 @@ export function GeneralSettings() {
                   </option>
                 ))}
               </Select>
-            </label>
+            </FormField>
           </div>
         </SettingsSection>
 

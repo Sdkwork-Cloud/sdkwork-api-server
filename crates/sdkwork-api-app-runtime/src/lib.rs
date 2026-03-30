@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use axum::Router;
+use futures_util::{stream, StreamExt, TryStreamExt};
 use std::io;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -421,24 +422,30 @@ async fn validate_secret_manager_for_store(
     store: &dyn AdminStore,
     manager: &CredentialSecretManager,
 ) -> Result<()> {
-    for credential in store.list_credentials().await? {
+    let credentials = store.list_credentials().await?;
+    stream::iter(credentials.into_iter().map(|credential| async move {
+        let tenant_id = credential.tenant_id.clone();
+        let provider_id = credential.provider_id.clone();
+        let key_reference = credential.key_reference.clone();
+
         resolve_credential_secret_with_manager(
             store,
             manager,
-            &credential.tenant_id,
-            &credential.provider_id,
-            &credential.key_reference,
+            &tenant_id,
+            &provider_id,
+            &key_reference,
         )
         .await
         .with_context(|| {
             format!(
                 "credential validation failed for tenant={} provider={} key_reference={}",
-                credential.tenant_id, credential.provider_id, credential.key_reference
+                tenant_id, provider_id, key_reference
             )
-        })?;
-    }
-
-    Ok(())
+        })
+    }))
+    .buffer_unordered(8)
+    .try_for_each(|_| async { Ok(()) })
+    .await
 }
 
 static NEXT_EXTENSION_RUNTIME_ROLLOUT_ID: AtomicU64 = AtomicU64::new(1);
@@ -1596,4 +1603,43 @@ fn extension_discovery_policy_from_config(
         policy = policy.with_trusted_signer(publisher.clone(), public_key.clone());
     }
     policy
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sdkwork_api_app_credential::persist_credential_with_secret_and_manager;
+    use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
+
+    #[tokio::test]
+    async fn validate_secret_manager_for_store_checks_multiple_credentials() {
+        let pool = run_migrations("sqlite::memory:").await.unwrap();
+        let store = SqliteAdminStore::new(pool);
+        let manager = CredentialSecretManager::database_encrypted("runtime-test-master-key");
+
+        persist_credential_with_secret_and_manager(
+            &store,
+            &manager,
+            "tenant-1",
+            "provider-a",
+            "cred-a",
+            "secret-a",
+        )
+        .await
+        .unwrap();
+        persist_credential_with_secret_and_manager(
+            &store,
+            &manager,
+            "tenant-2",
+            "provider-b",
+            "cred-b",
+            "secret-b",
+        )
+        .await
+        .unwrap();
+
+        validate_secret_manager_for_store(&store, &manager)
+            .await
+            .unwrap();
+    }
 }

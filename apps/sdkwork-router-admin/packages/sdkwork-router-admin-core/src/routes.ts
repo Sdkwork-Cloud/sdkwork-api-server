@@ -37,6 +37,13 @@ export const adminRoutes: AdminRouteDefinition[] = [
     group: 'API Router',
   },
   {
+    key: 'rate-limits',
+    label: 'Rate Limits',
+    eyebrow: 'Guardrail',
+    detail: 'Project, key, route, and model request-frequency policies',
+    group: 'API Router',
+  },
+  {
     key: 'route-config',
     label: 'Route Config',
     eyebrow: 'Route',

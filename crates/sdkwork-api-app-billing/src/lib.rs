@@ -1,4 +1,5 @@
 use anyhow::{ensure, Result};
+use async_trait::async_trait;
 use sdkwork_api_domain_billing::{BillingSummary, LedgerEntry, ProjectBillingSummary};
 use sdkwork_api_storage_core::AdminStore;
 use std::collections::BTreeMap;
@@ -54,24 +55,46 @@ pub async fn list_quota_policies(store: &dyn AdminStore) -> Result<Vec<QuotaPoli
     store.list_quota_policies().await
 }
 
-pub async fn check_quota(
-    store: &dyn AdminStore,
+#[async_trait]
+pub trait BillingQuotaStore: Send + Sync {
+    async fn list_ledger_entries_for_project(&self, project_id: &str) -> Result<Vec<LedgerEntry>>;
+    async fn list_quota_policies_for_project(&self, project_id: &str) -> Result<Vec<QuotaPolicy>>;
+}
+
+#[async_trait]
+impl<T> BillingQuotaStore for T
+where
+    T: AdminStore + ?Sized,
+{
+    async fn list_ledger_entries_for_project(&self, project_id: &str) -> Result<Vec<LedgerEntry>> {
+        AdminStore::list_ledger_entries_for_project(self, project_id).await
+    }
+
+    async fn list_quota_policies_for_project(&self, project_id: &str) -> Result<Vec<QuotaPolicy>> {
+        AdminStore::list_quota_policies_for_project(self, project_id).await
+    }
+}
+
+pub async fn check_quota<S>(
+    store: &S,
     project_id: &str,
     requested_units: u64,
-) -> Result<QuotaCheckResult> {
+) -> Result<QuotaCheckResult>
+where
+    S: BillingQuotaStore + ?Sized,
+{
     let used_units = store
-        .list_ledger_entries()
+        .list_ledger_entries_for_project(project_id)
         .await?
         .into_iter()
-        .filter(|entry| entry.project_id == project_id)
         .map(|entry| entry.units)
         .sum();
 
     let effective_policy = store
-        .list_quota_policies()
+        .list_quota_policies_for_project(project_id)
         .await?
         .into_iter()
-        .filter(|policy| policy.enabled && policy.project_id == project_id)
+        .filter(|policy| policy.enabled)
         .min_by(|left, right| {
             left.max_units
                 .cmp(&right.max_units)

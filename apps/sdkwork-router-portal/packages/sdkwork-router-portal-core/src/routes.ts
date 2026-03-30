@@ -2,6 +2,12 @@ import type { PortalRouteDefinition } from 'sdkwork-router-portal-types';
 
 export const portalRoutes: PortalRouteDefinition[] = [
   {
+    key: 'gateway',
+    label: 'Gateway',
+    eyebrow: 'Platform',
+    detail: 'Compatibility, deployment modes, and launch posture',
+  },
+  {
     key: 'dashboard',
     label: 'Dashboard',
     eyebrow: 'Overview',

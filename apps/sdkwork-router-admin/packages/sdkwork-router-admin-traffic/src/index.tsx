@@ -9,8 +9,10 @@ import {
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
   ToolbarDisclosure,
   ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
   useAdminI18n,
 } from 'sdkwork-router-admin-commons';
@@ -460,7 +462,7 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
           </>
         )}
       >
-        <>
+        <ToolbarInline>
           <ToolbarSearchField
             label={t('Search logs and usage')}
             value={search}
@@ -468,9 +470,9 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
             placeholder={t('project, model, provider, route, reason...')}
           />
           <ToolbarDisclosure>
-            <div className="adminx-form-grid">
+            <ToolbarInline className="adminx-toolbar-inline-disclosure">
               <ToolbarField label={t('View mode')}>
-                <select
+                <Select
                   value={viewMode}
                   onChange={(event) => setViewMode(event.target.value as ViewMode)}
                 >
@@ -479,10 +481,10 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
                   <option value="billing">{t('Billing summary by project')}</option>
                   <option value="users">{t('User traffic leaderboard')}</option>
                   <option value="projects">{t('Project hotspots')}</option>
-                </select>
+                </Select>
               </ToolbarField>
               <ToolbarField label={t('Recent window')}>
-                <select
+                <Select
                   value={recentWindow}
                   onChange={(event) => setRecentWindow(event.target.value as RecentWindow)}
                 >
@@ -490,11 +492,11 @@ export function TrafficPage({ snapshot }: AdminPageProps) {
                   <option value="24h">{t('Last 24 hours')}</option>
                   <option value="7d">{t('Last 7 days')}</option>
                   <option value="30d">{t('Last 30 days')}</option>
-                </select>
+                </Select>
               </ToolbarField>
-            </div>
+            </ToolbarInline>
           </ToolbarDisclosure>
-        </>
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable

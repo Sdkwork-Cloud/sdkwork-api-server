@@ -34,12 +34,20 @@ test('routing module speaks in user-facing routing posture language', () => {
   const routingPage = read('packages/sdkwork-router-portal-routing/src/pages/index.tsx');
   const routingServices = read('packages/sdkwork-router-portal-routing/src/services/index.ts');
 
-  assert.match(routingPage, /Predictable order/);
-  assert.match(routingPage, /Reliability guardrails/);
-  assert.match(routingPage, /Preview the active route/);
-  assert.match(routingPage, /Recent routing evidence/);
+  assert.match(routingPage, /Routing workbench/);
+  assert.match(routingPage, /Preset catalog/);
+  assert.match(routingPage, /Provider roster/);
+  assert.match(routingPage, /Evidence stream/);
+  assert.match(routingPage, /Edit routing posture/);
+  assert.match(routingPage, /Preview route/);
+  assert.match(routingPage, /Routing profile label/);
   assert.match(routingPage, /Capability/);
   assert.match(routingPage, /Requested model/);
   assert.match(routingPage, /Selection seed/);
+  assert.match(routingPage, /Search routing evidence/);
+  assert.match(routingPage, /Save posture/);
+  assert.doesNotMatch(routingPage, /<Tabs/);
+  assert.doesNotMatch(routingPage, /Policy editor/);
+  assert.doesNotMatch(routingPage, /Recent routing evidence/);
   assert.match(routingServices, /first healthy available provider in your ordered list wins/);
 });

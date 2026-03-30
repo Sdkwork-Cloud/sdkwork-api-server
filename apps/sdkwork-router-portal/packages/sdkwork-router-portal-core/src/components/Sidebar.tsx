@@ -6,23 +6,36 @@ import {
   PanelLeftClose,
   ReceiptText,
   Route,
+  Server,
   UserRound,
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePortalI18n } from 'sdkwork-router-portal-commons';
 import type { PortalRouteKey, PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
 
 import { resolvePortalPath } from '../application/router/routeManifest';
-import { PORTAL_COLLAPSED_SIDEBAR_WIDTH } from '../lib/portalPreferences';
+import {
+  clampSidebarWidth,
+  PORTAL_COLLAPSED_SIDEBAR_WIDTH,
+  PORTAL_MIN_SIDEBAR_WIDTH,
+} from '../lib/portalPreferences';
 import { portalRoutes } from '../routes';
 import { usePortalAuthStore } from '../store/usePortalAuthStore';
 import { usePortalShellStore } from '../store/usePortalShellStore';
 import { SidebarProfileDock } from './SidebarProfileDock';
 
 const routeIcons: Record<PortalRouteKey, LucideIcon> = {
+  gateway: Server,
   dashboard: Gauge,
   routing: Route,
   'api-keys': KeyRound,
@@ -34,7 +47,7 @@ const routeIcons: Record<PortalRouteKey, LucideIcon> = {
 };
 
 const routeGroups: Array<{ title: string; items: PortalRouteKey[] }> = [
-  { title: 'Workspace', items: ['dashboard', 'routing', 'usage'] },
+  { title: 'Workspace', items: ['gateway', 'dashboard', 'routing', 'usage'] },
   { title: 'Access', items: ['api-keys', 'user'] },
   { title: 'Commerce', items: ['credits', 'billing', 'account'] },
 ];
@@ -65,19 +78,91 @@ export function Sidebar({
 }) {
   const { t } = usePortalI18n();
   const storedWorkspace = usePortalAuthStore((state) => state.workspace);
-  const { hiddenSidebarItems, isSidebarCollapsed, sidebarWidth, toggleSidebar } =
-    usePortalShellStore();
+  const {
+    hiddenSidebarItems,
+    isSidebarCollapsed,
+    sidebarWidth,
+    toggleSidebar,
+    setSidebarCollapsed,
+    setSidebarWidth,
+  } = usePortalShellStore();
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(0);
 
   const resolvedWorkspace = workspace ?? storedWorkspace;
   const userInitials = getUserInitials(resolvedWorkspace);
-  const currentWidth = isSidebarCollapsed ? PORTAL_COLLAPSED_SIDEBAR_WIDTH : sidebarWidth;
+  const resolvedSidebarWidth = clampSidebarWidth(sidebarWidth);
+
+  useEffect(() => {
+    if (resolvedSidebarWidth !== sidebarWidth) {
+      setSidebarWidth(resolvedSidebarWidth);
+    }
+  }, [resolvedSidebarWidth, setSidebarWidth, sidebarWidth]);
+
+  useEffect(() => {
+    if (!isSidebarResizing) {
+      return;
+    }
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const nextWidth = clampSidebarWidth(
+        resizeStartWidthRef.current + (event.clientX - resizeStartXRef.current),
+      );
+      setSidebarWidth(nextWidth);
+    };
+
+    const handlePointerUp = () => {
+      setIsSidebarResizing(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isSidebarResizing, setSidebarWidth]);
+
+  const startSidebarResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nextWidth = isSidebarCollapsed ? PORTAL_MIN_SIDEBAR_WIDTH : resolvedSidebarWidth;
+      resizeStartXRef.current = event.clientX;
+      resizeStartWidthRef.current = nextWidth;
+
+      if (isSidebarCollapsed) {
+        setSidebarCollapsed(false);
+        setSidebarWidth(nextWidth);
+      }
+
+      setIsSidebarResizing(true);
+    },
+    [isSidebarCollapsed, resolvedSidebarWidth, setSidebarCollapsed, setSidebarWidth],
+  );
+
+  const currentWidth = isSidebarCollapsed ? PORTAL_COLLAPSED_SIDEBAR_WIDTH : resolvedSidebarWidth;
+  const showEdgeAffordances = !isSidebarCollapsed && (isSidebarHovered || isSidebarResizing);
 
   return (
-    <motion.div
-      initial={false}
-      animate={{ width: currentWidth }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-      className="relative z-20 flex h-full shrink-0"
+    <div
+      className={`relative z-20 flex h-full shrink-0 ${
+        isSidebarResizing ? '' : 'transition-[width] duration-200 ease-out'
+      }`}
+      onMouseEnter={() => setIsSidebarHovered(true)}
+      onMouseLeave={() => setIsSidebarHovered(false)}
+      style={{ width: currentWidth }}
     >
       <aside className="flex h-full w-full flex-col overflow-hidden border-r border-zinc-900/90 bg-zinc-950 bg-[linear-gradient(180deg,_#13151a_0%,_#0b0c10_100%)] text-zinc-300 shadow-[18px_0_50px_rgba(9,9,11,0.16)]">
         <div className={`relative flex flex-col pb-4 pt-6 ${isSidebarCollapsed ? 'items-center' : 'px-5'}`}>
@@ -186,7 +271,10 @@ export function Sidebar({
                         {({ isActive }) => (
                           <>
                             {isActive && !isSidebarCollapsed ? (
-                              <div className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary-500" />
+                              <motion.div
+                                layoutId="portal-sidebar-active-indicator"
+                                className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary-500"
+                              />
                             ) : null}
                             <div className="flex items-center gap-3">
                               <Icon
@@ -214,11 +302,37 @@ export function Sidebar({
             isSidebarCollapsed={isSidebarCollapsed}
             onLogout={onLogout}
             onOpenConfigCenter={onOpenConfigCenter}
+            sidebarWidth={currentWidth}
             userInitials={userInitials}
             workspace={resolvedWorkspace}
           />
         </div>
       </aside>
-    </motion.div>
+
+      {showEdgeAffordances ? (
+        <button
+          type="button"
+          data-slot="sidebar-edge-control"
+          title={t('Collapse sidebar')}
+          aria-label={t('Collapse sidebar')}
+          onClick={toggleSidebar}
+          className="absolute right-0 top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-white/8 bg-zinc-950/95 text-zinc-200 shadow-[0_14px_34px_rgba(9,9,11,0.3)] backdrop-blur transition-all duration-200 hover:scale-105 hover:bg-zinc-900"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
+      ) : null}
+
+      <div
+        data-slot="sidebar-resize-handle"
+        onPointerDown={startSidebarResize}
+        className="absolute inset-y-0 right-0 z-20 w-3 cursor-col-resize touch-none"
+      >
+        <div
+          className={`absolute inset-y-8 right-[5px] w-px rounded-full bg-white/10 transition-all duration-200 ${
+            showEdgeAffordances || isSidebarResizing ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      </div>
+    </div>
   );
 }

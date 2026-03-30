@@ -14,17 +14,17 @@ The gateway now uses five execution-truth labels instead of a binary `implemente
 
 ## Data Plane
 
-The table below reflects the current runtime truth as of 2026-03-22.
+The table below reflects the current runtime truth as of 2026-03-28.
 
 | API Family | Stateful Gateway | Stateless Gateway | Notes |
 |---|---|---|---|
 | `/v1/models` | `native` | `relay` | Stateful mode reads the local catalog; stateless mode relays model list and retrieve when a stateless upstream runtime is configured and otherwise falls back to a compatible local catalog |
 | `/v1/chat/completions` | `relay` | `relay` | Supports JSON and SSE relay for configured OpenAI-compatible upstreams; stateless mode now also relays list, retrieve, update, delete, and messages list when one upstream runtime is configured |
-| `/v1/messages` | `translated` | `translated` | Anthropic Messages compatibility for Claude Code and other Anthropic clients. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization`, `x-api-key`, and shared gateway routing policies while stateless mode reuses the configured upstream runtime |
+| `/v1/messages` | `translated` | `translated` | Anthropic Messages compatibility for Claude Code and other Anthropic clients. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization` and `x-api-key`, while both modes now preserve `anthropic-version` and `anthropic-beta` on the upstream relay path |
 | `/v1/messages/count_tokens` | `translated` | `translated` | Anthropic token counting compatibility. Uses the shared response-token counting path and preserves the configured model route key for usage accounting in stateful mode |
 | `/v1/completions` | `relay` | `relay` | Relays legacy text completions when provider wiring exists; stateless mode uses the configured single-upstream runtime or falls back locally |
 | `/v1/responses` | `relay` | `relay` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission; stateless mode relays the same core response operations through its configured upstream runtime |
-| `/v1beta/models/{model}:generateContent` | `translated` | `translated` | Gemini GenerateContent compatibility for Gemini CLI gateway mode and Google Generative Language clients. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization`, `x-goog-api-key`, and `?key=` while preserving routing, quota, billing, and usage recording |
+| `/v1beta/models/{model}:generateContent` | `translated` | `translated` | Gemini GenerateContent compatibility for Gemini CLI gateway mode and Google Generative Language clients. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization`, `x-goog-api-key`, and `?key=` while preserving routing, quota, billing, usage recording, and the official `GOOGLE_GEMINI_BASE_URL` plus `GEMINI_API_KEY_AUTH_MECHANISM=bearer` client setup path |
 | `/v1beta/models/{model}:streamGenerateContent` | `translated` | `translated` | Gemini SSE compatibility via `?alt=sse`, with OpenAI-compatible upstream chunk streams re-emitted as Gemini event frames |
 | `/v1beta/models/{model}:countTokens` | `translated` | `translated` | Gemini token counting compatibility through the shared token-count execution path |
 | `/v1/embeddings` | `relay` | `relay` | Uses catalog, credential, and provider state in stateful mode; stateless mode relays embeddings to its configured upstream runtime or falls back locally |

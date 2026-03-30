@@ -216,6 +216,30 @@ pub enum ProviderOutput {
     Stream(ProviderStreamOutput),
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProviderRequestOptions {
+    headers: HashMap<String, String>,
+}
+
+impl ProviderRequestOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.headers.is_empty()
+    }
+}
+
 pub type ProviderByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, io::Error>> + Send>>;
 
 pub struct ProviderStreamOutput {
@@ -275,6 +299,16 @@ impl ProviderOutput {
 #[async_trait]
 pub trait ProviderExecutionAdapter: ProviderAdapter + Send + Sync {
     async fn execute(&self, api_key: &str, request: ProviderRequest<'_>) -> Result<ProviderOutput>;
+
+    async fn execute_with_options(
+        &self,
+        api_key: &str,
+        request: ProviderRequest<'_>,
+        options: &ProviderRequestOptions,
+    ) -> Result<ProviderOutput> {
+        let _ = options;
+        self.execute(api_key, request).await
+    }
 }
 
 type AdapterFactory =

@@ -3,12 +3,12 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, ValueEnum};
-use serde_json::json;
 use sdkwork_api_config::{StandaloneConfig, StandaloneConfigLoader};
 use sdkwork_api_observability::init_tracing;
 use sdkwork_api_product_runtime::{
     ProductRuntimeRole, ProductSiteDirs, RouterProductRuntime, RouterProductRuntimeOptions,
 };
+use serde_json::json;
 
 const SDKWORK_CONFIG_DIR: &str = "SDKWORK_CONFIG_DIR";
 const SDKWORK_CONFIG_FILE: &str = "SDKWORK_CONFIG_FILE";
@@ -136,7 +136,11 @@ where
     let env_values = collect_env_values(env_pairs);
 
     Ok(ProductServiceSettings {
-        config_dir: resolve_string_option(cli.config_dir.as_deref(), &env_values, SDKWORK_CONFIG_DIR),
+        config_dir: resolve_string_option(
+            cli.config_dir.as_deref(),
+            &env_values,
+            SDKWORK_CONFIG_DIR,
+        ),
         config_file: resolve_string_option(
             cli.config_file.as_deref(),
             &env_values,
@@ -165,7 +169,11 @@ where
             &env_values,
             SDKWORK_GATEWAY_BIND,
         ),
-        admin_bind: resolve_string_option(cli.admin_bind.as_deref(), &env_values, SDKWORK_ADMIN_BIND),
+        admin_bind: resolve_string_option(
+            cli.admin_bind.as_deref(),
+            &env_values,
+            SDKWORK_ADMIN_BIND,
+        ),
         portal_bind: resolve_string_option(
             cli.portal_bind.as_deref(),
             &env_values,
@@ -323,7 +331,10 @@ fn render_service_plan(settings: &ProductServiceSettings, config: &StandaloneCon
     }
 }
 
-fn render_service_plan_text(settings: &ProductServiceSettings, config: &StandaloneConfig) -> String {
+fn render_service_plan_text(
+    settings: &ProductServiceSettings,
+    config: &StandaloneConfig,
+) -> String {
     let site_dirs = resolve_site_dirs(settings);
     let roles = settings
         .roles
@@ -382,7 +393,10 @@ fn render_service_plan_text(settings: &ProductServiceSettings, config: &Standalo
     lines.join("\n")
 }
 
-fn render_service_plan_json(settings: &ProductServiceSettings, config: &StandaloneConfig) -> String {
+fn render_service_plan_json(
+    settings: &ProductServiceSettings,
+    config: &StandaloneConfig,
+) -> String {
     let site_dirs = resolve_site_dirs(settings);
     let roles = settings
         .roles
@@ -543,7 +557,10 @@ mod tests {
         assert_eq!(settings.public_web_bind, Some("0.0.0.0:4301".to_owned()));
         assert_eq!(settings.gateway_upstream, Some("10.0.0.22:8080".to_owned()));
         assert_eq!(settings.admin_upstream, Some("10.0.0.31:8081".to_owned()));
-        assert_eq!(settings.database_url, Some("sqlite:///tmp/router.db".to_owned()));
+        assert_eq!(
+            settings.database_url,
+            Some("sqlite:///tmp/router.db".to_owned())
+        );
         assert_eq!(settings.roles, Some(vec![ProductRuntimeRole::Portal]));
     }
 
@@ -552,7 +569,9 @@ mod tests {
         let settings = ProductServiceSettings {
             config_dir: Some("D:/router/config".to_owned()),
             config_file: Some("cluster/router.yaml".to_owned()),
-            database_url: Some("postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router".to_owned()),
+            database_url: Some(
+                "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router".to_owned(),
+            ),
             public_web_bind: Some("0.0.0.0:3301".to_owned()),
             roles: Some(vec![ProductRuntimeRole::Web, ProductRuntimeRole::Gateway]),
             node_id_prefix: Some("edge-a".to_owned()),
@@ -571,7 +590,8 @@ mod tests {
             gateway_bind: "127.0.0.1:9080".to_owned(),
             admin_bind: "127.0.0.1:8081".to_owned(),
             portal_bind: "127.0.0.1:8082".to_owned(),
-            database_url: "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router".to_owned(),
+            database_url: "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"
+                .to_owned(),
             ..StandaloneConfig::default()
         };
 
@@ -580,7 +600,9 @@ mod tests {
         assert!(plan.contains("router-product-service dry run"));
         assert!(plan.contains("roles=web,gateway"));
         assert!(plan.contains("public_web_bind=0.0.0.0:3301"));
-        assert!(plan.contains("database_url=postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"));
+        assert!(plan.contains(
+            "database_url=postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"
+        ));
         assert!(plan.contains("admin_upstream=10.0.0.12:8081"));
         assert!(plan.contains("portal_upstream=10.0.0.13:8082"));
     }

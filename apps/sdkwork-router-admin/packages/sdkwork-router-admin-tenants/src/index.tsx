@@ -10,8 +10,12 @@ import {
   DialogFooter,
   DialogTrigger,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
+  Select,
+  Textarea,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, CreatedGatewayApiKey } from 'sdkwork-router-admin-types';
@@ -232,14 +236,14 @@ export function TenantsPage({
                 >
                   <form className="adminx-form-grid" onSubmit={(event) => void handleTenantSubmit(event)}>
                     <FormField label="Tenant id">
-                      <input
+                      <Input
                         value={tenantDraft.id}
                         onChange={(event) => setTenantDraft((current) => ({ ...current, id: event.target.value }))}
                         required
                       />
                     </FormField>
                     <FormField label="Tenant name">
-                      <input
+                      <Input
                         value={tenantDraft.name}
                         onChange={(event) => setTenantDraft((current) => ({ ...current, name: event.target.value }))}
                         required
@@ -270,7 +274,7 @@ export function TenantsPage({
                   <form className="adminx-form-grid" onSubmit={(event) => void handleProjectSubmit(event)}>
                     <FormField label="Tenant id">
                       {snapshot.tenants.length ? (
-                        <select
+                        <Select
                           value={projectDraft.tenant_id}
                           onChange={(event) => setProjectDraft((current) => ({ ...current, tenant_id: event.target.value }))}
                         >
@@ -279,9 +283,9 @@ export function TenantsPage({
                               {tenant.name} ({tenant.id})
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
-                        <input
+                        <Input
                           value={projectDraft.tenant_id}
                           onChange={(event) => setProjectDraft((current) => ({ ...current, tenant_id: event.target.value }))}
                           required
@@ -289,14 +293,14 @@ export function TenantsPage({
                       )}
                     </FormField>
                     <FormField label="Project id">
-                      <input
+                      <Input
                         value={projectDraft.id}
                         onChange={(event) => setProjectDraft((current) => ({ ...current, id: event.target.value }))}
                         required
                       />
                     </FormField>
                     <FormField label="Project name">
-                      <input
+                      <Input
                         value={projectDraft.name}
                         onChange={(event) => setProjectDraft((current) => ({ ...current, name: event.target.value }))}
                         required
@@ -337,7 +341,7 @@ export function TenantsPage({
                   <form className="adminx-form-grid" onSubmit={(event) => void handleApiKeySubmit(event)}>
                     <FormField label="Tenant">
                       {snapshot.tenants.length ? (
-                        <select
+                        <Select
                           value={apiKeyDraft.tenant_id}
                           onChange={(event) => {
                             const nextTenantId = event.target.value;
@@ -353,9 +357,9 @@ export function TenantsPage({
                               {tenant.name} ({tenant.id})
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
-                        <input
+                        <Input
                           value={apiKeyDraft.tenant_id}
                           onChange={(event) => setApiKeyDraft((current) => ({ ...current, tenant_id: event.target.value }))}
                           required
@@ -364,7 +368,7 @@ export function TenantsPage({
                     </FormField>
                     <FormField label="Project">
                       {availableApiKeyProjects.length ? (
-                        <select
+                        <Select
                           value={apiKeyDraft.project_id}
                           onChange={(event) => setApiKeyDraft((current) => ({ ...current, project_id: event.target.value }))}
                         >
@@ -373,9 +377,9 @@ export function TenantsPage({
                               {project.name} ({project.id})
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
-                        <input
+                        <Input
                           value={apiKeyDraft.project_id}
                           onChange={(event) => setApiKeyDraft((current) => ({ ...current, project_id: event.target.value }))}
                           required
@@ -383,24 +387,24 @@ export function TenantsPage({
                       )}
                     </FormField>
                     <FormField label="Environment">
-                      <select
+                      <Select
                         value={apiKeyDraft.environment}
                         onChange={(event) => setApiKeyDraft((current) => ({ ...current, environment: event.target.value }))}
                       >
                         <option value="production">Production</option>
                         <option value="staging">Staging</option>
                         <option value="development">Development</option>
-                      </select>
+                      </Select>
                     </FormField>
                     <FormField label="Key label">
-                      <input
+                      <Input
                         value={apiKeyDraft.label}
                         onChange={(event) => setApiKeyDraft((current) => ({ ...current, label: event.target.value }))}
                         placeholder="Production App Key"
                       />
                     </FormField>
                     <FormField label="Notes">
-                      <textarea
+                      <Textarea
                         value={apiKeyDraft.notes}
                         onChange={(event) => setApiKeyDraft((current) => ({ ...current, notes: event.target.value }))}
                         rows={3}
@@ -408,7 +412,7 @@ export function TenantsPage({
                       />
                     </FormField>
                     <FormField label="Expires at (ms)">
-                      <input
+                      <Input
                         type="number"
                         inputMode="numeric"
                         min="0"
@@ -431,12 +435,14 @@ export function TenantsPage({
           </>
         )}
       >
-        <ToolbarSearchField
-          label="Search tenants"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="tenant, project, environment, key label"
-        />
+        <ToolbarInline>
+          <ToolbarSearchField
+            label="Search tenants"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="tenant, project, environment, key label"
+          />
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable

@@ -4,6 +4,7 @@ export type AdminRouteKey =
   | 'tenants'
   | 'coupons'
   | 'api-keys'
+  | 'rate-limits'
   | 'route-config'
   | 'model-mapping'
   | 'usage-records'
@@ -126,6 +127,41 @@ export interface GatewayApiKeyRecord {
   active: boolean;
 }
 
+export interface RateLimitPolicyRecord {
+  policy_id: string;
+  project_id: string;
+  api_key_hash?: string | null;
+  route_key?: string | null;
+  model_name?: string | null;
+  requests_per_window: number;
+  window_seconds: number;
+  burst_requests: number;
+  limit_requests: number;
+  enabled: boolean;
+  notes?: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface RateLimitWindowRecord {
+  policy_id: string;
+  project_id: string;
+  api_key_hash?: string | null;
+  route_key?: string | null;
+  model_name?: string | null;
+  requests_per_window: number;
+  window_seconds: number;
+  burst_requests: number;
+  limit_requests: number;
+  request_count: number;
+  remaining_requests: number;
+  window_start_ms: number;
+  window_end_ms: number;
+  updated_at_ms: number;
+  enabled: boolean;
+  exceeded: boolean;
+}
+
 export interface CreatedGatewayApiKey {
   plaintext: string;
   hashed: string;
@@ -206,9 +242,13 @@ export interface UsageRecord {
   provider: string;
   units: number;
   amount: number;
+  api_key_hash?: string | null;
+  channel_id?: string | null;
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  latency_ms?: number | null;
+  reference_amount?: number | null;
   created_at_ms: number;
 }
 
@@ -307,6 +347,8 @@ export interface AdminWorkspaceSnapshot {
   tenants: TenantRecord[];
   projects: ProjectRecord[];
   apiKeys: GatewayApiKeyRecord[];
+  rateLimitPolicies: RateLimitPolicyRecord[];
+  rateLimitWindows: RateLimitWindowRecord[];
   channels: ChannelRecord[];
   providers: ProxyProviderRecord[];
   credentials: CredentialRecord[];

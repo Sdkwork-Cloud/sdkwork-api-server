@@ -15,6 +15,7 @@ use sdkwork_api_interface_http::{gateway_router_with_state, GatewayApiState};
 use sdkwork_api_interface_portal::{portal_router_with_state, PortalApiState};
 use sdkwork_api_runtime_host::{EmbeddedRuntime, RuntimeHostConfig};
 use sdkwork_api_storage_core::Reloadable;
+use serde::Serialize;
 use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,10 +25,7 @@ pub struct ProductSiteDirs {
 }
 
 impl ProductSiteDirs {
-    pub fn new(
-        admin_site_dir: impl Into<PathBuf>,
-        portal_site_dir: impl Into<PathBuf>,
-    ) -> Self {
+    pub fn new(admin_site_dir: impl Into<PathBuf>, portal_site_dir: impl Into<PathBuf>) -> Self {
         Self {
             admin_site_dir: admin_site_dir.into(),
             portal_site_dir: portal_site_dir.into(),
@@ -59,14 +57,9 @@ pub enum ProductRuntimeRole {
 
 impl ProductRuntimeRole {
     fn all() -> BTreeSet<Self> {
-        [
-            Self::Web,
-            Self::Gateway,
-            Self::Admin,
-            Self::Portal,
-        ]
-        .into_iter()
-        .collect()
+        [Self::Web, Self::Gateway, Self::Admin, Self::Portal]
+            .into_iter()
+            .collect()
     }
 
     pub fn parse(value: &str) -> Result<Self> {
@@ -163,6 +156,8 @@ impl RouterProductRuntimeOptions {
 }
 
 pub struct RouterProductRuntime {
+    mode: String,
+    roles: Vec<String>,
     public_base_url: Option<String>,
     public_bind_addr: Option<String>,
     gateway_bind_addr: Option<String>,
@@ -179,12 +174,32 @@ pub struct RouterProductRuntime {
     _portal_runtime_supervision: Option<StandaloneRuntimeSupervision>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouterProductRuntimeSnapshot {
+    pub mode: String,
+    pub roles: Vec<String>,
+    pub public_base_url: Option<String>,
+    pub public_bind_addr: Option<String>,
+    pub gateway_bind_addr: Option<String>,
+    pub admin_bind_addr: Option<String>,
+    pub portal_bind_addr: Option<String>,
+}
+
 impl RouterProductRuntime {
     pub async fn start(
         loader: StandaloneConfigLoader,
         config: StandaloneConfig,
         options: RouterProductRuntimeOptions,
     ) -> Result<Self> {
+        let mode = product_mode_label(options.mode).to_owned();
+        let roles = options
+            .roles
+            .iter()
+            .copied()
+            .map(ProductRuntimeRole::as_str)
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
         let live_store = Reloadable::new(build_admin_store_from_config(&config).await?);
         let live_secret_manager =
             Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
@@ -236,10 +251,12 @@ impl RouterProductRuntime {
             Some(
                 StandaloneListenerHost::bind(
                     requested_local_bind(&config.portal_bind, options.mode),
-                    portal_router_with_state(PortalApiState::with_live_store_and_jwt_secret_handle(
-                        live_store.clone(),
-                        live_portal_jwt.clone(),
-                    )),
+                    portal_router_with_state(
+                        PortalApiState::with_live_store_and_jwt_secret_handle(
+                            live_store.clone(),
+                            live_portal_jwt.clone(),
+                        ),
+                    ),
                 )
                 .await?,
             )
@@ -247,7 +264,8 @@ impl RouterProductRuntime {
             None
         };
 
-        let gateway_bind_addr = listener_bind(gateway_listener.as_ref(), ProductRuntimeRole::Gateway)?;
+        let gateway_bind_addr =
+            listener_bind(gateway_listener.as_ref(), ProductRuntimeRole::Gateway)?;
         let admin_bind_addr = listener_bind(admin_listener.as_ref(), ProductRuntimeRole::Admin)?;
         let portal_bind_addr = listener_bind(portal_listener.as_ref(), ProductRuntimeRole::Portal)?;
 
@@ -272,18 +290,17 @@ impl RouterProductRuntime {
             .contains(&ProductRuntimeRole::Portal)
             .then(|| node_id_for(&options, StandaloneServiceKind::Portal));
 
-        let gateway_runtime_rollout =
-            if let Some(node_id) = gateway_node_id.as_deref() {
-                Some(AbortOnDropJoinHandle::new(
-                    start_extension_runtime_rollout_supervision(
-                        StandaloneServiceKind::Gateway,
-                        node_id,
-                        live_store.clone(),
-                    )?,
-                ))
-            } else {
-                None
-            };
+        let gateway_runtime_rollout = if let Some(node_id) = gateway_node_id.as_deref() {
+            Some(AbortOnDropJoinHandle::new(
+                start_extension_runtime_rollout_supervision(
+                    StandaloneServiceKind::Gateway,
+                    node_id,
+                    live_store.clone(),
+                )?,
+            ))
+        } else {
+            None
+        };
         let admin_runtime_rollout = if let Some(node_id) = admin_node_id.as_deref() {
             Some(AbortOnDropJoinHandle::new(
                 start_extension_runtime_rollout_supervision(
@@ -296,24 +313,23 @@ impl RouterProductRuntime {
             None
         };
 
-        let gateway_runtime_supervision =
-            if let Some(listener_host) = gateway_listener.as_ref() {
-                Some(start_standalone_runtime_supervision(
-                    StandaloneServiceKind::Gateway,
-                    runtime_loader.clone(),
-                    effective_config.clone(),
-                    StandaloneServiceReloadHandles::gateway(live_store.clone())
-                        .with_secret_manager(live_secret_manager.clone())
-                        .with_listener(listener_host.reload_handle())
-                        .with_node_id(
-                            gateway_node_id
-                                .as_deref()
-                                .context("gateway node id missing")?,
-                        ),
-                ))
-            } else {
-                None
-            };
+        let gateway_runtime_supervision = if let Some(listener_host) = gateway_listener.as_ref() {
+            Some(start_standalone_runtime_supervision(
+                StandaloneServiceKind::Gateway,
+                runtime_loader.clone(),
+                effective_config.clone(),
+                StandaloneServiceReloadHandles::gateway(live_store.clone())
+                    .with_secret_manager(live_secret_manager.clone())
+                    .with_listener(listener_host.reload_handle())
+                    .with_node_id(
+                        gateway_node_id
+                            .as_deref()
+                            .context("gateway node id missing")?,
+                    ),
+            ))
+        } else {
+            None
+        };
         let admin_runtime_supervision = if let Some(listener_host) = admin_listener.as_ref() {
             Some(start_standalone_runtime_supervision(
                 StandaloneServiceKind::Admin,
@@ -334,7 +350,11 @@ impl RouterProductRuntime {
                 effective_config,
                 StandaloneServiceReloadHandles::portal(live_store, live_portal_jwt)
                     .with_listener(listener_host.reload_handle())
-                    .with_node_id(portal_node_id.as_deref().context("portal node id missing")?),
+                    .with_node_id(
+                        portal_node_id
+                            .as_deref()
+                            .context("portal node id missing")?,
+                    ),
             ))
         } else {
             None
@@ -342,10 +362,7 @@ impl RouterProductRuntime {
 
         let (web_runtime, public_base_url, public_bind_addr) =
             if options.roles.contains(&ProductRuntimeRole::Web) {
-                validate_site_dir(
-                    &options.site_dirs.admin_site_dir,
-                    ProductRuntimeRole::Admin,
-                )?;
+                validate_site_dir(&options.site_dirs.admin_site_dir, ProductRuntimeRole::Admin)?;
                 validate_site_dir(
                     &options.site_dirs.portal_site_dir,
                     ProductRuntimeRole::Portal,
@@ -384,6 +401,8 @@ impl RouterProductRuntime {
             };
 
         Ok(Self {
+            mode,
+            roles,
             public_base_url,
             public_bind_addr,
             gateway_bind_addr,
@@ -419,6 +438,25 @@ impl RouterProductRuntime {
 
     pub fn portal_bind_addr(&self) -> Option<&str> {
         self.portal_bind_addr.as_deref()
+    }
+
+    pub fn snapshot(&self) -> RouterProductRuntimeSnapshot {
+        RouterProductRuntimeSnapshot {
+            mode: self.mode.clone(),
+            roles: self.roles.clone(),
+            public_base_url: self.public_base_url.clone(),
+            public_bind_addr: self.public_bind_addr.clone(),
+            gateway_bind_addr: self.gateway_bind_addr.clone(),
+            admin_bind_addr: self.admin_bind_addr.clone(),
+            portal_bind_addr: self.portal_bind_addr.clone(),
+        }
+    }
+}
+
+fn product_mode_label(mode: RuntimeMode) -> &'static str {
+    match mode {
+        RuntimeMode::Embedded => "desktop",
+        RuntimeMode::Server => "server",
     }
 }
 
@@ -460,7 +498,10 @@ fn build_bind_overrides(
     overrides
 }
 
-fn node_id_for(options: &RouterProductRuntimeOptions, service_kind: StandaloneServiceKind) -> String {
+fn node_id_for(
+    options: &RouterProductRuntimeOptions,
+    service_kind: StandaloneServiceKind,
+) -> String {
     match options.node_id_prefix.as_deref() {
         Some(prefix) => format!("{prefix}-{}", service_kind_label(service_kind)),
         None => resolve_service_runtime_node_id(service_kind),

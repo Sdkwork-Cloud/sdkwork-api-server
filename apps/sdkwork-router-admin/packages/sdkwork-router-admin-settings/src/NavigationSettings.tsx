@@ -1,4 +1,4 @@
-import { useAdminI18n } from 'sdkwork-router-admin-commons';
+import { Checkbox, Label, useAdminI18n } from 'sdkwork-router-admin-commons';
 import { adminRoutes, useAdminAppStore } from 'sdkwork-router-admin-core';
 
 import { SettingsInfoCard, SettingsSection } from './Shared';
@@ -34,12 +34,10 @@ export function NavigationSettings() {
           description={t('Keep the left rail expanded or collapse it into icon-only navigation.')}
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
-              <input
-                type="radio"
+            <Label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
+              <Checkbox
                 checked={!isSidebarCollapsed}
                 onChange={() => setSidebarCollapsed(false)}
-                className="mt-1 h-4 w-4 border-zinc-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="grid gap-1">
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -49,14 +47,12 @@ export function NavigationSettings() {
                   {t('Keep labels visible across the full left rail.')}
                 </span>
               </span>
-            </label>
+            </Label>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
-              <input
-                type="radio"
+            <Label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
+              <Checkbox
                 checked={isSidebarCollapsed}
                 onChange={() => setSidebarCollapsed(true)}
-                className="mt-1 h-4 w-4 border-zinc-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="grid gap-1">
                 <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -66,7 +62,7 @@ export function NavigationSettings() {
                   {t('Reduce the rail to icon-only navigation without changing the canvas.')}
                 </span>
               </span>
-            </label>
+            </Label>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -89,15 +85,13 @@ export function NavigationSettings() {
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {sidebarRoutes.map((route) => (
-              <label
+              <Label
                 key={route.key}
                 className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!hiddenSidebarItems.includes(route.key)}
                   onChange={() => toggleSidebarItem(route.key)}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-primary-600 focus:ring-primary-500"
                 />
                 <span className="grid gap-0.5">
                   <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -107,7 +101,7 @@ export function NavigationSettings() {
                     {t(route.detail)}
                   </span>
                 </span>
-              </label>
+              </Label>
             ))}
           </div>
         </SettingsSection>

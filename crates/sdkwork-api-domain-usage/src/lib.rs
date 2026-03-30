@@ -17,6 +17,14 @@ pub struct UsageRecord {
     pub total_tokens: u64,
     #[serde(default)]
     pub created_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_amount: Option<f64>,
 }
 
 impl UsageRecord {
@@ -35,6 +43,10 @@ impl UsageRecord {
             output_tokens: 0,
             total_tokens: 0,
             created_at_ms: 0,
+            api_key_hash: None,
+            channel_id: None,
+            latency_ms: None,
+            reference_amount: None,
         }
     }
 
@@ -54,6 +66,20 @@ impl UsageRecord {
         self.input_tokens = input_tokens;
         self.output_tokens = output_tokens;
         self.total_tokens = total_tokens;
+        self
+    }
+
+    pub fn with_request_facts(
+        mut self,
+        api_key_hash: Option<&str>,
+        channel_id: Option<&str>,
+        latency_ms: Option<u64>,
+        reference_amount: Option<f64>,
+    ) -> Self {
+        self.api_key_hash = api_key_hash.map(ToOwned::to_owned);
+        self.channel_id = channel_id.map(ToOwned::to_owned);
+        self.latency_ms = latency_ms;
+        self.reference_amount = reference_amount;
         self
     }
 }

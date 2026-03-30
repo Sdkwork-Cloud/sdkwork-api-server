@@ -1,6 +1,13 @@
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent } from 'react';
 import { KeyRound, Shield, Sparkles } from 'lucide-react';
-import { FormField, InlineButton } from 'sdkwork-router-portal-commons';
+import {
+  Button,
+  FormField,
+  InlineButton,
+  Input,
+  Select,
+  Textarea,
+} from 'sdkwork-router-portal-commons';
 
 import type {
   PortalApiKeyCreateFormState,
@@ -34,78 +41,6 @@ const keyModeOptions: Array<{
   },
 ];
 
-function TextInput({
-  type = 'text',
-  value,
-  placeholder,
-  className = '',
-  autoComplete,
-  spellCheck,
-  onChange,
-}: {
-  type?: string;
-  value: string;
-  placeholder?: string;
-  className?: string;
-  autoComplete?: string;
-  spellCheck?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      autoComplete={autoComplete}
-      spellCheck={spellCheck}
-      onChange={(event) => onChange(event.target.value)}
-      className={`h-11 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-500 ${className}`.trim()}
-    />
-  );
-}
-
-function SelectInput({
-  value,
-  className = '',
-  onChange,
-  children,
-}: {
-  value: string;
-  className?: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className={`h-11 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-sm text-zinc-950 outline-none transition focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 ${className}`.trim()}
-    >
-      {children}
-    </select>
-  );
-}
-
-function TextArea({
-  value,
-  placeholder,
-  onChange,
-}: {
-  value: string;
-  placeholder?: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <textarea
-      rows={5}
-      value={value}
-      placeholder={placeholder}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-500"
-    />
-  );
-}
-
 function SelectionCard({
   title,
   detail,
@@ -120,14 +55,15 @@ function SelectionCard({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       className={
         selected
-          ? 'rounded-[24px] border border-primary-500/35 bg-primary-500/8 p-4 text-left transition shadow-[0_12px_30px_rgba(59,130,246,0.10)]'
-          : 'rounded-[24px] border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700'
+          ? 'h-auto w-full justify-start whitespace-normal rounded-[24px] border border-primary-500/35 bg-primary-500/8 p-4 text-left shadow-[0_12px_30px_rgba(59,130,246,0.10)] hover:bg-primary-500/10'
+          : 'h-auto w-full justify-start whitespace-normal rounded-[24px] border border-zinc-200 bg-white p-4 text-left shadow-none hover:border-zinc-300 hover:bg-white dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-950'
       }
+      variant="ghost"
     >
       <div className="flex items-start gap-3">
         {Icon ? (
@@ -146,7 +82,7 @@ function SelectionCard({
           <p className="mt-1 text-xs leading-6 text-zinc-500 dark:text-zinc-400">{detail}</p>
         </div>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -171,11 +107,11 @@ export function PortalApiKeyCreateForm({
             hint="Keep labels auditable for incident review, ownership review, and future rotation."
             label="Key label"
           >
-            <TextInput
+            <Input
               placeholder="Production rollout"
               value={formState.label}
-              onChange={(value) =>
-                onChange((current) => ({ ...current, label: value }))
+              onChange={(event) =>
+                onChange((current) => ({ ...current, label: event.target.value }))
               }
             />
           </FormField>
@@ -184,10 +120,10 @@ export function PortalApiKeyCreateForm({
             hint="Choose which workspace boundary this key should protect."
             label="Environment boundary"
           >
-            <SelectInput
+            <Select
               value={formState.environment}
-              onChange={(value) =>
-                onChange((current) => ({ ...current, environment: value }))
+              onChange={(event) =>
+                onChange((current) => ({ ...current, environment: event.target.value }))
               }
             >
               {environmentOptions.map((option) => (
@@ -195,7 +131,7 @@ export function PortalApiKeyCreateForm({
                   {option.label}
                 </option>
               ))}
-            </SelectInput>
+            </Select>
           </FormField>
 
           {formState.environment === 'custom' ? (
@@ -204,11 +140,11 @@ export function PortalApiKeyCreateForm({
                 hint="Examples: canary, partner, sandbox-eu"
                 label="Custom environment"
               >
-                <TextInput
+                <Input
                   placeholder="Custom environment"
                   value={formState.customEnvironment}
-                  onChange={(value) =>
-                    onChange((current) => ({ ...current, customEnvironment: value }))
+                  onChange={(event) =>
+                    onChange((current) => ({ ...current, customEnvironment: event.target.value }))
                   }
                 />
               </FormField>
@@ -267,14 +203,14 @@ export function PortalApiKeyCreateForm({
                 hint="Paste the exact plaintext value that should be stored in write-only mode."
                 label="API key"
               >
-                <TextInput
+                <Input
                   autoComplete="off"
                   className="font-mono"
                   placeholder="skw_live_custom_portal_secret"
                   spellCheck={false}
                   value={formState.customKey}
-                  onChange={(value) =>
-                    onChange((current) => ({ ...current, customKey: value }))
+                  onChange={(event) =>
+                    onChange((current) => ({ ...current, customKey: event.target.value }))
                   }
                 />
               </FormField>
@@ -285,11 +221,11 @@ export function PortalApiKeyCreateForm({
             hint="Optional. Leave empty to keep this key active until you revoke it."
             label="Expires at"
           >
-            <TextInput
+            <Input
               type="date"
               value={formState.expiresAt}
-              onChange={(value) =>
-                onChange((current) => ({ ...current, expiresAt: value }))
+              onChange={(event) =>
+                onChange((current) => ({ ...current, expiresAt: event.target.value }))
               }
             />
           </FormField>
@@ -298,11 +234,12 @@ export function PortalApiKeyCreateForm({
             hint="Add operator context, ownership, or rollout details for future review."
             label="Notes"
           >
-            <TextArea
+            <Textarea
+              rows={5}
               placeholder="Operator-managed migration key"
               value={formState.notes}
-              onChange={(value) =>
-                onChange((current) => ({ ...current, notes: value }))
+              onChange={(event) =>
+                onChange((current) => ({ ...current, notes: event.target.value }))
               }
             />
           </FormField>

@@ -16,11 +16,13 @@ sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
+sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
 sdkwork-api-openapi = { path = "../sdkwork-api-openapi" }
+sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-provider-core = { path = "../sdkwork-api-provider-core" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
@@ -28,6 +30,7 @@ serde_json.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+tower-http.workspace = true
 
 [dev-dependencies]
 ed25519-dalek.workspace = true

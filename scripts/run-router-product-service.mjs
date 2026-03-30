@@ -64,6 +64,7 @@ export function createRouterProductServiceRunPlan({
     command: runner.command,
     args: cargoArgs,
     shell: runner.shell,
+    windowsHide: platform === 'win32',
   };
 }
 
@@ -74,6 +75,7 @@ function runCli() {
     env: withSupportedWindowsCmakeGenerator(process.env, process.platform),
     stdio: 'inherit',
     shell: plan.shell,
+    windowsHide: plan.windowsHide ?? process.platform === 'win32',
   });
 
   child.on('error', (error) => {

@@ -3,6 +3,7 @@ mod compat_gemini;
 mod compat_streaming;
 
 use std::sync::{Arc, OnceLock};
+use std::time::Instant;
 
 use axum::{
     body::Body,
@@ -13,6 +14,7 @@ use axum::{
     extract::State,
     http::header,
     http::request::Parts,
+    http::HeaderMap,
     http::Request,
     http::StatusCode,
     middleware::Next,
@@ -151,13 +153,15 @@ use sdkwork_api_app_gateway::update_webhook;
 use sdkwork_api_app_gateway::video_content;
 use sdkwork_api_app_gateway::{
     create_embedding, create_response, delete_model_from_store,
-    execute_json_provider_request_with_runtime, execute_stream_provider_request_with_runtime,
-    list_models_from_store, planned_execution_provider_id_for_route, relay_assistant_from_store,
+    execute_json_provider_request_with_runtime_and_options,
+    execute_stream_provider_request_with_runtime_and_options, list_models_from_store,
+    planned_execution_usage_context_for_route, relay_assistant_from_store,
     relay_audio_voice_consent_from_store, relay_audio_voices_from_store, relay_batch_from_store,
     relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
     relay_cancel_response_from_store, relay_cancel_thread_run_from_store,
     relay_cancel_upload_from_store, relay_cancel_vector_store_file_batch_from_store,
-    relay_chat_completion_from_store, relay_chat_completion_stream_from_store,
+    relay_chat_completion_from_store, relay_chat_completion_from_store_with_options,
+    relay_chat_completion_stream_from_store, relay_chat_completion_stream_from_store_with_options,
     relay_compact_response_from_store, relay_complete_upload_from_store,
     relay_completion_from_store, relay_conversation_from_store,
     relay_conversation_items_from_store, relay_count_response_input_tokens_from_store,
@@ -209,7 +213,8 @@ use sdkwork_api_app_gateway::{
 use sdkwork_api_app_identity::{
     resolve_gateway_request_context, GatewayRequestContext as IdentityGatewayRequestContext,
 };
-use sdkwork_api_app_usage::persist_usage_record_with_tokens;
+use sdkwork_api_app_rate_limit::check_rate_limit;
+use sdkwork_api_app_usage::persist_usage_record_with_tokens_and_facts;
 use sdkwork_api_contract_openai::assistants::{CreateAssistantRequest, UpdateAssistantRequest};
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
@@ -261,16 +266,18 @@ use sdkwork_api_contract_openai::videos::{
     RemixVideoRequest, UpdateVideoCharacterRequest,
 };
 use sdkwork_api_contract_openai::webhooks::{CreateWebhookRequest, UpdateWebhookRequest};
+use sdkwork_api_domain_rate_limit::RateLimitCheckResult;
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
 use sdkwork_api_openapi::{
     build_openapi_document, extract_routes_from_function, render_docs_html, HttpMethod,
     OpenApiServiceSpec, RouteEntry,
 };
-use sdkwork_api_provider_core::{ProviderRequest, ProviderStreamOutput};
+use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions, ProviderStreamOutput};
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
 use sqlx::SqlitePool;
+use tower_http::cors::{Any, CorsLayer};
 
 const DEFAULT_STATELESS_TENANT_ID: &str = "sdkwork-stateless";
 const DEFAULT_STATELESS_PROJECT_ID: &str = "sdkwork-stateless-default";
@@ -359,6 +366,13 @@ fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
             )
         ),
     }
+}
+
+fn browser_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
 }
 
 fn humanize_route_path(path: &str, ignored_prefix: Option<&str>) -> String {
@@ -452,6 +466,14 @@ impl GatewayApiState {
     }
 }
 
+tokio::task_local! {
+    static CURRENT_GATEWAY_REQUEST_CONTEXT: IdentityGatewayRequestContext;
+}
+
+tokio::task_local! {
+    static CURRENT_GATEWAY_REQUEST_STARTED_AT: Instant;
+}
+
 #[derive(Clone, Debug)]
 struct AuthenticatedGatewayRequest(IdentityGatewayRequestContext);
 
@@ -466,31 +488,47 @@ impl AuthenticatedGatewayRequest {
 }
 
 impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
-    type Rejection = StatusCode;
+    type Rejection = Response;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &GatewayApiState,
     ) -> Result<Self, Self::Rejection> {
-        let Some(header_value) = parts.headers.get(header::AUTHORIZATION) else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
-        let Ok(header_value) = header_value.to_str() else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
-        let Some(token) = header_value
-            .strip_prefix("Bearer ")
-            .or_else(|| header_value.strip_prefix("bearer "))
-        else {
-            return Err(StatusCode::UNAUTHORIZED);
+        let context = if let Some(context) = parts
+            .extensions
+            .get::<IdentityGatewayRequestContext>()
+            .cloned()
+        {
+            context
+        } else {
+            let Some(header_value) = parts.headers.get(header::AUTHORIZATION) else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+            let Ok(header_value) = header_value.to_str() else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+            let Some(token) = header_value
+                .strip_prefix("Bearer ")
+                .or_else(|| header_value.strip_prefix("bearer "))
+            else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+
+            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
+            else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+            context
         };
 
-        let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
+        if let Err(response) =
+            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
+                .await
+        {
+            return Err(response);
+        }
 
         Ok(Self(context))
     }
@@ -510,22 +548,38 @@ impl CompatAuthenticatedGatewayRequest {
 }
 
 impl FromRequestParts<GatewayApiState> for CompatAuthenticatedGatewayRequest {
-    type Rejection = StatusCode;
+    type Rejection = Response;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &GatewayApiState,
     ) -> Result<Self, Self::Rejection> {
-        let Some(token) = extract_compat_gateway_token(parts) else {
-            return Err(StatusCode::UNAUTHORIZED);
+        let context = if let Some(context) = parts
+            .extensions
+            .get::<IdentityGatewayRequestContext>()
+            .cloned()
+        {
+            context
+        } else {
+            let Some(token) = extract_compat_gateway_token(parts) else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+
+            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), &token)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
+            else {
+                return Err(StatusCode::UNAUTHORIZED.into_response());
+            };
+            context
         };
 
-        let Some(context) = resolve_gateway_request_context(state.store.as_ref(), &token)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
+        if let Err(response) =
+            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
+                .await
+        {
+            return Err(response);
+        }
 
         Ok(Self(context))
     }
@@ -536,6 +590,69 @@ fn extract_compat_gateway_token(parts: &Parts) -> Option<String> {
         .or_else(|| header_value(parts.headers.get("x-api-key")))
         .or_else(|| header_value(parts.headers.get("x-goog-api-key")))
         .or_else(|| query_parameter(parts.uri.query(), "key"))
+}
+
+async fn enforce_gateway_request_rate_limit(
+    store: &dyn AdminStore,
+    context: &IdentityGatewayRequestContext,
+    route_key: &str,
+) -> Result<(), Response> {
+    match check_rate_limit(
+        store,
+        context.project_id(),
+        Some(context.api_key_hash()),
+        route_key,
+        None,
+        1,
+    )
+    .await
+    {
+        Ok(result) if result.allowed => Ok(()),
+        Ok(result) => Err(rate_limit_exceeded_response(
+            context.project_id(),
+            route_key,
+            &result,
+        )),
+        Err(_) => Err((
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to evaluate rate limit",
+        )
+            .into_response()),
+    }
+}
+
+fn rate_limit_exceeded_response(
+    project_id: &str,
+    route_key: &str,
+    evaluation: &RateLimitCheckResult,
+) -> Response {
+    let mut error = OpenAiErrorResponse::new(
+        rate_limit_exceeded_message(project_id, route_key, evaluation),
+        "rate_limit_exceeded",
+    );
+    error.error.code = Some("rate_limit_exceeded".to_owned());
+    (axum::http::StatusCode::TOO_MANY_REQUESTS, Json(error)).into_response()
+}
+
+fn rate_limit_exceeded_message(
+    project_id: &str,
+    route_key: &str,
+    evaluation: &RateLimitCheckResult,
+) -> String {
+    match (evaluation.policy_id.as_deref(), evaluation.limit_requests) {
+        (Some(policy_id), Some(limit_requests)) => format!(
+            "Rate limit exceeded for project {project_id} on route {route_key} under policy {policy_id}: requested {} requests with {} already used against a limit of {limit_requests}.",
+            evaluation.requested_requests, evaluation.used_requests,
+        ),
+        (_, Some(limit_requests)) => format!(
+            "Rate limit exceeded for project {project_id} on route {route_key}: requested {} requests with {} already used against a limit of {limit_requests}.",
+            evaluation.requested_requests, evaluation.used_requests,
+        ),
+        _ => format!(
+            "Rate limit exceeded for project {project_id} on route {route_key}: requested {} requests with {} already used.",
+            evaluation.requested_requests, evaluation.used_requests,
+        ),
+    }
 }
 
 fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
@@ -552,6 +669,23 @@ fn header_value(value: Option<&axum::http::HeaderValue>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+fn request_options_from_header_names(
+    headers: &HeaderMap,
+    header_names: &[&str],
+) -> ProviderRequestOptions {
+    header_names.iter().fold(
+        ProviderRequestOptions::default(),
+        |options, name| match header_value(headers.get(*name)) {
+            Some(value) => options.with_header(*name, value),
+            None => options,
+        },
+    )
+}
+
+fn anthropic_request_options(headers: &HeaderMap) -> ProviderRequestOptions {
+    request_options_from_header_names(headers, &["anthropic-version", "anthropic-beta"])
+}
+
 fn query_parameter(query: Option<&str>, key: &str) -> Option<String> {
     let query = query?;
     query.split('&').find_map(|pair| {
@@ -562,6 +696,43 @@ fn query_parameter(query: Option<&str>, key: &str) -> Option<String> {
             None
         }
     })
+}
+
+fn current_gateway_request_context() -> Option<IdentityGatewayRequestContext> {
+    CURRENT_GATEWAY_REQUEST_CONTEXT.try_with(Clone::clone).ok()
+}
+
+fn current_gateway_request_latency_ms() -> Option<u64> {
+    CURRENT_GATEWAY_REQUEST_STARTED_AT
+        .try_with(|started_at| started_at.elapsed().as_millis() as u64)
+        .ok()
+}
+
+async fn apply_gateway_request_context(
+    State(state): State<GatewayApiState>,
+    mut request: Request<Body>,
+    next: Next,
+) -> Response {
+    let token = extract_bearer_token(request.headers())
+        .or_else(|| header_value(request.headers().get("x-api-key")))
+        .or_else(|| header_value(request.headers().get("x-goog-api-key")))
+        .or_else(|| query_parameter(request.uri().query(), "key"));
+
+    let Some(token) = token else {
+        return next.run(request).await;
+    };
+
+    let Ok(Some(context)) = resolve_gateway_request_context(state.store.as_ref(), &token).await else {
+        return next.run(request).await;
+    };
+
+    request.extensions_mut().insert(context.clone());
+    CURRENT_GATEWAY_REQUEST_CONTEXT
+        .scope(
+            context,
+            CURRENT_GATEWAY_REQUEST_STARTED_AT.scope(Instant::now(), next.run(request)),
+        )
+        .await
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1049,6 +1220,7 @@ pub fn gateway_router_with_stateless_config(config: StatelessGatewayConfig) -> R
             metrics,
             observe_http_metrics,
         ))
+        .layer(browser_cors_layer())
         .layer(axum::middleware::from_fn_with_state(
             service_name,
             observe_http_tracing,
@@ -1490,6 +1662,10 @@ pub fn gateway_router_with_state(state: GatewayApiState) -> Router {
             "/v1/vector_stores/{vector_store_id}/file_batches/{batch_id}/files",
             get(vector_store_file_batch_files_with_state_handler),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            apply_gateway_request_context,
+        ))
         .layer(axum::middleware::from_fn(apply_request_routing_region))
         .layer(axum::middleware::from_fn_with_state(
             metrics,
@@ -5437,17 +5613,20 @@ async fn chat_completions_with_state_handler(
 
 async fn anthropic_messages_handler(
     request_context: StatelessGatewayRequest,
+    headers: HeaderMap,
     ExtractJson(payload): ExtractJson<Value>,
 ) -> Response {
     let request = match anthropic_request_to_chat_completion(&payload) {
         Ok(request) => request,
         Err(error) => return anthropic_invalid_request_response(error.to_string()),
     };
+    let options = anthropic_request_options(&headers);
 
     if request.stream.unwrap_or(false) {
-        match relay_stateless_stream_request(
+        match relay_stateless_stream_request_with_options(
             &request_context,
             ProviderRequest::ChatCompletionsStream(&request),
+            &options,
         )
         .await
         {
@@ -5463,8 +5642,12 @@ async fn anthropic_messages_handler(
         }
     }
 
-    match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletions(&request))
-        .await
+    match relay_stateless_json_request_with_options(
+        &request_context,
+        ProviderRequest::ChatCompletions(&request),
+        &options,
+    )
+    .await
     {
         Ok(Some(response)) => Json(openai_chat_response_to_anthropic(&response)).into_response(),
         Ok(None) => Json(openai_chat_response_to_anthropic(
@@ -5520,12 +5703,14 @@ async fn anthropic_count_tokens_handler(
 async fn anthropic_messages_with_state_handler(
     request_context: CompatAuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
+    headers: HeaderMap,
     ExtractJson(payload): ExtractJson<Value>,
 ) -> Response {
     let request = match anthropic_request_to_chat_completion(&payload) {
         Ok(request) => request,
         Err(error) => return anthropic_invalid_request_response(error.to_string()),
     };
+    let options = anthropic_request_options(&headers);
 
     match enforce_project_quota(state.store.as_ref(), request_context.project_id(), 100).await {
         Ok(Some(response)) => return response,
@@ -5540,12 +5725,13 @@ async fn anthropic_messages_with_state_handler(
     }
 
     if request.stream.unwrap_or(false) {
-        match relay_chat_completion_stream_from_store(
+        match relay_chat_completion_stream_from_store_with_options(
             state.store.as_ref(),
             &state.secret_manager,
             request_context.tenant_id(),
             request_context.project_id(),
             &request,
+            &options,
         )
         .await
         {
@@ -5601,12 +5787,13 @@ async fn anthropic_messages_with_state_handler(
         return local_anthropic_stream_response(&request.model);
     }
 
-    match relay_chat_completion_from_store(
+    match relay_chat_completion_from_store_with_options(
         state.store.as_ref(),
         &state.secret_manager,
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
+        &options,
     )
     .await
     {
@@ -16215,11 +16402,14 @@ async fn vector_store_file_batch_files_with_state_handler(
     .into_response()
 }
 
-async fn enforce_project_quota(
-    store: &dyn AdminStore,
+async fn enforce_project_quota<S>(
+    store: &S,
     project_id: &str,
     requested_units: u64,
-) -> anyhow::Result<Option<Response>> {
+) -> anyhow::Result<Option<Response>>
+where
+    S: sdkwork_api_app_billing::BillingQuotaStore + ?Sized,
+{
     let evaluation = check_quota(store, project_id, requested_units).await?;
     if evaluation.allowed {
         Ok(None)
@@ -16379,21 +16569,27 @@ async fn record_gateway_usage_for_project_with_route_key_and_tokens(
     amount: f64,
     token_usage: Option<TokenUsageMetrics>,
 ) -> anyhow::Result<()> {
-    let provider_id = planned_execution_provider_id_for_route(
+    let usage_context = planned_execution_usage_context_for_route(
         store, tenant_id, project_id, capability, route_key,
     )
     .await?;
     let token_usage = token_usage.unwrap_or_default();
-    persist_usage_record_with_tokens(
+    let api_key_hash = current_gateway_request_context()
+        .map(|context| context.api_key_hash().to_owned());
+    persist_usage_record_with_tokens_and_facts(
         store,
         project_id,
         usage_model,
-        &provider_id,
+        &usage_context.provider_id,
         units,
         amount,
         token_usage.input_tokens,
         token_usage.output_tokens,
         token_usage.total_tokens,
+        api_key_hash.as_deref(),
+        usage_context.channel_id.as_deref(),
+        current_gateway_request_latency_ms().or(usage_context.latency_ms),
+        usage_context.reference_amount,
     )
     .await?;
     persist_ledger_entry(store, project_id, units, amount).await?;
@@ -16404,15 +16600,25 @@ async fn relay_stateless_json_request(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
 ) -> anyhow::Result<Option<Value>> {
+    let options = ProviderRequestOptions::default();
+    relay_stateless_json_request_with_options(request_context, request, &options).await
+}
+
+async fn relay_stateless_json_request_with_options(
+    request_context: &StatelessGatewayRequest,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> anyhow::Result<Option<Value>> {
     let Some(upstream) = request_context.upstream() else {
         return Ok(None);
     };
 
-    execute_json_provider_request_with_runtime(
+    execute_json_provider_request_with_runtime_and_options(
         upstream.runtime_key(),
         upstream.base_url(),
         upstream.api_key(),
         request,
+        options,
     )
     .await
 }
@@ -16421,15 +16627,25 @@ async fn relay_stateless_stream_request(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
 ) -> anyhow::Result<Option<ProviderStreamOutput>> {
+    let options = ProviderRequestOptions::default();
+    relay_stateless_stream_request_with_options(request_context, request, &options).await
+}
+
+async fn relay_stateless_stream_request_with_options(
+    request_context: &StatelessGatewayRequest,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> anyhow::Result<Option<ProviderStreamOutput>> {
     let Some(upstream) = request_context.upstream() else {
         return Ok(None);
     };
 
-    execute_stream_provider_request_with_runtime(
+    execute_stream_provider_request_with_runtime_and_options(
         upstream.runtime_key(),
         upstream.base_url(),
         upstream.api_key(),
         request,
+        options,
     )
     .await
 }

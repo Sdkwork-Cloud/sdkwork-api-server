@@ -5,7 +5,6 @@ import {
   Palette,
   PanelLeft,
   RotateCcw,
-  Search,
   Sun,
   UserRound,
   type LucideIcon,
@@ -14,13 +13,15 @@ import { motion } from 'motion/react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
+  Button,
   Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-  Input,
+  FormField,
   PORTAL_LOCALE_OPTIONS,
+  SearchInput,
   Select,
   cn,
   usePortalI18n,
@@ -81,15 +82,16 @@ function ConfigNavButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-all duration-200',
+        'h-auto w-full justify-start gap-3 rounded-xl border px-3 py-2.5 text-[14px] font-medium shadow-none transition-all duration-200',
         active
           ? 'border-zinc-200/50 bg-white text-primary-600 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800 dark:text-primary-400'
           : 'border-transparent text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100',
       )}
       type="button"
+      variant="ghost"
     >
       <Icon
         className={cn(
@@ -98,7 +100,7 @@ function ConfigNavButton({
         )}
       />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -140,15 +142,16 @@ function ModeChoice({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-4 transition-all',
+        'h-auto w-full flex-col items-center justify-center gap-3 whitespace-normal rounded-xl border-2 p-4 text-center shadow-none transition-all',
         active
           ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10'
           : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700',
       )}
+      variant="ghost"
     >
       <Icon
         className={cn(
@@ -166,7 +169,7 @@ function ModeChoice({
       >
         {label}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -184,7 +187,12 @@ function ColorSwatch({
   previewClassName: string;
 }) {
   return (
-    <button type="button" onClick={onClick} className="group relative flex flex-col items-center gap-2">
+    <Button
+      type="button"
+      onClick={onClick}
+      className="group relative h-auto flex-col items-center gap-2 whitespace-normal rounded-none p-0 shadow-none hover:bg-transparent"
+      variant="ghost"
+    >
       <div
         className={cn(
           'flex h-10 w-10 items-center justify-center rounded-full shadow-sm ring-2 ring-offset-2 transition-all dark:ring-offset-zinc-950',
@@ -201,11 +209,11 @@ function ColorSwatch({
             ? 'text-zinc-900 dark:text-zinc-100'
             : 'text-zinc-500 group-hover:text-zinc-700 dark:text-zinc-400 dark:group-hover:text-zinc-300',
         )}
-      >
-        {label}
-      </span>
+        >
+          {label}
+        </span>
       <span className="sr-only">{color}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -280,16 +288,12 @@ export function ConfigCenter({
               <h1 className="mb-6 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                 {t('Settings')}
               </h1>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
-                <Input
-                  type="text"
-                  placeholder={t('Search settings...')}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="border-zinc-200 bg-white py-2.5 pl-9 pr-4 text-[13px] text-zinc-950 placeholder:text-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-500"
-                />
-              </div>
+              <SearchInput
+                placeholder={t('Search settings...')}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                inputClassName="h-10 pr-4 text-[13px]"
+              />
             </div>
 
             <nav className="scrollbar-hide flex-1 space-y-1.5 overflow-y-auto px-4 pb-6">
@@ -369,22 +373,24 @@ export function ConfigCenter({
                       description={t('Keep the left rail aligned with claw-studio while preserving the portal route set.')}
                     >
                       <div className="flex flex-wrap gap-3">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
+                          variant="secondary"
                         >
                           <PanelLeft className="h-4 w-4" />
                           {isSidebarCollapsed ? t('Expand sidebar') : t('Collapse sidebar')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={resetShellPreferences}
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                          variant="secondary"
                         >
                           <RotateCcw className="h-4 w-4" />
                           {t('Reset shell preferences')}
-                        </button>
+                        </Button>
                       </div>
                     </ConfigBlock>
 
@@ -425,10 +431,7 @@ export function ConfigCenter({
                       description={t('Choose the portal workspace language. Shared shell copy and locale-aware formatting update immediately.')}
                     >
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            {t('Language')}
-                          </label>
+                        <FormField label={t('Language')}>
                           <Select
                             value={locale}
                             onChange={(event) => setLocale(event.target.value as typeof locale)}
@@ -439,7 +442,7 @@ export function ConfigCenter({
                               </option>
                             ))}
                           </Select>
-                        </div>
+                        </FormField>
                       </div>
                     </ConfigBlock>
 
@@ -473,13 +476,14 @@ export function ConfigCenter({
                       </div>
 
                       <div className="mt-5 flex flex-wrap gap-3">
-                        <button
+                        <Button
                           type="button"
                           onClick={resetShellPreferences}
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+                          variant="default"
                         >
                           {t('Reset shell preferences')}
-                        </button>
+                        </Button>
                       </div>
                     </ConfigBlock>
                   </div>

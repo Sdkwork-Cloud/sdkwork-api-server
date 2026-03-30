@@ -4,6 +4,7 @@ export const PORTAL_ROUTE_PATHS: Record<PortalAnonymousRouteKey | PortalRouteKey
   login: '/login',
   register: '/register',
   'forgot-password': '/forgot-password',
+  gateway: '/gateway',
   dashboard: '/dashboard',
   routing: '/routing',
   'api-keys': '/api-keys',

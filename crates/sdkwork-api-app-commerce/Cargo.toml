@@ -1,0 +1,21 @@
+[package]
+name = "sdkwork-api-app-commerce"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
+sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
+sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lib]
+path = "src/lib.rs"

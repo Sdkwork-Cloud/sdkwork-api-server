@@ -1,3 +1,5 @@
+import { resolveGatewayBaseUrl as resolveGatewayBaseUrlFromPortalApi } from 'sdkwork-router-portal-portal-api';
+
 export type ApiKeySetupClientId =
   | 'codex'
   | 'claude-code'
@@ -139,13 +141,8 @@ async function invokeDesktopCommand<T>(command: string, args?: Record<string, un
 }
 
 export async function resolveGatewayBaseUrl(): Promise<string> {
-  if (!isDesktopRuntime()) {
-    return DEFAULT_GATEWAY_BASE_URL;
-  }
-
   try {
-    const baseUrl = await invokeDesktopCommand<string>('runtime_base_url');
-    return baseUrl || DEFAULT_GATEWAY_BASE_URL;
+    return await resolveGatewayBaseUrlFromPortalApi();
   } catch {
     return DEFAULT_GATEWAY_BASE_URL;
   }
@@ -253,7 +250,7 @@ export function buildApiKeyQuickSetupPlans(input: ApiKeyQuickSetupInput): ApiKey
       id: 'claude-code',
       label: 'Claude Code',
       description:
-        'Claude Code uses the Anthropic-compatible route exposed by the gateway and keeps the same Api key.',
+        'Claude Code uses the Anthropic-compatible route exposed by the gateway, keeps the same Api key, and preserves anthropic-version plus anthropic-beta headers on the relay path.',
       compatibility: 'anthropic',
       applyLabel: 'Apply setup',
       request: {
@@ -347,7 +344,7 @@ export function buildApiKeyQuickSetupPlans(input: ApiKeyQuickSetupInput): ApiKey
       id: 'gemini',
       label: 'Gemini',
       description:
-        'Gemini CLI uses the gateway Gemini-compatible compatibility routes while keeping this Api key as the only secret.',
+        'Gemini CLI uses the official GOOGLE_GEMINI_BASE_URL plus GEMINI_API_KEY_AUTH_MECHANISM=bearer setup while keeping this Api key as the only secret.',
       compatibility: 'gemini',
       applyLabel: 'Apply setup',
       request: {

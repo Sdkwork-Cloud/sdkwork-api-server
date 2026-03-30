@@ -16,6 +16,7 @@ sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
+sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
 sdkwork-api-app-runtime = { path = "../sdkwork-api-app-runtime" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-tenant = { path = "../sdkwork-api-app-tenant" }
@@ -25,6 +26,7 @@ sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }

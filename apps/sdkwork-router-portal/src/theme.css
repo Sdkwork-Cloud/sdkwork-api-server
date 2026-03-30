@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@source "../../../../";
 
 @theme {
   --color-primary-50: var(--theme-primary-50);
@@ -212,6 +213,75 @@ button {
 }
 
 @layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-thumb-border);
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  .ghost-scrollbar {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+  }
+
+  .ghost-scrollbar:hover,
+  .ghost-scrollbar:focus-within {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  .ghost-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .ghost-scrollbar:hover::-webkit-scrollbar,
+  .ghost-scrollbar:focus-within::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  .ghost-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .ghost-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  .ghost-scrollbar:hover::-webkit-scrollbar-thumb,
+  .ghost-scrollbar:focus-within::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--scrollbar-thumb) 72%, transparent);
+    border-color: transparent;
+  }
+
+  .ghost-scrollbar:hover::-webkit-scrollbar-thumb:hover,
+  .ghost-scrollbar:focus-within::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--scrollbar-thumb-hover) 78%, transparent);
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -219,7 +289,19 @@ button {
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
   }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(6px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
 }
 
 .portalx-auth-root,
@@ -1910,11 +1992,10 @@ button {
   --portal-shadow-strong: 0 28px 80px rgba(9, 9, 11, 0.28);
 }
 
-:root.theme-light {
+:root {
   color-scheme: light;
 }
 
-:root.theme-dark,
 :root.dark {
   color-scheme: dark;
   --portal-shell-background:

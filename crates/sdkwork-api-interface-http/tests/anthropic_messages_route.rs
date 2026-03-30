@@ -15,6 +15,8 @@ mod support;
 #[derive(Clone, Default)]
 struct UpstreamCaptureState {
     authorization: Arc<Mutex<Option<String>>>,
+    anthropic_version: Arc<Mutex<Option<String>>>,
+    anthropic_beta: Arc<Mutex<Option<String>>>,
     body: Arc<Mutex<Option<Value>>>,
 }
 
@@ -47,6 +49,8 @@ async fn stateless_anthropic_messages_route_translates_to_chat_completions() {
             Request::builder()
                 .method("POST")
                 .uri("/v1/messages")
+                .header("anthropic-version", "2023-06-01")
+                .header("anthropic-beta", "tools-2024-04-04")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     serde_json::json!({
@@ -94,6 +98,14 @@ async fn stateless_anthropic_messages_route_translates_to_chat_completions() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-stateless-openai")
     );
+    assert_eq!(
+        upstream_state.anthropic_version.lock().unwrap().as_deref(),
+        Some("2023-06-01")
+    );
+    assert_eq!(
+        upstream_state.anthropic_beta.lock().unwrap().as_deref(),
+        Some("tools-2024-04-04")
+    );
 }
 
 #[serial]
@@ -125,6 +137,7 @@ async fn stateful_anthropic_messages_route_accepts_x_api_key_and_records_usage()
                 .uri("/v1/messages")
                 .header("x-api-key", api_key.clone())
                 .header("anthropic-version", "2023-06-01")
+                .header("anthropic-beta", "tools-2024-04-04")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     serde_json::json!({
@@ -147,6 +160,14 @@ async fn stateful_anthropic_messages_route_accepts_x_api_key_and_records_usage()
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(json["content"][0]["text"], "Hello from upstream");
+    assert_eq!(
+        upstream_state.anthropic_version.lock().unwrap().as_deref(),
+        Some("2023-06-01")
+    );
+    assert_eq!(
+        upstream_state.anthropic_beta.lock().unwrap().as_deref(),
+        Some("tools-2024-04-04")
+    );
 
     support::assert_single_usage_record_and_decision_log(
         admin_app,
@@ -348,10 +369,7 @@ async fn upstream_chat_handler(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
-    *state.authorization.lock().unwrap() = headers
-        .get("authorization")
-        .and_then(|value| value.to_str().ok())
-        .map(ToOwned::to_owned);
+    capture_headers(&state, &headers);
     *state.body.lock().unwrap() = Some(body);
 
     (
@@ -382,10 +400,7 @@ async fn upstream_chat_stream_handler(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> axum::response::Response {
-    *state.authorization.lock().unwrap() = headers
-        .get("authorization")
-        .and_then(|value| value.to_str().ok())
-        .map(ToOwned::to_owned);
+    capture_headers(&state, &headers);
     *state.body.lock().unwrap() = Some(body);
 
     (
@@ -397,4 +412,19 @@ async fn upstream_chat_stream_handler(
         ),
     )
         .into_response()
+}
+
+fn capture_headers(state: &UpstreamCaptureState, headers: &HeaderMap) {
+    *state.authorization.lock().unwrap() = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.anthropic_version.lock().unwrap() = headers
+        .get("anthropic-version")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    *state.anthropic_beta.lock().unwrap() = headers
+        .get("anthropic-beta")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
 }

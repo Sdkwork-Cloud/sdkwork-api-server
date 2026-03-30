@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{ensure, Result};
@@ -262,10 +262,9 @@ async fn simulate_route_with_store_inner(
         .or_else(|| preferred_region_from_preferences(project_preferences.as_ref()));
 
     let mut model_candidate_ids: Vec<String> = store
-        .list_models()
+        .list_models_for_external_name(model)
         .await?
         .into_iter()
-        .filter(|entry| entry.external_name == model)
         .map(|entry| entry.provider_id)
         .collect();
 
@@ -281,7 +280,11 @@ async fn simulate_route_with_store_inner(
         model,
     );
 
-    let providers = store.list_providers().await?;
+    let providers = if model_candidate_ids.is_empty() {
+        store.list_providers().await?
+    } else {
+        store.list_providers_for_model(model).await?
+    };
     let provider_map = providers
         .into_iter()
         .map(|provider| (provider.id.clone(), provider))
@@ -289,11 +292,11 @@ async fn simulate_route_with_store_inner(
 
     let candidate_ids = if model_candidate_ids.is_empty() {
         if let Some(policy) = effective_policy.as_ref() {
-            let available_provider_ids = provider_map.keys().cloned().collect::<Vec<_>>();
+            let available_provider_ids = provider_map.keys().cloned().collect::<HashSet<_>>();
             let candidate_ids = policy
                 .declared_provider_ids()
                 .into_iter()
-                .filter(|provider_id| available_provider_ids.iter().any(|id| id == provider_id))
+                .filter(|provider_id| available_provider_ids.contains(provider_id))
                 .collect::<Vec<_>>();
 
             if candidate_ids.is_empty() {

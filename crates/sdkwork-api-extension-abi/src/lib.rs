@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
@@ -23,6 +24,8 @@ pub struct ProviderInvocation {
     pub operation: String,
     pub api_key: String,
     pub base_url: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub headers: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub path_params: Vec<String>,
     pub body: Value,
@@ -43,10 +46,16 @@ impl ProviderInvocation {
             operation: operation.into(),
             api_key: api_key.into(),
             base_url: base_url.into(),
+            headers: HashMap::new(),
             path_params,
             body,
             expects_stream,
         }
+    }
+
+    pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = headers;
+        self
     }
 }
 

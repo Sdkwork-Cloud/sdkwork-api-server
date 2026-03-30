@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::{
@@ -6,8 +7,15 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use sdkwork_api_app_billing::{
-    list_ledger_entries, list_quota_policies, summarize_billing_snapshot,
+use sdkwork_api_app_billing::summarize_billing_snapshot;
+use sdkwork_api_app_commerce::{
+    apply_portal_commerce_payment_event, cancel_portal_commerce_order,
+    list_project_commerce_orders, load_portal_commerce_catalog,
+    load_portal_commerce_checkout_session, load_project_membership, preview_portal_commerce_quote,
+    settle_portal_commerce_order, submit_portal_commerce_order, CommerceError,
+    PortalCommerceCatalog, PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
+    PortalCommercePaymentEventRequest, PortalCommerceQuote, PortalCommerceQuoteRequest,
+    PortalProjectMembershipRecord,
 };
 use sdkwork_api_app_identity::{
     change_portal_password, create_portal_api_key_with_metadata, delete_portal_api_key,
@@ -17,13 +25,14 @@ use sdkwork_api_app_identity::{
     PortalWorkspaceSummary,
 };
 use sdkwork_api_app_routing::{
-    list_routing_decision_logs, select_route_with_store_context,
-    simulate_route_with_store_selection_context, RouteSelectionContext,
+    select_route_with_store_context, simulate_route_with_store_selection_context,
+    RouteSelectionContext,
 };
-use sdkwork_api_app_usage::{list_usage_records, summarize_usage_records};
+use sdkwork_api_app_usage::summarize_usage_records;
 use sdkwork_api_domain_billing::{LedgerEntry, ProjectBillingSummary};
 use sdkwork_api_domain_catalog::ProxyProvider;
 use sdkwork_api_domain_identity::{GatewayApiKeyRecord, PortalUserProfile};
+use sdkwork_api_domain_rate_limit::{RateLimitPolicy, RateLimitWindowSnapshot};
 use sdkwork_api_domain_routing::{
     ProjectRoutingPreferences, RoutingDecision, RoutingDecisionLog, RoutingDecisionSource,
     RoutingStrategy,
@@ -34,6 +43,7 @@ use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use tower_http::cors::{Any, CorsLayer};
 
 const DEFAULT_PORTAL_JWT_SIGNING_SECRET: &str = "local-dev-portal-jwt-secret";
 
@@ -206,6 +216,20 @@ struct PortalDashboardSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct PortalGatewayRateLimitSnapshot {
+    project_id: String,
+    policy_count: usize,
+    active_policy_count: usize,
+    window_count: usize,
+    exceeded_window_count: usize,
+    headline: String,
+    detail: String,
+    generated_at_ms: u64,
+    policies: Vec<RateLimitPolicy>,
+    windows: Vec<RateLimitWindowSnapshot>,
+}
+
+#[derive(Debug, Serialize)]
 struct PortalRoutingProviderOption {
     provider_id: String,
     display_name: String,
@@ -257,6 +281,38 @@ pub fn portal_router() -> Router {
         )
         .route("/portal/dashboard", get(|| async { "dashboard" }))
         .route("/portal/workspace", get(|| async { "workspace" }))
+        .route(
+            "/portal/commerce/catalog",
+            get(|| async { "commerce-catalog" }),
+        )
+        .route(
+            "/portal/commerce/quote",
+            post(|| async { "commerce-quote" }),
+        )
+        .route(
+            "/portal/commerce/orders",
+            get(|| async { "commerce-orders" }).post(|| async { "commerce-orders" }),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/settle",
+            post(|| async { "commerce-order-settle" }),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/cancel",
+            post(|| async { "commerce-order-cancel" }),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/payment-events",
+            post(|| async { "commerce-order-payment-events" }),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/checkout-session",
+            get(|| async { "commerce-order-checkout-session" }),
+        )
+        .route(
+            "/portal/commerce/membership",
+            get(|| async { "commerce-membership" }),
+        )
         .route("/portal/api-keys", get(|| async { "api-keys" }))
         .route("/portal/usage/records", get(|| async { "usage-records" }))
         .route("/portal/usage/summary", get(|| async { "usage-summary" }))
@@ -285,6 +341,7 @@ pub fn portal_router() -> Router {
             metrics,
             observe_http_metrics,
         ))
+        .layer(browser_cors_layer())
         .layer(axum::middleware::from_fn_with_state(
             service_name,
             observe_http_tracing,
@@ -352,6 +409,36 @@ pub fn portal_router_with_state(state: PortalApiState) -> Router {
         .route("/portal/dashboard", get(dashboard_handler))
         .route("/portal/workspace", get(workspace_handler))
         .route(
+            "/portal/gateway/rate-limit-snapshot",
+            get(gateway_rate_limit_snapshot_handler),
+        )
+        .route("/portal/commerce/catalog", get(commerce_catalog_handler))
+        .route("/portal/commerce/quote", post(commerce_quote_handler))
+        .route(
+            "/portal/commerce/orders",
+            get(list_commerce_orders_handler).post(create_commerce_order_handler),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/settle",
+            post(settle_commerce_order_handler),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/cancel",
+            post(cancel_commerce_order_handler),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/payment-events",
+            post(apply_commerce_payment_event_handler),
+        )
+        .route(
+            "/portal/commerce/orders/{order_id}/checkout-session",
+            get(get_commerce_checkout_session_handler),
+        )
+        .route(
+            "/portal/commerce/membership",
+            get(get_project_membership_handler),
+        )
+        .route(
             "/portal/api-keys",
             get(list_api_keys_handler).post(create_api_key_handler),
         )
@@ -381,11 +468,19 @@ pub fn portal_router_with_state(state: PortalApiState) -> Router {
             metrics,
             observe_http_metrics,
         ))
+        .layer(browser_cors_layer())
         .layer(axum::middleware::from_fn_with_state(
             service_name,
             observe_http_tracing,
         ))
         .with_state(state)
+}
+
+fn browser_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
 }
 
 async fn register_handler(
@@ -453,6 +548,234 @@ async fn workspace_handler(
     load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
         .await
         .map(Json)
+}
+
+async fn commerce_catalog_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalCommerceCatalog>, StatusCode> {
+    let _workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
+    load_portal_commerce_catalog(state.store.as_ref())
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn commerce_quote_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+    Json(request): Json<PortalCommerceQuoteRequest>,
+) -> Result<Json<PortalCommerceQuote>, (StatusCode, Json<ErrorResponse>)> {
+    let _workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    preview_portal_commerce_quote(state.store.as_ref(), &request)
+        .await
+        .map(Json)
+        .map_err(portal_commerce_error_response)
+}
+
+async fn list_commerce_orders_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<Vec<PortalCommerceOrderRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    list_project_commerce_orders(state.store.as_ref(), &workspace.project.id)
+        .await
+        .map(Json)
+        .map_err(portal_commerce_error_response)
+}
+
+async fn create_commerce_order_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+    Json(request): Json<PortalCommerceQuoteRequest>,
+) -> Result<(StatusCode, Json<PortalCommerceOrderRecord>), (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    submit_portal_commerce_order(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &request,
+    )
+    .await
+    .map(|order| (StatusCode::CREATED, Json(order)))
+    .map_err(portal_commerce_error_response)
+}
+
+async fn settle_commerce_order_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalCommerceOrderRecord>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    settle_portal_commerce_order(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_commerce_error_response)
+}
+
+async fn cancel_commerce_order_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalCommerceOrderRecord>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    cancel_portal_commerce_order(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_commerce_error_response)
+}
+
+async fn apply_commerce_payment_event_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+    Json(request): Json<PortalCommercePaymentEventRequest>,
+) -> Result<Json<PortalCommerceOrderRecord>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    apply_portal_commerce_payment_event(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+        &request,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_commerce_error_response)
+}
+
+async fn get_commerce_checkout_session_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalCommerceCheckoutSession>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    load_portal_commerce_checkout_session(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_commerce_error_response)
+}
+
+async fn get_project_membership_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<Option<PortalProjectMembershipRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    load_project_membership(state.store.as_ref(), &workspace.project.id)
+        .await
+        .map(Json)
+        .map_err(portal_commerce_error_response)
 }
 
 async fn list_api_keys_handler(
@@ -549,6 +872,64 @@ async fn dashboard_handler(
     }))
 }
 
+async fn gateway_rate_limit_snapshot_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalGatewayRateLimitSnapshot>, StatusCode> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
+    let policies = state
+        .store
+        .list_rate_limit_policies_for_project(&workspace.project.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let windows = state
+        .store
+        .list_rate_limit_window_snapshots_for_project(&workspace.project.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let active_policy_count = policies.iter().filter(|policy| policy.enabled).count();
+    let window_count = windows.len();
+    let exceeded_window_count = windows.iter().filter(|window| window.exceeded).count();
+    let headline = if policies.is_empty() {
+        "No rate-limit policies configured yet".to_owned()
+    } else if exceeded_window_count > 0 {
+        "Rate-limit pressure is visible on the current project".to_owned()
+    } else if active_policy_count > 0 {
+        "Rate-limit posture is within configured headroom".to_owned()
+    } else {
+        "Rate-limit policies exist but are currently disabled".to_owned()
+    };
+    let detail = if policies.is_empty() {
+        "The workspace has no visible project-scoped rate-limit policy yet, so the gateway still relies on the default protection surface.".to_owned()
+    } else if exceeded_window_count > 0 {
+        format!(
+            "{} window(s) are currently over limit across {} policy record(s), so the portal is surfacing the live pressure state instead of waiting for a later audit.",
+            exceeded_window_count, policies.len()
+        )
+    } else {
+        format!(
+            "{} active policy record(s) and {} live window snapshot(s) are currently within the configured limit posture for project {}.",
+            active_policy_count,
+            window_count,
+            workspace.project.id
+        )
+    };
+
+    Ok(Json(PortalGatewayRateLimitSnapshot {
+        project_id: workspace.project.id,
+        policy_count: policies.len(),
+        active_policy_count,
+        window_count,
+        exceeded_window_count,
+        headline,
+        detail,
+        generated_at_ms: current_time_millis(),
+        policies,
+        windows,
+    }))
+}
+
 async fn list_usage_records_handler(
     claims: AuthenticatedPortalClaims,
     State(state): State<PortalApiState>,
@@ -584,12 +965,11 @@ async fn list_billing_ledger_handler(
     State(state): State<PortalApiState>,
 ) -> Result<Json<Vec<LedgerEntry>>, StatusCode> {
     let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
-    let ledger = list_ledger_entries(state.store.as_ref())
+    let ledger = state
+        .store
+        .list_ledger_entries_for_project(&workspace.project.id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|entry| entry.project_id == workspace.project.id)
-        .collect();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(ledger))
 }
 
@@ -715,6 +1095,21 @@ fn portal_error_response(error: PortalIdentityError) -> (StatusCode, Json<ErrorR
     (status, Json(body))
 }
 
+fn portal_commerce_error_response(error: CommerceError) -> (StatusCode, Json<ErrorResponse>) {
+    let status = match error {
+        CommerceError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+        CommerceError::NotFound(_) => StatusCode::NOT_FOUND,
+        CommerceError::Conflict(_) => StatusCode::CONFLICT,
+        CommerceError::Storage(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    let body = ErrorResponse {
+        error: ErrorBody {
+            message: error.to_string(),
+        },
+    };
+    (status, Json(body))
+}
+
 async fn load_workspace_for_user(
     store: &dyn AdminStore,
     user_id: &str,
@@ -729,13 +1124,10 @@ async fn load_project_usage_records(
     store: &dyn AdminStore,
     project_id: &str,
 ) -> Result<Vec<UsageRecord>, StatusCode> {
-    let mut usage_records = list_usage_records(store)
+    let usage_records = store
+        .list_usage_records_for_project(project_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|record| record.project_id == project_id)
-        .collect::<Vec<_>>();
-    usage_records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(usage_records)
 }
 
@@ -743,18 +1135,14 @@ async fn load_project_billing_summary(
     store: &dyn AdminStore,
     project_id: &str,
 ) -> Result<ProjectBillingSummary, StatusCode> {
-    let ledger = list_ledger_entries(store)
+    let ledger = store
+        .list_ledger_entries_for_project(project_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|entry| entry.project_id == project_id)
-        .collect::<Vec<_>>();
-    let policies = list_quota_policies(store)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let policies = store
+        .list_quota_policies_for_project(project_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|policy| policy.project_id == project_id)
-        .collect::<Vec<_>>();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let billing = summarize_billing_snapshot(&ledger, &policies);
 
     Ok(billing
@@ -803,18 +1191,10 @@ async fn load_project_routing_decision_logs(
     store: &dyn AdminStore,
     project_id: &str,
 ) -> Result<Vec<RoutingDecisionLog>, StatusCode> {
-    let mut logs = list_routing_decision_logs(store)
+    let logs = store
+        .list_routing_decision_logs_for_project(project_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|log| log.project_id.as_deref() == Some(project_id))
-        .collect::<Vec<_>>();
-    logs.sort_by(|left, right| {
-        right
-            .created_at_ms
-            .cmp(&left.created_at_ms)
-            .then_with(|| right.decision_id.cmp(&left.decision_id))
-    });
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(logs)
 }
 
@@ -822,21 +1202,27 @@ async fn load_latest_route_hint(
     store: &dyn AdminStore,
     project_id: &str,
 ) -> Result<(String, String), StatusCode> {
-    let routing_logs = load_project_routing_decision_logs(store, project_id).await?;
-    if let Some(log) = routing_logs.first() {
+    if let Some(log) = store
+        .find_latest_routing_decision_log_for_project(project_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         return Ok((log.capability.clone(), log.route_key.clone()));
     }
 
-    let usage_records = load_project_usage_records(store, project_id).await?;
-    if let Some(record) = usage_records.first() {
+    if let Some(record) = store
+        .find_latest_usage_record_for_project(project_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         return Ok(("chat_completion".to_owned(), record.model.clone()));
     }
 
-    let models = store
-        .list_models()
+    if let Some(model) = store
+        .find_any_model()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if let Some(model) = models.first() {
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         return Ok(("chat_completion".to_owned(), model.external_name.clone()));
     }
 
@@ -848,36 +1234,32 @@ async fn load_routing_provider_options(
     model: &str,
     preferences: &ProjectRoutingPreferences,
 ) -> Result<Vec<PortalRoutingProviderOption>, StatusCode> {
-    let model_provider_ids = store
-        .list_models()
+    let mut providers = store
+        .list_providers_for_model(model)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .into_iter()
-        .filter(|entry| entry.external_name == model)
-        .map(|entry| entry.provider_id)
         .collect::<Vec<_>>();
 
-    let mut providers = store
-        .list_providers()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .filter(|provider| {
-            model_provider_ids.is_empty()
-                || model_provider_ids
-                    .iter()
-                    .any(|provider_id| provider_id == &provider.id)
-        })
-        .collect::<Vec<_>>();
-    sort_routing_provider_options(&mut providers, preferences);
+    if providers.is_empty() {
+        providers = store
+            .list_providers()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    let preference_ranks = provider_preference_ranks(preferences);
+    let preferred_provider_ids = preferences
+        .ordered_provider_ids
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    sort_routing_provider_options(&mut providers, &preference_ranks);
 
     Ok(providers
         .into_iter()
         .map(|provider| PortalRoutingProviderOption {
-            preferred: preferences
-                .ordered_provider_ids
-                .iter()
-                .any(|provider_id| provider_id == &provider.id),
+            preferred: preferred_provider_ids.contains(&provider.id),
             default_provider: preferences.default_provider_id.as_deref() == Some(&provider.id),
             provider_id: provider.id,
             display_name: provider.display_name,
@@ -888,20 +1270,28 @@ async fn load_routing_provider_options(
 
 fn sort_routing_provider_options(
     providers: &mut [ProxyProvider],
-    preferences: &ProjectRoutingPreferences,
+    preference_ranks: &HashMap<String, usize>,
 ) {
     providers.sort_by(|left, right| {
-        provider_preference_rank(preferences, &left.id)
-            .cmp(&provider_preference_rank(preferences, &right.id))
+        provider_preference_rank(preference_ranks, &left.id)
+            .cmp(&provider_preference_rank(preference_ranks, &right.id))
             .then_with(|| left.display_name.cmp(&right.display_name))
             .then_with(|| left.id.cmp(&right.id))
     });
 }
 
-fn provider_preference_rank(preferences: &ProjectRoutingPreferences, provider_id: &str) -> usize {
+fn provider_preference_ranks(preferences: &ProjectRoutingPreferences) -> HashMap<String, usize> {
     preferences
         .ordered_provider_ids
         .iter()
-        .position(|candidate| candidate == provider_id)
+        .enumerate()
+        .map(|(index, provider_id)| (provider_id.clone(), index))
+        .collect()
+}
+
+fn provider_preference_rank(preference_ranks: &HashMap<String, usize>, provider_id: &str) -> usize {
+    preference_ranks
+        .get(provider_id)
+        .copied()
         .unwrap_or(usize::MAX)
 }

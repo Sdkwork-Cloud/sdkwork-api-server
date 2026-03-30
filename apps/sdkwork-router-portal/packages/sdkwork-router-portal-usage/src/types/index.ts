@@ -1,69 +1,74 @@
-import type { PortalRouteKey, UsageRecord, UsageSummary } from 'sdkwork-router-portal-types';
+import type {
+  GatewayApiKeyRecord,
+  PortalRouteKey,
+  UsageRecord,
+} from 'sdkwork-router-portal-types';
 
 export interface PortalUsagePageProps {
   onNavigate: (route: PortalRouteKey) => void;
 }
 
-export type UsageDateRange = '24h' | '7d' | '30d' | 'all';
+export type UsageTimeRange = '24h' | '7d' | '30d' | 'all';
 
 export interface UsageFilters {
+  api_key_hash: string;
+  channel_id: string;
   model: string;
-  provider: string;
-  date_range: UsageDateRange;
+  time_range: UsageTimeRange;
 }
 
-export interface UsageHighlight {
-  id: string;
-  label: string;
-  value: string;
-  detail: string;
-}
-
-export interface UsageProfileItem {
-  id: string;
-  label: string;
-  value: string;
-  detail: string;
-}
-
-export interface UsageTrendPoint {
-  bucket: string;
-  requests: number;
-  units: number;
-  amount: number;
+export interface UsageSummarySnapshot {
+  total_requests: number;
+  total_tokens: number;
   input_tokens: number;
   output_tokens: number;
-  total_tokens: number;
+  actual_amount: number;
+  reference_amount: number;
+  average_latency_ms: number | null;
 }
 
-export interface UsageMixPoint {
-  id: string;
+export interface UsageFilterOption {
+  value: string;
   label: string;
-  requests: number;
-  units: number;
-  amount: number;
-  share: number;
 }
 
-export interface UsageDiagnostic {
-  id: string;
-  title: string;
-  detail: string;
-  tone: 'accent' | 'positive' | 'warning' | 'default';
+export interface UsageFilterOptions {
+  api_keys: UsageFilterOption[];
+  channels: string[];
+  models: string[];
 }
 
-export interface UsageWorkbenchViewModel {
-  summary: UsageSummary;
-  filtered_records: UsageRecord[];
-  total_units: number;
-  total_amount: number;
-  model_options: string[];
-  provider_options: string[];
-  highlights: UsageHighlight[];
-  traffic_profile: UsageProfileItem[];
-  spend_watch: UsageProfileItem[];
-  request_volume_series: UsageTrendPoint[];
-  provider_mix: UsageMixPoint[];
-  model_mix: UsageMixPoint[];
-  diagnostics: UsageDiagnostic[];
+export interface UsageTableRow extends UsageRecord {
+  api_key_label: string;
+  channel_label: string;
+  latency_ms: number | null;
+  reference_amount: number;
+}
+
+export interface UsagePaginationState {
+  page: number;
+  page_size: number;
+  total_items: number;
+  total_pages: number;
+}
+
+export interface PortalUsageViewModel {
+  summary: UsageSummarySnapshot;
+  filter_options: UsageFilterOptions;
+  filtered_records: UsageTableRow[];
+  rows: UsageTableRow[];
+  pagination: UsagePaginationState;
+}
+
+export interface PortalUsageWorkbenchData {
+  apiKeys: GatewayApiKeyRecord[];
+  records: UsageRecord[];
+}
+
+export interface BuildPortalUsageViewModelInput {
+  records: UsageRecord[];
+  apiKeys: GatewayApiKeyRecord[];
+  filters: UsageFilters;
+  page: number;
+  page_size: number;
 }

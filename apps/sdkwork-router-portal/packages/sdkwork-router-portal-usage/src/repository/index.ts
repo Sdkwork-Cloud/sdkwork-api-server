@@ -1,17 +1,17 @@
 import {
-  getPortalUsageSummary,
+  listPortalApiKeys,
   listPortalUsageRecords,
 } from 'sdkwork-router-portal-portal-api';
-import type { UsageRecord, UsageSummary } from 'sdkwork-router-portal-types';
+import type { GatewayApiKeyRecord, UsageRecord } from 'sdkwork-router-portal-types';
 
 export async function loadUsageWorkbenchData(): Promise<{
-  summary: UsageSummary;
+  apiKeys: GatewayApiKeyRecord[];
   records: UsageRecord[];
 }> {
-  const [summary, records] = await Promise.all([
-    getPortalUsageSummary(),
+  const [apiKeys, records] = await Promise.all([
+    listPortalApiKeys(),
     listPortalUsageRecords(),
   ]);
 
-  return { summary, records };
+  return { apiKeys, records };
 }

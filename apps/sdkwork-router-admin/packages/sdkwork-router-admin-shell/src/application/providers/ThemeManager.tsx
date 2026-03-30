@@ -3,24 +3,21 @@ import { useEffect } from 'react';
 import { useAdminAppStore } from 'sdkwork-router-admin-core';
 
 export function ThemeManager() {
-  const { themeMode, themeColor, isSidebarCollapsed } = useAdminAppStore();
+  const { themeMode, themeColor } = useAdminAppStore();
 
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', themeColor);
-    root.setAttribute('data-theme-mode', themeMode);
-    root.setAttribute('data-sidebar-collapsed', String(isSidebarCollapsed));
 
     const applyMode = () => {
-      const resolvedDark =
+      if (
         themeMode === 'dark'
-        || (themeMode === 'system'
-          && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-      root.classList.toggle('dark', resolvedDark);
-      root.classList.toggle('theme-dark', resolvedDark);
-      root.classList.toggle('theme-light', !resolvedDark);
-      root.style.colorScheme = resolvedDark ? 'dark' : 'light';
+        || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
     };
 
     applyMode();
@@ -31,7 +28,9 @@ export function ThemeManager() {
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
-  }, [isSidebarCollapsed, themeColor, themeMode]);
+
+    return undefined;
+  }, [themeColor, themeMode]);
 
   return null;
 }

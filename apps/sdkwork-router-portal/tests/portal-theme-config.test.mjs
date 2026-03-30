@@ -15,12 +15,14 @@ test('portal theme system exposes claw-style theme mode and color controls', () 
   const store = read('packages/sdkwork-router-portal-core/src/store/usePortalShellStore.ts');
 
   assert.match(themeManager, /data-theme/);
-  assert.match(themeManager, /data-theme-mode/);
   assert.match(themeManager, /themeMode/);
   assert.match(themeManager, /themeColor/);
-  assert.match(themeManager, /theme-light/);
-  assert.match(themeManager, /theme-dark/);
-  assert.match(themeManager, /colorScheme/);
+  assert.match(themeManager, /classList\.add\('dark'\)/);
+  assert.match(themeManager, /classList\.remove\('dark'\)/);
+  assert.doesNotMatch(themeManager, /data-theme-mode/);
+  assert.doesNotMatch(themeManager, /theme-light/);
+  assert.doesNotMatch(themeManager, /theme-dark/);
+  assert.doesNotMatch(themeManager, /colorScheme/);
   assert.match(store, /themeMode/);
   assert.match(store, /themeColor/);
   assert.match(store, /tech-blue/);
@@ -35,8 +37,9 @@ test('portal theme system exposes claw-style theme mode and color controls', () 
   assert.match(theme, /\[data-theme="zinc"\]/);
   assert.match(theme, /\[data-theme="violet"\]/);
   assert.match(theme, /\[data-theme="rose"\]/);
-  assert.match(theme, /:root\.theme-dark/);
-  assert.match(theme, /:root\.theme-light/);
+  assert.match(theme, /:root\.dark/);
+  assert.doesNotMatch(theme, /:root\.theme-dark/);
+  assert.doesNotMatch(theme, /:root\.theme-light/);
 });
 
 test('portal preferences persist under a dedicated shell storage key', () => {
@@ -46,8 +49,12 @@ test('portal preferences persist under a dedicated shell storage key', () => {
 
   assert.match(preferences, /sdkwork-router-portal\.preferences\.v1/);
   assert.match(store, /persist/);
-  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 60/);
-  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 240/);
+  assert.match(preferences, /PORTAL_COLLAPSED_SIDEBAR_WIDTH = 72/);
+  assert.match(preferences, /PORTAL_DEFAULT_SIDEBAR_WIDTH = 252/);
+  assert.match(preferences, /PORTAL_MIN_SIDEBAR_WIDTH = 220/);
+  assert.match(preferences, /PORTAL_MAX_SIDEBAR_WIDTH = 360/);
+  assert.match(store, /sidebarCollapsePreference/);
+  assert.match(store, /resolveAutoSidebarCollapsed/);
   assert.match(configCenter, /Appearance/);
   assert.match(configCenter, /Theme mode/);
   assert.match(configCenter, /Theme color/);
@@ -100,6 +107,7 @@ test('portal default theme behavior matches claw-studio defaults', () => {
 
   assert.match(store, /themeMode:\s*'system'/);
   assert.match(store, /themeColor:\s*'lobster'/);
+  assert.match(store, /sidebarCollapsePreference:\s*'auto'/);
   assert.doesNotMatch(store, /themeMode:\s*'dark'/);
   assert.doesNotMatch(store, /themeColor:\s*'tech-blue'/);
 });

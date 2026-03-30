@@ -10,11 +10,14 @@ import {
   DialogFooter,
   DialogTrigger,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
   ToolbarDisclosure,
   ToolbarField,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, ManagedUser } from 'sdkwork-router-admin-types';
@@ -314,12 +317,12 @@ export function UsersPage({
               </DialogTrigger>
               <DialogContent size="medium">
                 <AdminDialog
-                  title={operatorDraft.id ? 'Edit operator' : 'Create operator'}
-                  detail="Operators manage catalog, traffic, and runtime posture. Keep this population tightly controlled and only rotate passwords when needed."
-                >
+                    title={operatorDraft.id ? 'Edit operator' : 'Create operator'}
+                    detail="Operators manage catalog, traffic, and runtime posture. Keep this population tightly controlled and only rotate passwords when needed."
+                  >
                   <form className="adminx-form-grid" onSubmit={(event) => void handleOperatorSubmit(event)}>
                     <FormField label="Display name">
-                      <input
+                      <Input
                         value={operatorDraft.display_name}
                         onChange={(event) =>
                           setOperatorDraft((current) => ({
@@ -330,7 +333,7 @@ export function UsersPage({
                       />
                     </FormField>
                     <FormField label="Email">
-                      <input
+                      <Input
                         value={operatorDraft.email}
                         onChange={(event) =>
                           setOperatorDraft((current) => ({
@@ -345,7 +348,7 @@ export function UsersPage({
                       label={operatorDraft.id ? 'New password' : 'Password'}
                       hint={operatorDraft.id ? 'Leave blank to preserve the current password.' : 'Set a strong operator password.'}
                     >
-                      <input
+                      <Input
                         value={operatorDraft.password}
                         onChange={(event) =>
                           setOperatorDraft((current) => ({
@@ -357,7 +360,7 @@ export function UsersPage({
                       />
                     </FormField>
                     <FormField label="Status">
-                      <select
+                      <Select
                         value={operatorDraft.active ? 'active' : 'disabled'}
                         onChange={(event) =>
                           setOperatorDraft((current) => ({
@@ -367,7 +370,7 @@ export function UsersPage({
                       >
                         <option value="active">Active</option>
                         <option value="disabled">Disabled</option>
-                      </select>
+                      </Select>
                     </FormField>
                     <DialogFooter>
                       <InlineButton onClick={resetOperatorDialog}>Cancel</InlineButton>
@@ -398,26 +401,26 @@ export function UsersPage({
               <DialogContent size="large">
                 <AdminDialog
                   title={portalDraft.id ? 'Edit portal user' : 'Create portal user'}
-                  detail="Portal identities are scoped to a tenant and project so usage, billing, and request posture remain attributable after every change."
-                >
-                  <form className="adminx-form-grid" onSubmit={(event) => void handlePortalSubmit(event)}>
-                    <FormField label="Display name">
-                      <input
-                        value={portalDraft.display_name}
-                        onChange={(event) =>
-                          setPortalDraft((current) => ({
-                            ...current,
+                    detail="Portal identities are scoped to a tenant and project so usage, billing, and request posture remain attributable after every change."
+                  >
+                    <form className="adminx-form-grid" onSubmit={(event) => void handlePortalSubmit(event)}>
+                      <FormField label="Display name">
+                      <Input
+                          value={portalDraft.display_name}
+                          onChange={(event) =>
+                            setPortalDraft((current) => ({
+                              ...current,
                             display_name: event.target.value,
                           }))}
-                        required
-                      />
-                    </FormField>
-                    <FormField label="Email">
-                      <input
-                        value={portalDraft.email}
-                        onChange={(event) =>
-                          setPortalDraft((current) => ({
-                            ...current,
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Email">
+                      <Input
+                          value={portalDraft.email}
+                          onChange={(event) =>
+                            setPortalDraft((current) => ({
+                              ...current,
                             email: event.target.value,
                           }))}
                         type="email"
@@ -425,90 +428,90 @@ export function UsersPage({
                       />
                     </FormField>
                     <FormField
-                      label={portalDraft.id ? 'New password' : 'Password'}
-                      hint={portalDraft.id ? 'Leave blank to keep the current secret.' : 'Set an initial portal password.'}
-                    >
-                      <input
-                        value={portalDraft.password}
-                        onChange={(event) =>
-                          setPortalDraft((current) => ({
-                            ...current,
+                        label={portalDraft.id ? 'New password' : 'Password'}
+                        hint={portalDraft.id ? 'Leave blank to keep the current secret.' : 'Set an initial portal password.'}
+                      >
+                      <Input
+                          value={portalDraft.password}
+                          onChange={(event) =>
+                            setPortalDraft((current) => ({
+                              ...current,
                             password: event.target.value,
                           }))}
                         type="password"
                         required={!portalDraft.id}
                       />
-                    </FormField>
-                    <FormField label="Workspace tenant">
-                      {snapshot.tenants.length ? (
-                        <select
-                          value={portalDraft.workspace_tenant_id}
-                          onChange={(event) => {
-                            const nextTenantId = event.target.value;
-                            setPortalDraft((current) => ({
+                      </FormField>
+                      <FormField label="Workspace tenant">
+                        {snapshot.tenants.length ? (
+                        <Select
+                            value={portalDraft.workspace_tenant_id}
+                            onChange={(event) => {
+                              const nextTenantId = event.target.value;
+                              setPortalDraft((current) => ({
                               ...current,
                               workspace_tenant_id: nextTenantId,
                               workspace_project_id: defaultProjectId(snapshot, nextTenantId),
                             }));
                           }}
                         >
-                          {snapshot.tenants.map((tenant) => (
-                            <option key={tenant.id} value={tenant.id}>
-                              {tenant.name} ({tenant.id})
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          value={portalDraft.workspace_tenant_id}
-                          onChange={(event) =>
-                            setPortalDraft((current) => ({
-                              ...current,
+                            {snapshot.tenants.map((tenant) => (
+                              <option key={tenant.id} value={tenant.id}>
+                                {tenant.name} ({tenant.id})
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                        <Input
+                            value={portalDraft.workspace_tenant_id}
+                            onChange={(event) =>
+                              setPortalDraft((current) => ({
+                                ...current,
                               workspace_tenant_id: event.target.value,
                             }))}
                         />
                       )}
-                    </FormField>
-                    <FormField label="Workspace project">
-                      {availableProjects.length ? (
-                        <select
-                          value={portalDraft.workspace_project_id}
-                          onChange={(event) =>
-                            setPortalDraft((current) => ({
-                              ...current,
-                              workspace_project_id: event.target.value,
-                            }))}
-                        >
-                          {availableProjects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name} ({project.id})
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          value={portalDraft.workspace_project_id}
-                          onChange={(event) =>
-                            setPortalDraft((current) => ({
-                              ...current,
+                      </FormField>
+                      <FormField label="Workspace project">
+                        {availableProjects.length ? (
+                        <Select
+                            value={portalDraft.workspace_project_id}
+                            onChange={(event) =>
+                              setPortalDraft((current) => ({
+                                ...current,
+                                workspace_project_id: event.target.value,
+                              }))}
+                          >
+                            {availableProjects.map((project) => (
+                              <option key={project.id} value={project.id}>
+                                {project.name} ({project.id})
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                        <Input
+                            value={portalDraft.workspace_project_id}
+                            onChange={(event) =>
+                              setPortalDraft((current) => ({
+                                ...current,
                               workspace_project_id: event.target.value,
                             }))}
                         />
-                      )}
-                    </FormField>
-                    <FormField label="Status">
-                      <select
-                        value={portalDraft.active ? 'active' : 'disabled'}
-                        onChange={(event) =>
-                          setPortalDraft((current) => ({
-                            ...current,
-                            active: event.target.value === 'active',
-                          }))}
-                      >
-                        <option value="active">Active</option>
-                        <option value="disabled">Disabled</option>
-                      </select>
-                    </FormField>
+                        )}
+                      </FormField>
+                      <FormField label="Status">
+                      <Select
+                          value={portalDraft.active ? 'active' : 'disabled'}
+                          onChange={(event) =>
+                            setPortalDraft((current) => ({
+                              ...current,
+                              active: event.target.value === 'active',
+                            }))}
+                        >
+                          <option value="active">Active</option>
+                          <option value="disabled">Disabled</option>
+                        </Select>
+                      </FormField>
                     <div className="adminx-note">
                       <strong>Selected workspace posture</strong>
                       <p>
@@ -534,38 +537,40 @@ export function UsersPage({
           </>
         )}
       >
-        <ToolbarSearchField
-          label="Search users"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="name, email, tenant, project"
-        />
-        <ToolbarDisclosure>
-          <div className="adminx-form-grid">
-            <ToolbarField label="User type">
-              <select
-                value={roleFilter}
-                onChange={(event) =>
-                  setRoleFilter(event.target.value as 'all' | 'operator' | 'portal')}
-              >
-                <option value="all">All users</option>
-                <option value="operator">Operators</option>
-                <option value="portal">Portal users</option>
-              </select>
-            </ToolbarField>
-            <ToolbarField label="Status">
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as 'all' | 'active' | 'disabled')}
-              >
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </ToolbarField>
-          </div>
-        </ToolbarDisclosure>
+        <ToolbarInline className="adminx-toolbar-inline-users">
+          <ToolbarSearchField
+            label="Search users"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="name, email, tenant, project"
+          />
+          <ToolbarDisclosure>
+            <ToolbarInline className="adminx-toolbar-inline-users-filters">
+              <ToolbarField label="User type">
+                <Select
+                  value={roleFilter}
+                  onChange={(event) =>
+                    setRoleFilter(event.target.value as 'all' | 'operator' | 'portal')}
+                >
+                  <option value="all">All users</option>
+                  <option value="operator">Operators</option>
+                  <option value="portal">Portal users</option>
+                </Select>
+              </ToolbarField>
+              <ToolbarField label="Status">
+                <Select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as 'all' | 'active' | 'disabled')}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </Select>
+              </ToolbarField>
+            </ToolbarInline>
+          </ToolbarDisclosure>
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable

@@ -219,16 +219,16 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
   );
 
   const viewModel = useMemo(
-    () => buildPortalApiKeysViewModel(apiKeys, createdKey, resolvedFilters),
-    [apiKeys, createdKey, resolvedFilters],
+    () => buildPortalApiKeysViewModel(apiKeys, createdKey, resolvedFilters, gatewayBaseUrl),
+    [apiKeys, createdKey, gatewayBaseUrl, resolvedFilters],
   );
   const usagePlaintext = usageKey
     ? readPortalApiKeyPlaintextReveal(usageKey.hashed_key) ??
       (createdKey?.hashed === usageKey.hashed_key ? createdKey.plaintext : null)
     : null;
   const usagePreview = useMemo(
-    () => (usageKey ? buildPortalApiKeyUsagePreview(usageKey, usagePlaintext) : null),
-    [usageKey, usagePlaintext],
+    () => (usageKey ? buildPortalApiKeyUsagePreview(usageKey, usagePlaintext, gatewayBaseUrl) : null),
+    [gatewayBaseUrl, usageKey, usagePlaintext],
   );
   const quickSetupPlans = useMemo(
     () =>

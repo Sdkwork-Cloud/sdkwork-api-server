@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 
-import { useAdminI18n } from 'sdkwork-router-admin-commons';
+import { Button, useAdminI18n } from 'sdkwork-router-admin-commons';
 import { useAdminAppStore } from 'sdkwork-router-admin-core';
 
 import { SettingsSection } from './Shared';
@@ -29,14 +29,15 @@ function ThemeModeCard({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-4 transition-all ${
+      className={`h-auto w-full flex-col items-center justify-center gap-3 whitespace-normal rounded-xl border-2 p-4 text-center shadow-none ${
         active
           ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10'
           : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700'
       }`}
+      variant="ghost"
     >
       <Icon
         className={`h-6 w-6 ${
@@ -55,7 +56,7 @@ function ThemeModeCard({
       <span className="text-center text-xs leading-6 text-zinc-500 dark:text-zinc-400">
         {description}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -112,11 +113,12 @@ export function AppearanceSettings() {
         >
           <div className="flex flex-wrap gap-4">
             {THEME_COLORS.map((color) => (
-              <button
+              <Button
                 key={color.id}
                 type="button"
                 onClick={() => setThemeColor(color.id)}
-                className="group relative flex flex-col items-center gap-2"
+                className="group relative h-auto flex-col items-center gap-2 whitespace-normal rounded-none p-0 shadow-none hover:bg-transparent"
+                variant="ghost"
               >
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full ${color.colorClass} shadow-sm ring-2 ring-offset-2 transition-all dark:ring-offset-zinc-950 ${
@@ -136,7 +138,7 @@ export function AppearanceSettings() {
                 >
                   {t(color.label)}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         </SettingsSection>

@@ -99,7 +99,7 @@ use sdkwork_api_extension_host::{
     verify_discovered_extension_package_trust, BuiltinProviderExtensionFactory,
     DiscoveredExtensionPackage, ExtensionDiscoveryPolicy, ExtensionHost,
 };
-use sdkwork_api_provider_core::{ProviderRequest, ProviderStreamOutput};
+use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions, ProviderStreamOutput};
 use sdkwork_api_provider_ollama::OllamaProviderAdapter;
 use sdkwork_api_provider_openai::OpenAiProviderAdapter;
 use sdkwork_api_provider_openrouter::OpenRouterProviderAdapter;
@@ -119,6 +119,14 @@ pub const LOCAL_PROVIDER_ID: &str = "sdkwork.local";
 
 tokio::task_local! {
     static REQUEST_ROUTING_REGION: Option<String>;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlannedExecutionUsageContext {
+    pub provider_id: String,
+    pub channel_id: Option<String>,
+    pub latency_ms: Option<u64>,
+    pub reference_amount: Option<f64>,
 }
 
 #[derive(Clone)]
@@ -491,6 +499,22 @@ pub async fn planned_execution_provider_id_for_route(
     capability: &str,
     route_key: &str,
 ) -> Result<String> {
+    Ok(
+        planned_execution_usage_context_for_route(
+            store, tenant_id, project_id, capability, route_key,
+        )
+        .await?
+        .provider_id,
+    )
+}
+
+pub async fn planned_execution_usage_context_for_route(
+    store: &dyn AdminStore,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+) -> Result<PlannedExecutionUsageContext> {
     let requested_region = current_request_routing_region();
     let decision = match take_cached_routing_decision(
         tenant_id,
@@ -513,13 +537,27 @@ pub async fn planned_execution_provider_id_for_route(
             .await?
         }
     };
+    let selected_assessment = decision
+        .assessments
+        .iter()
+        .find(|assessment| assessment.provider_id == decision.selected_provider_id);
     let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
-        return Ok(LOCAL_PROVIDER_ID.to_owned());
+        return Ok(PlannedExecutionUsageContext {
+            provider_id: LOCAL_PROVIDER_ID.to_owned(),
+            channel_id: None,
+            latency_ms: selected_assessment.and_then(|assessment| assessment.latency_ms),
+            reference_amount: selected_assessment.and_then(|assessment| assessment.cost),
+        });
     };
 
     let target = provider_execution_target_for_provider(store, &provider).await?;
     if target.local_fallback {
-        return Ok(target.provider_id);
+        return Ok(PlannedExecutionUsageContext {
+            provider_id: target.provider_id,
+            channel_id: Some(provider.channel_id),
+            latency_ms: selected_assessment.and_then(|assessment| assessment.latency_ms),
+            reference_amount: selected_assessment.and_then(|assessment| assessment.cost),
+        });
     }
 
     let has_credential = store
@@ -528,9 +566,19 @@ pub async fn planned_execution_provider_id_for_route(
         .is_some();
 
     if has_credential {
-        Ok(target.provider_id)
+        Ok(PlannedExecutionUsageContext {
+            provider_id: target.provider_id,
+            channel_id: Some(provider.channel_id),
+            latency_ms: selected_assessment.and_then(|assessment| assessment.latency_ms),
+            reference_amount: selected_assessment.and_then(|assessment| assessment.cost),
+        })
     } else {
-        Ok(LOCAL_PROVIDER_ID.to_owned())
+        Ok(PlannedExecutionUsageContext {
+            provider_id: LOCAL_PROVIDER_ID.to_owned(),
+            channel_id: Some(provider.channel_id),
+            latency_ms: selected_assessment.and_then(|assessment| assessment.latency_ms),
+            reference_amount: selected_assessment.and_then(|assessment| assessment.cost),
+        })
     }
 }
 
@@ -598,6 +646,26 @@ pub async fn relay_chat_completion_from_store(
     _project_id: &str,
     request: &CreateChatCompletionRequest,
 ) -> Result<Option<Value>> {
+    let options = ProviderRequestOptions::default();
+    relay_chat_completion_from_store_with_options(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        request,
+        &options,
+    )
+    .await
+}
+
+pub async fn relay_chat_completion_from_store_with_options(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateChatCompletionRequest,
+    options: &ProviderRequestOptions,
+) -> Result<Option<Value>> {
     let decision = select_gateway_route(
         store,
         tenant_id,
@@ -616,11 +684,12 @@ pub async fn relay_chat_completion_from_store(
         return Ok(None);
     };
 
-    execute_json_provider_request_for_provider(
+    execute_json_provider_request_for_provider_with_options(
         store,
         &provider,
         &api_key,
         ProviderRequest::ChatCompletions(request),
+        options,
     )
     .await
 }
@@ -802,6 +871,26 @@ pub async fn relay_chat_completion_stream_from_store(
     _project_id: &str,
     request: &CreateChatCompletionRequest,
 ) -> Result<Option<ProviderStreamOutput>> {
+    let options = ProviderRequestOptions::default();
+    relay_chat_completion_stream_from_store_with_options(
+        store,
+        secret_manager,
+        tenant_id,
+        _project_id,
+        request,
+        &options,
+    )
+    .await
+}
+
+pub async fn relay_chat_completion_stream_from_store_with_options(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    _project_id: &str,
+    request: &CreateChatCompletionRequest,
+    options: &ProviderRequestOptions,
+) -> Result<Option<ProviderStreamOutput>> {
     let decision = select_gateway_route(
         store,
         tenant_id,
@@ -820,11 +909,12 @@ pub async fn relay_chat_completion_stream_from_store(
         return Ok(None);
     };
 
-    execute_stream_provider_request_for_provider(
+    execute_stream_provider_request_for_provider_with_options(
         store,
         &provider,
         &api_key,
         ProviderRequest::ChatCompletionsStream(request),
+        options,
     )
     .await
 }
@@ -6504,6 +6594,20 @@ async fn execute_json_provider_request_for_provider(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<Value>> {
+    let options = ProviderRequestOptions::default();
+    execute_json_provider_request_for_provider_with_options(
+        store, provider, api_key, request, &options,
+    )
+    .await
+}
+
+async fn execute_json_provider_request_for_provider_with_options(
+    store: &dyn AdminStore,
+    provider: &ProxyProvider,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<Value>> {
     let descriptor =
         provider_execution_descriptor_for_provider(store, provider, api_key.to_owned()).await?;
     debug_assert!(descriptor.local_fallback || descriptor.provider_id == provider.id);
@@ -6511,11 +6615,12 @@ async fn execute_json_provider_request_for_provider(
         return Ok(None);
     }
 
-    execute_json_provider_request(
+    execute_json_provider_request_with_options(
         &descriptor.runtime_key,
         descriptor.base_url,
         &descriptor.api_key,
         request,
+        options,
     )
     .await
 }
@@ -6526,6 +6631,20 @@ async fn execute_stream_provider_request_for_provider(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<ProviderStreamOutput>> {
+    let options = ProviderRequestOptions::default();
+    execute_stream_provider_request_for_provider_with_options(
+        store, provider, api_key, request, &options,
+    )
+    .await
+}
+
+async fn execute_stream_provider_request_for_provider_with_options(
+    store: &dyn AdminStore,
+    provider: &ProxyProvider,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<ProviderStreamOutput>> {
     let descriptor =
         provider_execution_descriptor_for_provider(store, provider, api_key.to_owned()).await?;
     debug_assert!(descriptor.local_fallback || descriptor.provider_id == provider.id);
@@ -6533,11 +6652,12 @@ async fn execute_stream_provider_request_for_provider(
         return Ok(None);
     }
 
-    execute_stream_provider_request(
+    execute_stream_provider_request_with_options(
         &descriptor.runtime_key,
         descriptor.base_url,
         &descriptor.api_key,
         request,
+        options,
     )
     .await
 }
@@ -6548,27 +6668,44 @@ async fn execute_json_provider_request(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<Value>> {
+    let options = ProviderRequestOptions::default();
+    execute_json_provider_request_with_options(runtime_key, base_url, api_key, request, &options)
+        .await
+}
+
+async fn execute_json_provider_request_with_options(
+    runtime_key: &str,
+    base_url: String,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<Value>> {
     let host = configured_extension_host()?;
     let Some(adapter) = host.resolve_provider(runtime_key, base_url) else {
         return Ok(None);
     };
 
-    let response = adapter.execute(api_key, request).await?;
+    let response = adapter
+        .execute_with_options(api_key, request, options)
+        .await?;
     Ok(response.into_json())
 }
 
-async fn execute_stream_provider_request(
+async fn execute_stream_provider_request_with_options(
     runtime_key: &str,
     base_url: String,
     api_key: &str,
     request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
 ) -> Result<Option<ProviderStreamOutput>> {
     let host = configured_extension_host()?;
     let Some(adapter) = host.resolve_provider(runtime_key, base_url) else {
         return Ok(None);
     };
 
-    let response = adapter.execute(api_key, request).await?;
+    let response = adapter
+        .execute_with_options(api_key, request, options)
+        .await?;
     Ok(response.into_stream())
 }
 
@@ -6578,7 +6715,32 @@ pub async fn execute_json_provider_request_with_runtime(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<Value>> {
-    execute_json_provider_request(runtime_key, base_url.into(), api_key, request).await
+    let options = ProviderRequestOptions::default();
+    execute_json_provider_request_with_runtime_and_options(
+        runtime_key,
+        base_url,
+        api_key,
+        request,
+        &options,
+    )
+    .await
+}
+
+pub async fn execute_json_provider_request_with_runtime_and_options(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<Value>> {
+    execute_json_provider_request_with_options(
+        runtime_key,
+        base_url.into(),
+        api_key,
+        request,
+        options,
+    )
+    .await
 }
 
 pub async fn execute_stream_provider_request_with_runtime(
@@ -6587,7 +6749,32 @@ pub async fn execute_stream_provider_request_with_runtime(
     api_key: &str,
     request: ProviderRequest<'_>,
 ) -> Result<Option<ProviderStreamOutput>> {
-    execute_stream_provider_request(runtime_key, base_url.into(), api_key, request).await
+    let options = ProviderRequestOptions::default();
+    execute_stream_provider_request_with_runtime_and_options(
+        runtime_key,
+        base_url,
+        api_key,
+        request,
+        &options,
+    )
+    .await
+}
+
+pub async fn execute_stream_provider_request_with_runtime_and_options(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<ProviderStreamOutput>> {
+    execute_stream_provider_request_with_options(
+        runtime_key,
+        base_url.into(),
+        api_key,
+        request,
+        options,
+    )
+    .await
 }
 
 fn fallback_speech_bytes(format: &str) -> Vec<u8> {

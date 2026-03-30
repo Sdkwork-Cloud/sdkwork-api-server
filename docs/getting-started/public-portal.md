@@ -12,6 +12,7 @@ It is the default end-user boundary for account creation, dashboard and usage re
 - `POST /portal/auth/change-password`
 - `GET /portal/workspace`
 - `GET /portal/dashboard`
+- `GET /portal/commerce/catalog`
 - `GET /portal/usage/records`
 - `GET /portal/usage/summary`
 - `GET /portal/billing/summary`
@@ -64,7 +65,7 @@ The current portal batch intentionally supports:
 - dashboard snapshot with recent requests
 - usage workbench and per-call token-unit visibility
 - billing summary and ledger reads
-- coupon redemption, recharge, and subscription entry points through a frontend commerce seam
+- backend-readable subscription, recharge, and coupon catalog plus frontend entry points
 - self-service gateway API key issuance
 
 It intentionally does not yet include:

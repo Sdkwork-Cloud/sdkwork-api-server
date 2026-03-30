@@ -1,7 +1,9 @@
 [workspace]
 members = [
     "crates/sdkwork-api-app-billing",
+    "crates/sdkwork-api-app-commerce",
     "crates/sdkwork-api-app-catalog",
+    "crates/sdkwork-api-app-rate-limit",
     "crates/sdkwork-api-app-coupon",
     "crates/sdkwork-api-app-credential",
     "crates/sdkwork-api-app-extension",
@@ -20,9 +22,11 @@ members = [
     "crates/sdkwork-api-contract-openai",
     "crates/sdkwork-api-domain-billing",
     "crates/sdkwork-api-domain-catalog",
+    "crates/sdkwork-api-domain-commerce",
     "crates/sdkwork-api-domain-coupon",
     "crates/sdkwork-api-domain-credential",
     "crates/sdkwork-api-domain-identity",
+    "crates/sdkwork-api-domain-rate-limit",
     "crates/sdkwork-api-domain-routing",
     "crates/sdkwork-api-domain-tenant",
     "crates/sdkwork-api-domain-usage",
@@ -82,6 +86,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1"
 tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors"] }
 toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = "0.3"

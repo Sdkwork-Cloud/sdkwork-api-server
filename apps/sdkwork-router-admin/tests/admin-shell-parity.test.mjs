@@ -83,17 +83,26 @@ test('admin shell sidebar footer anchors user identity and bottom settings affor
   assert.match(theme, /adminx-shell-sidebar-footer-user/);
 });
 
-test('admin sidebar keeps claw-style top brand rhythm and drops custom resize affordances', () => {
+test('admin sidebar keeps claw-studio shell resize and edge-collapse affordances intact', () => {
   const sidebar = read('packages/sdkwork-router-admin-shell/src/components/Sidebar.tsx');
 
-  assert.match(sidebar, /motion\.(div|aside)/);
   assert.match(sidebar, /SDKWork Router Admin/);
   assert.match(sidebar, /Control plane/);
   assert.match(sidebar, /M12 2v2/);
   assert.match(sidebar, /M15 12a3 3 0 1 1-6 0/);
   assert.match(sidebar, /w-full items-center overflow-hidden whitespace-nowrap/);
-  assert.doesNotMatch(sidebar, /sidebar-resize-handle/);
-  assert.doesNotMatch(sidebar, /col-resize/);
+  assert.match(sidebar, /const COLLAPSED_SIDEBAR_WIDTH = 72/);
+  assert.match(sidebar, /const MIN_SIDEBAR_WIDTH = 220/);
+  assert.match(sidebar, /const MAX_SIDEBAR_WIDTH = 360/);
+  assert.match(sidebar, /const \[isSidebarHovered, setIsSidebarHovered\] = useState\(false\)/);
+  assert.match(sidebar, /const \[isSidebarResizing, setIsSidebarResizing\] = useState\(false\)/);
+  assert.match(sidebar, /const resizeStartXRef = useRef\(0\)/);
+  assert.match(sidebar, /const resizeStartWidthRef = useRef\(0\)/);
+  assert.match(sidebar, /showEdgeAffordances = !isSidebarCollapsed && \(isSidebarHovered \|\| isSidebarResizing\)/);
+  assert.match(sidebar, /data-slot="sidebar-edge-control"/);
+  assert.match(sidebar, /data-slot="sidebar-resize-handle"/);
+  assert.match(sidebar, /cursor-col-resize/);
+  assert.match(sidebar, /onPointerDown=\{startSidebarResize\}/);
 });
 
 test('admin shell sidebar keeps a compact claw-style footer while retaining user menu controls', () => {
@@ -120,7 +129,7 @@ test('admin sidebar route items use direct claw-style composition and keep an al
   assert.match(sidebar, /onClick=\{isSidebarCollapsed \? toggleSidebar : undefined\}/);
   assert.match(sidebar, /title=\{isSidebarCollapsed \? t\('Expand sidebar'\) : undefined\}/);
   assert.match(sidebar, /aria-label=\{isSidebarCollapsed \? t\('Expand sidebar'\) : undefined\}/);
-  assert.match(sidebar, /title=\{t\('Collapse sidebar'\)\}/);
+  assert.match(sidebar, /title=\{t\('common\.collapseSidebar'\)\}|title=\{t\('Collapse sidebar'\)\}/);
   assert.doesNotMatch(sidebar, /adminx-shell-sidebar-link-leading/);
   assert.doesNotMatch(sidebar, /adminx-shell-sidebar-link-copy/);
   assert.doesNotMatch(sidebar, /adminx-shell-sidebar-footer-leading/);
@@ -223,14 +232,19 @@ test('admin settings panels use claw-style sections instead of admin-only KPI su
   assert.doesNotMatch(shared, /inline-flex h-9 w-9 items-center justify-center rounded-xl/);
 });
 
-test('theme manager applies claw-compatible root classes for shared dark styling', () => {
+test('theme manager applies the claw-compatible root theme contract for shared dark styling', () => {
   const themeManager = read(
     'packages/sdkwork-router-admin-shell/src/application/providers/ThemeManager.tsx',
   );
 
-  assert.match(themeManager, /classList\.toggle\('dark'/);
-  assert.match(themeManager, /theme-light/);
-  assert.match(themeManager, /theme-dark/);
+  assert.match(themeManager, /data-theme/);
+  assert.doesNotMatch(themeManager, /data-sidebar-collapsed/);
+  assert.match(themeManager, /classList\.add\('dark'\)/);
+  assert.match(themeManager, /classList\.remove\('dark'\)/);
+  assert.doesNotMatch(themeManager, /data-theme-mode/);
+  assert.doesNotMatch(themeManager, /theme-light/);
+  assert.doesNotMatch(themeManager, /theme-dark/);
+  assert.doesNotMatch(themeManager, /colorScheme/);
 });
 
 test('admin shell typography stays on a claw-compatible system sans stack', () => {
@@ -268,6 +282,13 @@ test('admin auth surface mirrors claw auth route shape while keeping admin-only 
   assert.match(auth, /adminx-auth-content/);
   assert.match(auth, /adminx-auth-provider-grid/);
   assert.match(auth, /adminx-auth-mode-switch/);
+  assert.match(auth, /Label/);
+  assert.match(auth, /LeadingIconInput/);
+  assert.doesNotMatch(auth, /adminx-auth-input-element pl-10/);
+  assert.match(auth, /DEV_ADMIN_CREDENTIALS/);
+  assert.match(auth, /import\.meta\.env\.DEV/);
+  assert.match(auth, /admin@sdkwork\.local/);
+  assert.match(auth, /ChangeMe123!/);
   assert.match(auth, /Scan to Login/);
   assert.match(auth, /Use the SDKWork mobile app to scan the QR code for instant access\./);
   assert.match(auth, /Welcome back/);
@@ -295,8 +316,9 @@ test('admin auth surface mirrors claw auth route shape while keeping admin-only 
   assert.match(theme, /font-size:\s*24px/);
   assert.match(theme, /font-size:\s*30px/);
   assert.match(theme, /max-width:\s*200px/);
-  assert.match(theme, /\.adminx-auth-input-shell input\s*\{[^}]*border-radius:\s*12px;/);
-  assert.match(theme, /\.adminx-auth-input-shell input\s*\{[^}]*font-size:\s*14px;/);
+  assert.match(theme, /\.adminx-auth-input-shell \.adminx-auth-input-element\s*\{[^}]*min-height:\s*40px;/);
+  assert.match(theme, /\.adminx-auth-input-shell \.adminx-auth-input-element\s*\{[^}]*font-size:\s*14px;/);
+  assert.doesNotMatch(theme, /\.adminx-auth-input-shell input\s*\{[^}]*border-radius:\s*12px;/);
   assert.match(theme, /\.adminx-auth-primary-button\s*\{[^}]*border-radius:\s*12px;/);
   assert.match(theme, /\.adminx-auth-primary-button\s*\{[^}]*font-size:\s*14px;/);
   assert.match(theme, /\.adminx-auth-provider-button\s*\{[^}]*border-radius:\s*12px;/);
@@ -306,9 +328,9 @@ test('content primitives expose theme-aware rows, placeholders, and surface stat
   const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
   const theme = read('packages/sdkwork-router-admin-shell/src/styles/index.css');
 
-  assert.match(commons, /adminx-table-row/);
+  assert.match(commons, /sticky top-0 z-10 whitespace-nowrap border-b border-zinc-200\/80/);
+  assert.match(commons, /transition-colors hover:bg-zinc-50\/80/);
   assert.match(commons, /Dialog|DialogContent|DialogTrigger/);
-  assert.match(theme, /adminx-table-row:hover/);
   assert.match(theme, /::placeholder/);
   assert.match(theme, /option\s*\{/);
 });
@@ -329,4 +351,17 @@ test('admin commons exports claw-aligned shadcn primitives for future page parit
   assert.match(commons, /export const Dialog =/);
   assert.match(commons, /export const DialogContent/);
   assert.match(settings, /Input/);
+});
+
+test('admin auth and settings interaction surfaces reuse shared Button primitives instead of raw page-local buttons', () => {
+  const auth = read('packages/sdkwork-router-admin-auth/src/index.tsx');
+  const appearance = read('packages/sdkwork-router-admin-settings/src/AppearanceSettings.tsx');
+  const shared = read('packages/sdkwork-router-admin-settings/src/Shared.tsx');
+
+  assert.match(auth, /Button/);
+  assert.match(appearance, /Button/);
+  assert.match(shared, /Button/);
+  assert.doesNotMatch(auth, /<button/);
+  assert.doesNotMatch(appearance, /<button/);
+  assert.doesNotMatch(shared, /<button/);
 });

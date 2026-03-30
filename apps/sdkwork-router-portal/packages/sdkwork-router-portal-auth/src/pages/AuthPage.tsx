@@ -1,10 +1,15 @@
 import { ArrowRight, Chrome, Github, Lock, Mail, QrCode, Smartphone, User } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Input, Label, usePortalI18n } from 'sdkwork-router-portal-commons';
+import { Button, Label, LeadingIconInput, usePortalI18n } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 
 import type { PortalAuthMode, PortalAuthPageProps } from '../types';
+
+const DEV_PORTAL_CREDENTIALS = {
+  email: 'portal@sdkwork.local',
+  password: 'ChangeMe123!',
+};
 
 function resolveAuthMode(pathname: string): PortalAuthMode {
   if (pathname === '/register') {
@@ -74,11 +79,16 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
   const mode = resolveAuthMode(location.pathname);
   const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
   const copy = authCopy(mode);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(
+    import.meta.env.DEV && mode === 'login' ? DEV_PORTAL_CREDENTIALS.email : '',
+  );
+  const [password, setPassword] = useState(
+    import.meta.env.DEV && mode === 'login' ? DEV_PORTAL_CREDENTIALS.password : '',
+  );
   const [name, setName] = useState('');
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const showDevCredentials = import.meta.env.DEV && mode === 'login';
 
   useEffect(() => {
     const nextEmail = searchParams.get('email');
@@ -86,6 +96,15 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
       setEmail(nextEmail);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!showDevCredentials) {
+      return;
+    }
+
+    setEmail((current) => current.trim() || DEV_PORTAL_CREDENTIALS.email);
+    setPassword((current) => current || DEV_PORTAL_CREDENTIALS.password);
+  }, [showDevCredentials]);
 
   function withRedirect(pathname: string, extra: Record<string, string> = {}) {
     const params = new URLSearchParams();
@@ -174,39 +193,31 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
             <form className="space-y-5" onSubmit={handleSubmit}>
               {mode === 'register' ? (
                 <div>
-                <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">{t('Name')}</Label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <User className="h-5 w-5 text-zinc-400" />
-                    </div>
-                    <Input
-                      className="h-10 rounded-xl border-zinc-200 bg-white py-2.5 pl-10 pr-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="Workspace owner"
-                      required
-                      type="text"
-                      value={name}
-                    />
-                  </div>
+                  <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">{t('Name')}</Label>
+                  <LeadingIconInput
+                    icon={<User className="h-5 w-5" />}
+                    inputClassName="h-10 pr-3"
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Workspace owner"
+                    required
+                    type="text"
+                    value={name}
+                  />
                 </div>
               ) : null}
 
               <div>
                 <Label className="mb-1.5 block text-zinc-700 dark:text-zinc-300">{t('Email')}</Label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Mail className="h-5 w-5 text-zinc-400" />
-                  </div>
-                  <Input
-                    autoComplete="email"
-                    className="h-10 rounded-xl border-zinc-200 bg-white py-2.5 pl-10 pr-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="name@example.com"
-                    required
-                    type="email"
-                    value={email}
-                  />
-                </div>
+                <LeadingIconInput
+                  autoComplete="email"
+                  icon={<Mail className="h-5 w-5" />}
+                  inputClassName="h-10 pr-3"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="name@example.com"
+                  required
+                  type="email"
+                  value={email}
+                />
               </div>
 
               {mode !== 'forgot-password' ? (
@@ -214,29 +225,26 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                   <div className="mb-1.5 flex items-center justify-between">
                     <Label className="text-zinc-700 dark:text-zinc-300">{t('Password')}</Label>
                     {mode === 'login' ? (
-                      <button
-                        className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500"
+                      <Button
+                        className="h-auto rounded-none p-0 text-sm font-medium text-primary-600 shadow-none hover:bg-transparent hover:text-primary-500"
                         onClick={() => navigate(withRedirect('/forgot-password', { email }))}
                         type="button"
+                        variant="ghost"
                       >
                         {t('Forgot password?')}
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <Lock className="h-5 w-5 text-zinc-400" />
-                    </div>
-                    <Input
-                      autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                      className="h-10 rounded-xl border-zinc-200 bg-white py-2.5 pl-10 pr-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder={mode === 'register' ? 'Create a password' : 'Enter your password'}
-                      required
-                      type="password"
-                      value={password}
-                    />
-                  </div>
+                  <LeadingIconInput
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                    icon={<Lock className="h-5 w-5" />}
+                    inputClassName="h-10 pr-3"
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={mode === 'register' ? 'Create a password' : 'Enter your password'}
+                    required
+                    type="password"
+                    value={password}
+                  />
                 </div>
               ) : null}
 
@@ -245,6 +253,12 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </form>
+
+            {showDevCredentials ? (
+              <p className="mt-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                {t('Local dev credentials are prefilled: {email} / {password}.', DEV_PORTAL_CREDENTIALS)}
+              </p>
+            ) : null}
 
             {feedback ? (
               <p className="mt-4 text-sm font-medium text-rose-500">{feedback}</p>
@@ -264,14 +278,22 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3">
-                  <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800" type="button">
+                  <Button
+                    className="h-auto w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    type="button"
+                    variant="secondary"
+                  >
                     <Github className="h-5 w-5" />
                     GitHub
-                  </button>
-                  <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800" type="button">
+                  </Button>
+                  <Button
+                    className="h-auto w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    type="button"
+                    variant="secondary"
+                  >
                     <Chrome className="h-5 w-5" />
                     Google
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -280,46 +302,50 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
               {mode === 'login' ? (
                 <>
                   {t('No account?')}{' '}
-                  <button
-                    className="font-bold text-primary-600 transition-colors hover:text-primary-500"
+                  <Button
+                    className="h-auto rounded-none p-0 font-bold text-primary-600 shadow-none hover:bg-transparent hover:text-primary-500"
                     onClick={() => navigate(withRedirect(copy.alternatePath))}
                     type="button"
+                    variant="ghost"
                   >
                     {t(copy.alternateLabel)}
-                  </button>
+                  </Button>
                 </>
               ) : mode === 'register' ? (
                 <>
                   {t('Already have an account?')}{' '}
-                  <button
-                    className="font-bold text-primary-600 transition-colors hover:text-primary-500"
+                  <Button
+                    className="h-auto rounded-none p-0 font-bold text-primary-600 shadow-none hover:bg-transparent hover:text-primary-500"
                     onClick={() => navigate(withRedirect(copy.alternatePath))}
                     type="button"
+                    variant="ghost"
                   >
                     {t(copy.alternateLabel)}
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <button
-                  className="mx-auto flex items-center justify-center gap-1 font-bold text-primary-600 transition-colors hover:text-primary-500"
+                <Button
+                  className="mx-auto h-auto gap-1 rounded-none p-0 font-bold text-primary-600 shadow-none hover:bg-transparent hover:text-primary-500"
                   onClick={() => navigate(withRedirect('/login', { email }))}
                   type="button"
+                  variant="ghost"
                 >
                   <ArrowRight className="h-4 w-4 rotate-180" />
                   {t('Back to login')}
-                </button>
+                </Button>
               )}
             </div>
 
             {mode === 'forgot-password' ? (
               <div className="mt-4 text-center">
-                <button
-                  className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500"
+                <Button
+                  className="h-auto rounded-none p-0 text-sm font-medium text-primary-600 shadow-none hover:bg-transparent hover:text-primary-500"
                   onClick={() => navigate(withRedirect('/register'))}
                   type="button"
+                  variant="ghost"
                 >
                   {t('Create account')}
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>

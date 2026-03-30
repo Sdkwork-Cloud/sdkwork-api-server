@@ -3,15 +3,20 @@ import type { FormEvent } from 'react';
 
 import {
   AdminDialog,
+  Checkbox,
   ConfirmDialog,
   DataTable,
   Dialog,
   DialogContent,
   DialogFooter,
   FormField,
+  Input,
   InlineButton,
   PageToolbar,
   Pill,
+  Select,
+  Textarea,
+  ToolbarInline,
   ToolbarSearchField,
 } from 'sdkwork-router-admin-commons';
 import type {
@@ -548,12 +553,14 @@ export function GatewayAccessPage({
           </>
         )}
       >
-        <ToolbarSearchField
-          label="Search Api keys"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="label, project, hashed key..."
-        />
+        <ToolbarInline>
+          <ToolbarSearchField
+            label="Search Api keys"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="label, project, hashed key..."
+          />
+        </ToolbarInline>
       </PageToolbar>
 
       <DataTable
@@ -669,7 +676,7 @@ export function GatewayAccessPage({
             <form className="adminx-form-grid" onSubmit={(event) => void handleCreateSubmit(event)}>
               <FormField label="Tenant">
                 {snapshot.tenants.length ? (
-                  <select
+                  <Select
                     value={createDraftState.tenant_id}
                     onChange={(event) =>
                       setCreateDraftState((current) => ({
@@ -686,9 +693,9 @@ export function GatewayAccessPage({
                         {tenant.name} ({tenant.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={createDraftState.tenant_id}
                     onChange={(event) =>
                       setCreateDraftState((current) => ({ ...current, tenant_id: event.target.value }))
@@ -700,7 +707,7 @@ export function GatewayAccessPage({
 
               <FormField label="Project">
                 {availableCreateProjects.length ? (
-                  <select
+                  <Select
                     value={createDraftState.project_id}
                     onChange={(event) =>
                       setCreateDraftState((current) => ({ ...current, project_id: event.target.value }))
@@ -711,9 +718,9 @@ export function GatewayAccessPage({
                         {project.name} ({project.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     value={createDraftState.project_id}
                     onChange={(event) =>
                       setCreateDraftState((current) => ({ ...current, project_id: event.target.value }))
@@ -724,7 +731,7 @@ export function GatewayAccessPage({
               </FormField>
 
               <FormField label="Environment">
-                <select
+                <Select
                   value={createDraftState.environment}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({ ...current, environment: event.target.value }))
@@ -733,11 +740,11 @@ export function GatewayAccessPage({
                   <option value="live">Live</option>
                   <option value="staging">Staging</option>
                   <option value="test">Test</option>
-                </select>
+                </Select>
               </FormField>
 
               <FormField label="Label">
-                <input
+                <Input
                   value={createDraftState.label}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({ ...current, label: event.target.value }))
@@ -747,7 +754,7 @@ export function GatewayAccessPage({
               </FormField>
 
               <FormField label="Expires at">
-                <input
+                <Input
                   type="datetime-local"
                   value={createDraftState.expires_at}
                   onChange={(event) =>
@@ -757,7 +764,7 @@ export function GatewayAccessPage({
               </FormField>
 
               <FormField label="Notes">
-                <textarea
+                <Textarea
                   rows={3}
                   value={createDraftState.notes}
                   onChange={(event) =>
@@ -767,7 +774,7 @@ export function GatewayAccessPage({
               </FormField>
 
               <FormField label="Custom Api key" hint="Leave empty to let the gateway generate the plaintext.">
-                <input
+                <Input
                   value={createDraftState.plaintext_key}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({ ...current, plaintext_key: event.target.value }))
@@ -777,7 +784,7 @@ export function GatewayAccessPage({
               </FormField>
 
               <FormField label="Route mode">
-                <select
+                <Select
                   value={createDraftState.route_mode}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({
@@ -788,11 +795,11 @@ export function GatewayAccessPage({
                 >
                   <option value="sdkwork-remote">SDKWork gateway default</option>
                   <option value="custom">Custom provider</option>
-                </select>
+                </Select>
               </FormField>
 
               <FormField label="Pinned provider">
-                <select
+                <Select
                   value={createDraftState.route_provider_id}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({ ...current, route_provider_id: event.target.value }))
@@ -805,11 +812,11 @@ export function GatewayAccessPage({
                       {provider.display_name} ({provider.id})
                     </option>
                   ))}
-                </select>
+                </Select>
               </FormField>
 
               <FormField label="Model mapping">
-                <select
+                <Select
                   value={createDraftState.model_mapping_id}
                   onChange={(event) =>
                     setCreateDraftState((current) => ({ ...current, model_mapping_id: event.target.value }))
@@ -821,7 +828,7 @@ export function GatewayAccessPage({
                       {mapping.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </FormField>
 
               <DialogFooter>
@@ -844,16 +851,16 @@ export function GatewayAccessPage({
             {editingKey ? (
               <form className="adminx-form-grid" onSubmit={(event) => void handleEditSubmit(event)}>
                 <FormField label="Workspace">
-                  <input
+                  <Input
                     value={`${editingKey.tenant_id} / ${editingKey.project_id} / ${editingKey.environment}`}
                     disabled
                   />
                 </FormField>
                 <FormField label="Hashed key">
-                  <input value={editingKey.hashed_key} disabled />
+                  <Input value={editingKey.hashed_key} disabled />
                 </FormField>
                 <FormField label="Label">
-                  <input
+                  <Input
                     value={editDraft.label}
                     onChange={(event) =>
                       setEditDraft((current) => ({ ...current, label: event.target.value }))
@@ -862,7 +869,7 @@ export function GatewayAccessPage({
                   />
                 </FormField>
                 <FormField label="Expires at">
-                  <input
+                  <Input
                     type="datetime-local"
                     value={editDraft.expires_at}
                     onChange={(event) =>
@@ -871,7 +878,7 @@ export function GatewayAccessPage({
                   />
                 </FormField>
                 <FormField label="Notes">
-                  <textarea
+                  <Textarea
                     rows={3}
                     value={editDraft.notes}
                     onChange={(event) =>
@@ -903,10 +910,10 @@ export function GatewayAccessPage({
             {routeKey ? (
               <form className="adminx-form-grid" onSubmit={(event) => void handleRouteSubmit(event)}>
                 <FormField label="Api key">
-                  <input value={`${routeKey.label || routeKey.project_id} (${routeKey.environment})`} disabled />
+                  <Input value={`${routeKey.label || routeKey.project_id} (${routeKey.environment})`} disabled />
                 </FormField>
                 <FormField label="Source">
-                  <select
+                  <Select
                     value={routeDraft.source}
                     onChange={(event) =>
                       setRouteDraft((current) => ({
@@ -917,10 +924,10 @@ export function GatewayAccessPage({
                   >
                     <option value="system-generated">System generated</option>
                     <option value="custom">Custom</option>
-                  </select>
+                  </Select>
                 </FormField>
                 <FormField label="Route mode">
-                  <select
+                  <Select
                     value={routeDraft.route_mode}
                     onChange={(event) =>
                       setRouteDraft((current) => ({
@@ -931,10 +938,10 @@ export function GatewayAccessPage({
                   >
                     <option value="sdkwork-remote">SDKWork gateway default</option>
                     <option value="custom">Custom provider</option>
-                  </select>
+                  </Select>
                 </FormField>
                 <FormField label="Pinned provider">
-                  <select
+                  <Select
                     value={routeDraft.route_provider_id}
                     onChange={(event) =>
                       setRouteDraft((current) => ({ ...current, route_provider_id: event.target.value }))
@@ -947,10 +954,10 @@ export function GatewayAccessPage({
                         {provider.display_name} ({provider.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </FormField>
                 <FormField label="Model mapping">
-                  <select
+                  <Select
                     value={routeDraft.model_mapping_id}
                     onChange={(event) =>
                       setRouteDraft((current) => ({ ...current, model_mapping_id: event.target.value }))
@@ -962,7 +969,7 @@ export function GatewayAccessPage({
                         {mapping.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </FormField>
                 <DialogFooter>
                   <InlineButton onClick={() => setRouteKey(null)}>Cancel</InlineButton>
@@ -1052,8 +1059,7 @@ export function GatewayAccessPage({
                           <div className="adminx-form-grid">
                             {openClawInstances.map((instance) => (
                               <label key={instance.id} className="adminx-row">
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={selectedInstanceIds.includes(instance.id)}
                                   onChange={(event) =>
                                     setSelectedInstanceIds((current) =>

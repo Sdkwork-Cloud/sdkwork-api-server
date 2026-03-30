@@ -1,10 +1,11 @@
+import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { Slot } from '@radix-ui/react-slot';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx, type ClassValue } from 'clsx';
-import { Search as SearchIcon, X } from 'lucide-react';
+import { Check, Search as SearchIcon, X } from 'lucide-react';
 import {
   createContext,
   forwardRef,
@@ -116,6 +117,7 @@ const portalMessages: Record<Exclude<PortalLocale, 'en-US'>, Record<string, stri
     'Back to login': '返回登录',
     'Continue with': '继续使用',
     'QR login': '扫码登录',
+    'Local dev credentials are prefilled: {email} / {password}.': '本地开发环境已预填测试账号：{email} / {password}。',
     'Open app to scan': '打开应用扫码',
     'Create your workspace access and continue into the portal shell.': '创建你的工作区访问权限并继续进入门户壳层。',
     'Password reset links are not enabled for the current portal backend. Continue back to sign in with your workspace email.': '当前门户后端未启用密码重置链接，请返回并使用工作区邮箱登录。',
@@ -325,22 +327,20 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
-export function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  ...props
-}: ButtonProps) {
-  const Comp = asChild ? Slot : 'button';
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button';
 
-  return (
-    <Comp
-      className={cn(buttonVariants({ variant, size }), className)}
-      {...props}
-    />
-  );
-}
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size }), className)}
+        ref={ref}
+        {...props}
+      />
+    );
+  },
+);
+Button.displayName = 'Button';
 
 export function Badge({
   className,
@@ -424,25 +424,42 @@ export const DialogOverlay = forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+const dialogSizeClassNames = {
+  small: 'max-w-md',
+  medium: 'max-w-2xl',
+  large: 'max-w-4xl',
+} as const;
+
+export interface DialogContentProps
+  extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  size?: keyof typeof dialogSizeClassNames;
+  showCloseButton?: boolean;
+}
+
 export const DialogContent = forwardRef<
   ElementRef<typeof DialogPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, size = 'medium', showCloseButton = true, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        `fixed left-1/2 top-1/2 z-50 grid w-[min(720px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-3xl border ${portalBorder} bg-[var(--portal-overlay-surface)] p-6 ${portalShadowStrong}`,
+        `fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[28px] border ${portalBorder} bg-[var(--portal-overlay-surface)] p-6 ${portalShadowStrong} focus:outline-none`,
+        dialogSizeClassNames[size],
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className={`absolute right-4 top-4 rounded-md p-2 ${portalTextMuted} transition hover:bg-[var(--portal-hover-surface)] hover:text-[var(--portal-text-primary)]`}>
-        <X className="h-4 w-4" />
-        <span className="sr-only">{translatePortalText('Close')}</span>
-      </DialogPrimitive.Close>
+      {showCloseButton ? (
+        <DialogPrimitive.Close asChild>
+          <DialogIconCloseButton
+            className="absolute right-4 top-4"
+            label={translatePortalText('Close')}
+          />
+        </DialogPrimitive.Close>
+      ) : null}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
@@ -452,21 +469,45 @@ export function DialogHeader({
   className,
   ...props
 }: ComponentPropsWithoutRef<'div'>) {
-  return <div className={cn('flex flex-col gap-1.5', className)} {...props} />;
+  return <div className={cn('flex flex-col gap-1.5 text-center sm:text-left', className)} {...props} />;
 }
 
 export function DialogFooter({
   className,
   ...props
 }: ComponentPropsWithoutRef<'div'>) {
-  return <div className={cn('flex flex-wrap items-center justify-end gap-3', className)} {...props} />;
+  return <div className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)} {...props} />;
+}
+
+function DialogIconCloseButton({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  return (
+    <Button
+      aria-label={label}
+      className={cn(
+        `${portalTextMuted} hover:bg-[var(--portal-hover-surface)] hover:text-[var(--portal-text-primary)]`,
+        className,
+      )}
+      size="icon"
+      type="button"
+      variant="ghost"
+    >
+      <X className="h-4 w-4" />
+      <span className="sr-only">{label}</span>
+    </Button>
+  );
 }
 
 export const DialogTitle = forwardRef<
   ElementRef<typeof DialogPrimitive.Title>,
   ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title ref={ref} className={cn(`text-xl font-semibold ${portalText}`, className)} {...props} />
+  <DialogPrimitive.Title ref={ref} className={cn(`text-lg font-semibold tracking-tight ${portalText}`, className)} {...props} />
 ));
 DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
@@ -477,6 +518,59 @@ export const DialogDescription = forwardRef<
   <DialogPrimitive.Description ref={ref} className={cn(`text-sm ${portalTextSecondary}`, className)} {...props} />
 ));
 DialogDescription.displayName = DialogPrimitive.Description.displayName;
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}
+
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  className,
+}: ModalProps) {
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        size="small"
+        showCloseButton={false}
+        className={cn(`max-w-md border ${portalBorder} p-0`, className)}
+      >
+        <DialogHeader className={cn(`flex-row items-start justify-between gap-4 border-b ${portalBorder} px-6 py-5 text-left`)}>
+          <div className="grid gap-1.5">
+            <DialogTitle className="text-xl font-semibold tracking-tight">{title}</DialogTitle>
+            {description ? <DialogDescription>{description}</DialogDescription> : null}
+          </div>
+          <DialogClose asChild>
+            <DialogIconCloseButton label={translatePortalText('Close')} />
+          </DialogClose>
+        </DialogHeader>
+        <div className="overflow-y-auto p-6">{children}</div>
+        {footer ? (
+          <DialogFooter className={cn(`border-t ${portalBorder} px-6 py-5`)}>
+            {footer}
+          </DialogFooter>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Tabs = TabsPrimitive.Root;
 
@@ -522,7 +616,7 @@ export const Input = forwardRef<
 >(({ className, ...props }, ref) => (
   <input
     ref={ref}
-    className={cn(`flex h-11 w-full rounded-xl border ${portalBorder} bg-[var(--portal-surface-elevated)] px-3 py-2 text-sm ${portalText} outline-none transition placeholder:text-[var(--portal-text-muted)] focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20`, className)}
+    className={cn(`flex h-11 w-full rounded-xl border ${portalBorder} bg-[var(--portal-surface-elevated)] px-3 py-2 text-sm ${portalText} shadow-sm outline-none transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[var(--portal-text-muted)] focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-50`, className)}
     {...props}
   />
 ));
@@ -534,22 +628,53 @@ export const Select = forwardRef<
 >(({ className, ...props }, ref) => (
   <select
     ref={ref}
-    className={cn(`flex h-11 w-full rounded-xl border ${portalBorder} bg-[var(--portal-surface-elevated)] px-3 py-2 text-sm ${portalText} outline-none transition focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20`, className)}
+    className={cn(`flex h-11 w-full appearance-none rounded-xl border ${portalBorder} bg-[var(--portal-surface-elevated)] px-3 py-2 text-sm ${portalText} shadow-sm outline-none transition-colors focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-50`, className)}
     {...props}
   />
 ));
 Select.displayName = 'Select';
 
-export const Checkbox = forwardRef<
-  HTMLInputElement,
-  ComponentPropsWithoutRef<'input'>
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  ComponentPropsWithoutRef<'textarea'>
 >(({ className, ...props }, ref) => (
-  <input
+  <textarea
     ref={ref}
-    className={cn(`h-4 w-4 rounded border ${portalBorder} bg-[var(--portal-surface-background)] text-primary-500`, className)}
-    type="checkbox"
+    className={cn(`flex min-h-[96px] w-full rounded-xl border ${portalBorder} bg-[var(--portal-surface-elevated)] px-3 py-2 text-sm ${portalText} shadow-sm outline-none transition-colors placeholder:text-[var(--portal-text-muted)] focus:border-primary-500/35 focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-50`, className)}
     {...props}
   />
+));
+Textarea.displayName = 'Textarea';
+
+type PortalCheckboxEvent = {
+  target: { checked: boolean };
+  currentTarget: { checked: boolean };
+};
+
+export const Checkbox = forwardRef<
+  ElementRef<typeof CheckboxPrimitive.Root>,
+  Omit<ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>, 'onChange' | 'onCheckedChange'> & {
+    onChange?: (event: PortalCheckboxEvent) => void;
+    onCheckedChange?: (checked: boolean) => void;
+  }
+>(({ className, onChange, onCheckedChange, ...props }, ref) => (
+  <CheckboxPrimitive.Root
+    ref={ref}
+    className={cn(`peer flex h-4 w-4 shrink-0 items-center justify-center rounded border ${portalBorder} bg-[var(--portal-surface-background)] text-primary-500 shadow-sm ring-offset-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary-600 data-[state=checked]:bg-primary-600 data-[state=checked]:text-white dark:focus-visible:ring-offset-zinc-950 dark:data-[state=checked]:border-primary-500 dark:data-[state=checked]:bg-primary-500`, className)}
+    onCheckedChange={(checked) => {
+      const resolvedChecked = checked === true;
+      onCheckedChange?.(resolvedChecked);
+      onChange?.({
+        target: { checked: resolvedChecked },
+        currentTarget: { checked: resolvedChecked },
+      });
+    }}
+    {...props}
+  >
+    <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">
+      <Check className="h-4 w-4" />
+    </CheckboxPrimitive.Indicator>
+  </CheckboxPrimitive.Root>
 ));
 Checkbox.displayName = 'Checkbox';
 
@@ -569,13 +694,15 @@ export function FormField({
   label,
   children,
   hint,
+  className,
 }: {
   label: string;
   children: ReactNode;
   hint?: string;
+  className?: string;
 }) {
   return (
-    <label className="grid gap-2">
+    <label className={cn('grid gap-2', className)}>
       <Label>{label}</Label>
       {children}
       {hint ? <span className={`text-xs ${portalTextMuted}`}>{hint}</span> : null}
@@ -604,6 +731,80 @@ export function ToolbarField({
   );
 }
 
+export function ToolbarInline({
+  children,
+  className,
+  ...props
+}: ComponentPropsWithoutRef<'div'>) {
+  return (
+    <div
+      className={cn('flex min-w-0 flex-nowrap items-end gap-3 overflow-x-auto', className)}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function SearchInput({
+  className,
+  inputClassName,
+  iconClassName,
+  style,
+  type,
+  ...props
+}: Omit<ComponentPropsWithoutRef<'input'>, 'className'> & {
+  className?: string;
+  inputClassName?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <LeadingIconInput
+      className={className}
+      icon={<SearchIcon className="h-4 w-4" />}
+      iconClassName={iconClassName}
+      inputClassName={inputClassName}
+      style={style}
+      type={type}
+      {...props}
+    />
+  );
+}
+
+export function LeadingIconInput({
+  className,
+  inputClassName,
+  iconClassName,
+  icon,
+  style,
+  type,
+  ...props
+}: Omit<ComponentPropsWithoutRef<'input'>, 'className'> & {
+  className?: string;
+  inputClassName?: string;
+  iconClassName?: string;
+  icon: ReactNode;
+}) {
+  return (
+    <span className={cn('relative block w-full', className)}>
+      <span
+        className={cn(
+          'pointer-events-none absolute left-4 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-zinc-400 dark:text-zinc-500',
+          iconClassName,
+        )}
+      >
+        {icon}
+      </span>
+      <Input
+        className={inputClassName}
+        style={{ ...style, paddingLeft: '2.75rem' }}
+        type={type ?? 'text'}
+        {...props}
+      />
+    </span>
+  );
+}
+
 export function ToolbarSearchField({
   label,
   className,
@@ -620,13 +821,7 @@ export function ToolbarSearchField({
       className={cn('flex-1 basis-[24rem]', className)}
       controlClassName="min-w-0"
     >
-      <span className="relative block w-full">
-        <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
-        <Input
-          className={cn('pl-11', inputClassName)}
-          {...props}
-        />
-      </span>
+      <SearchInput inputClassName={inputClassName} {...props} />
     </ToolbarField>
   );
 }
@@ -720,16 +915,18 @@ export function InlineButton({
   tone,
   type,
   disabled,
+  className,
 }: {
   children: ReactNode;
   onClick?: () => void;
   tone?: 'primary' | 'secondary' | 'ghost';
   type?: 'button' | 'submit';
   disabled?: boolean;
+  className?: string;
 }) {
   const variant = tone === 'primary' ? 'default' : tone === 'ghost' ? 'ghost' : 'secondary';
   return (
-    <Button disabled={disabled} onClick={onClick} type={type ?? 'button'} variant={variant}>
+    <Button className={className} disabled={disabled} onClick={onClick} type={type ?? 'button'} variant={variant}>
       {children}
     </Button>
   );
@@ -784,18 +981,28 @@ export function DataTable<T>({
 }: {
   columns: Array<{ key: string; label: string; render: (row: T) => ReactNode }>;
   rows: T[];
-  empty: string;
+  empty: ReactNode;
   getKey: (row: T, index: number) => string;
 }) {
   return (
-    <div className={`overflow-hidden rounded-2xl border ${portalBorder} ${portalSurfaceElevated}`}>
+    <div
+      data-slot="table-container"
+      className="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white/92 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/70"
+    >
       <div className="overflow-x-auto">
-        <table className={`min-w-full divide-y ${portalBorder} text-sm`}>
-          <thead className="bg-[var(--portal-hover-surface)]">
-            <tr>
+        <table
+          data-slot="table"
+          className="min-w-full border-separate border-spacing-0 text-sm"
+        >
+          <thead
+            data-slot="table-header"
+            className="bg-zinc-50/90 dark:bg-zinc-900/80"
+          >
+            <tr data-slot="table-header-row">
               {columns.map((column) => (
                 <th
-                  className={`whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] ${portalTextMuted}`}
+                  data-slot="table-head"
+                  className="sticky top-0 z-10 whitespace-nowrap border-b border-zinc-200/80 bg-zinc-50/95 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/95 dark:text-zinc-400"
                   key={column.key}
                 >
                   {column.label}
@@ -803,18 +1010,30 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className={`divide-y ${portalBorder}`}>
+          <tbody data-slot="table-body" className="bg-transparent">
             {rows.length ? rows.map((row, index) => (
-              <tr className="transition hover:bg-[var(--portal-hover-surface)]" key={getKey(row, index)}>
+              <tr
+                className="transition-colors hover:bg-zinc-50/80 dark:hover:bg-zinc-900/70"
+                data-slot="table-row"
+                key={getKey(row, index)}
+              >
                 {columns.map((column) => (
-                  <td className={`px-4 py-3 align-top ${portalTextSecondary}`} key={column.key}>
+                  <td
+                    className="border-t border-zinc-200/70 px-4 py-4 align-top text-zinc-600 dark:border-zinc-800/80 dark:text-zinc-300"
+                    data-slot="table-cell"
+                    key={column.key}
+                  >
                     {column.render(row)}
                   </td>
                 ))}
               </tr>
             )) : (
-              <tr>
-                <td className={`px-4 py-8 text-center text-sm ${portalTextMuted}`} colSpan={columns.length}>
+              <tr data-slot="table-empty-row">
+                <td
+                  className="border-t border-zinc-200/70 px-4 py-9 text-center text-sm text-zinc-500 dark:border-zinc-800/80 dark:text-zinc-400"
+                  colSpan={columns.length}
+                  data-slot="table-empty"
+                >
                   {empty}
                 </td>
               </tr>

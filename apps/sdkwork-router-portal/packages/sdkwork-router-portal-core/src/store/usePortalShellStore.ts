@@ -7,10 +7,14 @@ import {
   PORTAL_DEFAULT_SIDEBAR_WIDTH,
   PORTAL_PREFERENCES_STORAGE_KEY,
 } from '../lib/portalPreferences';
+import { resolveAutoSidebarCollapsed } from '../lib/sidebarAutoCollapse';
+
+type SidebarCollapsePreference = 'auto' | 'user';
 
 interface PortalShellState {
   isSidebarCollapsed: boolean;
   sidebarWidth: number;
+  sidebarCollapsePreference: SidebarCollapsePreference;
   hiddenSidebarItems: PortalRouteKey[];
   themeMode: PortalThemeMode;
   themeColor: PortalThemeColor;
@@ -32,23 +36,56 @@ const PORTAL_THEME_COLOR_IDS: PortalThemeColor[] = [
   'rose',
 ];
 
-const defaultShellState = {
-  isSidebarCollapsed: false,
-  sidebarWidth: PORTAL_DEFAULT_SIDEBAR_WIDTH,
-  hiddenSidebarItems: [] as PortalRouteKey[],
-  themeMode: 'system' as PortalThemeMode,
-  themeColor: 'lobster' as PortalThemeColor,
-};
+function createDefaultShellState() {
+  return {
+    isSidebarCollapsed: resolveAutoSidebarCollapsed(),
+    sidebarWidth: PORTAL_DEFAULT_SIDEBAR_WIDTH,
+    sidebarCollapsePreference: 'auto' as SidebarCollapsePreference,
+    hiddenSidebarItems: [] as PortalRouteKey[],
+    themeMode: 'system' as PortalThemeMode,
+    themeColor: 'lobster' as PortalThemeColor,
+  };
+}
+
+type PersistedPortalShellState = Pick<
+  PortalShellState,
+  | 'isSidebarCollapsed'
+  | 'sidebarWidth'
+  | 'sidebarCollapsePreference'
+  | 'hiddenSidebarItems'
+  | 'themeMode'
+  | 'themeColor'
+>;
+
+function resolveSidebarCollapsePreference(
+  nextState: Partial<PersistedPortalShellState>,
+  currentState: PortalShellState,
+): SidebarCollapsePreference {
+  if (
+    nextState.sidebarCollapsePreference === 'auto'
+    || nextState.sidebarCollapsePreference === 'user'
+  ) {
+    return nextState.sidebarCollapsePreference;
+  }
+
+  if (typeof nextState.isSidebarCollapsed === 'boolean') {
+    return 'user';
+  }
+
+  return currentState.sidebarCollapsePreference;
+}
 
 export const usePortalShellStore = create<PortalShellState>()(
   persist(
     (set) => ({
-      ...defaultShellState,
+      ...createDefaultShellState(),
       toggleSidebar: () =>
         set((state) => ({
           isSidebarCollapsed: !state.isSidebarCollapsed,
+          sidebarCollapsePreference: 'user',
         })),
-      setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
+      setSidebarCollapsed: (isSidebarCollapsed) =>
+        set({ isSidebarCollapsed, sidebarCollapsePreference: 'user' }),
       setSidebarWidth: (sidebarWidth) =>
         set({
           sidebarWidth: clampSidebarWidth(sidebarWidth),
@@ -61,28 +98,36 @@ export const usePortalShellStore = create<PortalShellState>()(
         })),
       setThemeMode: (themeMode) => set({ themeMode }),
       setThemeColor: (themeColor) => set({ themeColor }),
-      resetShellPreferences: () => set(defaultShellState),
+      resetShellPreferences: () => set(createDefaultShellState()),
     }),
     {
       name: PORTAL_PREFERENCES_STORAGE_KEY,
-      partialize: (state) => ({
+      partialize: (state): PersistedPortalShellState => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
         sidebarWidth: clampSidebarWidth(state.sidebarWidth),
+        sidebarCollapsePreference: state.sidebarCollapsePreference,
         hiddenSidebarItems: state.hiddenSidebarItems,
         themeMode: state.themeMode,
         themeColor: state.themeColor,
       }),
       merge: (persistedState, currentState) => {
-        const nextState = (persistedState as Partial<PortalShellState>) || {};
+        const nextState = (persistedState as Partial<PersistedPortalShellState>) || {};
         const nextThemeColor = PORTAL_THEME_COLOR_IDS.includes(
           nextState.themeColor ?? currentState.themeColor,
         )
           ? nextState.themeColor ?? currentState.themeColor
           : currentState.themeColor;
+        const sidebarCollapsePreference = resolveSidebarCollapsePreference(nextState, currentState);
+        const isSidebarCollapsed =
+          sidebarCollapsePreference === 'auto'
+            ? resolveAutoSidebarCollapsed()
+            : nextState.isSidebarCollapsed ?? currentState.isSidebarCollapsed;
 
         return {
           ...currentState,
           ...nextState,
+          isSidebarCollapsed,
+          sidebarCollapsePreference,
           sidebarWidth: clampSidebarWidth(nextState.sidebarWidth ?? currentState.sidebarWidth),
           themeColor: nextThemeColor,
         };

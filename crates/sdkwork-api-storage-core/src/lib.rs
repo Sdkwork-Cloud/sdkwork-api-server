@@ -4,9 +4,13 @@ use sdkwork_api_domain_billing::{LedgerEntry, QuotaPolicy};
 use sdkwork_api_domain_catalog::{
     Channel, ChannelModelRecord, ModelCatalogEntry, ModelPriceRecord, ProxyProvider,
 };
+use sdkwork_api_domain_commerce::{CommerceOrderRecord, ProjectMembershipRecord};
 use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_identity::{AdminUserRecord, GatewayApiKeyRecord, PortalUserRecord};
+use sdkwork_api_domain_rate_limit::{
+    RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,
+};
 use sdkwork_api_domain_routing::{
     ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingDecisionLog, RoutingPolicy,
 };
@@ -239,6 +243,22 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_provider(&self, provider: &ProxyProvider) -> Result<ProxyProvider>;
     async fn list_providers(&self) -> Result<Vec<ProxyProvider>>;
+    async fn list_providers_for_model(&self, model: &str) -> Result<Vec<ProxyProvider>> {
+        let model_provider_ids = self
+            .list_models_for_external_name(model)
+            .await?
+            .into_iter()
+            .map(|entry| entry.provider_id)
+            .collect::<std::collections::HashSet<_>>();
+        Ok(self
+            .list_providers()
+            .await?
+            .into_iter()
+            .filter(|provider| {
+                model_provider_ids.is_empty() || model_provider_ids.contains(&provider.id)
+            })
+            .collect())
+    }
     async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>>;
     async fn delete_provider(&self, provider_id: &str) -> Result<bool>;
 
@@ -252,6 +272,28 @@ pub trait AdminStore: Send + Sync {
         envelope: &SecretEnvelope,
     ) -> Result<UpstreamCredential>;
     async fn list_credentials(&self) -> Result<Vec<UpstreamCredential>>;
+    async fn list_credentials_for_tenant(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        Ok(self
+            .list_credentials()
+            .await?
+            .into_iter()
+            .filter(|credential| credential.tenant_id == tenant_id)
+            .collect())
+    }
+    async fn list_credentials_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        Ok(self
+            .list_credentials()
+            .await?
+            .into_iter()
+            .filter(|credential| credential.provider_id == provider_id)
+            .collect())
+    }
     async fn find_credential(
         &self,
         tenant_id: &str,
@@ -278,6 +320,20 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry>;
     async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>>;
+    async fn list_models_for_external_name(
+        &self,
+        external_name: &str,
+    ) -> Result<Vec<ModelCatalogEntry>> {
+        Ok(self
+            .list_models()
+            .await?
+            .into_iter()
+            .filter(|model| model.external_name == external_name)
+            .collect())
+    }
+    async fn find_any_model(&self) -> Result<Option<ModelCatalogEntry>> {
+        Ok(self.list_models().await?.into_iter().next())
+    }
     async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>>;
     async fn delete_model(&self, external_name: &str) -> Result<bool>;
     async fn delete_model_variant(&self, external_name: &str, provider_id: &str) -> Result<bool>;
@@ -309,6 +365,27 @@ pub trait AdminStore: Send + Sync {
         log: &RoutingDecisionLog,
     ) -> Result<RoutingDecisionLog>;
     async fn list_routing_decision_logs(&self) -> Result<Vec<RoutingDecisionLog>>;
+    async fn list_routing_decision_logs_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RoutingDecisionLog>> {
+        Ok(self
+            .list_routing_decision_logs()
+            .await?
+            .into_iter()
+            .filter(|log| log.project_id.as_deref() == Some(project_id))
+            .collect())
+    }
+    async fn find_latest_routing_decision_log_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<RoutingDecisionLog>> {
+        Ok(self
+            .list_routing_decision_logs_for_project(project_id)
+            .await?
+            .into_iter()
+            .next())
+    }
     async fn insert_provider_health_snapshot(
         &self,
         snapshot: &ProviderHealthSnapshot,
@@ -317,11 +394,79 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_usage_record(&self, record: &UsageRecord) -> Result<UsageRecord>;
     async fn list_usage_records(&self) -> Result<Vec<UsageRecord>>;
+    async fn list_usage_records_for_project(&self, project_id: &str) -> Result<Vec<UsageRecord>> {
+        Ok(self
+            .list_usage_records()
+            .await?
+            .into_iter()
+            .filter(|record| record.project_id == project_id)
+            .collect())
+    }
+    async fn find_latest_usage_record_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<UsageRecord>> {
+        Ok(self
+            .list_usage_records_for_project(project_id)
+            .await?
+            .into_iter()
+            .next())
+    }
 
     async fn insert_ledger_entry(&self, entry: &LedgerEntry) -> Result<LedgerEntry>;
     async fn list_ledger_entries(&self) -> Result<Vec<LedgerEntry>>;
+    async fn list_ledger_entries_for_project(&self, project_id: &str) -> Result<Vec<LedgerEntry>> {
+        Ok(self
+            .list_ledger_entries()
+            .await?
+            .into_iter()
+            .filter(|entry| entry.project_id == project_id)
+            .collect())
+    }
     async fn insert_quota_policy(&self, policy: &QuotaPolicy) -> Result<QuotaPolicy>;
     async fn list_quota_policies(&self) -> Result<Vec<QuotaPolicy>>;
+    async fn list_quota_policies_for_project(&self, project_id: &str) -> Result<Vec<QuotaPolicy>> {
+        Ok(self
+            .list_quota_policies()
+            .await?
+            .into_iter()
+            .filter(|policy| policy.project_id == project_id)
+            .collect())
+    }
+
+    async fn insert_rate_limit_policy(&self, policy: &RateLimitPolicy) -> Result<RateLimitPolicy>;
+    async fn list_rate_limit_policies(&self) -> Result<Vec<RateLimitPolicy>>;
+    async fn list_rate_limit_policies_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RateLimitPolicy>> {
+        Ok(self
+            .list_rate_limit_policies()
+            .await?
+            .into_iter()
+            .filter(|policy| policy.project_id == project_id)
+            .collect())
+    }
+    async fn list_rate_limit_window_snapshots(&self) -> Result<Vec<RateLimitWindowSnapshot>>;
+    async fn list_rate_limit_window_snapshots_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<RateLimitWindowSnapshot>> {
+        Ok(self
+            .list_rate_limit_window_snapshots()
+            .await?
+            .into_iter()
+            .filter(|snapshot| snapshot.project_id == project_id)
+            .collect())
+    }
+    async fn check_and_consume_rate_limit(
+        &self,
+        policy_id: &str,
+        requested_requests: u64,
+        limit_requests: u64,
+        window_seconds: u64,
+        now_ms: u64,
+    ) -> Result<RateLimitCheckResult>;
 
     async fn insert_tenant(&self, tenant: &Tenant) -> Result<Tenant>;
     async fn list_tenants(&self) -> Result<Vec<Tenant>>;
@@ -335,8 +480,41 @@ pub trait AdminStore: Send + Sync {
 
     async fn insert_coupon(&self, coupon: &CouponCampaign) -> Result<CouponCampaign>;
     async fn list_coupons(&self) -> Result<Vec<CouponCampaign>>;
+    async fn list_active_coupons(&self) -> Result<Vec<CouponCampaign>> {
+        Ok(self
+            .list_coupons()
+            .await?
+            .into_iter()
+            .filter(|coupon| coupon.active && coupon.remaining > 0)
+            .collect())
+    }
     async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>>;
     async fn delete_coupon(&self, coupon_id: &str) -> Result<bool>;
+
+    async fn insert_commerce_order(
+        &self,
+        order: &CommerceOrderRecord,
+    ) -> Result<CommerceOrderRecord>;
+    async fn list_commerce_orders(&self) -> Result<Vec<CommerceOrderRecord>>;
+    async fn list_commerce_orders_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<CommerceOrderRecord>> {
+        Ok(self
+            .list_commerce_orders()
+            .await?
+            .into_iter()
+            .filter(|order| order.project_id == project_id)
+            .collect())
+    }
+    async fn upsert_project_membership(
+        &self,
+        membership: &ProjectMembershipRecord,
+    ) -> Result<ProjectMembershipRecord>;
+    async fn find_project_membership(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<ProjectMembershipRecord>>;
 
     async fn insert_portal_user(&self, user: &PortalUserRecord) -> Result<PortalUserRecord>;
     async fn list_portal_users(&self) -> Result<Vec<PortalUserRecord>>;

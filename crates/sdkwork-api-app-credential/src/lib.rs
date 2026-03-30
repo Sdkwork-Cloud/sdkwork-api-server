@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_secret_core::{
     decrypt, encrypt, master_key_id, CredentialSecretRef, SecretBackendKind, SecretEnvelope,
@@ -392,13 +393,47 @@ pub async fn list_credentials(store: &dyn AdminStore) -> Result<Vec<UpstreamCred
     store.list_credentials().await
 }
 
-pub async fn delete_credential_with_manager(
-    store: &dyn AdminStore,
+#[async_trait]
+pub trait CredentialInventoryStore: Send + Sync {
+    async fn list_credentials_for_tenant(&self, tenant_id: &str)
+        -> Result<Vec<UpstreamCredential>>;
+
+    async fn list_credentials_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<UpstreamCredential>>;
+}
+
+#[async_trait]
+impl<T> CredentialInventoryStore for T
+where
+    T: AdminStore + ?Sized,
+{
+    async fn list_credentials_for_tenant(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        AdminStore::list_credentials_for_tenant(self, tenant_id).await
+    }
+
+    async fn list_credentials_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<UpstreamCredential>> {
+        AdminStore::list_credentials_for_provider(self, provider_id).await
+    }
+}
+
+pub async fn delete_credential_with_manager<T>(
+    store: &T,
     manager: &CredentialSecretManager,
     tenant_id: &str,
     provider_id: &str,
     key_reference: &str,
-) -> Result<bool> {
+) -> Result<bool>
+where
+    T: AdminStore + ?Sized,
+{
     let Some(credential) = store
         .find_credential(tenant_id, provider_id, key_reference)
         .await?
@@ -406,56 +441,75 @@ pub async fn delete_credential_with_manager(
         return Ok(false);
     };
 
-    manager.remove_secret(&credential)?;
-    store
-        .delete_credential(tenant_id, provider_id, key_reference)
+    delete_credential_record_with_manager(store, manager, &credential)
         .await
+        .map(|_| true)
 }
 
-pub async fn delete_provider_credentials_with_manager(
-    store: &dyn AdminStore,
+pub async fn delete_provider_credentials_with_manager<T>(
+    store: &T,
     manager: &CredentialSecretManager,
     provider_id: &str,
-) -> Result<()> {
-    let credentials = store.list_credentials().await?;
-    for credential in credentials
-        .into_iter()
-        .filter(|credential| credential.provider_id == provider_id)
-    {
-        delete_credential_with_manager(
-            store,
-            manager,
-            &credential.tenant_id,
-            &credential.provider_id,
-            &credential.key_reference,
-        )
-        .await?;
+) -> Result<()>
+where
+    T: AdminStore + CredentialInventoryStore + ?Sized,
+{
+    for credential in list_provider_credentials(store, provider_id).await? {
+        delete_credential_record_with_manager(store, manager, &credential).await?;
     }
 
     Ok(())
 }
 
-pub async fn delete_tenant_credentials_with_manager(
-    store: &dyn AdminStore,
+pub async fn delete_tenant_credentials_with_manager<T>(
+    store: &T,
     manager: &CredentialSecretManager,
     tenant_id: &str,
-) -> Result<()> {
-    let credentials = store.list_credentials().await?;
-    for credential in credentials
-        .into_iter()
-        .filter(|credential| credential.tenant_id == tenant_id)
-    {
-        delete_credential_with_manager(
-            store,
-            manager,
+) -> Result<()>
+where
+    T: AdminStore + CredentialInventoryStore + ?Sized,
+{
+    for credential in list_tenant_credentials(store, tenant_id).await? {
+        delete_credential_record_with_manager(store, manager, &credential).await?;
+    }
+
+    Ok(())
+}
+
+async fn delete_credential_record_with_manager<T>(
+    store: &T,
+    manager: &CredentialSecretManager,
+    credential: &UpstreamCredential,
+) -> Result<()>
+where
+    T: AdminStore + ?Sized,
+{
+    manager.remove_secret(credential)?;
+    store
+        .delete_credential(
             &credential.tenant_id,
             &credential.provider_id,
             &credential.key_reference,
         )
         .await?;
-    }
-
     Ok(())
+}
+
+async fn list_tenant_credentials<T>(store: &T, tenant_id: &str) -> Result<Vec<UpstreamCredential>>
+where
+    T: CredentialInventoryStore + ?Sized,
+{
+    store.list_credentials_for_tenant(tenant_id).await
+}
+
+async fn list_provider_credentials<T>(
+    store: &T,
+    provider_id: &str,
+) -> Result<Vec<UpstreamCredential>>
+where
+    T: CredentialInventoryStore + ?Sized,
+{
+    store.list_credentials_for_provider(provider_id).await
 }
 
 pub async fn resolve_credential_secret(
@@ -509,4 +563,92 @@ pub async fn resolve_provider_secret_with_manager(
 
     let secret = manager.resolve_secret(store, &credential).await?;
     Ok(Some(secret))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::Mutex;
+
+    #[tokio::test]
+    async fn list_tenant_credentials_reads_only_tenant_scope() {
+        let store = RecordingCredentialInventoryStore::new(vec![
+            UpstreamCredential::new("tenant-1", "provider-a", "key-a"),
+            UpstreamCredential::new("tenant-1", "provider-b", "key-b"),
+            UpstreamCredential::new("tenant-2", "provider-a", "key-c"),
+        ]);
+
+        let credentials = list_tenant_credentials(&store, "tenant-1").await.unwrap();
+
+        assert_eq!(credentials.len(), 2);
+        assert_eq!(
+            store.last_tenant_id.lock().unwrap().as_deref(),
+            Some("tenant-1")
+        );
+    }
+
+    #[tokio::test]
+    async fn list_provider_credentials_reads_only_provider_scope() {
+        let store = RecordingCredentialInventoryStore::new(vec![
+            UpstreamCredential::new("tenant-1", "provider-a", "key-a"),
+            UpstreamCredential::new("tenant-1", "provider-b", "key-b"),
+            UpstreamCredential::new("tenant-2", "provider-a", "key-c"),
+        ]);
+
+        let credentials = list_provider_credentials(&store, "provider-a")
+            .await
+            .unwrap();
+
+        assert_eq!(credentials.len(), 2);
+        assert_eq!(
+            store.last_provider_id.lock().unwrap().as_deref(),
+            Some("provider-a")
+        );
+    }
+
+    struct RecordingCredentialInventoryStore {
+        credentials: Vec<UpstreamCredential>,
+        last_tenant_id: Mutex<Option<String>>,
+        last_provider_id: Mutex<Option<String>>,
+    }
+
+    impl RecordingCredentialInventoryStore {
+        fn new(credentials: Vec<UpstreamCredential>) -> Self {
+            Self {
+                credentials,
+                last_tenant_id: Mutex::new(None),
+                last_provider_id: Mutex::new(None),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl CredentialInventoryStore for RecordingCredentialInventoryStore {
+        async fn list_credentials_for_tenant(
+            &self,
+            tenant_id: &str,
+        ) -> Result<Vec<UpstreamCredential>> {
+            *self.last_tenant_id.lock().unwrap() = Some(tenant_id.to_owned());
+            Ok(self
+                .credentials
+                .iter()
+                .filter(|credential| credential.tenant_id == tenant_id)
+                .cloned()
+                .collect())
+        }
+
+        async fn list_credentials_for_provider(
+            &self,
+            provider_id: &str,
+        ) -> Result<Vec<UpstreamCredential>> {
+            *self.last_provider_id.lock().unwrap() = Some(provider_id.to_owned());
+            Ok(self
+                .credentials
+                .iter()
+                .filter(|credential| credential.provider_id == provider_id)
+                .cloned()
+                .collect())
+        }
+    }
 }

@@ -14,12 +14,14 @@ export function SidebarProfileDock({
   isSidebarCollapsed,
   onLogout,
   onOpenConfigCenter,
+  sidebarWidth,
   userInitials,
   workspace,
 }: {
   isSidebarCollapsed: boolean;
   onLogout?: () => void;
   onOpenConfigCenter: () => void;
+  sidebarWidth: number;
   userInitials: string;
   workspace: PortalWorkspaceSummary | null;
 }) {
@@ -119,7 +121,7 @@ export function SidebarProfileDock({
       window.removeEventListener('resize', updateUserMenuPosition);
       window.removeEventListener('scroll', updateUserMenuPosition, true);
     };
-  }, [isSidebarCollapsed, open]);
+  }, [isSidebarCollapsed, open, sidebarWidth]);
 
   const footerActionClass = `group relative flex items-center rounded-xl border border-white/8 bg-white/[0.04] text-zinc-300 transition-all duration-200 hover:bg-white/[0.07] hover:text-white ${
     isSidebarCollapsed ? 'mx-auto h-10 w-10 justify-center px-0' : 'w-full gap-3 px-3 py-2.5'
