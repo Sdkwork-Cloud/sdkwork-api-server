@@ -13,6 +13,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  usePortalI18n,
 } from 'sdkwork-router-portal-commons';
 import type { CreatedGatewayApiKey, GatewayApiKeyRecord } from 'sdkwork-router-portal-types';
 
@@ -75,6 +76,7 @@ export function PortalApiKeyDialogs({
   usageKey: GatewayApiKeyRecord | null;
   usagePreview: PortalApiKeyUsagePreview | null;
 }) {
+  const { locale, t } = usePortalI18n();
   const isLatestUsageKey = createdKey && usageKey ? createdKey.hashed === usageKey.hashed_key : false;
 
   return (
@@ -82,11 +84,11 @@ export function PortalApiKeyDialogs({
       <Dialog onOpenChange={(open) => !open && onCloseCreate()} open={createOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Create API key</DialogTitle>
+            <DialogTitle>{t('Create API key')}</DialogTitle>
             <DialogDescription>
-              Recommended key setup starts with Key label ownership, any needed
-              Custom environment override, and the Lifecycle policy that matches
-              the rollout plan.
+              {t(
+                'Recommended key setup starts with Key label ownership, any needed Custom environment override, and the Lifecycle policy that matches the rollout plan.',
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -102,8 +104,10 @@ export function PortalApiKeyDialogs({
       <Dialog onOpenChange={(open) => !open && onCloseUsage()} open={Boolean(usageKey)}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{usagePreview?.title ?? 'Usage method'}</DialogTitle>
-            <DialogDescription>{usagePreview?.detail}</DialogDescription>
+            <DialogTitle>{usagePreview?.title ? t(usagePreview.title) : t('Usage method')}</DialogTitle>
+            <DialogDescription>
+              {usagePreview?.detail ? t(usagePreview.detail) : undefined}
+            </DialogDescription>
           </DialogHeader>
 
           {usageKey && usagePreview ? (
@@ -115,8 +119,10 @@ export function PortalApiKeyDialogs({
                       {usageKey.label}
                     </div>
                     <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                      Use this key for the {usageKey.environment} environment boundary and keep
-                      rollout verification inside the same workspace posture.
+                      {t(
+                        'Use this key for the {environment} environment boundary and keep rollout verification inside the same workspace posture.',
+                        { environment: usageKey.environment },
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -130,11 +136,11 @@ export function PortalApiKeyDialogs({
                           : 'inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300'
                       }
                     >
-                      {usageKey.active ? 'Active' : 'Inactive'}
+                      {usageKey.active ? t('Active') : t('Inactive')}
                     </span>
                     {usagePlaintext || isLatestUsageKey ? (
                       <InlineButton onClick={onCopyPlaintext} tone="secondary">
-                        Copy plaintext
+                        {t('Copy plaintext')}
                       </InlineButton>
                     ) : null}
                   </div>
@@ -145,7 +151,7 @@ export function PortalApiKeyDialogs({
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
                     <Link2 className="h-4 w-4 text-primary-500" />
-                    Portal endpoint
+                    {t('Portal endpoint')}
                   </div>
                   <div className="mt-3 break-all text-sm text-zinc-600 dark:text-zinc-300">
                     {gatewayBaseUrl}/v1/models
@@ -155,48 +161,52 @@ export function PortalApiKeyDialogs({
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-50">
                     <KeyRound className="h-4 w-4 text-primary-500" />
-                    Authorization header
+                    {t('Authorization header')}
                   </div>
                   <div className="mt-3 break-all text-sm text-zinc-600 dark:text-zinc-300">
                     {usagePreview.authorizationHeader ??
-                      'Plaintext unavailable. Rotate this key to obtain a new one-time secret.'}
+                      t('Plaintext unavailable. Rotate this key to obtain a new one-time secret.')}
                   </div>
                 </article>
 
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    Expires at
+                    {t('Expires at')}
                   </div>
                   <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
                     {usageKey.expires_at_ms
-                      ? `This credential expires on ${new Intl.DateTimeFormat('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        }).format(new Date(usageKey.expires_at_ms))}.`
-                      : 'This credential has no expiry. Keep revocation ownership explicit.'}
+                      ? t('This credential expires on {date}.', {
+                          date: new Intl.DateTimeFormat(locale, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          }).format(new Date(usageKey.expires_at_ms)),
+                        })
+                      : t('This credential has no expiry. Keep revocation ownership explicit.')}
                   </div>
                 </article>
               </div>
 
               <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                 <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  How to use this key
+                  {t('How to use this key')}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                  Use this key for the {usageKey.environment} environment boundary and keep rollout
-                  verification inside the same workspace posture. If the plaintext is no longer
-                  visible, create a replacement instead of depending on the UI as secret storage.
+                  {t(
+                    'Use this key for the {environment} environment boundary and keep rollout verification inside the same workspace posture. If the plaintext is no longer visible, create a replacement instead of depending on the UI as secret storage.',
+                    { environment: usageKey.environment },
+                  )}
                 </p>
               </article>
 
               <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                 <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  Quick setup
+                  {t('Quick setup')}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                  Apply setup directly on this device for Codex, Claude Code, OpenCode, Gemini,
-                  or OpenClaw, or copy the generated snippets into your preferred environment.
+                  {t(
+                    'Apply setup directly on this device for Codex, Claude Code, OpenCode, Gemini, or OpenClaw, or copy the generated snippets into your preferred environment.',
+                  )}
                 </p>
 
                 <Tabs className="mt-4" value={selectedClientId} onValueChange={(value) => onSelectClient(value as ApiKeySetupClientId)}>
@@ -216,18 +226,18 @@ export function PortalApiKeyDialogs({
                             {plan.label}
                           </div>
                           <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                            {plan.description}
+                            {t(plan.description)}
                           </p>
                         </div>
 
                         {plan.requiresInstances ? (
                           <div className="rounded-[20px] border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
                             <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                              OpenClaw instances
+                              {t('OpenClaw instances')}
                             </div>
                             {loadingInstances ? (
                               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-                                Loading local instances...
+                                {t('Loading local instances...')}
                               </p>
                             ) : openClawInstances.length ? (
                               <div className="mt-3 grid gap-2">
@@ -252,7 +262,7 @@ export function PortalApiKeyDialogs({
                               </div>
                             ) : (
                               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-                                No OpenClaw instances were detected on this machine.
+                                {t('No OpenClaw instances were detected on this machine.')}
                               </p>
                             )}
                           </div>
@@ -264,7 +274,7 @@ export function PortalApiKeyDialogs({
                             className="rounded-[20px] border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60"
                           >
                             <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                              {snippet.title}
+                              {t(snippet.title)}
                             </div>
                             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                               {snippet.target}
@@ -282,7 +292,7 @@ export function PortalApiKeyDialogs({
                 <DialogFooter className="mt-4">
                   {usagePlaintext || isLatestUsageKey ? (
                     <InlineButton onClick={onCopyPlaintext} tone="secondary">
-                      Copy plaintext
+                      {t('Copy plaintext')}
                     </InlineButton>
                   ) : null}
                   <InlineButton
@@ -294,7 +304,7 @@ export function PortalApiKeyDialogs({
                     }
                     onClick={onApplySetup}
                   >
-                    {applyingClientId === selectedClientId ? 'Applying...' : 'Apply setup'}
+                    {applyingClientId === selectedClientId ? t('Applying...') : t('Apply setup')}
                   </InlineButton>
                 </DialogFooter>
               </article>
@@ -302,7 +312,7 @@ export function PortalApiKeyDialogs({
               {usageKey.notes ? (
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    Notes
+                    {t('Notes')}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                     {usageKey.notes}
@@ -313,7 +323,7 @@ export function PortalApiKeyDialogs({
               {usageStatus ? (
                 <article className="rounded-[24px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    Status
+                    {t('Status')}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                     {usageStatus}
@@ -323,7 +333,7 @@ export function PortalApiKeyDialogs({
 
               {usagePreview.curlExample ? (
                 <article className="rounded-[24px] border border-zinc-200 bg-zinc-950 p-5 dark:border-zinc-800">
-                  <div className="text-sm font-semibold text-zinc-100">Quickstart snippet</div>
+                  <div className="text-sm font-semibold text-zinc-100">{t('Quickstart snippet')}</div>
                   <pre className="mt-4 overflow-x-auto text-sm leading-6 text-zinc-300">
                     <code>{usagePreview.curlExample}</code>
                   </pre>

@@ -12,6 +12,8 @@ import {
   ToolbarField,
   ToolbarInline,
   ToolbarSearchField,
+  translatePortalText,
+  usePortalI18n,
 } from 'sdkwork-router-portal-commons';
 
 import {
@@ -81,14 +83,14 @@ function includesQuery(query: string, values: Array<string | number | null | und
 
 function serviceHealthLabel(status: GatewayCommandCenterSnapshot['serviceHealthChecks'][number]['status']) {
   if (status === 'healthy') {
-    return 'Healthy';
+    return translatePortalText('Healthy');
   }
 
   if (status === 'degraded') {
-    return 'Degraded';
+    return translatePortalText('Degraded');
   }
 
-  return 'Unreachable';
+  return translatePortalText('Unreachable');
 }
 
 function serviceHealthTone(status: GatewayCommandCenterSnapshot['serviceHealthChecks'][number]['status']) {
@@ -114,7 +116,7 @@ function rateLimitScopeLabel(input: {
     input.model_name ? `model:${input.model_name}` : null,
   ].filter(Boolean);
 
-  return parts.length ? parts.join(' / ') : 'project-wide';
+  return parts.length ? parts.join(' / ') : translatePortalText('project-wide');
 }
 
 function verificationFocus(routeFamily: string): string {
@@ -143,7 +145,7 @@ function verificationTone(focus: string) {
 
 function formatLatency(latencyMs?: number | null): string {
   if (latencyMs === null || latencyMs === undefined) {
-    return 'No latency sample';
+    return translatePortalText('No latency sample');
   }
 
   return `${latencyMs} ms`;
@@ -185,7 +187,9 @@ function workbenchConfig(
         scopeLabel: 'Scope',
         meterLabel: 'Limit',
         detailLabel: 'Operator notes',
-        detail: `Project rate-limit policy posture was last checked ${formatDateTime(snapshot.rateLimitSnapshot.generated_at_ms)}.`,
+        detail: translatePortalText('Project rate-limit policy posture was last checked {checkedAt}.', {
+          checkedAt: formatDateTime(snapshot.rateLimitSnapshot.generated_at_ms),
+        }),
         emptyTitle: 'No rate-limit policies in this slice',
         emptyDetail:
           'The workspace does not currently expose a matching project-scoped rate-limit policy.',
@@ -203,7 +207,9 @@ function workbenchConfig(
         scopeLabel: 'Scope',
         meterLabel: 'Usage',
         detailLabel: 'Window detail',
-        detail: `Live rate-limit windows were last checked ${formatDateTime(snapshot.rateLimitSnapshot.generated_at_ms)}.`,
+        detail: translatePortalText('Live rate-limit windows were last checked {checkedAt}.', {
+          checkedAt: formatDateTime(snapshot.rateLimitSnapshot.generated_at_ms),
+        }),
         emptyTitle: 'No live windows in this slice',
         emptyDetail: 'Live rate-limit pressure will appear here once gateway activity is present.',
       };
@@ -239,7 +245,9 @@ function workbenchConfig(
         scopeLabel: 'Health route',
         meterLabel: 'Runtime signal',
         detailLabel: 'Operator detail',
-        detail: `Live service health was last checked ${formatDateTime(snapshot.runtimeHealth.checkedAtMs)}.`,
+        detail: translatePortalText('Live service health was last checked {checkedAt}.', {
+          checkedAt: formatDateTime(snapshot.runtimeHealth.checkedAtMs),
+        }),
         emptyTitle: 'No service health checks in this slice',
         emptyDetail: 'Refresh service health to pull the latest runtime evidence into the command workbench.',
       };
@@ -272,7 +280,11 @@ function buildWorkbenchRows(
           meter: <Pill tone={focus === 'translated' ? 'accent' : focus === 'desktop' ? 'seed' : 'positive'}>{row.truth}</Pill>,
           status: (
             <Pill tone={focus === 'translated' ? 'accent' : focus === 'desktop' ? 'seed' : 'positive'}>
-              {focus === 'translated' ? 'Translated' : focus === 'desktop' ? 'Desktop setup' : 'Direct'}
+              {focus === 'translated'
+                ? translatePortalText('Translated routes')
+                : focus === 'desktop'
+                  ? translatePortalText('Desktop setup')
+                  : translatePortalText('Direct gateway')}
             </Pill>
           ),
           detail: <p className="max-w-[30rem] leading-6">{row.outcome}</p>,
@@ -295,14 +307,20 @@ function buildWorkbenchRows(
           <div className="space-y-1">
             <strong className="text-zinc-950 dark:text-zinc-50">{policy.policy_id}</strong>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Updated {formatDateTime(policy.updated_at_ms)}
+              {translatePortalText('Updated {checkedAt}', {
+                checkedAt: formatDateTime(policy.updated_at_ms),
+              })}
             </p>
           </div>
         ),
         scope: rateLimitScopeLabel(policy),
         meter: `${formatUnits(policy.limit_requests)} req / ${policy.window_seconds}s · burst ${formatUnits(policy.burst_requests || policy.requests_per_window)}`,
-        status: <Pill tone={policy.enabled ? 'positive' : 'warning'}>{policy.enabled ? 'Enabled' : 'Disabled'}</Pill>,
-        detail: policy.notes ?? 'No operator notes were attached to this policy.',
+        status: (
+          <Pill tone={policy.enabled ? 'positive' : 'warning'}>
+            {policy.enabled ? translatePortalText('Enabled') : translatePortalText('Disabled')}
+          </Pill>
+        ),
+        detail: policy.notes ?? translatePortalText('No operator notes were attached to this policy.'),
         searchText: [
           policy.policy_id,
           policy.project_id,
@@ -322,22 +340,31 @@ function buildWorkbenchRows(
         return {
           id: `${window.policy_id}:${window.window_start_ms}`,
           focus,
-          subject: (
-            <div className="space-y-1">
-              <strong className="text-zinc-950 dark:text-zinc-50">{window.policy_id}</strong>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Started {formatDateTime(window.window_start_ms)}
-              </p>
-            </div>
-          ),
+        subject: (
+          <div className="space-y-1">
+            <strong className="text-zinc-950 dark:text-zinc-50">{window.policy_id}</strong>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {translatePortalText('Started {checkedAt}', {
+                checkedAt: formatDateTime(window.window_start_ms),
+              })}
+            </p>
+          </div>
+        ),
           scope: rateLimitScopeLabel(window),
           meter: `${formatUnits(window.request_count)} / ${formatUnits(window.limit_requests)} · ${formatUnits(window.remaining_requests)} remaining`,
           status: (
             <Pill tone={rateLimitTone(window.enabled, window.exceeded)}>
-              {!window.enabled ? 'Disabled' : window.exceeded ? 'Over limit' : 'Within limit'}
+              {!window.enabled
+                ? translatePortalText('Disabled')
+                : window.exceeded
+                  ? translatePortalText('Over limit')
+                  : translatePortalText('Within limit')}
             </Pill>
           ),
-          detail: `${window.window_seconds}s window · ends ${formatDateTime(window.window_end_ms)}`,
+          detail: translatePortalText('{windowSeconds}s window · ends {endsAt}', {
+            windowSeconds: window.window_seconds,
+            endsAt: formatDateTime(window.window_end_ms),
+          }),
           searchText: [
             window.policy_id,
             window.project_id,
@@ -367,7 +394,7 @@ function buildWorkbenchRows(
           ),
           scope: snippet.routeFamily,
           meter: <Pill tone={verificationTone(focus)}>{focus === 'openai' ? 'OpenAI-compatible' : focus === 'anthropic' ? 'Anthropic Messages' : 'Gemini'}</Pill>,
-          status: <Pill tone="seed">Ready to run</Pill>,
+          status: <Pill tone="seed">{translatePortalText('Ready to run')}</Pill>,
           detail: (
             <pre className="max-w-[34rem] overflow-x-auto rounded-2xl bg-zinc-950 p-3 text-xs leading-6 text-zinc-300">
               <code>{snippet.command}</code>
@@ -403,9 +430,10 @@ function buildWorkbenchRows(
 }
 
 export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
+  const { t } = usePortalI18n();
   const [snapshot, setSnapshot] = useState<GatewayCommandCenterSnapshot | null>(null);
   const [status, setStatus] = useState(
-    'Loading the router product command center and current launch posture...',
+    t('Loading the router product command center and current launch posture...'),
   );
   const [refreshing, setRefreshing] = useState(false);
   const [restartingRuntime, setRestartingRuntime] = useState(false);
@@ -426,18 +454,20 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
 
         setSnapshot(nextSnapshot);
         setStatus(
-          'The portal now exposes compatibility, deployment modes, runtime evidence, and commercial runway as one operator-facing product surface.',
+          t(
+            'The portal now exposes compatibility, deployment modes, runtime evidence, and commercial runway as one operator-facing product surface.',
+          ),
         );
       } catch (error) {
         if (cancelled) {
           return;
         }
 
-        setStatus(
-          error instanceof Error
-            ? error.message
-            : 'The command center could not load the current gateway posture.',
-        );
+          setStatus(
+            error instanceof Error
+              ? error.message
+              : t('The command center could not load the current gateway posture.'),
+          );
       }
     };
 
@@ -456,13 +486,13 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
       const nextSnapshot = await loadGatewayCommandCenterSnapshot();
       setSnapshot(nextSnapshot);
       setStatus(
-        'The command center is showing the latest compatibility, runtime, and commercial posture.',
+        t('The command center is showing the latest compatibility, runtime, and commercial posture.'),
       );
     } catch (error) {
       setStatus(
         error instanceof Error
           ? error.message
-          : 'The command center could not refresh the current gateway posture.',
+          : t('The command center could not refresh the current gateway posture.'),
       );
     } finally {
       setRefreshing(false);
@@ -475,19 +505,21 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
     }
 
     setRestartingRuntime(true);
-    setStatus('Restarting the embedded desktop runtime and refreshing live service posture...');
+    setStatus(t('Restarting the embedded desktop runtime and refreshing live service posture...'));
 
     try {
       const nextSnapshot = await restartGatewayCommandCenterDesktopRuntime();
       setSnapshot(nextSnapshot);
       setStatus(
-        'Desktop runtime restarted successfully and the command center has been refreshed with the latest service posture.',
+        t(
+          'Desktop runtime restarted successfully and the command center has been refreshed with the latest service posture.',
+        ),
       );
     } catch (error) {
       setStatus(
         error instanceof Error
           ? error.message
-          : 'Desktop runtime restart failed before the command center could refresh.',
+          : t('Desktop runtime restart failed before the command center could refresh.'),
       );
     } finally {
       setRestartingRuntime(false);
@@ -496,10 +528,12 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
 
   if (!snapshot) {
     return (
-      <Surface detail={status} title="Gateway posture">
+      <Surface detail={status} title={t('Gateway posture')}>
         <EmptyState
-          detail="The command center will appear once the portal finishes assembling the product-facing router view."
-          title="Preparing gateway command center"
+          detail={t(
+            'The command center will appear once the portal finishes assembling the product-facing router view.',
+          )}
+          title={t('Preparing gateway command center')}
         />
       </Surface>
     );
@@ -513,7 +547,7 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
       && includesQuery(deferredSearch, [row.searchText]),
   );
   const focusLabel =
-    config.focusOptions.find((option) => option.value === focusFilter)?.label ?? 'All';
+    t(config.focusOptions.find((option) => option.value === focusFilter)?.label ?? 'All');
 
   return (
     <div className="grid gap-4">
@@ -521,51 +555,54 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
         detail={status}
         actions={(
           <div className="flex flex-wrap gap-2">
-            <InlineButton
-              disabled={refreshing || restartingRuntime}
-              onClick={() => {
-                void refreshCommandCenter('Refreshing the full command center posture...');
-              }}
-              tone="secondary"
-            >
-              {refreshing ? 'Refreshing command center...' : 'Refresh command center'}
-            </InlineButton>
-          </div>
-        )}
-        title="Gateway posture"
-      >
-        <GatewayPostureGrid cards={snapshot.postureCards} />
-      </Surface>
+                <InlineButton
+                  disabled={refreshing || restartingRuntime}
+                  onClick={() => {
+                    void refreshCommandCenter(t('Refreshing the full command center posture...'));
+                  }}
+                  tone="secondary"
+                >
+                  {refreshing ? t('Refreshing command center...') : t('Refresh command center')}
+                </InlineButton>
+              </div>
+            )}
+            title={t('Gateway posture')}
+          >
+            <GatewayPostureGrid cards={snapshot.postureCards} />
+          </Surface>
 
       <Surface
-        detail={`${snapshot.launchReadiness.detail} Critical blockers and watchpoints stay visible before launch traffic expands.`}
-        title="Launch readiness"
+        detail={`${snapshot.launchReadiness.detail} ${t('Critical blockers and watchpoints stay visible before launch traffic expands.')}`}
+        title={t('Launch readiness')}
       >
         <GatewayLaunchReadinessPanel readiness={snapshot.launchReadiness} />
       </Surface>
 
       <Surface
-        detail={config.detail}
+        detail={t(config.detail)}
         actions={(
           <div className="flex flex-wrap gap-2">
-            <InlineButton
-              disabled={refreshing || restartingRuntime}
-              onClick={() => {
-                void refreshCommandCenter('Refreshing service health and gateway evidence...');
-              }}
-              tone="secondary"
-            >
-              {refreshing ? 'Refreshing service health...' : 'Refresh service health'}
-            </InlineButton>
-          </div>
-        )}
-        title="Command workbench"
-      >
+                <InlineButton
+                  disabled={refreshing || restartingRuntime}
+                  onClick={() => {
+                    void refreshCommandCenter(t('Refreshing service health and gateway evidence...'));
+                  }}
+                  tone="secondary"
+                >
+                  {refreshing ? t('Refreshing service health...') : t('Refresh service health')}
+                </InlineButton>
+              </div>
+            )}
+            title={t('Command workbench')}
+          >
         <div className="grid gap-4">
           <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-            <Pill tone="seed">{config.laneLabel}</Pill>
-            <span>{`${formatUnits(visibleRows.length)} of ${formatUnits(allRows.length)} rows visible`}</span>
-            <span>{`Focus: ${focusLabel}`}</span>
+            <Pill tone="seed">{t(config.laneLabel)}</Pill>
+            <span>{t('{visible} of {total} rows visible', {
+              visible: formatUnits(visibleRows.length),
+              total: formatUnits(allRows.length),
+            })}</span>
+            <span>{t('Focus: {focus}', { focus: focusLabel })}</span>
           </div>
 
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
@@ -574,40 +611,40 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
             workbench.
           </p>
 
-          <ToolbarInline
-            data-slot="portal-gateway-filter-bar"
-          >
-            <ToolbarSearchField
-              label="Search gateway evidence"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search gateway evidence"
-              className="min-w-[15rem] flex-[0_1_20rem]"
-            />
-            <ToolbarField label="Workbench lane" className="min-w-[12rem] shrink-0">
-              <Select
-                value={workbenchLane}
-                onChange={(event) => {
+              <ToolbarInline
+                data-slot="portal-gateway-filter-bar"
+              >
+                <ToolbarSearchField
+                  label={t('Search gateway evidence')}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={t('Search gateway evidence')}
+                  className="min-w-[15rem] flex-[0_1_20rem]"
+                />
+                <ToolbarField label={t('Workbench lane')} className="min-w-[12rem] shrink-0">
+                  <Select
+                    value={workbenchLane}
+                    onChange={(event) => {
                   setWorkbenchLane(event.target.value as GatewayWorkbenchLane);
                   setFocusFilter('all');
                 }}
               >
                 {WORKBENCH_LANE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.label)}
                   </option>
                 ))}
               </Select>
             </ToolbarField>
 
-            <ToolbarField label="Operational focus" className="min-w-[12rem] shrink-0">
-              <Select
-                value={focusFilter}
-                onChange={(event) => setFocusFilter(event.target.value)}
+                <ToolbarField label={t('Operational focus')} className="min-w-[12rem] shrink-0">
+                  <Select
+                    value={focusFilter}
+                    onChange={(event) => setFocusFilter(event.target.value)}
               >
                 {config.focusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.label)}
                   </option>
                 ))}
               </Select>
@@ -620,27 +657,27 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
                   setSearchQuery('');
                 }}
                 tone="secondary"
-              >
-                Clear filters
-              </InlineButton>
-            </div>
+                >
+                  {t('Clear filters')}
+                </InlineButton>
+              </div>
           </ToolbarInline>
 
           <DataTable
             columns={[
-              { key: 'subject', label: config.subjectLabel, render: (row) => row.subject },
-              { key: 'scope', label: config.scopeLabel, render: (row) => row.scope },
-              { key: 'meter', label: config.meterLabel, render: (row) => row.meter },
-              { key: 'status', label: 'Status', render: (row) => row.status },
-              { key: 'detail', label: config.detailLabel, render: (row) => row.detail },
+              { key: 'subject', label: t(config.subjectLabel), render: (row) => row.subject },
+              { key: 'scope', label: t(config.scopeLabel), render: (row) => row.scope },
+              { key: 'meter', label: t(config.meterLabel), render: (row) => row.meter },
+              { key: 'status', label: t('Status'), render: (row) => row.status },
+              { key: 'detail', label: t(config.detailLabel), render: (row) => row.detail },
             ]}
             empty={(
               <div className="mx-auto flex max-w-[34rem] flex-col items-center gap-2 text-center">
                 <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-                  {config.emptyTitle}
+                  {t(config.emptyTitle)}
                 </strong>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {config.emptyDetail}
+                  {t(config.emptyDetail)}
                 </p>
               </div>
             )}
@@ -651,8 +688,10 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
       </Surface>
 
       <Surface
-        detail="Desktop runtime cards keep the local bind story visible while Restart desktop runtime remains intentionally narrow."
-        title="Desktop runtime"
+        detail={t(
+          'Desktop runtime cards keep the local bind story visible while Restart desktop runtime remains intentionally narrow.',
+        )}
+        title={t('Desktop runtime')}
       >
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="grid gap-4">
@@ -671,18 +710,21 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
       </Surface>
 
       <Surface
-        detail="Mode switchboard and topology playbooks keep the path from desktop mode to hosted server mode explicit."
-        title="Deployment playbooks"
+        detail={t(
+          'Mode switchboard and topology playbooks keep the path from desktop mode to hosted server mode explicit.',
+        )}
+        title={t('Deployment playbooks')}
       >
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <section className="grid gap-4">
             <div className="space-y-2">
               <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                Mode switchboard
+                {t('Mode switchboard')}
               </strong>
               <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                Keep the product launch path readable whether the router is running on one machine
-                or transitioning into a hosted topology.
+                {t(
+                  'Keep the product launch path readable whether the router is running on one machine or transitioning into a hosted topology.',
+                )}
               </p>
             </div>
             <GatewayModeGrid cards={snapshot.modeCards} />
@@ -691,11 +733,12 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
           <section className="grid gap-4">
             <div className="space-y-2">
               <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                Topology playbooks
+                {t('Topology playbooks')}
               </strong>
               <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                Promote runtime documentation into executable rollout playbooks that operators can
-                apply immediately.
+                {t(
+                  'Promote runtime documentation into executable rollout playbooks that operators can apply immediately.',
+                )}
               </p>
             </div>
             <GatewayTopologyGrid playbooks={snapshot.topologyPlaybooks} />
@@ -704,18 +747,21 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
       </Surface>
 
       <Surface
-        detail="Commerce catalog and launch actions keep access, routing, and billing runway on one commercial surface."
-        title="Commercial runway"
+        detail={t(
+          'Commerce catalog and launch actions keep access, routing, and billing runway on one commercial surface.',
+        )}
+        title={t('Commercial runway')}
       >
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <section className="grid gap-4">
             <div className="space-y-2">
               <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                Commerce catalog
+                {t('Commerce catalog')}
               </strong>
               <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                Active membership, recharge packs, and coupon campaigns remain visible as backend
-                product inventory instead of drifting into frontend-only launch copy.
+                {t(
+                  'Active membership, recharge packs, and coupon campaigns remain visible as backend product inventory instead of drifting into frontend-only launch copy.',
+                )}
               </p>
             </div>
             <GatewayPostureGrid cards={snapshot.commerceCatalogCards} />
@@ -724,11 +770,12 @@ export function PortalGatewayPage({ onNavigate }: PortalGatewayPageProps) {
           <section className="grid gap-4">
             <div className="space-y-2">
               <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                Launch actions
+                {t('Launch actions')}
               </strong>
               <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                Open API Keys, Open Routing, and Open Billing are the three fastest actions for
-                turning this command center into a real launch workflow.
+                {t(
+                  'Open API Keys, Open Routing, and Open Billing are the three fastest actions for turning this command center into a real launch workflow.',
+                )}
               </p>
             </div>
             <GatewayReadinessGrid actions={snapshot.readinessActions} onNavigate={onNavigate} />

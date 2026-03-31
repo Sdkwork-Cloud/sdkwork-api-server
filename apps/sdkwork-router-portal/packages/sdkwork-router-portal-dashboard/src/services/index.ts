@@ -1,4 +1,8 @@
-import { formatCurrency, formatDateTime, formatUnits } from 'sdkwork-router-portal-commons';
+import {
+  formatCurrency,
+  formatDateTime,
+  formatUnits,
+} from 'sdkwork-router-portal-commons/format-core';
 import type {
   PortalDashboardSummary,
   PortalRouteKey,
@@ -23,6 +27,52 @@ import type {
   DashboardTone,
   PortalDashboardPageViewModel,
 } from '../types';
+
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeDashboardSummary(snapshot: PortalDashboardSummary): PortalDashboardSummary {
+  return {
+    ...snapshot,
+    usage_summary: {
+      ...snapshot.usage_summary,
+      projects: safeArray(snapshot.usage_summary.projects),
+      providers: safeArray(snapshot.usage_summary.providers),
+      models: safeArray(snapshot.usage_summary.models),
+    },
+    recent_requests: safeArray(snapshot.recent_requests),
+  };
+}
+
+function normalizeRoutingSummary(
+  routingSummary?: PortalRoutingSummary | null,
+): PortalRoutingSummary | null {
+  if (!routingSummary) {
+    return null;
+  }
+
+  return {
+    ...routingSummary,
+    preferences: {
+      ...routingSummary.preferences,
+      ordered_provider_ids: safeArray(routingSummary.preferences.ordered_provider_ids),
+    },
+    preview: {
+      ...routingSummary.preview,
+      candidate_ids: safeArray(routingSummary.preview.candidate_ids),
+      assessments: safeArray(routingSummary.preview.assessments),
+    },
+    provider_options: safeArray(routingSummary.provider_options),
+  };
+}
+
+function normalizeRoutingLogs(logs?: PortalRoutingDecisionLog[] | null): PortalRoutingDecisionLog[] {
+  return safeArray(logs).map((log) => ({
+    ...log,
+    assessments: safeArray(log.assessments),
+  }));
+}
 
 function routingStrategyLabel(strategy?: PortalRoutingStrategy | string | null): string {
   switch (strategy) {
@@ -592,24 +642,28 @@ export function buildPortalDashboardViewModel(
   routingLogs: PortalRoutingDecisionLog[] = [],
   usageRecords: UsageRecord[] = [],
 ): PortalDashboardPageViewModel {
-  const traffic_trend_points = buildTrafficTrendPoints(snapshot, usageRecords);
-  const spend_trend_points = buildSpendTrendPoints(snapshot, usageRecords);
+  const normalizedSnapshot = normalizeDashboardSummary(snapshot);
+  const normalizedRoutingSummary = normalizeRoutingSummary(routingSummary);
+  const normalizedRoutingLogs = normalizeRoutingLogs(routingLogs);
+  const normalizedUsageRecords = safeArray(usageRecords);
+  const traffic_trend_points = buildTrafficTrendPoints(normalizedSnapshot, normalizedUsageRecords);
+  const spend_trend_points = buildSpendTrendPoints(normalizedSnapshot, normalizedUsageRecords);
 
   return {
-    snapshot,
-    insights: buildInsights(snapshot, routingSummary),
-    metrics: buildMetrics(snapshot, routingSummary),
-    routing_posture: buildRoutingPosture(routingSummary, routingLogs),
-    quick_actions: buildQuickActions(snapshot, routingSummary),
-    provider_mix: buildProviderMix(snapshot),
-    model_mix: buildModelMix(snapshot),
-    request_volume_series: buildRequestVolumeSeries(snapshot, usageRecords),
-    spend_series: buildSpendSeries(snapshot, usageRecords),
+    snapshot: normalizedSnapshot,
+    insights: buildInsights(normalizedSnapshot, normalizedRoutingSummary),
+    metrics: buildMetrics(normalizedSnapshot, normalizedRoutingSummary),
+    routing_posture: buildRoutingPosture(normalizedRoutingSummary, normalizedRoutingLogs),
+    quick_actions: buildQuickActions(normalizedSnapshot, normalizedRoutingSummary),
+    provider_mix: buildProviderMix(normalizedSnapshot),
+    model_mix: buildModelMix(normalizedSnapshot),
+    request_volume_series: buildRequestVolumeSeries(normalizedSnapshot, normalizedUsageRecords),
+    spend_series: buildSpendSeries(normalizedSnapshot, normalizedUsageRecords),
     traffic_trend_points,
     spend_trend_points,
-    provider_share_series: buildProviderShareSeries(snapshot),
-    model_demand_series: buildModelDemandSeries(snapshot),
-    activity_feed: buildActivityFeed(snapshot, routingLogs),
-    modules: buildModules(snapshot, routingSummary),
+    provider_share_series: buildProviderShareSeries(normalizedSnapshot),
+    model_demand_series: buildModelDemandSeries(normalizedSnapshot),
+    activity_feed: buildActivityFeed(normalizedSnapshot, normalizedRoutingLogs),
+    modules: buildModules(normalizedSnapshot, normalizedRoutingSummary),
   };
 }

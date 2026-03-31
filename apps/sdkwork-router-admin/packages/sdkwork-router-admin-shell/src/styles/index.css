@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-@source "../../../../";
+@source "../../../../src";
+@source "../../../";
 
 @theme {
   --color-primary-50: var(--theme-primary-50);

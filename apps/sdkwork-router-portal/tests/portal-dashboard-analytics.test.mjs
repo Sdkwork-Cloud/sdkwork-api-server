@@ -3,10 +3,26 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
+import jiti from '../node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti.mjs';
+
 const appRoot = path.resolve(import.meta.dirname, '..');
 
 function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
+}
+
+function loadDashboardServices() {
+  const load = jiti(import.meta.url, { moduleCache: false });
+  return load(
+    path.join(
+      appRoot,
+      'packages',
+      'sdkwork-router-portal-dashboard',
+      'src',
+      'services',
+      'index.ts',
+    ),
+  );
 }
 
 test('dashboard exposes a claw-style analytics workbench instead of the earlier split operational board', () => {
@@ -57,4 +73,59 @@ test('dashboard exposes a claw-style analytics workbench instead of the earlier 
   assert.match(dashboardRepository, /listPortalUsageRecords/);
   assert.match(dashboardServices, /request_volume_series/);
   assert.match(dashboardServices, /spend_series/);
+});
+
+test('dashboard view model tolerates missing usage collections from live payloads', () => {
+  const { buildPortalDashboardViewModel } = loadDashboardServices();
+  const now = Date.now();
+
+  const viewModel = buildPortalDashboardViewModel({
+    workspace: {
+      user: {
+        id: 'portal-user',
+        email: 'portal@example.com',
+        display_name: 'Portal User',
+        workspace_tenant_id: 'tenant-demo',
+        workspace_project_id: 'project-demo',
+        active: true,
+        created_at_ms: now,
+      },
+      tenant: {
+        id: 'tenant-demo',
+        name: 'Tenant Demo',
+      },
+      project: {
+        tenant_id: 'tenant-demo',
+        id: 'project-demo',
+        name: 'Project Demo',
+      },
+    },
+    usage_summary: {
+      total_requests: 0,
+      project_count: 0,
+      model_count: 0,
+      provider_count: 0,
+    },
+    billing_summary: {
+      project_id: 'project-demo',
+      entry_count: 0,
+      used_units: 0,
+      booked_amount: 0,
+      quota_policy_id: null,
+      quota_limit_units: null,
+      remaining_units: 20000,
+      exhausted: false,
+    },
+    api_key_count: 0,
+  });
+
+  assert.deepEqual(viewModel.snapshot.recent_requests, []);
+  assert.deepEqual(viewModel.snapshot.usage_summary.projects, []);
+  assert.deepEqual(viewModel.snapshot.usage_summary.providers, []);
+  assert.deepEqual(viewModel.snapshot.usage_summary.models, []);
+  assert.deepEqual(viewModel.provider_mix, []);
+  assert.deepEqual(viewModel.model_mix, []);
+  assert.deepEqual(viewModel.activity_feed, []);
+  assert.deepEqual(viewModel.traffic_trend_points, []);
+  assert.deepEqual(viewModel.spend_trend_points, []);
 });

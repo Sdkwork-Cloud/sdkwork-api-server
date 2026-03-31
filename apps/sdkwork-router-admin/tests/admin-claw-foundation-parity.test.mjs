@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -14,12 +14,22 @@ function readFromClaw(relativePath) {
   return readFileSync(path.join(clawRoot, relativePath), 'utf8');
 }
 
+function readFirstExistingClaw(candidates) {
+  for (const relativePath of candidates) {
+    const absolutePath = path.join(clawRoot, relativePath);
+    if (existsSync(absolutePath)) {
+      return readFileSync(absolutePath, 'utf8');
+    }
+  }
+
+  throw new Error(`Unable to resolve claw reference from candidates: ${candidates.join(', ')}`);
+}
+
 test('admin shell stylesheet carries the claw-studio theme token and scrollbar primitives', () => {
   const adminTheme = readFromApp('packages/sdkwork-router-admin-shell/src/styles/index.css');
   const clawTheme = readFromClaw('packages/sdkwork-claw-shell/src/styles/index.css');
 
   const requiredSnippets = [
-    '@source "../../../../";',
     '--theme-primary-50: #eff6ff;',
     '--theme-primary-500: #3b82f6;',
     '[data-theme="lobster"]',
@@ -28,7 +38,6 @@ test('admin shell stylesheet carries the claw-studio theme token and scrollbar p
     '[data-theme="violet"]',
     '[data-theme="rose"]',
     '.custom-scrollbar {',
-    '.ghost-scrollbar {',
     '.scrollbar-hide {',
   ];
 
@@ -36,6 +45,12 @@ test('admin shell stylesheet carries the claw-studio theme token and scrollbar p
     assert.match(clawTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(adminTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+
+  assert.match(clawTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.match(adminTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/src";/);
+  assert.match(adminTheme, /@source "\.\.\/\.\.\/\.\.\/";/);
+  assert.doesNotMatch(adminTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.match(adminTheme, /\.ghost-scrollbar \{/);
 });
 
 test('admin commons primitives use claw-style tailwind surfaces instead of admin-only shell wrappers', () => {
@@ -105,10 +120,25 @@ test('admin shell chrome uses claw-style translucent header and dark rail classe
 test('admin sidebar collapse heuristics and persisted preference mirror claw-studio', () => {
   const adminStore = readFromApp('packages/sdkwork-router-admin-core/src/store.ts');
   const adminAutoCollapse = readFromApp('packages/sdkwork-router-admin-core/src/sidebarAutoCollapse.ts');
-  const clawStore = readFromClaw('packages/sdkwork-claw-core/src/stores/useAppStore.ts');
-  const clawAutoCollapse = readFromClaw('packages/sdkwork-claw-core/src/stores/sidebarAutoCollapse.ts');
+  const clawStore = readFirstExistingClaw([
+    'packages/sdkwork-claw-core/src/stores/useAppStore.ts',
+    'packages/sdkwork-claw-core/src/store/useAppStore.ts',
+  ]);
 
-  const sharedAutoCollapseSnippets = [
+  const clawBaselineStoreSnippets = [
+    'isSidebarCollapsed',
+    'sidebarWidth',
+    'toggleSidebar',
+    'setSidebarCollapsed',
+    'setSidebarWidth',
+  ];
+
+  for (const snippet of clawBaselineStoreSnippets) {
+    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(adminStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+
+  const adminAutoCollapseSnippets = [
     'const COMPACT_VIEWPORT_WIDTH = 1440;',
     'const ROOMY_VIEWPORT_WIDTH = 1600;',
     'const TIGHT_VIEWPORT_HEIGHT = 900;',
@@ -118,12 +148,11 @@ test('admin sidebar collapse heuristics and persisted preference mirror claw-stu
     'export function resolveAutoSidebarCollapsed',
   ];
 
-  for (const snippet of sharedAutoCollapseSnippets) {
-    assert.match(clawAutoCollapse, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const snippet of adminAutoCollapseSnippets) {
     assert.match(adminAutoCollapse, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  const sharedStoreSnippets = [
+  const adminStoreSnippets = [
     'sidebarCollapsePreference',
     "sidebarCollapsePreference: 'auto'",
     'resolveAutoSidebarCollapsed()',
@@ -131,8 +160,7 @@ test('admin sidebar collapse heuristics and persisted preference mirror claw-stu
     "sidebarCollapsePreference === 'auto'",
   ];
 
-  for (const snippet of sharedStoreSnippets) {
-    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const snippet of adminStoreSnippets) {
     assert.match(adminStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });

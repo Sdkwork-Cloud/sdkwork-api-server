@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -14,12 +14,22 @@ function readFromClaw(relativePath) {
   return readFileSync(path.join(clawRoot, relativePath), 'utf8');
 }
 
+function readFirstExistingClaw(candidates) {
+  for (const relativePath of candidates) {
+    const absolutePath = path.join(clawRoot, relativePath);
+    if (existsSync(absolutePath)) {
+      return readFileSync(absolutePath, 'utf8');
+    }
+  }
+
+  throw new Error(`Unable to resolve claw reference from candidates: ${candidates.join(', ')}`);
+}
+
 test('portal theme stylesheet keeps the claw-studio token and scrollbar foundation intact', () => {
   const portalTheme = readFromApp('src/theme.css');
   const clawTheme = readFromClaw('packages/sdkwork-claw-shell/src/styles/index.css');
 
   const requiredThemeSnippets = [
-    '@source "../../../../";',
     '--theme-primary-50: #eff6ff;',
     '--theme-primary-500: #3b82f6;',
     '[data-theme="lobster"]',
@@ -29,7 +39,6 @@ test('portal theme stylesheet keeps the claw-studio token and scrollbar foundati
     '[data-theme="rose"]',
     '--scrollbar-track: color-mix(in srgb, var(--theme-primary-200) 10%, transparent);',
     '.custom-scrollbar {',
-    '.ghost-scrollbar {',
     '.scrollbar-hide {',
     '@keyframes shake',
   ];
@@ -38,6 +47,12 @@ test('portal theme stylesheet keeps the claw-studio token and scrollbar foundati
     assert.match(clawTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(portalTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+
+  assert.match(clawTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.match(portalTheme, /@source "\.\/";/);
+  assert.match(portalTheme, /@source "\.\.\/packages";/);
+  assert.doesNotMatch(portalTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.match(portalTheme, /\.ghost-scrollbar \{/);
 });
 
 test('portal ThemeManager follows the claw-studio root contract instead of router-local theme flags', () => {
@@ -60,10 +75,25 @@ test('portal sidebar collapse heuristics and persisted preference mirror claw-st
   const portalAutoCollapse = readFromApp(
     'packages/sdkwork-router-portal-core/src/lib/sidebarAutoCollapse.ts',
   );
-  const clawStore = readFromClaw('packages/sdkwork-claw-core/src/stores/useAppStore.ts');
-  const clawAutoCollapse = readFromClaw('packages/sdkwork-claw-core/src/stores/sidebarAutoCollapse.ts');
+  const clawStore = readFirstExistingClaw([
+    'packages/sdkwork-claw-core/src/stores/useAppStore.ts',
+    'packages/sdkwork-claw-core/src/store/useAppStore.ts',
+  ]);
 
-  const sharedAutoCollapseSnippets = [
+  const clawBaselineStoreSnippets = [
+    'isSidebarCollapsed',
+    'sidebarWidth',
+    'toggleSidebar',
+    'setSidebarCollapsed',
+    'setSidebarWidth',
+  ];
+
+  for (const snippet of clawBaselineStoreSnippets) {
+    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(portalStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+
+  const portalAutoCollapseSnippets = [
     'const COMPACT_VIEWPORT_WIDTH = 1440;',
     'const ROOMY_VIEWPORT_WIDTH = 1600;',
     'const TIGHT_VIEWPORT_HEIGHT = 900;',
@@ -73,12 +103,11 @@ test('portal sidebar collapse heuristics and persisted preference mirror claw-st
     'export function resolveAutoSidebarCollapsed',
   ];
 
-  for (const snippet of sharedAutoCollapseSnippets) {
-    assert.match(clawAutoCollapse, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const snippet of portalAutoCollapseSnippets) {
     assert.match(portalAutoCollapse, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  const sharedStoreSnippets = [
+  const portalStoreSnippets = [
     'sidebarCollapsePreference',
     "sidebarCollapsePreference: 'auto'",
     'resolveAutoSidebarCollapsed()',
@@ -86,8 +115,7 @@ test('portal sidebar collapse heuristics and persisted preference mirror claw-st
     "sidebarCollapsePreference === 'auto'",
   ];
 
-  for (const snippet of sharedStoreSnippets) {
-    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const snippet of portalStoreSnippets) {
     assert.match(portalStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });

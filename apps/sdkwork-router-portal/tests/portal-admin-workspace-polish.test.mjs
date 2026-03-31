@@ -115,11 +115,11 @@ test('portal toolbars keep search first and pin actions to one right-aligned row
   );
   assert.match(
     gatewayPage,
-    /<ToolbarInline[\s\S]*?data-slot="portal-gateway-filter-bar"[\s\S]*?<ToolbarSearchField[\s\S]*?<ToolbarField label="Workbench lane"[\s\S]*?<ToolbarField label="Operational focus"[\s\S]*?ml-auto flex shrink-0 items-center gap-2\.5 whitespace-nowrap/,
+    /<ToolbarInline[\s\S]*?data-slot="portal-gateway-filter-bar"[\s\S]*?<ToolbarSearchField[\s\S]*?label=\{t\('Search gateway evidence'\)\}[\s\S]*?placeholder=\{t\('Search gateway evidence'\)\}[\s\S]*?<ToolbarField label=\{t\('Workbench lane'\)\}[\s\S]*?<ToolbarField label=\{t\('Operational focus'\)\}[\s\S]*?ml-auto flex shrink-0 items-center gap-2\.5 whitespace-nowrap/,
   );
   assert.match(
     routingPage,
-    /<ToolbarInline[\s\S]*?data-slot="portal-routing-filter-bar"[\s\S]*?<ToolbarSearchField[\s\S]*?<ToolbarField label="Workbench lane"[\s\S]*?<ToolbarField[\s\S]*?label="Operational focus"[\s\S]*?ml-auto flex shrink-0 items-center gap-2\.5 whitespace-nowrap/,
+    /<ToolbarInline[\s\S]*?data-slot="portal-routing-filter-bar"[\s\S]*?<ToolbarSearchField[\s\S]*?label=\{t\('Search routing evidence'\)\}[\s\S]*?placeholder=\{t\('Search routing evidence'\)\}[\s\S]*?<ToolbarField label=\{t\('Workbench lane'\)\}[\s\S]*?<ToolbarField[\s\S]*?label=\{t\('Operational focus'\)\}[\s\S]*?ml-auto flex shrink-0 items-center gap-2\.5 whitespace-nowrap/,
   );
   assert.match(
     routingPage,
@@ -129,6 +129,112 @@ test('portal toolbars keep search first and pin actions to one right-aligned row
     routingPage,
     /data-slot="portal-routing-toolbar" className="flex flex-wrap gap-2"/,
   );
+});
+
+test('routing and gateway workbench filters localize search and filter labels through shared portal i18n', () => {
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+  const gatewayPage = read('packages/sdkwork-router-portal-gateway/src/pages/index.tsx');
+  const routingPage = read('packages/sdkwork-router-portal-routing/src/pages/index.tsx');
+
+  assert.match(gatewayPage, /usePortalI18n/);
+  assert.match(gatewayPage, /label=\{t\('Search gateway evidence'\)\}/);
+  assert.match(gatewayPage, /placeholder=\{t\('Search gateway evidence'\)\}/);
+  assert.match(gatewayPage, /label=\{t\('Workbench lane'\)\}/);
+  assert.match(gatewayPage, /label=\{t\('Operational focus'\)\}/);
+
+  assert.match(routingPage, /usePortalI18n/);
+  assert.match(routingPage, /label=\{t\('Search routing evidence'\)\}/);
+  assert.match(routingPage, /placeholder=\{t\('Search routing evidence'\)\}/);
+  assert.match(routingPage, /label=\{t\('Workbench lane'\)\}/);
+  assert.match(routingPage, /label=\{t\('Operational focus'\)\}/);
+
+  assert.match(commons, /'Search gateway evidence'/);
+  assert.match(commons, /'Search routing evidence'/);
+  assert.match(commons, /'Workbench lane'/);
+  assert.match(commons, /'Operational focus'/);
+});
+
+test('gateway command center localizes status feedback and primary workbench actions through shared portal i18n', () => {
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+  const gatewayPage = read('packages/sdkwork-router-portal-gateway/src/pages/index.tsx');
+
+  assert.match(gatewayPage, /usePortalI18n/);
+  assert.match(gatewayPage, /t\('Loading the router product command center and current launch posture\.\.\.'\)/);
+  assert.match(gatewayPage, /t\('Refresh command center'\)/);
+  assert.match(gatewayPage, /t\('Refreshing command center\.\.\.'\)/);
+  assert.match(gatewayPage, /t\('Refresh service health'\)/);
+  assert.match(gatewayPage, /t\('Refreshing service health\.\.\.'\)/);
+  assert.match(gatewayPage, /t\('Clear filters'\)/);
+  assert.match(gatewayPage, /title=\{t\('Gateway posture'\)\}/);
+  assert.match(gatewayPage, /title=\{t\('Preparing gateway command center'\)\}/);
+
+  assert.match(commons, /'Loading the router product command center and current launch posture\.\.\.'/);
+  assert.match(commons, /'Refresh command center'/);
+  assert.match(commons, /'Refresh service health'/);
+  assert.match(commons, /'Preparing gateway command center'/);
+});
+
+test('gateway command center localizes lower commercial and deployment surfaces through shared portal i18n', () => {
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+  const gatewayPage = read('packages/sdkwork-router-portal-gateway/src/pages/index.tsx');
+
+  assert.match(gatewayPage, /title=\{t\('Launch readiness'\)\}/);
+  assert.match(
+    gatewayPage,
+    /t\(\s*'Critical blockers and watchpoints stay visible before launch traffic expands\.'/,
+  );
+  assert.match(gatewayPage, /title=\{t\('Desktop runtime'\)\}/);
+  assert.match(
+    gatewayPage,
+    /t\(\s*'Desktop runtime cards keep the local bind story visible while Restart desktop runtime remains intentionally narrow\.'/,
+  );
+  assert.match(gatewayPage, /title=\{t\('Deployment playbooks'\)\}/);
+  assert.match(gatewayPage, /t\(\s*'Mode switchboard'/);
+  assert.match(gatewayPage, /t\(\s*'Topology playbooks'/);
+  assert.match(gatewayPage, /title=\{t\('Commercial runway'\)\}/);
+  assert.match(gatewayPage, /t\(\s*'Commerce catalog'/);
+  assert.match(gatewayPage, /t\(\s*'Launch actions'/);
+  assert.match(
+    gatewayPage,
+    /t\(\s*'Open API Keys, Open Routing, and Open Billing are the three fastest actions for turning this command center into a real launch workflow\.'/,
+  );
+
+  assert.match(commons, /'Launch readiness'/);
+  assert.match(commons, /'Desktop runtime'/);
+  assert.match(commons, /'Deployment playbooks'/);
+  assert.match(commons, /'Mode switchboard'/);
+  assert.match(commons, /'Topology playbooks'/);
+  assert.match(commons, /'Commercial runway'/);
+  assert.match(commons, /'Commerce catalog'/);
+  assert.match(commons, /'Launch actions'/);
+});
+
+test('gateway workbench configuration and row statuses localize through shared portal i18n instead of raw helper english', () => {
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+  const gatewayPage = read('packages/sdkwork-router-portal-gateway/src/pages/index.tsx');
+
+  assert.match(gatewayPage, /translatePortalText/);
+  assert.match(gatewayPage, /<Pill tone="seed">\{t\(config\.laneLabel\)\}<\/Pill>/);
+  assert.match(gatewayPage, /detail=\{t\(config\.detail\)\}/);
+  assert.match(gatewayPage, /\{WORKBENCH_LANE_OPTIONS\.map\(\(option\) => \([\s\S]*?\{t\(option\.label\)\}/);
+  assert.match(gatewayPage, /\{config\.focusOptions\.map\(\(option\) => \([\s\S]*?\{t\(option\.label\)\}/);
+  assert.match(gatewayPage, /label:\s*t\(config\.subjectLabel\)/);
+  assert.match(gatewayPage, /label:\s*t\(config\.scopeLabel\)/);
+  assert.match(gatewayPage, /label:\s*t\(config\.meterLabel\)/);
+  assert.match(gatewayPage, /label:\s*t\(config\.detailLabel\)/);
+  assert.match(gatewayPage, /\{t\(config\.emptyTitle\)\}/);
+  assert.match(gatewayPage, /\{t\(config\.emptyDetail\)\}/);
+  assert.match(gatewayPage, /return translatePortalText\('Healthy'\)/);
+  assert.match(gatewayPage, /return translatePortalText\('Degraded'\)/);
+  assert.match(gatewayPage, /return translatePortalText\('Unreachable'\)/);
+  assert.match(gatewayPage, /translatePortalText\('No latency sample'\)/);
+  assert.match(gatewayPage, /translatePortalText\('Ready to run'\)/);
+
+  assert.match(commons, /'Service health'/);
+  assert.match(commons, /'Compatibility routes'/);
+  assert.match(commons, /'Verification commands'/);
+  assert.match(commons, /'No latency sample'/);
+  assert.match(commons, /'Ready to run'/);
 });
 
 test('portal form primitives keep a shadcn-style contract and portal settings flows stay on shared form shells', () => {

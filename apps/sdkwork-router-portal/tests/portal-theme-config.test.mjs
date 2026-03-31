@@ -194,6 +194,14 @@ test('portal shell background gradients stay theme-driven instead of mixing fixe
   assert.match(theme, /body\s*\{[^}]*background:\s*var\(\s*--portal-shell-background\b/s);
 });
 
+test('portal theme restricts tailwind source scanning to the portal app instead of the whole workspace', () => {
+  const theme = read('src/theme.css');
+
+  assert.match(theme, /@source "\.\/";/);
+  assert.match(theme, /@source "\.\.\/packages";/);
+  assert.doesNotMatch(theme, /@source "\.\.\/\.\.\/\.\.\/\.\.\//);
+});
+
 test('portal theme substrate matches claw-studio scrollbar and dark color-scheme behavior', () => {
   const theme = read('src/theme.css');
   const layout = read('packages/sdkwork-router-portal-core/src/application/layouts/MainLayout.tsx');

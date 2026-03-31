@@ -1,4 +1,4 @@
-import { formatUnits } from 'sdkwork-router-portal-commons';
+import { formatUnits } from 'sdkwork-router-portal-commons/format-core';
 import type {
   PortalCommerceCoupon,
   PortalCommerceQuote,

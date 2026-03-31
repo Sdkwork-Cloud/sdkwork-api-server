@@ -165,7 +165,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
             </div>
             <h2 className="mb-2 text-2xl font-bold">{t('QR login')}</h2>
             <p className="mb-8 max-w-[200px] text-sm text-zinc-400">
-              Open the desktop app and scan this code to continue without typing credentials.
+              {t('Open the desktop app and scan this code to continue without typing credentials.')}
             </p>
 
             <div className="mb-6 rounded-2xl bg-white p-4 shadow-xl">
@@ -198,7 +198,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                     icon={<User className="h-5 w-5" />}
                     inputClassName="h-10 pr-3"
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Workspace owner"
+                    placeholder={t('Workspace owner')}
                     required
                     type="text"
                     value={name}
@@ -213,7 +213,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                   icon={<Mail className="h-5 w-5" />}
                   inputClassName="h-10 pr-3"
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@example.com"
+                  placeholder={t('name@example.com')}
                   required
                   type="email"
                   value={email}
@@ -240,7 +240,7 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
                     icon={<Lock className="h-5 w-5" />}
                     inputClassName="h-10 pr-3"
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder={mode === 'register' ? 'Create a password' : 'Enter your password'}
+                    placeholder={mode === 'register' ? t('Create a password') : t('Enter your password')}
                     required
                     type="password"
                     value={password}

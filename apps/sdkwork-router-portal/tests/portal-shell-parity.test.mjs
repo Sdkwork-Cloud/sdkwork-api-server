@@ -28,6 +28,8 @@ test('portal shell adopts a claw-style router and shell composition', () => {
   assert.match(header, /bg-white\/72 backdrop-blur-xl dark:bg-zinc-950\/78/);
   assert.match(header, /SDKWork Router/);
   assert.doesNotMatch(header, /Portal Workspace/);
+  assert.match(appRoutes, /lazy\(async \(\) =>/);
+  assert.match(appRoutes, /<Suspense fallback=\{<PortalBootScreen status="Loading portal workspace\.\.\." \/>}/);
 });
 
 test('portal header behaves like a claw-style desktop titlebar without a centered workspace strip', () => {

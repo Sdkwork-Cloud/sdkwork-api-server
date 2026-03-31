@@ -9,6 +9,14 @@
     ".": {
       "import": "./src/index.tsx",
       "types": "./src/index.tsx"
+    },
+    "./format-core": {
+      "import": "./src/format-core.ts",
+      "types": "./src/format-core.ts"
+    },
+    "./i18n-core": {
+      "import": "./src/i18n-core.ts",
+      "types": "./src/i18n-core.ts"
     }
   },
   "dependencies": {

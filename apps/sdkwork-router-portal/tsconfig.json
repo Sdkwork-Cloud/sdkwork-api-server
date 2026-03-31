@@ -23,6 +23,7 @@
       "sdkwork-router-portal-billing": ["packages/sdkwork-router-portal-billing/src/index.tsx"],
       "sdkwork-router-portal-commerce": ["packages/sdkwork-router-portal-commerce/src/index.ts"],
       "sdkwork-router-portal-commons": ["packages/sdkwork-router-portal-commons/src/index.tsx"],
+      "sdkwork-router-portal-commons/i18n-core": ["packages/sdkwork-router-portal-commons/src/i18n-core.ts"],
       "sdkwork-router-portal-core": ["packages/sdkwork-router-portal-core/src/index.tsx"],
       "sdkwork-router-portal-credits": ["packages/sdkwork-router-portal-credits/src/index.tsx"],
       "sdkwork-router-portal-dashboard": ["packages/sdkwork-router-portal-dashboard/src/index.tsx"],

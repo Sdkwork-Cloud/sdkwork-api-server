@@ -1,6 +1,6 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { copyText } from 'sdkwork-router-portal-commons';
+import { copyText, usePortalI18n } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 import type { CreatedGatewayApiKey, GatewayApiKeyRecord } from 'sdkwork-router-portal-types';
 
@@ -42,6 +42,7 @@ import type {
 } from '../types';
 
 export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
+  const { t } = usePortalI18n();
   const [apiKeys, setApiKeys] = useState<GatewayApiKeyRecord[]>([]);
   const [createdKey, setCreatedKey] = useState<CreatedGatewayApiKey | null>(null);
   const [filters, setFilters] = useState<PortalApiKeyFilterState>({
@@ -60,7 +61,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
   const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
   const [applyingClientId, setApplyingClientId] = useState<ApiKeySetupClientId | null>(null);
   const [usageStatus, setUsageStatus] = useState('');
-  const [, setStatus] = useState('Loading issued keys...');
+  const [, setStatus] = useState(t('Loading issued keys...'));
   const [submitting, setSubmitting] = useState(false);
   const [mutatingKey, setMutatingKey] = useState<string | null>(null);
   const deferredSearchQuery = useDeferredValue(filters.searchQuery);
@@ -76,7 +77,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     void refresh()
       .then(() => {
         if (!cancelled) {
-          setStatus('Credential inventory is synced with the latest project key state.');
+          setStatus(t('Credential inventory is synced with the latest project key state.'));
         }
       })
       .catch((error) => {
@@ -94,25 +95,25 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     event.preventDefault();
 
     if (!formState.label.trim()) {
-      setStatus('Key label is required so credentials remain auditable after creation.');
+      setStatus(t('Key label is required so credentials remain auditable after creation.'));
       return;
     }
 
     const environment = resolvePortalApiKeyEnvironment(formState);
     if (!environment) {
-      setStatus('Custom environment is required when the custom environment option is selected.');
+      setStatus(t('Custom environment is required when the custom environment option is selected.'));
       return;
     }
 
     const expiresAtMs = resolvePortalApiKeyExpiresAt(formState);
     if (formState.expiresAt.trim() && !expiresAtMs) {
-      setStatus('Expires at must be a valid date before the credential can be created.');
+      setStatus(t('Expires at must be a valid date before the credential can be created.'));
       return;
     }
 
     const customKey = resolvePortalApiKeyPlaintext(formState);
     if (formState.keyMode === 'custom' && !customKey) {
-      setStatus('Custom key mode requires a plaintext key before the credential can be created.');
+      setStatus(t('Custom key mode requires a plaintext key before the credential can be created.'));
       return;
     }
 
@@ -121,8 +122,8 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     setSubmitting(true);
     setStatus(
       formState.keyMode === 'custom'
-        ? `Registering a custom ${environment} key for this workspace...`
-        : `Issuing a Portal-managed ${environment} key for this workspace...`,
+        ? t('Registering a custom {environment} key for this workspace...', { environment })
+        : t('Issuing a Portal-managed {environment} key for this workspace...', { environment }),
     );
 
     try {
@@ -139,8 +140,14 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
       setCreatedKey(nextKey);
       setStatus(
         formState.keyMode === 'custom'
-          ? `Custom key stored for ${environment}. Verify the plaintext value before leaving this page.`
-          : `Portal-managed key issued for ${environment}. Copy the plaintext secret before leaving this page.`,
+          ? t(
+              'Custom key stored for {environment}. Verify the plaintext value before leaving this page.',
+              { environment },
+            )
+          : t(
+              'Portal-managed key issued for {environment}. Copy the plaintext secret before leaving this page.',
+              { environment },
+            ),
       );
       setCreateDialogOpen(false);
       setFormState(createEmptyPortalApiKeyFormState());
@@ -161,22 +168,30 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     const copied = await copyText(plaintext);
     setStatus(
       copied
-        ? 'Plaintext key copied to clipboard.'
-        : 'Clipboard copy is unavailable in this browser context.',
+        ? t('Plaintext key copied to clipboard.')
+        : t('Clipboard copy is unavailable in this browser context.'),
     );
   }
 
   async function handleKeyStatusChange(key: GatewayApiKeyRecord, active: boolean) {
     setMutatingKey(key.hashed_key);
-    setStatus(`${active ? 'Restoring' : 'Revoking'} ${key.label}...`);
+    setStatus(
+      active
+        ? t('Restoring {label}...', { label: key.label })
+        : t('Revoking {label}...', { label: key.label }),
+    );
 
     try {
       await setPortalApiKeyActive(key.hashed_key, active);
       await refresh();
       setStatus(
         active
-          ? `${key.label} is active again and can authenticate gateway traffic.`
-          : `${key.label} has been revoked and will no longer authenticate requests.`,
+          ? t('{label} is active again and can authenticate gateway traffic.', {
+              label: key.label,
+            })
+          : t('{label} has been revoked and will no longer authenticate requests.', {
+              label: key.label,
+            }),
       );
     } catch (error) {
       setStatus(portalErrorMessage(error));
@@ -187,7 +202,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
 
   async function handleDeleteKey(key: GatewayApiKeyRecord) {
     setMutatingKey(key.hashed_key);
-    setStatus(`Deleting ${key.label}...`);
+    setStatus(t('Deleting {label}...', { label: key.label }));
 
     try {
       await removePortalApiKey(key.hashed_key);
@@ -202,7 +217,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
         setUsageKey(null);
       }
 
-      setStatus(`${key.label} was deleted from this workspace.`);
+      setStatus(t('{label} was deleted from this workspace.', { label: key.label }));
     } catch (error) {
       setStatus(portalErrorMessage(error));
     } finally {
@@ -297,17 +312,19 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
     }
 
     if (!usagePlaintext) {
-      setUsageStatus('Plaintext Api key is no longer visible on this device. Create a replacement first.');
+      setUsageStatus(
+        t('Plaintext Api key is no longer visible on this device. Create a replacement first.'),
+      );
       return;
     }
 
     if (selectedPlan.requiresInstances && !selectedInstanceIds.length) {
-      setUsageStatus('Select at least one OpenClaw instance before applying setup.');
+      setUsageStatus(t('Select at least one OpenClaw instance before applying setup.'));
       return;
     }
 
     setApplyingClientId(selectedPlan.id);
-    setUsageStatus(`Applying ${selectedPlan.label} setup...`);
+    setUsageStatus(t('Applying {label} setup...', { label: selectedPlan.label }));
 
     try {
       const result = await applyApiKeyQuickSetup({
@@ -324,8 +341,12 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
       });
       setUsageStatus(
         result.updatedInstanceIds.length
-          ? `Applied setup to ${result.updatedInstanceIds.length} OpenClaw instance(s).`
-          : `Applied setup and wrote ${result.writtenFiles.length} file(s).`,
+          ? t('Applied setup to {count} OpenClaw instance(s).', {
+              count: result.updatedInstanceIds.length,
+            })
+          : t('Applied setup and wrote {count} file(s).', {
+              count: result.writtenFiles.length,
+            }),
       );
     } catch (error) {
       setUsageStatus(portalErrorMessage(error));
@@ -342,7 +363,7 @@ export function PortalApiKeysPage({ onNavigate }: PortalApiKeysPageProps) {
           onOpenUsage={() => onNavigate('usage')}
           onRefresh={() => {
             void refresh().then(() =>
-              setStatus('Credential inventory is synced with the latest project key state.'),
+              setStatus(t('Credential inventory is synced with the latest project key state.')),
             );
           }}
           onSearchChange={(value) =>

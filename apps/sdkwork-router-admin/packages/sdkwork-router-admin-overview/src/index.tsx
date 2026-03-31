@@ -1,60 +1,20 @@
 import { Pill, StatCard, Surface } from 'sdkwork-router-admin-commons';
 import type { AdminPageProps, AdminRouteKey } from 'sdkwork-router-admin-types';
 
-function topPortalUsers(snapshot: AdminPageProps['snapshot']) {
-  return [...snapshot.portalUsers]
-    .sort((left, right) => (
-      right.request_count - left.request_count
-      || right.total_tokens - left.total_tokens
-      || right.usage_units - left.usage_units
-    ))
-    .slice(0, 5);
-}
-
-function hottestProjects(snapshot: AdminPageProps['snapshot']) {
-  const tokensByProject = new Map<string, number>();
-  for (const record of snapshot.usageRecords) {
-    tokensByProject.set(
-      record.project_id,
-      (tokensByProject.get(record.project_id) ?? 0) + record.total_tokens,
-    );
-  }
-
-  return snapshot.projects
-    .map((project) => {
-      const traffic = snapshot.usageSummary.projects.find(
-        (summary) => summary.project_id === project.id,
-      );
-      const billing = snapshot.billingSummary.projects.find(
-        (summary) => summary.project_id === project.id,
-      );
-
-      return {
-        ...project,
-        request_count: traffic?.request_count ?? 0,
-        total_tokens: tokensByProject.get(project.id) ?? 0,
-        booked_amount: billing?.booked_amount ?? 0,
-      };
-    })
-    .sort((left, right) => (
-      right.request_count - left.request_count
-      || right.total_tokens - left.total_tokens
-      || right.booked_amount - left.booked_amount
-    ))
-    .slice(0, 5);
-}
+import { buildAdminOverviewViewModel } from './view-model';
 
 export function OverviewPage({
   snapshot,
   onNavigate: _onNavigate,
 }: AdminPageProps & { onNavigate: (route: AdminRouteKey) => void }) {
-  const rankedUsers = topPortalUsers(snapshot);
-  const rankedProjects = hottestProjects(snapshot);
+  const viewModel = buildAdminOverviewViewModel(snapshot);
+  const rankedUsers = viewModel.rankedUsers;
+  const rankedProjects = viewModel.rankedProjects;
 
   return (
     <div className="adminx-page-grid">
       <section className="adminx-stat-grid">
-        {snapshot.overviewMetrics.map((metric) => (
+        {viewModel.metrics.map((metric) => (
           <StatCard
             key={metric.label}
             label={metric.label}
@@ -69,7 +29,7 @@ export function OverviewPage({
         detail="Alerts are generated from live billing, runtime, catalog, and workspace health signals from the control plane."
       >
         <div className="adminx-card-grid">
-          {snapshot.alerts.map((alert) => (
+          {viewModel.alerts.map((alert) => (
             <article key={alert.id} className="adminx-mini-card">
               <div className="adminx-row">
                 <strong>{alert.title}</strong>

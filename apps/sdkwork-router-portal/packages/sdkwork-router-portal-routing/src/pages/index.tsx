@@ -21,6 +21,7 @@ import {
   ToolbarField,
   ToolbarInline,
   ToolbarSearchField,
+  usePortalI18n,
 } from 'sdkwork-router-portal-commons';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 import type {
@@ -83,6 +84,8 @@ type RoutingWorkbenchConfig = {
   emptyDetail: string;
   focusOptions: Array<{ value: string; label: string }>;
 };
+
+type TranslateFn = (text: string, values?: Record<string, string | number>) => string;
 
 const WORKBENCH_OPTIONS: Array<{ value: RoutingWorkbenchLane; label: string }> = [
   { value: 'providers', label: 'Provider roster' },
@@ -268,50 +271,54 @@ function buildWorkbenchConfig(lane: RoutingWorkbenchLane): RoutingWorkbenchConfi
   }
 }
 
-function buildPreviewOutcomeCards(preview: PortalRoutingDecision): RoutingCardItem[] {
+function buildPreviewOutcomeCards(
+  preview: PortalRoutingDecision,
+  t: TranslateFn,
+): RoutingCardItem[] {
   return [
     {
       id: 'preview-provider',
-      label: 'Selected provider',
+      label: t('Selected provider'),
       value: preview.selected_provider_id,
-      detail: 'The provider chosen by the latest routing preview.',
+      detail: t('The provider chosen by the latest routing preview.'),
       tone: 'positive' as const,
     },
     {
       id: 'preview-reason',
-      label: 'Selection reason',
-      value: preview.selection_reason ?? 'Top-ranked eligible provider',
-      detail: 'The current preview explains why the selected provider won the route.',
+      label: t('Selection reason'),
+      value: preview.selection_reason ?? t('Top-ranked eligible provider'),
+      detail: t('The current preview explains why the selected provider won the route.'),
     },
     {
       id: 'preview-candidates',
-      label: 'Candidate path',
-      value: preview.candidate_ids.join(' -> ') || 'No candidates',
-      detail: 'Candidate order remains visible so fallback posture is explainable.',
+      label: t('Candidate path'),
+      value: preview.candidate_ids.join(' -> ') || t('No candidates'),
+      detail: t('Candidate order remains visible so fallback posture is explainable.'),
     },
     {
       id: 'preview-slo',
-      label: 'SLO posture',
+      label: t('SLO posture'),
       value: preview.slo_degraded
-        ? 'Degraded fallback'
+        ? t('Degraded fallback')
         : preview.slo_applied
-          ? 'Guardrails applied'
-          : 'No active guardrails',
+          ? t('Guardrails applied')
+          : t('No active guardrails'),
       detail: preview.matched_policy_id
-        ? `Matched policy ${preview.matched_policy_id}.`
-        : 'No routing policy matched the current preview inputs.',
+        ? t('Matched policy {policyId}.', { policyId: preview.matched_policy_id })
+        : t('No routing policy matched the current preview inputs.'),
       tone: preview.slo_degraded ? 'warning' : preview.slo_applied ? 'positive' : 'default',
     },
   ];
 }
 
 export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
+  const { t } = usePortalI18n();
   const [summary, setSummary] = useState<PortalRoutingSummary | null>(null);
   const [decisionLogs, setDecisionLogs] = useState<PortalRoutingDecisionLog[]>([]);
   const [preview, setPreview] = useState<PortalRoutingDecision | null>(null);
   const [form, setForm] = useState<RoutingFormState | null>(null);
   const [previewForm, setPreviewForm] = useState<RoutingPreviewFormState | null>(null);
-  const [status, setStatus] = useState('Loading routing posture...');
+  const [status, setStatus] = useState(t('Loading routing posture...'));
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -340,7 +347,9 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
       .then(() => {
         if (!cancelled) {
           setStatus(
-            'Routing workbench is synced with the latest project posture, provider order, and decision evidence.',
+            t(
+              'Routing workbench is synced with the latest project posture, provider order, and decision evidence.',
+            ),
           );
         }
       })
@@ -379,35 +388,39 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
     return [
       {
         id: 'summary-posture',
-        label: 'Active posture',
+        label: t('Active posture'),
         value: buildRoutingStrategyLabel(form.strategy),
-        detail:
+        detail: t(
           'Routing strategy is translated into user-facing posture language instead of raw enum names.',
+        ),
         tone: 'positive' as const,
       },
       {
         id: 'summary-default',
-        label: 'Default provider',
-        value: form.default_provider_id ?? 'Auto fallback',
-        detail:
+        label: t('Default provider'),
+        value: form.default_provider_id ?? t('Auto fallback'),
+        detail: t(
           'Default provider acts as the stable fallback when multiple candidates remain eligible.',
+        ),
       },
       {
         id: 'summary-model',
-        label: 'Preview model',
+        label: t('Preview model'),
         value: previewForm.model || viewModel.summary.latest_model_hint,
-        detail:
+        detail: t(
           'The current preview model stays visible so operators always know which workload is being tuned.',
+        ),
       },
       {
         id: 'summary-evidence',
-        label: 'Evidence entries',
+        label: t('Evidence entries'),
         value: String(decisionLogs.length),
-        detail:
+        detail: t(
           'Preview and live routing traces remain close to the posture editor for faster diagnosis.',
+        ),
       },
     ];
-  }, [decisionLogs.length, form, previewForm, viewModel]);
+  }, [decisionLogs.length, form, previewForm, t, viewModel]);
 
   const workbenchConfig = useMemo(
     () => buildWorkbenchConfig(workbenchLane),
@@ -432,10 +445,10 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
         scope: buildRoutingStrategyLabel(preset.strategy),
         status: (
           <Pill tone={preset.active ? 'positive' : 'default'}>
-            {preset.active ? 'Active' : 'Available'}
+            {preset.active ? t('Active') : t('Available')}
           </Pill>
         ),
-        detail: preset.detail,
+        detail: t(preset.detail),
         actions: (
           <InlineButton
             onClick={() => {
@@ -487,12 +500,14 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
               }
 
               setStatus(
-                'Preset applied locally. Save posture when the updated routing shape looks right.',
+                t(
+                  'Preset applied locally. Save posture when the updated routing shape looks right.',
+                ),
               );
             }}
             tone={preset.active ? 'secondary' : 'primary'}
           >
-            {preset.active ? 'Active preset' : 'Apply preset'}
+            {preset.active ? t('Active preset') : t('Apply preset')}
           </InlineButton>
         ),
         searchText: [preset.title, preset.detail, preset.id, preset.strategy].join(' ').toLowerCase(),
@@ -527,22 +542,22 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
           status: (
             <Pill tone={evidenceStatusTone(log)}>
               {log.slo_degraded
-                ? 'Degraded'
+                ? t('Degraded')
                 : log.slo_applied
-                  ? 'Guardrailed'
+                  ? t('Guardrailed')
                   : log.decision_source.toLowerCase().includes('preview')
-                    ? 'Preview'
-                    : 'Live'}
+                    ? t('Preview')
+                    : t('Live')}
             </Pill>
           ),
           detail:
             log.selection_reason
             ?? log.assessments[0]?.reasons[0]
-            ?? 'Selection evidence is available from the current routing trace.',
+            ?? t('Selection evidence is available from the current routing trace.'),
           actions: (
             <div className="space-y-1 text-xs text-zinc-500 dark:text-zinc-400">
               <div>{log.decision_source}</div>
-              <div>{log.matched_policy_id ?? 'No matched policy'}</div>
+              <div>{log.matched_policy_id ?? t('No matched policy')}</div>
             </div>
           ),
           searchText: [
@@ -575,17 +590,19 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
         scope: (
           <div className="space-y-1">
             <div>{provider.channel_id}</div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">Priority #{index + 1}</div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              {t('Priority #{priority}', { priority: index + 1 })}
+            </div>
           </div>
         ),
         status: (
           <Pill tone={isDefault ? 'accent' : 'positive'}>
-            {isDefault ? 'Default' : 'Ordered'}
+            {isDefault ? t('Default') : t('Ordered')}
           </Pill>
         ),
         detail: isDefault
-          ? 'Default provider stays available as the stable fallback when several providers remain eligible.'
-          : 'Ordered providers keep deterministic failover readable for operators and support teams.',
+          ? t('Default provider stays available as the stable fallback when several providers remain eligible.')
+          : t('Ordered providers keep deterministic failover readable for operators and support teams.'),
         actions: (
           <div className="flex flex-wrap gap-2">
             <InlineButton
@@ -607,12 +624,14 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                   return { ...current, ordered_provider_ids: orderedProviderIds };
                 });
                 setStatus(
-                  'Provider order changed locally. Save posture to publish the new fallback order.',
+                  t(
+                    'Provider order changed locally. Save posture to publish the new fallback order.',
+                  ),
                 );
               }}
               tone="ghost"
             >
-              Move up
+              {t('Move up')}
             </InlineButton>
             <InlineButton
               disabled={index === orderedProviders.length - 1}
@@ -636,23 +655,27 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                   return { ...current, ordered_provider_ids: orderedProviderIds };
                 });
                 setStatus(
-                  'Provider order changed locally. Save posture to publish the new fallback order.',
+                  t(
+                    'Provider order changed locally. Save posture to publish the new fallback order.',
+                  ),
                 );
               }}
               tone="ghost"
             >
-              Move down
+              {t('Move down')}
             </InlineButton>
             <InlineButton
               onClick={() => {
                 setForm((current) =>
                   current ? { ...current, default_provider_id: provider.provider_id } : current,
                 );
-                setStatus('Default provider updated locally. Save posture to publish the change.');
+                setStatus(
+                  t('Default provider updated locally. Save posture to publish the change.'),
+                );
               }}
               tone={isDefault ? 'secondary' : 'primary'}
             >
-              {isDefault ? 'Default provider' : 'Set default'}
+              {isDefault ? t('Default provider') : t('Set default')}
             </InlineButton>
           </div>
         ),
@@ -667,7 +690,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
           .toLowerCase(),
       };
     });
-  }, [form, orderedProviders, viewModel, workbenchLane]);
+  }, [form, orderedProviders, t, viewModel, workbenchLane]);
 
   const visibleWorkbenchRows = useMemo(
     () =>
@@ -680,8 +703,8 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
   );
 
   const previewOutcomeCards = useMemo(
-    () => (viewModel ? buildPreviewOutcomeCards(viewModel.preview) : []),
-    [viewModel],
+    () => (viewModel ? buildPreviewOutcomeCards(viewModel.preview, t) : []),
+    [t, viewModel],
   );
 
   async function handleSave(event?: FormEvent<HTMLFormElement>): Promise<void> {
@@ -691,7 +714,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
     }
 
     setSaving(true);
-    setStatus('Saving routing preferences for this project...');
+    setStatus(t('Saving routing preferences for this project...'));
 
     try {
       await updatePortalRoutingPreferences({
@@ -707,7 +730,9 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
       await refresh();
       setEditDialogOpen(false);
       setStatus(
-        'Routing posture saved. The workbench now reflects the updated provider order and guardrails.',
+        t(
+          'Routing posture saved. The workbench now reflects the updated provider order and guardrails.',
+        ),
       );
     } catch (error) {
       setStatus(portalErrorMessage(error));
@@ -723,7 +748,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
     }
 
     setPreviewing(true);
-    setStatus('Previewing the active route...');
+    setStatus(t('Previewing the active route...'));
 
     try {
       const capability = previewForm.capability.trim() || 'chat_completion';
@@ -751,7 +776,9 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
       setPreviewDialogOpen(false);
       setWorkbenchLane('evidence');
       setFocusFilter('preview');
-      setStatus('Preview updated with the current routing posture and added to the evidence stream.');
+      setStatus(
+        t('Preview updated with the current routing posture and added to the evidence stream.'),
+      );
     } catch (error) {
       setStatus(portalErrorMessage(error));
     } finally {
@@ -761,17 +788,19 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
 
   if (!viewModel || !form || !previewForm) {
     return (
-      <Surface detail={status} title="Routing">
+      <Surface detail={status} title={t('Routing')}>
         <EmptyState
-          detail="Routing posture will appear once the portal finishes loading project summary, provider options, and decision evidence."
-          title="Preparing routing workbench"
+          detail={t(
+            'Routing posture will appear once the portal finishes loading project summary, provider options, and decision evidence.',
+          )}
+          title={t('Preparing routing workbench')}
         />
       </Surface>
     );
   }
 
   const focusLabel =
-    workbenchConfig.focusOptions.find((option) => option.value === focusFilter)?.label ?? 'All';
+    t(workbenchConfig.focusOptions.find((option) => option.value === focusFilter)?.label ?? 'All');
   const guardrailCards: RoutingCardItem[] = viewModel.guardrails.map((item) => {
     const tone: RoutingCardItem['tone'] =
       item.id === 'provider-default'
@@ -783,7 +812,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
     return {
       id: item.id,
       label: item.label,
-      value: item.value,
+      value: item.value === 'Open' ? t('Open') : item.value === 'Auto' ? t('Auto') : item.value,
       detail: item.detail,
       tone,
     };
@@ -796,21 +825,23 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit routing posture</DialogTitle>
+            <DialogTitle>{t('Edit routing posture')}</DialogTitle>
             <DialogDescription>
-              Save posture after adjusting profile label, strategy, regional preference, and reliability guardrails.
+              {t(
+                'Save posture after adjusting profile label, strategy, regional preference, and reliability guardrails.',
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => void handleSave(event)}>
-            <FormField label="Routing profile label">
+            <FormField label={t('Routing profile label')}>
               <Input
                 onChange={(event) => setForm({ ...form, preset_id: event.target.value })}
                 placeholder="predictable"
                 value={form.preset_id}
               />
             </FormField>
-            <FormField label="Strategy">
+            <FormField label={t('Strategy')}>
               <Select
                 onChange={(event) =>
                   setForm({
@@ -820,39 +851,39 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 }
                 value={form.strategy}
               >
-                <option value="deterministic_priority">Predictable order</option>
-                <option value="weighted_random">Traffic distribution</option>
-                <option value="slo_aware">Reliability guardrails</option>
-                <option value="geo_affinity">Regional preference</option>
+                <option value="deterministic_priority">{t('Predictable order')}</option>
+                <option value="weighted_random">{t('Traffic distribution')}</option>
+                <option value="slo_aware">{t('Reliability guardrails')}</option>
+                <option value="geo_affinity">{t('Regional preference')}</option>
               </Select>
             </FormField>
-            <FormField label="Max cost">
+            <FormField label={t('Max cost')}>
               <Input
                 onChange={(event) => setForm({ ...form, max_cost: event.target.value })}
                 placeholder="0.30"
                 value={form.max_cost}
               />
             </FormField>
-            <FormField label="Max latency ms">
+            <FormField label={t('Max latency ms')}>
               <Input
                 onChange={(event) => setForm({ ...form, max_latency_ms: event.target.value })}
                 placeholder="250"
                 value={form.max_latency_ms}
               />
             </FormField>
-            <FormField label="Preferred region">
+            <FormField label={t('Preferred region')}>
               <Select
                 onChange={(event) => setForm({ ...form, preferred_region: event.target.value })}
                 value={form.preferred_region}
               >
-                <option value="">Auto</option>
+                <option value="">{t('Auto')}</option>
                 <option value="us-east">us-east</option>
                 <option value="us-west">us-west</option>
                 <option value="eu-west">eu-west</option>
                 <option value="ap-southeast">ap-southeast</option>
               </Select>
             </FormField>
-            <FormField label="Default provider">
+            <FormField label={t('Default provider')}>
               <Select
                 onChange={(event) =>
                   setForm({
@@ -862,7 +893,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 }
                 value={form.default_provider_id ?? ''}
               >
-                <option value="">Auto fallback</option>
+                <option value="">{t('Auto fallback')}</option>
                 {orderedProviders.map((provider) => (
                   <option key={provider.provider_id} value={provider.provider_id}>
                     {provider.display_name}
@@ -879,37 +910,41 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                       ...form,
                       require_healthy: event.target.checked,
                     })
-                  }
-                />
-                <span>Require healthy providers</span>
-              </Label>
-              <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                Reliability guardrails bias routing toward healthy, lower-risk providers before traffic leaves the workspace.
-              </p>
-            </div>
-            <DialogFooter className="md:col-span-2">
-              <InlineButton onClick={() => setEditDialogOpen(false)} tone="ghost">
-                Cancel
-              </InlineButton>
-              <InlineButton disabled={saving} tone="primary" type="submit">
-                {saving ? 'Saving...' : 'Save posture'}
-              </InlineButton>
-            </DialogFooter>
-          </form>
+                      }
+                    />
+                    <span>{t('Require healthy providers')}</span>
+                  </Label>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                    {t(
+                      'Reliability guardrails bias routing toward healthy, lower-risk providers before traffic leaves the workspace.',
+                    )}
+                  </p>
+                </div>
+                <DialogFooter className="md:col-span-2">
+                  <InlineButton onClick={() => setEditDialogOpen(false)} tone="ghost">
+                    {t('Cancel')}
+                  </InlineButton>
+                  <InlineButton disabled={saving} tone="primary" type="submit">
+                    {saving ? t('Saving...') : t('Save posture')}
+                  </InlineButton>
+                </DialogFooter>
+              </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Preview route</DialogTitle>
+            <DialogTitle>{t('Preview route')}</DialogTitle>
             <DialogDescription>
-              Preview route inputs are stored separately from the saved posture so operators can test scenarios before traffic shifts.
+              {t(
+                'Preview route inputs are stored separately from the saved posture so operators can test scenarios before traffic shifts.',
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => void handlePreview(event)}>
-            <FormField label="Capability">
+            <FormField label={t('Capability')}>
               <Input
                 onChange={(event) =>
                   setPreviewForm({ ...previewForm, capability: event.target.value })
@@ -918,7 +953,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 value={previewForm.capability}
               />
             </FormField>
-            <FormField label="Requested model">
+            <FormField label={t('Requested model')}>
               <Input
                 onChange={(event) =>
                   setPreviewForm({ ...previewForm, model: event.target.value })
@@ -927,36 +962,36 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 value={previewForm.model}
               />
             </FormField>
-            <FormField label="Requested region">
+            <FormField label={t('Requested region')}>
               <Select
                 onChange={(event) =>
                   setPreviewForm({ ...previewForm, requested_region: event.target.value })
                 }
                 value={previewForm.requested_region}
               >
-                <option value="">Auto</option>
+                <option value="">{t('Auto')}</option>
                 <option value="us-east">us-east</option>
                 <option value="us-west">us-west</option>
                 <option value="eu-west">eu-west</option>
                 <option value="ap-southeast">ap-southeast</option>
               </Select>
             </FormField>
-            <FormField label="Selection seed">
+            <FormField label={t('Selection seed')}>
               <Input
                 inputMode="numeric"
                 onChange={(event) =>
                   setPreviewForm({ ...previewForm, selection_seed: event.target.value })
                 }
-                placeholder="Optional deterministic seed"
+                placeholder={t('Optional deterministic seed')}
                 value={previewForm.selection_seed}
               />
             </FormField>
             <DialogFooter className="md:col-span-2">
               <InlineButton onClick={() => setPreviewDialogOpen(false)} tone="ghost">
-                Close
+                {t('Close')}
               </InlineButton>
               <InlineButton disabled={previewing} tone="primary" type="submit">
-                {previewing ? 'Running preview...' : 'Run preview'}
+                {previewing ? t('Running preview...') : t('Run preview')}
               </InlineButton>
             </DialogFooter>
           </form>
@@ -971,36 +1006,40 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
               className="ml-auto flex shrink-0 items-center gap-2.5 whitespace-nowrap"
             >
               <InlineButton onClick={() => setEditDialogOpen(true)} tone="primary">
-                Edit posture
+                {t('Edit posture')}
               </InlineButton>
               <InlineButton onClick={() => setPreviewDialogOpen(true)} tone="secondary">
-                Run preview
+                {t('Run preview')}
               </InlineButton>
               <InlineButton onClick={() => onNavigate('usage')} tone="secondary">
-                Open usage
+                {t('Open usage')}
               </InlineButton>
               <InlineButton onClick={() => onNavigate('api-keys')} tone="ghost">
-                Validate with a key
+                {t('Validate with a key')}
               </InlineButton>
             </div>
           )}
           detail={status}
-          title="Routing posture"
+          title={t('Routing posture')}
         >
           <RoutingCardGrid items={summaryCards} />
         </Surface>
 
-        <Surface detail={workbenchConfig.detail} title="Routing workbench">
+        <Surface detail={t(workbenchConfig.detail)} title={t('Routing workbench')}>
           <div className="grid gap-4">
             <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-              <Pill tone="seed">{workbenchConfig.laneLabel}</Pill>
-              <span>{`${visibleWorkbenchRows.length} of ${workbenchRows.length} rows visible`}</span>
-              <span>{`Focus: ${focusLabel}`}</span>
+              <Pill tone="seed">{t(workbenchConfig.laneLabel)}</Pill>
+              <span>{t('{visible} of {total} rows visible', {
+                visible: visibleWorkbenchRows.length,
+                total: workbenchRows.length,
+              })}</span>
+              <span>{t('Focus: {focus}', { focus: focusLabel })}</span>
             </div>
 
             <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-              Routing workbench keeps Provider roster, Preset catalog, and Evidence stream inside
-              one operator table while edit and preview actions stay inside focused dialogs.
+              {t(
+                'Routing workbench keeps Provider roster, Preset catalog, and Evidence stream inside one operator table while edit and preview actions stay inside focused dialogs.',
+              )}
             </p>
 
             <ToolbarInline
@@ -1008,12 +1047,12 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
             >
               <ToolbarSearchField
                 className="min-w-[15rem] flex-[0_1_20rem]"
-                label="Search routing evidence"
+                label={t('Search routing evidence')}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search routing evidence"
+                placeholder={t('Search routing evidence')}
                 value={searchQuery}
               />
-              <ToolbarField label="Workbench lane" className="min-w-[12rem] shrink-0">
+              <ToolbarField label={t('Workbench lane')} className="min-w-[12rem] shrink-0">
                 <Select
                   onChange={(event) => {
                     setWorkbenchLane(event.target.value as RoutingWorkbenchLane);
@@ -1023,14 +1062,14 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 >
                   {WORKBENCH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.label)}
                     </option>
                   ))}
                 </Select>
               </ToolbarField>
 
               <ToolbarField
-                label="Operational focus"
+                label={t('Operational focus')}
                 className="min-w-[12rem] shrink-0"
               >
                 <Select
@@ -1039,7 +1078,7 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 >
                   {workbenchConfig.focusOptions.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.label)}
                     </option>
                   ))}
                 </Select>
@@ -1053,30 +1092,30 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                   }}
                   tone="secondary"
                 >
-                  Clear filters
+                  {t('Clear filters')}
                 </InlineButton>
               </div>
             </ToolbarInline>
 
             <DataTable
               columns={[
-                { key: 'subject', label: 'Subject', render: (row) => row.subject },
-                { key: 'scope', label: workbenchConfig.scopeLabel, render: (row) => row.scope },
-                { key: 'status', label: 'Status', render: (row) => row.status },
-                { key: 'detail', label: workbenchConfig.detailLabel, render: (row) => row.detail },
+                { key: 'subject', label: t('Subject'), render: (row) => row.subject },
+                { key: 'scope', label: t(workbenchConfig.scopeLabel), render: (row) => row.scope },
+                { key: 'status', label: t('Status'), render: (row) => row.status },
+                { key: 'detail', label: t(workbenchConfig.detailLabel), render: (row) => row.detail },
                 {
                   key: 'actions',
-                  label: workbenchConfig.actionsLabel,
+                  label: t(workbenchConfig.actionsLabel),
                   render: (row) => row.actions,
                 },
               ]}
               empty={(
                 <div className="mx-auto flex max-w-[34rem] flex-col items-center gap-2 text-center">
                   <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-                    {workbenchConfig.emptyTitle}
+                    {t(workbenchConfig.emptyTitle)}
                   </strong>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {workbenchConfig.emptyDetail}
+                    {t(workbenchConfig.emptyDetail)}
                   </p>
                 </div>
               )}
@@ -1088,8 +1127,10 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
 
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <Surface
-            detail="Guardrail posture keeps cost, latency, regional preference, and the latest routing signals readable before you publish changes."
-            title="Guardrail posture"
+            detail={t(
+              'Guardrail posture keeps cost, latency, regional preference, and the latest routing signals readable before you publish changes.',
+            )}
+            title={t('Guardrail posture')}
           >
             <div className="grid gap-4">
               <RoutingCardGrid columns="xl:grid-cols-2" items={guardrailCards} />
@@ -1098,14 +1139,15 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                      Latest routing signals
+                      {t('Latest routing signals')}
                     </strong>
                     <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                      Preview and live traces stay adjacent to guardrails so posture changes remain
-                      explainable without secondary tabs.
+                      {t(
+                        'Preview and live traces stay adjacent to guardrails so posture changes remain explainable without secondary tabs.',
+                      )}
                     </p>
                   </div>
-                  <Pill tone="accent">{`${latestSignals.length} signals`}</Pill>
+                  <Pill tone="accent">{t('{count} signals', { count: latestSignals.length })}</Pill>
                 </div>
 
                 <div className="mt-4 grid gap-3">
@@ -1132,8 +1174,8 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                     ))
                   ) : (
                     <EmptyState
-                      detail="Run a preview or wait for live traffic to collect routing signals."
-                      title="No routing signals yet"
+                      detail={t('Run a preview or wait for live traffic to collect routing signals.')}
+                      title={t('No routing signals yet')}
                     />
                   )}
                 </div>
@@ -1142,8 +1184,10 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
           </Surface>
 
           <Surface
-            detail="Preview outcome keeps the selected provider, fallback path, and provider assessments visible before traffic posture is saved."
-            title="Preview outcome"
+            detail={t(
+              'Preview outcome keeps the selected provider, fallback path, and provider assessments visible before traffic posture is saved.',
+            )}
+            title={t('Preview outcome')}
           >
             <div className="grid gap-4">
               <RoutingCardGrid columns="xl:grid-cols-2" items={previewOutcomeCards} />
@@ -1152,11 +1196,12 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <strong className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                      Candidate assessments
+                      {t('Candidate assessments')}
                     </strong>
                     <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                      Selection evidence stays operationally readable so support teams can validate
-                      health, latency, and policy posture before rollout.
+                      {t(
+                        'Selection evidence stays operationally readable so support teams can validate health, latency, and policy posture before rollout.',
+                      )}
                     </p>
                   </div>
                   <Pill
@@ -1169,10 +1214,10 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                     }
                   >
                     {viewModel.preview.slo_degraded
-                      ? 'Degraded fallback'
+                      ? t('Degraded fallback')
                       : viewModel.preview.slo_applied
-                        ? 'Guardrails applied'
-                        : 'Preview only'}
+                        ? t('Guardrails applied')
+                        : t('Preview only')}
                   </Pill>
                 </div>
 
@@ -1190,11 +1235,11 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                             </strong>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">
                               {assessment.region ? `${assessment.region} / ` : ''}
-                              {assessment.available ? 'Available' : 'Not available'}
+                              {assessment.available ? t('Available') : t('Not available')}
                             </p>
                           </div>
                           <Pill tone={assessment.available ? 'positive' : 'warning'}>
-                            {assessment.health}
+                            {t(assessment.health)}
                           </Pill>
                         </div>
 
@@ -1211,14 +1256,14 @@ export function PortalRoutingPage({ onNavigate }: PortalRoutingPageProps) {
                         <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                           {assessment.reasons[0]
                             ?? assessment.slo_violations[0]
-                            ?? 'The preview did not expose additional assessment detail for this provider.'}
+                            ?? t('The preview did not expose additional assessment detail for this provider.')}
                         </p>
                       </article>
                     ))
                   ) : (
                     <EmptyState
-                      detail="Run a preview to inspect provider-level candidate assessments."
-                      title="No preview assessments yet"
+                      detail={t('Run a preview to inspect provider-level candidate assessments.')}
+                      title={t('No preview assessments yet')}
                     />
                   )}
                 </div>

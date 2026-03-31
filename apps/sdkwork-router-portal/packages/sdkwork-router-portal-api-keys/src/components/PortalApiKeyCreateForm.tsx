@@ -7,39 +7,13 @@ import {
   Input,
   Select,
   Textarea,
+  usePortalI18n,
 } from 'sdkwork-router-portal-commons';
 
 import type {
   PortalApiKeyCreateFormState,
   PortalApiKeyCreateMode,
 } from '../types';
-
-const environmentOptions = [
-  { value: 'live', label: 'live' },
-  { value: 'staging', label: 'staging' },
-  { value: 'test', label: 'test' },
-  { value: 'custom', label: 'Custom environment' },
-] as const;
-
-const keyModeOptions: Array<{
-  id: PortalApiKeyCreateMode;
-  title: string;
-  detail: string;
-  icon: typeof Sparkles;
-}> = [
-  {
-    id: 'system-generated',
-    title: 'System generated',
-    detail: 'Let Portal create a one-time plaintext secret that is stored in write-only mode.',
-    icon: Sparkles,
-  },
-  {
-    id: 'custom',
-    title: 'Custom key',
-    detail: 'Provide an exact plaintext value when rollout coordination requires a predefined credential.',
-    icon: KeyRound,
-  },
-];
 
 function SelectionCard({
   title,
@@ -97,18 +71,46 @@ export function PortalApiKeyCreateForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   submitting: boolean;
 }) {
+  const { t } = usePortalI18n();
   const isSystemGenerated = formState.keyMode === 'system-generated';
+  const environmentOptions = [
+    { value: 'live', label: t('Live') },
+    { value: 'staging', label: t('Staging') },
+    { value: 'test', label: t('Test') },
+    { value: 'custom', label: t('Custom environment') },
+  ] as const;
+  const keyModeOptions: Array<{
+    id: PortalApiKeyCreateMode;
+    title: string;
+    detail: string;
+    icon: typeof Sparkles;
+  }> = [
+    {
+      id: 'system-generated',
+      title: t('System generated'),
+      detail: t('Let Portal create a one-time plaintext secret that is stored in write-only mode.'),
+      icon: Sparkles,
+    },
+    {
+      id: 'custom',
+      title: t('Custom key'),
+      detail: t('Provide an exact plaintext value when rollout coordination requires a predefined credential.'),
+      icon: KeyRound,
+    },
+  ];
 
   return (
     <form className="space-y-6" onSubmit={onSubmit}>
       <section className="rounded-[28px] border border-zinc-200 bg-zinc-50/80 p-5 dark:border-zinc-800 dark:bg-zinc-900/50">
         <div className="grid gap-5 lg:grid-cols-2">
           <FormField
-            hint="Keep labels auditable for incident review, ownership review, and future rotation."
-            label="Key label"
+            hint={t(
+              'Keep labels auditable for incident review, ownership review, and future rotation.',
+            )}
+            label={t('Key label')}
           >
             <Input
-              placeholder="Production rollout"
+              placeholder={t('Production rollout')}
               value={formState.label}
               onChange={(event) =>
                 onChange((current) => ({ ...current, label: event.target.value }))
@@ -117,8 +119,8 @@ export function PortalApiKeyCreateForm({
           </FormField>
 
           <FormField
-            hint="Choose which workspace boundary this key should protect."
-            label="Environment boundary"
+            hint={t('Choose which workspace boundary this key should protect.')}
+            label={t('Environment boundary')}
           >
             <Select
               value={formState.environment}
@@ -137,11 +139,11 @@ export function PortalApiKeyCreateForm({
           {formState.environment === 'custom' ? (
             <div className="lg:col-span-2">
               <FormField
-                hint="Examples: canary, partner, sandbox-eu"
-                label="Custom environment"
+                hint={t('Examples: canary, partner, sandbox-eu')}
+                label={t('Custom environment')}
               >
                 <Input
-                  placeholder="Custom environment"
+                  placeholder={t('Custom environment')}
                   value={formState.customEnvironment}
                   onChange={(event) =>
                     onChange((current) => ({ ...current, customEnvironment: event.target.value }))
@@ -151,13 +153,13 @@ export function PortalApiKeyCreateForm({
             </div>
           ) : null}
 
-          <div className="space-y-2 lg:col-span-2">
-            <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-              Gateway key mode
-            </div>
-            <p className="text-xs leading-6 text-zinc-500 dark:text-zinc-400">
-              Choose whether Portal generates the secret or stores a custom plaintext value for this workspace boundary.
-            </p>
+          <FormField
+            className="space-y-3 lg:col-span-2"
+            hint={t(
+              'Choose whether Portal generates the secret or stores a custom plaintext value for this workspace boundary.',
+            )}
+            label={t('Gateway key mode')}
+          >
             <div className="grid gap-3 md:grid-cols-2">
               {keyModeOptions.map((option) => (
                 <SelectionCard
@@ -176,7 +178,7 @@ export function PortalApiKeyCreateForm({
                 />
               ))}
             </div>
-          </div>
+          </FormField>
 
           {isSystemGenerated ? (
             <div className="lg:col-span-2 rounded-[24px] border border-primary-500/15 bg-primary-500/8 p-4 dark:border-primary-500/20 dark:bg-primary-500/10">
@@ -186,13 +188,15 @@ export function PortalApiKeyCreateForm({
                 </span>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    Portal-managed key
+                    {t('Portal-managed key')}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                    Portal will generate a one-time plaintext secret, persist only the hashed value, and reveal the plaintext once after creation.
+                    {t(
+                      'Portal will generate a one-time plaintext secret, persist only the hashed value, and reveal the plaintext once after creation.',
+                    )}
                   </p>
                   <div className="mt-3 rounded-2xl border border-dashed border-primary-500/25 bg-white/70 px-3 py-3 text-sm text-zinc-600 dark:border-primary-500/20 dark:bg-zinc-950/50 dark:text-zinc-300">
-                    A one-time plaintext key will be revealed after creation.
+                    {t('A one-time plaintext key will be revealed after creation.')}
                   </div>
                 </div>
               </div>
@@ -200,8 +204,8 @@ export function PortalApiKeyCreateForm({
           ) : (
             <div className="lg:col-span-2">
               <FormField
-                hint="Paste the exact plaintext value that should be stored in write-only mode."
-                label="API key"
+                hint={t('Paste the exact plaintext value that should be stored in write-only mode.')}
+                label={t('API key')}
               >
                 <Input
                   autoComplete="off"
@@ -218,8 +222,8 @@ export function PortalApiKeyCreateForm({
           )}
 
           <FormField
-            hint="Optional. Leave empty to keep this key active until you revoke it."
-            label="Expires at"
+            hint={t('Optional. Leave empty to keep this key active until you revoke it.')}
+            label={t('Expires at')}
           >
             <Input
               type="date"
@@ -231,12 +235,12 @@ export function PortalApiKeyCreateForm({
           </FormField>
 
           <FormField
-            hint="Add operator context, ownership, or rollout details for future review."
-            label="Notes"
+            hint={t('Add operator context, ownership, or rollout details for future review.')}
+            label={t('Notes')}
           >
             <Textarea
               rows={5}
-              placeholder="Operator-managed migration key"
+              placeholder={t('Operator-managed migration key')}
               value={formState.notes}
               onChange={(event) =>
                 onChange((current) => ({ ...current, notes: event.target.value }))
@@ -248,7 +252,7 @@ export function PortalApiKeyCreateForm({
 
       <div className="flex flex-wrap justify-end gap-3">
         <InlineButton disabled={submitting} tone="primary" type="submit">
-          {submitting ? 'Creating API key...' : 'Create API key'}
+          {submitting ? t('Creating API key...') : t('Create API key')}
         </InlineButton>
       </div>
     </form>

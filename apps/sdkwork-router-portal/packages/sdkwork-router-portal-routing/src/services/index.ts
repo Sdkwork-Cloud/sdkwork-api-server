@@ -6,6 +6,7 @@ import type {
   PortalRoutingSummary,
   PortalRoutingStrategy,
 } from 'sdkwork-router-portal-types';
+import { translatePortalText } from 'sdkwork-router-portal-commons/i18n-core';
 
 import type {
   PortalRoutingPageViewModel,
@@ -16,7 +17,7 @@ import type {
 
 function formatRoutingDateTime(timestamp: number): string {
   if (!timestamp) {
-    return 'Pending';
+    return translatePortalText('Pending');
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -31,7 +32,7 @@ function normalizeRoutingAssessment(
   assessment: Partial<PortalRoutingAssessment> | null | undefined,
 ): PortalRoutingAssessment {
   return {
-    provider_id: assessment?.provider_id ?? 'Unknown provider',
+    provider_id: assessment?.provider_id ?? translatePortalText('Unknown provider'),
     available: assessment?.available ?? false,
     health: assessment?.health ?? 'unknown',
     policy_rank: assessment?.policy_rank ?? 0,
@@ -50,7 +51,7 @@ function normalizeRoutingDecision(
   decision: Partial<PortalRoutingDecision> | null | undefined,
 ): PortalRoutingDecision {
   return {
-    selected_provider_id: decision?.selected_provider_id ?? 'Unavailable',
+    selected_provider_id: decision?.selected_provider_id ?? translatePortalText('Unavailable'),
     candidate_ids: Array.isArray(decision?.candidate_ids) ? decision.candidate_ids : [],
     matched_policy_id: decision?.matched_policy_id ?? null,
     strategy: decision?.strategy ?? null,
@@ -75,7 +76,7 @@ function normalizeRoutingDecisionLog(
     project_id: log.project_id ?? null,
     capability: log.capability ?? 'unknown',
     route_key: log.route_key ?? 'unknown',
-    selected_provider_id: log.selected_provider_id ?? 'Unavailable',
+    selected_provider_id: log.selected_provider_id ?? translatePortalText('Unavailable'),
     matched_policy_id: log.matched_policy_id ?? null,
     strategy: log.strategy ?? 'unknown',
     selection_seed: log.selection_seed ?? null,
@@ -95,17 +96,17 @@ export function buildRoutingStrategyLabel(
 ): string {
   switch (strategy) {
     case 'deterministic_priority':
-      return 'Predictable order';
+      return translatePortalText('Predictable order');
     case 'weighted_random':
-      return 'Traffic distribution';
+      return translatePortalText('Traffic distribution');
     case 'slo_aware':
-      return 'Reliability guardrails';
+      return translatePortalText('Reliability guardrails');
     case 'geo_affinity':
-      return 'Regional preference';
+      return translatePortalText('Regional preference');
     case 'static_fallback':
-      return 'Platform fallback';
+      return translatePortalText('Platform fallback');
     default:
-      return 'Adaptive routing';
+      return translatePortalText('Adaptive routing');
   }
 }
 
@@ -115,29 +116,37 @@ function buildPresetCards(
   return [
     {
       id: 'predictable',
-      title: 'Predictable order',
-      detail: 'The first healthy available provider in your ordered list wins, and the next provider becomes the deterministic fallback.',
+      title: translatePortalText('Predictable order'),
+      detail: translatePortalText(
+        'The first healthy available provider in your ordered list wins, and the next provider becomes the deterministic fallback.',
+      ),
       strategy: 'deterministic_priority',
       active: preferences.strategy === 'deterministic_priority',
     },
     {
       id: 'distribution',
-      title: 'Traffic distribution',
-      detail: 'Spread traffic across eligible providers when you want to balance exposure instead of pinning every request to one path.',
+      title: translatePortalText('Traffic distribution'),
+      detail: translatePortalText(
+        'Spread traffic across eligible providers when you want to balance exposure instead of pinning every request to one path.',
+      ),
       strategy: 'weighted_random',
       active: preferences.strategy === 'weighted_random',
     },
     {
       id: 'reliability',
-      title: 'Reliability guardrails',
-      detail: 'Bias toward healthy, low-latency, and policy-compliant providers when production confidence matters more than raw spread.',
+      title: translatePortalText('Reliability guardrails'),
+      detail: translatePortalText(
+        'Bias toward healthy, low-latency, and policy-compliant providers when production confidence matters more than raw spread.',
+      ),
       strategy: 'slo_aware',
       active: preferences.strategy === 'slo_aware',
     },
     {
       id: 'regional',
-      title: 'Regional preference',
-      detail: 'Prefer providers that match the target region so routing stays closer to user locality and compliance boundaries.',
+      title: translatePortalText('Regional preference'),
+      detail: translatePortalText(
+        'Prefer providers that match the target region so routing stays closer to user locality and compliance boundaries.',
+      ),
       strategy: 'geo_affinity',
       active: preferences.strategy === 'geo_affinity',
     },
@@ -151,31 +160,39 @@ function buildGuardrails(
   return [
     {
       id: 'provider-default',
-      label: 'Default provider',
+      label: translatePortalText('Default provider'),
       value: preferences.default_provider_id ?? 'Auto',
-      detail: 'A default provider acts as the stable fallback when multiple candidates remain eligible.',
+      detail: translatePortalText(
+        'A default provider acts as the stable fallback when multiple candidates remain eligible.',
+      ),
     },
     {
       id: 'cost',
-      label: 'Max cost',
+      label: translatePortalText('Max cost'),
       value: preferences.max_cost === null || preferences.max_cost === undefined
         ? 'Open'
         : `$${preferences.max_cost.toFixed(2)}`,
-      detail: 'Keep a cost ceiling visible so route posture reflects commercial intent, not only technical possibility.',
+      detail: translatePortalText(
+        'Keep a cost ceiling visible so route posture reflects commercial intent, not only technical possibility.',
+      ),
     },
     {
       id: 'latency',
-      label: 'Max latency',
+      label: translatePortalText('Max latency'),
       value: preferences.max_latency_ms === null || preferences.max_latency_ms === undefined
         ? 'Open'
         : `${preferences.max_latency_ms}ms`,
-      detail: 'Latency guardrails let the workspace make reliability posture explicit before traffic starts flowing.',
+      detail: translatePortalText(
+        'Latency guardrails let the workspace make reliability posture explicit before traffic starts flowing.',
+      ),
     },
     {
       id: 'region',
-      label: 'Preferred region',
+      label: translatePortalText('Preferred region'),
       value: preview.requested_region ?? preferences.preferred_region ?? 'Auto',
-      detail: 'The active route preview should always show the region signal that influenced provider selection.',
+      detail: translatePortalText(
+        'The active route preview should always show the region signal that influenced provider selection.',
+      ),
     },
   ];
 }
@@ -186,7 +203,13 @@ function buildEvidence(
   return logs.slice(0, 4).map((log) => ({
     id: log.decision_id,
     title: `${log.route_key} -> ${log.selected_provider_id}`,
-    detail: `${log.decision_source} used ${log.strategy}${log.requested_region ? ` in ${log.requested_region}` : ''}.`,
+    detail: translatePortalText('{source} used {strategy}{regionSuffix}.', {
+      source: log.decision_source,
+      strategy: buildRoutingStrategyLabel(log.strategy),
+      regionSuffix: log.requested_region
+        ? translatePortalText(' in {region}', { region: log.requested_region })
+        : '',
+    }),
     timestamp_label: formatRoutingDateTime(log.created_at_ms),
   }));
 }

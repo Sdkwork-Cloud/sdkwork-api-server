@@ -178,3 +178,11 @@ test('admin compact list toolbars keep search first, actions right, and filters 
     assert.match(source, /ToolbarInline/);
   }
 });
+
+test('admin toolbar search primitive exposes stable wrapper and input classes for icon-safe spacing', () => {
+  const commons = read('packages/sdkwork-router-admin-commons/src/index.tsx');
+
+  assert.match(commons, /cn\('adminx-toolbar-search-input', className\)/);
+  assert.match(commons, /cn\('adminx-toolbar-search-input-element', inputClassName\)/);
+  assert.match(commons, /<span className="adminx-toolbar-field-control adminx-toolbar-search-control">/);
+});

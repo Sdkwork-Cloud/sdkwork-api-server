@@ -301,6 +301,10 @@ test('vite config serves static assets from the /admin/ base path', () => {
   const viteConfig = read('vite.config.ts');
 
   assert.match(viteConfig, /base:\s*'\/admin\/'/);
+  assert.match(viteConfig, /manualChunks/);
+  assert.match(viteConfig, /react-vendor/);
+  assert.match(viteConfig, /radix-vendor/);
+  assert.match(viteConfig, /charts-vendor|motion-vendor|icon-vendor/);
 });
 
 test('admin root app enables the claw-studio tailwind v4 substrate', () => {
@@ -315,8 +319,23 @@ test('admin root app enables the claw-studio tailwind v4 substrate', () => {
   assert.match(viteConfig, /plugins:\s*\[react\(\),\s*tailwindcss\(\)\]/);
   assert.match(theme, /@import "tailwindcss";/);
   assert.match(theme, /@plugin "@tailwindcss\/typography";/);
-  assert.match(theme, /@source "\.\.\/\.\.\/\.\.\/\.\.\//);
+  assert.match(theme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/src";/);
+  assert.match(theme, /@source "\.\.\/\.\.\/\.\.\/";/);
+  assert.doesNotMatch(theme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
   assert.match(theme, /@theme\s*\{/);
+});
+
+test('admin routes lazy-load workbench modules behind a loading boundary', () => {
+  const routes = read('packages/sdkwork-router-admin-shell/src/application/router/AppRoutes.tsx');
+
+  assert.match(routes, /lazy,\s*Suspense/);
+  assert.match(routes, /const OverviewPage = lazy/);
+  assert.match(routes, /const UsersPage = lazy/);
+  assert.match(routes, /const CatalogPage = lazy/);
+  assert.match(routes, /const GatewayAccessPage = lazy/);
+  assert.match(routes, /<Suspense fallback=\{<LoadingScreen \/>}/);
+  assert.doesNotMatch(routes, /import \{ OverviewPage \} from 'sdkwork-router-admin-overview';/);
+  assert.doesNotMatch(routes, /import \{ UsersPage \} from 'sdkwork-router-admin-users';/);
 });
 
 test('admin commons package exposes radix and shadcn-style dependencies', () => {

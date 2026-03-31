@@ -1,7 +1,7 @@
 import {
   formatCurrency,
   formatUnits,
-} from 'sdkwork-router-portal-commons';
+} from 'sdkwork-router-portal-commons/format-core';
 import type {
   LedgerEntry,
   ProjectBillingSummary,

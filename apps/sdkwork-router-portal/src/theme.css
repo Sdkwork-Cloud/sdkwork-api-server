@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-@source "../../../../";
+@source "./";
+@source "../packages";
 
 @theme {
   --color-primary-50: var(--theme-primary-50);
@@ -1155,6 +1156,16 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.portalx-search-input {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.portalx-search-input .portalx-search-input-element {
+  padding-left: 2.75rem;
 }
 
 .portalx-split-grid-wide {

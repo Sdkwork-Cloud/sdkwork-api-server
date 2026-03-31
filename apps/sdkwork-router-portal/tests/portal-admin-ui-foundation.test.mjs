@@ -35,6 +35,10 @@ test('portal app adopts the shadcn and tailwind admin-ui foundation', () => {
   assert.doesNotMatch(commonsPackageJson, /"devDependencies"[\s\S]*"tailwind-merge":/);
 
   assert.match(viteConfig, /@tailwindcss\/vite/);
+  assert.match(viteConfig, /manualChunks/);
+  assert.match(viteConfig, /react-vendor/);
+  assert.match(viteConfig, /radix-vendor/);
+  assert.match(viteConfig, /charts-vendor|icon-vendor/);
   assert.match(theme, /@import "tailwindcss";/);
   assert.match(commons, /cva\(/);
   assert.match(commons, /function cn/);
@@ -59,4 +63,12 @@ test('portal commons exposes shadcn-style checkbox, textarea, and modal primitiv
   assert.match(commons, /variant="ghost"/);
   assert.match(commons, /size="icon"/);
   assert.doesNotMatch(commons, /DialogClose asChild>[\s\S]*?<button/);
+});
+
+test('portal search primitives expose stable wrapper and input classes for icon-safe spacing', () => {
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+
+  assert.match(commons, /cn\('portalx-search-input', className\)/);
+  assert.match(commons, /cn\('portalx-search-input-element', inputClassName\)/);
+  assert.match(commons, /style=\{\{ \.\.\.style, paddingLeft: '2\.75rem' \}\}/);
 });

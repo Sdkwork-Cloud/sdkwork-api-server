@@ -1,4 +1,4 @@
-import { formatDateTime } from 'sdkwork-router-portal-commons';
+import { formatDateTime } from 'sdkwork-router-portal-commons/format-core';
 import type { PortalWorkspaceSummary } from 'sdkwork-router-portal-types';
 
 import type {

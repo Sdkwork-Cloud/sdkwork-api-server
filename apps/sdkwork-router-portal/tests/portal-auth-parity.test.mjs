@@ -110,6 +110,25 @@ test('portal auth visuals follow the claw-style split card layout instead of the
   assert.doesNotMatch(appRoutes, /function AuthLayout/);
 });
 
+test('portal auth localizes qr guidance and field placeholders through the shared i18n layer', () => {
+  const authPage = read('packages/sdkwork-router-portal-auth/src/pages/AuthPage.tsx');
+  const commons = read('packages/sdkwork-router-portal-commons/src/index.tsx');
+
+  assert.match(
+    authPage,
+    /t\('Open the desktop app and scan this code to continue without typing credentials\.'\)/,
+  );
+  assert.match(authPage, /placeholder=\{t\('Workspace owner'\)\}/);
+  assert.match(authPage, /placeholder=\{t\('name@example\.com'\)\}/);
+  assert.match(authPage, /placeholder=\{mode === 'register' \? t\('Create a password'\) : t\('Enter your password'\)\}/);
+
+  assert.match(commons, /'Open the desktop app and scan this code to continue without typing credentials\.'/);
+  assert.match(commons, /'Workspace owner'/);
+  assert.match(commons, /'name@example\.com'/);
+  assert.match(commons, /'Create a password'/);
+  assert.match(commons, /'Enter your password'/);
+});
+
 test('portal shell profile dock is wired to shared auth state instead of logout-only props', () => {
   const sidebar = read('packages/sdkwork-router-portal-core/src/components/Sidebar.tsx');
   const profileDock = read('packages/sdkwork-router-portal-core/src/components/SidebarProfileDock.tsx');

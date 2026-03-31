@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
+    "app:update-create": "node ../../../scripts/app-update-create.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
@@ -59,5 +60,6 @@
     "turbo": "^2.5.8",
     "typescript": "^5.8.2",
     "vite": "^7.0.0"
-  }
+  },
+  "version": "0.1.0"
 }

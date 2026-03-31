@@ -61,6 +61,8 @@ const adminMessages: Record<Exclude<AdminLocale, 'en-US'>, Record<string, string
     Settings: '设置',
     Shell: '壳层',
     'Settings center': '设置中心',
+    'Search settings': '搜索设置',
+    'No settings sections match the current filter.': '当前筛选条件下没有匹配的设置分组。',
     'Open settings center': '打开设置中心',
     'Close account controls': '关闭账户控制',
     'Open account controls': '打开账户控制',
@@ -873,10 +875,10 @@ export function SearchInput({
 }) {
   return (
     <LeadingIconInput
-      className={className}
+      className={cn('adminx-toolbar-search-input', className)}
       icon={<SearchIcon className="h-4 w-4" />}
       iconClassName={iconClassName}
-      inputClassName={inputClassName}
+      inputClassName={cn('adminx-toolbar-search-input-element', inputClassName)}
       style={style}
       type={type}
       {...props}

@@ -1,24 +1,24 @@
-import { Button, DataTable } from 'sdkwork-router-portal-commons';
+import { Button, DataTable, usePortalI18n } from 'sdkwork-router-portal-commons';
 import type { CreatedGatewayApiKey, GatewayApiKeyRecord } from 'sdkwork-router-portal-types';
 
-function formatDate(value?: number | null): string {
+function formatDate(value: number | null | undefined, locale: string, emptyLabel: string): string {
   if (value === null || value === undefined) {
-    return 'Never';
+    return emptyLabel;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   }).format(new Date(value));
 }
 
-function formatLastUsed(value?: number | null): string {
+function formatLastUsed(value: number | null | undefined, locale: string, emptyLabel: string): string {
   if (value === null || value === undefined) {
-    return 'Not yet';
+    return emptyLabel;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -34,16 +34,16 @@ function maskValue(value: string): string {
   return `${value.slice(0, 10)}********${value.slice(-4)}`;
 }
 
-function describeUsage(item: GatewayApiKeyRecord): string {
+function describeUsage(item: GatewayApiKeyRecord, t: (text: string) => string): string {
   if (!item.active) {
-    return 'Revoked from gateway traffic';
+    return t('Revoked from gateway traffic');
   }
 
   if (item.last_used_at_ms) {
-    return 'Gateway traffic observed';
+    return t('Gateway traffic observed');
   }
 
-  return 'Ready for first authenticated request';
+  return t('Ready for first authenticated request');
 }
 
 const secondaryButtonClassName =
@@ -76,13 +76,15 @@ export function PortalApiKeyTable({
   resolvePlaintext: (item: GatewayApiKeyRecord) => string | null;
   onToggleStatus: (item: GatewayApiKeyRecord) => void;
 }) {
+  const { locale, t } = usePortalI18n();
+
   return (
     <div data-slot="portal-api-key-table">
       <DataTable
         columns={[
           {
             key: 'name',
-            label: 'Name',
+            label: t('Name'),
             render: (item) => (
               <div className="min-w-[16rem]">
                 <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
@@ -98,7 +100,7 @@ export function PortalApiKeyTable({
           },
           {
             key: 'key',
-            label: 'API key',
+            label: t('API key'),
             render: (item) => {
               const isLatestCreatedKey = latestCreatedKey?.hashed === item.hashed_key;
               const plaintext = resolvePlaintext(item);
@@ -121,11 +123,11 @@ export function PortalApiKeyTable({
                       type="button"
                       variant="secondary"
                     >
-                      Copy key
+                      {t('Copy key')}
                     </Button>
                   ) : (
                     <span className="inline-flex h-9 items-center justify-center rounded-2xl border border-primary-500/15 bg-primary-500/10 px-3 text-xs font-semibold text-primary-600 dark:border-primary-500/20 dark:text-primary-300">
-                      Write-only
+                      {t('Write-only')}
                     </span>
                   )}
                 </div>
@@ -134,16 +136,16 @@ export function PortalApiKeyTable({
           },
           {
             key: 'source',
-            label: 'Source',
+            label: t('Source'),
             render: () => (
               <span className="inline-flex min-w-[8rem] items-center justify-center rounded-full border border-primary-500/15 bg-primary-500/10 px-3 py-1 text-xs font-semibold text-primary-600 dark:border-primary-500/20 dark:text-primary-300">
-                Portal managed
+                {t('Portal managed')}
               </span>
             ),
           },
           {
             key: 'environment',
-            label: 'Environment',
+            label: t('Environment'),
             render: (item) => (
               <span className="inline-flex min-w-[8rem] items-center justify-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
                 {item.environment}
@@ -152,29 +154,29 @@ export function PortalApiKeyTable({
           },
           {
             key: 'usage',
-            label: 'Usage',
+            label: t('Usage'),
             render: (item) => (
               <div className="min-w-[11rem]">
                 <div className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  {formatLastUsed(item.last_used_at_ms)}
+                  {formatLastUsed(item.last_used_at_ms, locale, t('Not yet'))}
                 </div>
                 <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Last authenticated use
+                  {t('Last authenticated use')}
                 </div>
                 <div className="mt-2 text-xs font-semibold text-primary-500">
-                  {describeUsage(item)}
+                  {describeUsage(item, t)}
                 </div>
               </div>
             ),
           },
           {
             key: 'expires_at',
-            label: 'Expires at',
-            render: (item) => formatDate(item.expires_at_ms),
+            label: t('Expires at'),
+            render: (item) => formatDate(item.expires_at_ms, locale, t('Never')),
           },
           {
             key: 'status',
-            label: 'Status',
+            label: t('Status'),
             render: (item) => (
               <span
                 className={
@@ -183,18 +185,18 @@ export function PortalApiKeyTable({
                     : 'inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300'
                 }
               >
-                {item.active ? 'Active' : 'Inactive'}
+                {item.active ? t('Active') : t('Inactive')}
               </span>
             ),
           },
           {
             key: 'created_at',
-            label: 'Created at',
-            render: (item) => formatDate(item.created_at_ms),
+            label: t('Created at'),
+            render: (item) => formatDate(item.created_at_ms, locale, t('Never')),
           },
           {
             key: 'actions',
-            label: 'Actions',
+            label: t('Actions'),
             render: (item) => (
               <div className="flex min-w-[17rem] flex-wrap gap-2">
                 <Button
@@ -203,7 +205,7 @@ export function PortalApiKeyTable({
                   type="button"
                   variant="secondary"
                 >
-                  Usage method
+                  {t('Usage method')}
                 </Button>
                 <Button
                   className={subtleButtonClassName}
@@ -212,7 +214,7 @@ export function PortalApiKeyTable({
                   type="button"
                   variant="secondary"
                 >
-                  {item.active ? 'Disable' : 'Enable'}
+                  {item.active ? t('Disable') : t('Enable')}
                 </Button>
                 <Button
                   className={dangerButtonClassName}
@@ -221,7 +223,7 @@ export function PortalApiKeyTable({
                   type="button"
                   variant="destructive"
                 >
-                  Delete
+                  {t('Delete')}
                 </Button>
               </div>
             ),
@@ -230,10 +232,10 @@ export function PortalApiKeyTable({
         empty={(
           <div className="mx-auto flex max-w-[32rem] flex-col items-center gap-2 text-center">
             <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-              No API keys yet
+              {t('No API keys yet')}
             </strong>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Create your first key to connect a client or service to the SDKWork Router gateway.
+              {t('Create your first key to connect a client or service to the SDKWork Router gateway.')}
             </p>
           </div>
         )}

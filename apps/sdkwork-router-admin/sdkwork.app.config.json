@@ -1,0 +1,130 @@
+{
+  "app": {
+    "key": "sdkwork-router-admin",
+    "name": "SDKWork Router Admin",
+    "description": null,
+    "appType": "APP_REACT",
+    "versionSource": "package.json",
+    "packageName": null,
+    "bundleId": null
+  },
+  "backend": {
+    "profileKey": "backend-root-admin",
+    "ownerMode": "organization",
+    "grantMode": "current",
+    "platform": "WEB",
+    "appId": "10001",
+    "tenantId": "20001",
+    "organizationId": "30001"
+  },
+  "publish": {
+    "status": "ACTIVE",
+    "installSkill": {
+      "name": "sdkwork-skills-app"
+    },
+    "platforms": [
+      "WEB",
+      "DESKTOP",
+      "DESKTOP_WINDOWS",
+      "DESKTOP_MACOS",
+      "DESKTOP_LINUX"
+    ],
+    "installPlatforms": [
+      "WEB",
+      "DESKTOP",
+      "DESKTOP_WINDOWS",
+      "DESKTOP_MACOS",
+      "DESKTOP_LINUX"
+    ],
+    "defaultPackageId": "web-production",
+    "config": {
+      "workspaceRoot": "apps/sdkwork-api-router/apps/sdkwork-router-admin",
+      "framework": "react-tauri",
+      "managedBy": "apps/scripts/app-update-create.mjs"
+    }
+  },
+  "environments": {
+    "development": {
+      "accessUrl": "https://api-dev.sdkwork.com/apps/sdkwork-router-admin",
+      "deployEnv": "development",
+      "deployUrl": "https://api-dev.sdkwork.com/apps/sdkwork-router-admin"
+    },
+    "test": {
+      "accessUrl": "https://api-test.sdkwork.com/apps/sdkwork-router-admin",
+      "deployEnv": "test",
+      "deployUrl": "https://api-test.sdkwork.com/apps/sdkwork-router-admin"
+    },
+    "production": {
+      "accessUrl": "https://api.sdkwork.com/apps/sdkwork-router-admin",
+      "deployEnv": "production",
+      "deployUrl": "https://api.sdkwork.com/apps/sdkwork-router-admin"
+    }
+  },
+  "artifacts": {
+    "packages": [
+      {
+        "id": "web-production",
+        "name": "SDKWork Router Admin Web Bundle",
+        "sourceType": "WEB_URL",
+        "packageFormat": "ZIP",
+        "platform": "WEB",
+        "urlTemplate": "https://cdn.sdkwork.com/apps/sdkwork-router-admin/{env}/{version}/web.zip",
+        "enabled": true
+      },
+      {
+        "id": "desktop-windows",
+        "name": "SDKWork Router Admin Windows Bundle",
+        "sourceType": "BINARY_URL",
+        "packageFormat": "ZIP",
+        "platform": "DESKTOP_WINDOWS",
+        "urlTemplate": "https://cdn.sdkwork.com/apps/sdkwork-router-admin/{env}/{version}/windows-x64.zip",
+        "enabled": true
+      },
+      {
+        "id": "desktop-macos",
+        "name": "SDKWork Router Admin macOS Bundle",
+        "sourceType": "BINARY_URL",
+        "packageFormat": "DMG",
+        "platform": "DESKTOP_MACOS",
+        "urlTemplate": "https://cdn.sdkwork.com/apps/sdkwork-router-admin/{env}/{version}/macos-universal.dmg",
+        "enabled": true
+      },
+      {
+        "id": "desktop-linux",
+        "name": "SDKWork Router Admin Linux Bundle",
+        "sourceType": "BINARY_URL",
+        "packageFormat": "APPIMAGE",
+        "platform": "DESKTOP_LINUX",
+        "urlTemplate": "https://cdn.sdkwork.com/apps/sdkwork-router-admin/{env}/{version}/linux-x64.AppImage",
+        "enabled": true
+      }
+    ],
+    "runtimePayloads": {
+      "TAURI": {
+        "manifestUrl": "https://cdn.sdkwork.com/apps/sdkwork-router-admin/{env}/tauri/latest.json",
+        "channel": "{env}"
+      }
+    },
+    "metadata": {
+      "workspaceRoot": "apps/sdkwork-api-router/apps/sdkwork-router-admin",
+      "framework": "react-tauri",
+      "packageManager": "pnpm"
+    }
+  },
+  "release": {
+    "channel": "STABLE",
+    "titleTemplate": "SDKWork Router Admin {version}",
+    "summaryTemplate": "SDKWork Router Admin release {version} for {env}",
+    "highlights": [
+      "Unified pnpm app:update-create publish pipeline",
+      "PlusApp metadata synchronized automatically",
+      "Desktop runtime payloads standardized",
+      "Web access URLs kept in sync per environment"
+    ],
+    "forceUpdate": false,
+    "metadata": {
+      "ownerMode": "organization",
+      "framework": "react-tauri"
+    }
+  }
+}
