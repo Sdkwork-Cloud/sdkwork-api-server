@@ -2563,6 +2563,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "sdkwork-api-domain-billing",
+ "sdkwork-api-domain-identity",
  "sdkwork-api-policy-quota",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",

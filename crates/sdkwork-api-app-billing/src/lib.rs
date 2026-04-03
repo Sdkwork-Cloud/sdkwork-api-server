@@ -1,11 +1,12 @@
 use anyhow::{ensure, Result};
 use async_trait::async_trait;
 use sdkwork_api_domain_billing::{
-    AccountBenefitLotRecord, AccountBenefitLotStatus, AccountBenefitType,
-    BillingEventAccountingModeSummary, BillingEventCapabilitySummary, BillingEventGroupSummary,
-    BillingEventProjectSummary, BillingEventRecord, BillingEventSummary, BillingSummary,
-    LedgerEntry, ProjectBillingSummary,
+    AccountBenefitLotRecord, AccountBenefitLotStatus, AccountBenefitType, AccountRecord,
+    AccountStatus, AccountType, BillingEventAccountingModeSummary, BillingEventCapabilitySummary,
+    BillingEventGroupSummary, BillingEventProjectSummary, BillingEventRecord, BillingEventSummary,
+    BillingSummary, LedgerEntry, ProjectBillingSummary,
 };
+use sdkwork_api_domain_identity::GatewayAuthSubject;
 use sdkwork_api_policy_quota::{
     builtin_quota_policy_registry, QuotaPolicyExecutionInput, STRICTEST_LIMIT_QUOTA_POLICY_ID,
 };
@@ -318,6 +319,34 @@ where
         sufficient_balance: shortfall_quantity <= f64::EPSILON,
         allocations,
     })
+}
+
+pub async fn resolve_payable_account_for_gateway_subject<S>(
+    store: &S,
+    subject: &GatewayAuthSubject,
+) -> Result<Option<AccountRecord>>
+where
+    S: AccountKernelStore + ?Sized,
+{
+    let Some(account) = store
+        .find_account_record_by_owner(
+            subject.tenant_id,
+            subject.organization_id,
+            subject.user_id,
+            AccountType::Primary,
+        )
+        .await?
+    else {
+        return Ok(None);
+    };
+
+    ensure!(
+        account.status == AccountStatus::Active,
+        "primary account {} is not active",
+        account.account_id
+    );
+
+    Ok(Some(account))
 }
 
 pub async fn persist_ledger_entry(

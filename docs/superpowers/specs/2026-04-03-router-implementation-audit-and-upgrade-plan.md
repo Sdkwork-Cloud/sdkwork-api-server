@@ -173,7 +173,7 @@ Admin and portal are already much better than before, but the next commercial up
 
 ## What Was Landed In This Audit Pass
 
-This pass closes three important structural gaps:
+This pass closes four important structural gaps:
 
 ### Commercial account kernel contract freeze
 
@@ -223,8 +223,24 @@ The identity side is now also beyond design-only status for the canonical gatewa
 This is the right bridge state, but the full request path is still incomplete because:
 
 - the HTTP gateway still authenticates against the legacy workspace-string request context instead of the canonical subject resolver
-- there is still no canonical account lookup step from `GatewayAuthSubject` to the payable `ai_account`
+- the HTTP gateway still does not consume the canonical subject-to-account resolver on live admission paths
 - hold, release, and settlement mutations still do not execute inside a transactional account-kernel orchestration layer
+
+### Canonical payable-account subject resolution
+
+The account side now has the first real bridge from canonical auth subject to canonical payable account:
+
+- `AccountKernelStore` now exposes owner-scope lookup for `(tenant_id, organization_id, user_id, account_type)`
+- SQLite implements the indexed owner-scope query against `ai_account`
+- `sdkwork-api-app-billing` now resolves the active primary `ai_account` for a `GatewayAuthSubject`
+- resolution returns `None` when a payable account has not yet been provisioned
+- suspended or closed primary accounts now fail closed instead of being silently treated as chargeable
+
+This is the correct precondition for the next billing phase, but it is still only a bridge layer because:
+
+- the HTTP gateway still admits requests on the legacy workspace-string path
+- request execution still does not create transactional holds or settlements in the canonical kernel
+- PostgreSQL still lacks real account-kernel CRUD parity beyond schema mirroring
 
 ### Product-module manifest uplift
 
@@ -267,7 +283,7 @@ This phase should start with domain and storage contracts plus compatibility pro
 
 Immediate next step after this audit update:
 
-- extend the new `sdkwork-api-app-billing` account service from read-models and hold planning into real hold creation, release, and settlement mutations
+- extend the new `sdkwork-api-app-billing` account service from subject resolution, read-models, and hold planning into real hold creation, release, and settlement mutations
 - keep PostgreSQL storage parity as the next storage follow-up so the new kernel remains database-portable
 
 ### Phase 2: Gateway settlement flow

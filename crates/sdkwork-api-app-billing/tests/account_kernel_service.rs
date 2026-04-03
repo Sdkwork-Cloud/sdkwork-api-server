@@ -1,8 +1,11 @@
-use sdkwork_api_app_billing::{plan_account_hold, summarize_account_balance};
+use sdkwork_api_app_billing::{
+    plan_account_hold, resolve_payable_account_for_gateway_subject, summarize_account_balance,
+};
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountRecord,
-    AccountType,
+    AccountStatus, AccountType,
 };
+use sdkwork_api_domain_identity::GatewayAuthSubject;
 use sdkwork_api_storage_core::AccountKernelStore;
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
@@ -142,4 +145,61 @@ async fn plans_hold_across_lots_in_spend_order_and_reports_shortfall() {
             .collect::<Vec<_>>(),
         vec![(8103, 20.0), (8102, 30.0), (8101, 80.0)]
     );
+}
+
+#[tokio::test]
+async fn resolves_active_primary_account_for_gateway_auth_subject() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let primary_account = AccountRecord::new(7301, 1001, 2002, 9001, AccountType::Primary)
+        .with_created_at_ms(10)
+        .with_updated_at_ms(10);
+    let grant_account = AccountRecord::new(7302, 1001, 2002, 9001, AccountType::Grant)
+        .with_created_at_ms(11)
+        .with_updated_at_ms(11);
+    store.insert_account_record(&primary_account).await.unwrap();
+    store.insert_account_record(&grant_account).await.unwrap();
+
+    let subject = GatewayAuthSubject::for_api_key(1001, 2002, 9001, 778899, "hash_live");
+    let resolved = resolve_payable_account_for_gateway_subject(&store, &subject)
+        .await
+        .unwrap();
+
+    assert_eq!(resolved, Some(primary_account));
+}
+
+#[tokio::test]
+async fn payable_account_resolution_returns_none_when_primary_account_is_missing() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let subject = GatewayAuthSubject::for_api_key(1001, 2002, 9001, 778899, "hash_live");
+    let resolved = resolve_payable_account_for_gateway_subject(&store, &subject)
+        .await
+        .unwrap();
+
+    assert_eq!(resolved, None);
+}
+
+#[tokio::test]
+async fn payable_account_resolution_rejects_inactive_primary_accounts() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let suspended_account = AccountRecord::new(7401, 1001, 2002, 9001, AccountType::Primary)
+        .with_status(AccountStatus::Suspended)
+        .with_created_at_ms(10)
+        .with_updated_at_ms(10);
+    store
+        .insert_account_record(&suspended_account)
+        .await
+        .unwrap();
+
+    let subject = GatewayAuthSubject::for_api_key(1001, 2002, 9001, 778899, "hash_live");
+    let error = resolve_payable_account_for_gateway_subject(&store, &subject)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.to_string(), "primary account 7401 is not active");
 }

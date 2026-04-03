@@ -2,8 +2,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountHoldAllocationRecord, AccountHoldRecord,
-    AccountLedgerAllocationRecord, AccountLedgerEntryRecord, AccountRecord, BillingEventRecord,
-    LedgerEntry, PricingPlanRecord, PricingRateRecord, QuotaPolicy, RequestSettlementRecord,
+    AccountLedgerAllocationRecord, AccountLedgerEntryRecord, AccountRecord, AccountType,
+    BillingEventRecord, LedgerEntry, PricingPlanRecord, PricingRateRecord, QuotaPolicy,
+    RequestSettlementRecord,
 };
 use sdkwork_api_domain_catalog::{
     Channel, ChannelModelRecord, ModelCatalogEntry, ModelPriceRecord, ProxyProvider,
@@ -960,6 +961,19 @@ pub trait AccountKernelStore: AdminStore {
         Err(unsupported_account_kernel_method(
             self.dialect(),
             "find_account_record",
+        ))
+    }
+
+    async fn find_account_record_by_owner(
+        &self,
+        _tenant_id: u64,
+        _organization_id: u64,
+        _user_id: u64,
+        _account_type: AccountType,
+    ) -> Result<Option<AccountRecord>> {
+        Err(unsupported_account_kernel_method(
+            self.dialect(),
+            "find_account_record_by_owner",
         ))
     }
 

@@ -7781,6 +7781,32 @@ impl AccountKernelStore for SqliteAdminStore {
         row.map(decode_account_record_row).transpose()
     }
 
+    async fn find_account_record_by_owner(
+        &self,
+        tenant_id: u64,
+        organization_id: u64,
+        user_id: u64,
+        account_type: AccountType,
+    ) -> Result<Option<AccountRecord>> {
+        let row = sqlx::query(
+            "SELECT account_id, tenant_id, organization_id, user_id, account_type,
+                    currency_code, credit_unit_code, status, allow_overdraft, overdraft_limit,
+                    created_at_ms, updated_at_ms
+             FROM ai_account
+             WHERE tenant_id = ?
+               AND organization_id = ?
+               AND user_id = ?
+               AND account_type = ?",
+        )
+        .bind(i64::try_from(tenant_id)?)
+        .bind(i64::try_from(organization_id)?)
+        .bind(i64::try_from(user_id)?)
+        .bind(account_type_as_str(account_type))
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(decode_account_record_row).transpose()
+    }
+
     async fn insert_account_benefit_lot(
         &self,
         record: &AccountBenefitLotRecord,
