@@ -42,9 +42,12 @@ test('recharge page keeps pending payment queue visible and routes users back to
 
   assert.match(page, /PortalRechargePage\(\{ onNavigate \}: PortalRechargePageProps\)/);
   assert.doesNotMatch(page, /onNavigate:\s*_onNavigate/);
+  assert.match(page, /Payment information/);
+  assert.match(page, /Recommended/);
   assert.match(page, /Pending payment queue/);
   assert.match(page, /Open billing workbench/);
   assert.match(page, /onClick=\{\(\) => onNavigate\('billing'\)\}/);
+  assert.doesNotMatch(page, /Recharge decision support/);
 });
 
 test('recharge services validate custom recharge amounts against server-managed policy bounds and increments', () => {

@@ -1,9 +1,7 @@
 import {
   createPortalCommerceOrder,
-  getPortalBillingEventSummary,
   getPortalBillingSummary,
   getPortalCommerceCatalog,
-  getPortalCommerceMembership,
   listPortalCommerceOrders,
   previewPortalCommerceQuote,
 } from 'sdkwork-router-portal-portal-api';
@@ -12,21 +10,17 @@ import type { PortalCommerceOrder, PortalCommerceQuote } from 'sdkwork-router-po
 import type { PortalRechargePageData } from '../types';
 
 export async function loadPortalRechargePageData(): Promise<PortalRechargePageData> {
-  const [summary, catalog, orders, membership, billing_event_summary] = await Promise.all([
+  const [summary, catalog, orders] = await Promise.all([
     getPortalBillingSummary(),
     getPortalCommerceCatalog(),
     listPortalCommerceOrders(),
-    getPortalCommerceMembership(),
-    getPortalBillingEventSummary(),
   ]);
 
   return {
     summary,
-    rechargeOptions: catalog.recharge_options,
-    customRechargePolicy: catalog.custom_recharge_policy,
-    orders,
-    membership,
-    billing_event_summary,
+    rechargeOptions: Array.isArray(catalog.recharge_options) ? catalog.recharge_options : [],
+    customRechargePolicy: catalog.custom_recharge_policy ?? null,
+    orders: Array.isArray(orders) ? orders : [],
   };
 }
 

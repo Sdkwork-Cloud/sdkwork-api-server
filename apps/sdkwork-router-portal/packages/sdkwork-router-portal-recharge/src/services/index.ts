@@ -1,8 +1,4 @@
 import type {
-  BillingEventAccountingModeSummary,
-  BillingEventCapabilitySummary,
-  BillingEventSummary,
-  PortalCommerceMembership,
   PortalCommerceOrder,
   PortalCommerceQuote,
   PortalCustomRechargePolicy,
@@ -11,9 +7,7 @@ import type {
 } from 'sdkwork-router-portal-types';
 
 import type {
-  PortalRechargeFinanceProjection,
   PortalRechargeQuoteSnapshot,
-  PortalRechargeSummaryCard,
 } from '../types';
 
 type TranslateFn = (text: string, values?: Record<string, string | number>) => string;
@@ -37,110 +31,6 @@ function formatCurrency(amount: number): string {
 
 function formatUnits(units: number): string {
   return rechargeUnitsFormatter.format(units);
-}
-
-function emptyBillingEventSummary(): BillingEventSummary {
-  return {
-    total_events: 0,
-    project_count: 0,
-    group_count: 0,
-    capability_count: 0,
-    total_request_count: 0,
-    total_units: 0,
-    total_input_tokens: 0,
-    total_output_tokens: 0,
-    total_tokens: 0,
-    total_image_count: 0,
-    total_audio_seconds: 0,
-    total_video_seconds: 0,
-    total_music_seconds: 0,
-    total_upstream_cost: 0,
-    total_customer_charge: 0,
-    projects: [],
-    groups: [],
-    capabilities: [],
-    accounting_modes: [],
-  };
-}
-
-function sortAccountingModes(
-  items: BillingEventAccountingModeSummary[],
-): BillingEventAccountingModeSummary[] {
-  return [...items]
-    .filter((item) => item.event_count > 0)
-    .sort((left, right) =>
-      right.total_customer_charge - left.total_customer_charge
-      || right.request_count - left.request_count
-      || left.accounting_mode.localeCompare(right.accounting_mode),
-    );
-}
-
-function sortCapabilities(
-  items: BillingEventCapabilitySummary[],
-): BillingEventCapabilitySummary[] {
-  return [...items]
-    .filter((item) => item.event_count > 0)
-    .sort((left, right) =>
-      right.total_customer_charge - left.total_customer_charge
-      || right.request_count - left.request_count
-      || right.total_tokens - left.total_tokens
-      || left.capability.localeCompare(right.capability),
-    );
-}
-
-export function buildPortalRechargeFinanceProjection(input: {
-  membership: PortalCommerceMembership | null;
-  billingEventSummary: BillingEventSummary | null | undefined;
-}): PortalRechargeFinanceProjection {
-  const summary = input.billingEventSummary ?? emptyBillingEventSummary();
-
-  return {
-    membership: input.membership,
-    leading_accounting_mode: sortAccountingModes(summary.accounting_modes)[0] ?? null,
-    leading_capability: sortCapabilities(summary.capabilities)[0] ?? null,
-    multimodal_totals: {
-      image_count: summary.total_image_count,
-      audio_seconds: summary.total_audio_seconds,
-      video_seconds: summary.total_video_seconds,
-      music_seconds: summary.total_music_seconds,
-    },
-  };
-}
-
-export function buildPortalRechargeSummaryCards(input: {
-  quote: PortalCommerceQuote | null;
-  rechargeOptions: PortalRechargeOption[];
-  summary: ProjectBillingSummary | null;
-  orders: PortalCommerceOrder[];
-  t: TranslateFn;
-}): PortalRechargeSummaryCard[] {
-  const { orders, quote, rechargeOptions, summary, t } = input;
-  const recommendedOption = rechargeOptions.find((option) => option.recommended) ?? rechargeOptions[0];
-  const balanceValue =
-    summary?.remaining_units === null || summary?.remaining_units === undefined
-      ? t('Unlimited')
-      : formatUnits(summary.remaining_units);
-  const rechargeOrders = orders.filter((order) => (
-    order.target_kind === 'custom_recharge' || order.target_kind === 'recharge_pack'
-  ));
-
-  return [
-    {
-      label: t('Balance'),
-      value: balanceValue,
-      detail: t('Current available balance before the next quota guardrail is reached.'),
-    },
-    {
-      label: t('Effective ratio'),
-      value: quote?.effective_ratio_label ?? recommendedOption?.effective_ratio_label ?? t('n/a'),
-      detail: t('Recharge pricing is quoted from the server-managed recharge policy.'),
-    },
-    {
-      label: t('Recharge orders'),
-      value: formatUnits(rechargeOrders.length),
-      detail: t('Recent top-up orders remain visible together with custom recharge history.'),
-    },
-  ];
 }
 
 export function buildPortalRechargeQuoteSnapshot(input: {
@@ -178,9 +68,9 @@ export function buildPortalRechargeQuoteSnapshot(input: {
 }
 
 export function buildPortalRechargeHistoryRows(
-  orders: PortalCommerceOrder[],
+  orders: PortalCommerceOrder[] | null | undefined,
 ): PortalCommerceOrder[] {
-  return orders
+  return (orders ?? [])
     .filter((order) => order.target_kind === 'custom_recharge' || order.target_kind === 'recharge_pack')
     .slice()
     .sort((left, right) => right.created_at_ms - left.created_at_ms);

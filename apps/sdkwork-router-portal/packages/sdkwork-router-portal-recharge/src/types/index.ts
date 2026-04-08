@@ -1,8 +1,4 @@
 import type {
-  BillingEventAccountingModeSummary,
-  BillingEventCapabilitySummary,
-  BillingEventSummary,
-  PortalCommerceMembership,
   PortalCommerceOrder,
   PortalCommerceQuote,
   PortalCustomRechargePolicy,
@@ -20,14 +16,6 @@ export interface PortalRechargePageData {
   rechargeOptions: PortalRechargeOption[];
   customRechargePolicy: PortalCustomRechargePolicy | null;
   orders: PortalCommerceOrder[];
-  membership: PortalCommerceMembership | null;
-  billing_event_summary: BillingEventSummary;
-}
-
-export interface PortalRechargeSummaryCard {
-  label: string;
-  value: string;
-  detail: string;
 }
 
 export interface PortalRechargeQuoteSnapshot {
@@ -48,18 +36,4 @@ export interface PortalRechargeSelection {
 export interface PortalRechargePageState {
   quote: PortalCommerceQuote | null;
   selection: PortalRechargeSelection | null;
-}
-
-export interface PortalRechargeMultimodalTotals {
-  image_count: number;
-  audio_seconds: number;
-  video_seconds: number;
-  music_seconds: number;
-}
-
-export interface PortalRechargeFinanceProjection {
-  membership: PortalCommerceMembership | null;
-  leading_accounting_mode: BillingEventAccountingModeSummary | null;
-  leading_capability: BillingEventCapabilitySummary | null;
-  multimodal_totals: PortalRechargeMultimodalTotals;
 }

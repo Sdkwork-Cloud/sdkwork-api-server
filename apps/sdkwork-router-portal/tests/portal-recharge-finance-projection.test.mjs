@@ -25,134 +25,71 @@ function loadRechargeServices() {
   );
 }
 
-test('recharge workspace consumes membership and billing event summary across repository, types, services, and page', () => {
+test('recharge workspace removes deleted finance-projection dependencies across repository, types, services, and page', () => {
   const repository = read('packages/sdkwork-router-portal-recharge/src/repository/index.ts');
   const pageTypes = read('packages/sdkwork-router-portal-recharge/src/types/index.ts');
   const services = read('packages/sdkwork-router-portal-recharge/src/services/index.ts');
   const page = read('packages/sdkwork-router-portal-recharge/src/pages/index.tsx');
 
-  assert.match(repository, /getPortalCommerceMembership/);
-  assert.match(repository, /getPortalBillingEventSummary/);
-  assert.match(pageTypes, /membership: PortalCommerceMembership \| null;/);
-  assert.match(pageTypes, /billing_event_summary: BillingEventSummary;/);
-  assert.match(pageTypes, /PortalRechargeFinanceProjection/);
-  assert.match(services, /buildPortalRechargeFinanceProjection/);
-  assert.match(page, /Recharge decision support/);
-  assert.match(page, /Leading accounting mode/);
-  assert.match(page, /Leading capability/);
-  assert.match(page, /Multimodal demand/);
-  assert.match(page, /portal-recharge-decision-support/);
-  assert.match(page, /portal-recharge-multimodal-demand/);
+  assert.doesNotMatch(repository, /getPortalCommerceMembership/);
+  assert.doesNotMatch(repository, /getPortalBillingEventSummary/);
+  assert.doesNotMatch(pageTypes, /membership: PortalCommerceMembership \| null;/);
+  assert.doesNotMatch(pageTypes, /billing_event_summary: BillingEventSummary;/);
+  assert.doesNotMatch(pageTypes, /PortalRechargeFinanceProjection/);
+  assert.doesNotMatch(services, /buildPortalRechargeFinanceProjection/);
+  assert.doesNotMatch(services, /buildPortalRechargeSummaryCards/);
+  assert.match(services, /buildPortalRechargeQuoteSnapshot/);
+  assert.match(page, /Payment information/);
+  assert.doesNotMatch(page, /Recharge decision support/);
+  assert.doesNotMatch(page, /Leading accounting mode/);
+  assert.doesNotMatch(page, /Leading capability/);
+  assert.doesNotMatch(page, /Multimodal demand/);
+  assert.doesNotMatch(page, /portal-recharge-decision-support/);
+  assert.doesNotMatch(page, /portal-recharge-multimodal-demand/);
 });
 
-test('recharge services derive finance projection from membership and billing event evidence', () => {
-  const { buildPortalRechargeFinanceProjection } = loadRechargeServices();
+test('recharge services build payment information snapshot from quote and current balance', () => {
+  const { buildPortalRechargeQuoteSnapshot } = loadRechargeServices();
 
-  const projection = buildPortalRechargeFinanceProjection({
-    membership: {
-      membership_id: 'member-growth',
-      project_id: 'project-demo',
-      user_id: 'user-1',
-      plan_id: 'growth',
-      plan_name: 'Growth',
-      price_cents: 19900,
-      price_label: '$199 / month',
-      cadence: 'monthly',
-      included_units: 12000,
-      status: 'active',
-      source: 'workspace_seed',
-      activated_at_ms: 100,
-      updated_at_ms: 200,
+  const snapshot = buildPortalRechargeQuoteSnapshot({
+    customRechargePolicy: null,
+    quote: {
+      amount_cents: 4900,
+      list_price_cents: 4900,
+      projected_remaining_units: 16400,
+      granted_units: 12000,
+      bonus_units: 400,
+      effective_ratio_label: '248 units / USD',
+      pricing_rule_label: 'Growth top-up',
     },
-    billingEventSummary: {
-      total_events: 4,
-      project_count: 1,
-      group_count: 2,
-      capability_count: 3,
-      total_request_count: 7,
-      total_units: 480,
-      total_input_tokens: 160,
-      total_output_tokens: 120,
-      total_tokens: 280,
-      total_image_count: 6,
-      total_audio_seconds: 92,
-      total_video_seconds: 48,
-      total_music_seconds: 25,
-      total_upstream_cost: 9.1,
-      total_customer_charge: 12.4,
-      projects: [],
-      groups: [],
-      capabilities: [
-        {
-          capability: 'audio',
-          event_count: 1,
-          request_count: 2,
-          total_tokens: 0,
-          image_count: 0,
-          audio_seconds: 92,
-          video_seconds: 48,
-          music_seconds: 25,
-          total_upstream_cost: 1.8,
-          total_customer_charge: 1.4,
-        },
-        {
-          capability: 'responses',
-          event_count: 2,
-          request_count: 4,
-          total_tokens: 280,
-          image_count: 0,
-          audio_seconds: 0,
-          video_seconds: 0,
-          music_seconds: 0,
-          total_upstream_cost: 3.1,
-          total_customer_charge: 4.1,
-        },
-        {
-          capability: 'images',
-          event_count: 1,
-          request_count: 1,
-          total_tokens: 0,
-          image_count: 6,
-          audio_seconds: 0,
-          video_seconds: 0,
-          music_seconds: 0,
-          total_upstream_cost: 4.2,
-          total_customer_charge: 6.9,
-        },
-      ],
-      accounting_modes: [
-        {
-          accounting_mode: 'passthrough',
-          event_count: 1,
-          request_count: 2,
-          total_upstream_cost: 1.8,
-          total_customer_charge: 1.4,
-        },
-        {
-          accounting_mode: 'platform_credit',
-          event_count: 2,
-          request_count: 4,
-          total_upstream_cost: 3.1,
-          total_customer_charge: 4.1,
-        },
-        {
-          accounting_mode: 'byok',
-          event_count: 1,
-          request_count: 1,
-          total_upstream_cost: 4.2,
-          total_customer_charge: 6.9,
-        },
-      ],
+    summary: {
+      remaining_units: 4000,
     },
+    t: (text) => text,
   });
 
-  assert.equal(projection.membership?.plan_name, 'Growth');
-  assert.equal(projection.leading_accounting_mode?.accounting_mode, 'byok');
-  assert.equal(projection.leading_capability?.capability, 'images');
-  assert.deepEqual(projection.multimodal_totals, {
-    image_count: 6,
-    audio_seconds: 92,
-    video_seconds: 48,
-    music_seconds: 25,
+  assert.deepEqual(snapshot, {
+    amountLabel: '$49.00',
+    projectedBalanceLabel: '16,400',
+    grantedUnitsLabel: '12,400',
+    effectiveRatioLabel: '248 units / USD',
+    pricingRuleLabel: 'Growth top-up',
   });
+});
+
+test('recharge data path tolerates missing array payloads so slice-based UI rendering does not crash', () => {
+  const repository = read('packages/sdkwork-router-portal-recharge/src/repository/index.ts');
+  const page = read('packages/sdkwork-router-portal-recharge/src/pages/index.tsx');
+  const { buildPortalRechargeHistoryRows } = loadRechargeServices();
+
+  assert.deepEqual(buildPortalRechargeHistoryRows(undefined), []);
+  assert.match(
+    repository,
+    /rechargeOptions:\s*Array\.isArray\(catalog\.recharge_options\)\s*\?\s*catalog\.recharge_options\s*:\s*\[\]/,
+  );
+  assert.match(
+    repository,
+    /orders:\s*Array\.isArray\(orders\)\s*\?\s*orders\s*:\s*\[\]/,
+  );
+  assert.match(page, /\(options\s*\?\?\s*\[\]\)\s*\.slice\(\)/);
 });

@@ -2,7 +2,6 @@ import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 
 import {
-  formatCurrency,
   formatDateTime,
   formatUnits,
   usePortalI18n,
@@ -20,11 +19,6 @@ import {
 } from 'sdkwork-router-portal-commons/framework/layout';
 import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 import type {
-  BillingAccountingMode,
-  BillingEventAccountingModeSummary,
-  BillingEventCapabilitySummary,
-  BillingEventSummary,
-  PortalCommerceMembership,
   PortalCommerceOrder,
   PortalCommerceOrderStatus,
   PortalCustomRechargePolicy,
@@ -39,32 +33,17 @@ import {
 } from '../repository';
 import {
   buildPortalRechargeHistoryRows,
-  buildPortalRechargeFinanceProjection,
   buildPortalRechargeQuoteSnapshot,
-  buildPortalRechargeSummaryCards,
   formatRechargeAmountInput,
   parseRechargeAmountInput,
   validatePortalRechargeAmount,
 } from '../services';
 import type {
-  PortalRechargeFinanceProjection,
   PortalRechargePageProps,
   PortalRechargeSelection,
 } from '../types';
 
 const PAGE_SIZE = 8;
-
-function titleCaseToken(value: string): string {
-  return value
-    .split(/[-_\s]+/g)
-    .filter(Boolean)
-    .map((segment) =>
-      segment.length <= 3
-        ? segment.toUpperCase()
-        : `${segment.slice(0, 1).toUpperCase()}${segment.slice(1)}`,
-    )
-    .join(' ');
-}
 
 function orderStatusLabel(
   status: PortalCommerceOrderStatus,
@@ -95,137 +74,6 @@ function orderStatusVariant(
     default:
       return 'secondary';
   }
-}
-
-function resolveMembershipStatusLabel(
-  status: string | null | undefined,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  const normalized = status?.trim().toLowerCase() ?? '';
-
-  switch (normalized) {
-    case 'active':
-      return t('Active');
-    case 'inactive':
-      return t('Inactive');
-    case 'canceled':
-    case 'cancelled':
-      return t('Canceled');
-    case 'past_due':
-    case 'past-due':
-      return t('Past due');
-    case 'grace_period':
-    case 'grace-period':
-      return t('Grace period');
-    case 'paused':
-      return t('Paused');
-    default:
-      return status?.trim() ? titleCaseToken(status) : t('Inactive');
-  }
-}
-
-function accountingModeLabel(
-  mode: BillingAccountingMode | null | undefined,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  switch (mode) {
-    case 'platform_credit':
-      return t('Platform credit');
-    case 'byok':
-      return t('BYOK');
-    case 'passthrough':
-      return t('Passthrough');
-    default:
-      return t('Accounting mode');
-  }
-}
-
-function capabilityLabel(
-  capability: string | null | undefined,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  switch (capability?.trim().toLowerCase()) {
-    case 'responses':
-      return t('Responses');
-    case 'images':
-      return t('Images');
-    case 'audio':
-      return t('Audio');
-    case 'video':
-      return t('Video');
-    case 'music':
-      return t('Music');
-    default:
-      return capability?.trim() ? titleCaseToken(capability) : t('Capability');
-  }
-}
-
-function accountingModeDetail(
-  summary: BillingEventAccountingModeSummary | null,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  if (!summary) {
-    return t('Billing event evidence will appear here after routed traffic starts recording chargeback activity.');
-  }
-
-  return t('{requests} requests / {events} events', {
-    requests: formatUnits(summary.request_count),
-    events: formatUnits(summary.event_count),
-  });
-}
-
-function capabilityDetail(
-  summary: BillingEventCapabilitySummary | null,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  if (!summary) {
-    return t('Billing event evidence will appear here after routed traffic starts recording chargeback activity.');
-  }
-
-  const facts: string[] = [];
-
-  if (summary.total_tokens > 0) {
-    facts.push(t('{count} tokens', { count: formatUnits(summary.total_tokens) }));
-  }
-  if (summary.image_count > 0) {
-    facts.push(t('{count} images', { count: formatUnits(summary.image_count) }));
-  }
-  if (summary.audio_seconds > 0) {
-    facts.push(t('{count} audio sec', { count: formatUnits(summary.audio_seconds) }));
-  }
-  if (summary.video_seconds > 0) {
-    facts.push(t('{count} video sec', { count: formatUnits(summary.video_seconds) }));
-  }
-  if (summary.music_seconds > 0) {
-    facts.push(t('{count} music sec', { count: formatUnits(summary.music_seconds) }));
-  }
-
-  facts.push(t('{count} requests', { count: formatUnits(summary.request_count) }));
-
-  return facts.join(' / ');
-}
-
-function membershipDetail(
-  membership: PortalCommerceMembership | null,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  if (!membership) {
-    return t('No active membership is recorded yet. Complete a subscription checkout to activate monthly entitlement posture.');
-  }
-
-  return t('{planName} is the active workspace membership and defines the current subscription entitlement baseline.', {
-    planName: membership.plan_name,
-  });
-}
-
-function buildFinanceProjection(
-  membership: PortalCommerceMembership | null,
-  billingEventSummary: BillingEventSummary | null,
-): PortalRechargeFinanceProjection {
-  return buildPortalRechargeFinanceProjection({
-    membership,
-    billingEventSummary,
-  });
 }
 
 function formatBalance(
@@ -281,11 +129,9 @@ function resolveRechargeValidationMessage(
 export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   const { t } = usePortalI18n();
   const loadingStatus = t('Loading recharge workspace...');
-  const syncedStatus = t('Recharge options and history are synced with the current workspace balance.');
-  const defaultQuoteStatus = t('Select a server-managed recharge amount to preview the top-up quote.');
+  const syncedStatus = t('Recharge options and payment information are synced with the current workspace balance.');
+  const defaultQuoteStatus = t('Choose a recharge package to load payment information.');
   const [summary, setSummary] = useState<ProjectBillingSummary | null>(null);
-  const [membership, setMembership] = useState<PortalCommerceMembership | null>(null);
-  const [billingEventSummary, setBillingEventSummary] = useState<BillingEventSummary | null>(null);
   const [options, setOptions] = useState<PortalRechargeOption[]>([]);
   const [policy, setPolicy] = useState<PortalCustomRechargePolicy | null>(null);
   const [orders, setOrders] = useState<PortalCommerceOrder[]>([]);
@@ -304,8 +150,6 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     try {
       const data = await loadPortalRechargePageData();
       setSummary(data.summary);
-      setMembership(data.membership);
-      setBillingEventSummary(data.billing_event_summary);
       setOptions(data.rechargeOptions);
       setPolicy(data.customRechargePolicy);
       setOrders(data.orders);
@@ -346,7 +190,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
 
     async function loadQuote() {
       setQuoteLoading(true);
-      setQuoteStatus(t('Loading recharge quote...'));
+      setQuoteStatus(t('Loading payment information...'));
 
       try {
         const nextQuote = await previewPortalRechargeQuote({
@@ -359,7 +203,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         }
 
         setQuote(nextQuote);
-        setQuoteStatus(t('Recharge quote is ready and priced by the server-managed recharge policy.'));
+        setQuoteStatus(t('Payment information is ready. Review the package before creating the recharge order.'));
       } catch (error) {
         if (!cancelled) {
           setQuote(null);
@@ -379,6 +223,24 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     };
   }, [selection, summary, t]);
 
+  const sortedOptions = useMemo(
+    () =>
+      (options ?? [])
+        .slice()
+        .sort(
+          (left, right) =>
+            Number(right.recommended) - Number(left.recommended)
+            || left.amount_cents - right.amount_cents,
+        ),
+    [options],
+  );
+  const selectedPresetOption = useMemo(
+    () =>
+      selection?.mode === 'preset'
+        ? sortedOptions.find((option) => option.amount_cents === selection.amountCents) ?? null
+        : null,
+    [selection, sortedOptions],
+  );
   const rechargeOrders = useMemo(() => buildPortalRechargeHistoryRows(orders), [orders]);
   const pendingPaymentOrders = useMemo(
     () => rechargeOrders.filter((order) => order.status === 'pending_payment'),
@@ -399,21 +261,6 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         t,
       }),
     [policy, quote, summary, t],
-  );
-  const summaryCards = useMemo(
-    () =>
-      buildPortalRechargeSummaryCards({
-        quote,
-        rechargeOptions: options,
-        summary,
-        orders,
-        t,
-      }),
-    [options, orders, quote, summary, t],
-  );
-  const financeProjection = useMemo(
-    () => buildFinanceProjection(membership, billingEventSummary),
-    [billingEventSummary, membership],
   );
   const pageStatus = status !== syncedStatus ? status : '';
 
@@ -466,7 +313,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         amount_cents: selection.amountCents,
       });
       await refreshRechargePage({ preserveSelection: true });
-      setQuoteStatus(t('Recharge order created. Open billing when you are ready to settle it.'));
+      setQuoteStatus(t('Recharge order created. Complete payment from billing when you are ready to settle it.'));
       setPage(1);
     } catch (error) {
       setQuoteStatus(portalErrorMessage(error));
@@ -476,186 +323,47 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   }
 
   return (
-    <div className="space-y-4" data-slot="portal-recharge-page">
-      <div
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-        data-slot="portal-recharge-summary-grid"
-      >
-        {summaryCards.map((item) => (
-          <Card
-            className="border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
-            key={item.label}
-          >
-            <CardContent className="space-y-3 p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                {item.label}
-              </p>
-              <strong className="block text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                {item.value}
-              </strong>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{item.detail}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card
-        className="border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
-        data-slot="portal-recharge-decision-support"
-      >
-        <CardContent className="space-y-4 p-5">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-              {t('Recharge decision support')}
-            </h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {t('Recharge posture combines membership baseline, accounting mode mix, and workload shape before you create a top-up order.')}
-            </p>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            <div className="rounded-3xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                {t('Active membership')}
-              </span>
-              <strong className="mt-2 block text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-                {financeProjection.membership?.plan_name ?? t('No active membership')}
-              </strong>
-              <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                {membershipDetail(financeProjection.membership, t)}
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                    {t('Status')}
-                  </span>
-                  <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    {resolveMembershipStatusLabel(financeProjection.membership?.status, t)}
-                  </strong>
-                </div>
-                <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                    {t('Included units')}
-                  </span>
-                  <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                    {financeProjection.membership
-                      ? formatUnits(financeProjection.membership.included_units)
-                      : t('n/a')}
-                  </strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                {t('Leading accounting mode')}
-              </span>
-              <strong className="mt-2 block text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-                {accountingModeLabel(financeProjection.leading_accounting_mode?.accounting_mode, t)}
-              </strong>
-              <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                {accountingModeDetail(financeProjection.leading_accounting_mode, t)}
-              </p>
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                  {t('Customer charge')}
-                </span>
-                <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  {financeProjection.leading_accounting_mode
-                    ? formatCurrency(financeProjection.leading_accounting_mode.total_customer_charge)
-                    : t('n/a')}
-                </strong>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                {t('Leading capability')}
-              </span>
-              <strong className="mt-2 block text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-                {capabilityLabel(financeProjection.leading_capability?.capability, t)}
-              </strong>
-              <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                {capabilityDetail(financeProjection.leading_capability, t)}
-              </p>
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                  {t('Customer charge')}
-                </span>
-                <strong className="mt-2 block text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  {financeProjection.leading_capability
-                    ? formatCurrency(financeProjection.leading_capability.total_customer_charge)
-                    : t('n/a')}
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-            data-slot="portal-recharge-multimodal-demand"
-          >
-            {[
-              { label: t('Images'), value: formatUnits(financeProjection.multimodal_totals.image_count) },
-              { label: t('Audio'), value: formatUnits(financeProjection.multimodal_totals.audio_seconds) },
-              { label: t('Video'), value: formatUnits(financeProjection.multimodal_totals.video_seconds) },
-              { label: t('Music'), value: formatUnits(financeProjection.multimodal_totals.music_seconds) },
-            ].map((item) => (
-              <div
-                className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/60"
-                key={item.label}
-              >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                  {item.label}
-                </span>
-                <strong className="mt-2 block text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                  {item.value}
-                </strong>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t('Multimodal demand keeps image, audio, video, and music traffic visible before a top-up is created.')}
-          </p>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-5" data-slot="portal-recharge-page">
       {pageStatus ? (
         <div
-          className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300"
+          className="rounded-[24px] border border-zinc-200 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300"
           role="status"
         >
           {pageStatus}
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.24fr_0.76fr]">
+      <div className="grid gap-5 xl:grid-cols-[1.14fr_0.86fr] xl:items-start">
         <Card
-          className="border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+          className="overflow-hidden border-zinc-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.07)] dark:border-zinc-800 dark:bg-zinc-950"
           data-slot="portal-recharge-options"
         >
-          <CardContent className="space-y-5 p-5">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                {t('Recharge options')}
-              </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {t('Choose a server-managed top-up amount or enter a custom recharge amount below.')}
-              </p>
+          <CardContent className="space-y-6 p-5 sm:p-6">
+            <div className="space-y-3">
+              <Badge variant="secondary">{t('Commercial recharge')}</Badge>
+              <div className="space-y-2">
+                <h2 className="text-[1.8rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  {t('Recharge options')}
+                </h2>
+                <p className="max-w-[42rem] text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                  {t('Choose the package that restores your workspace runway fastest, or switch to a custom amount when you need tighter control.')}
+                </p>
+              </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              {options.map((option) => {
+            <div className="grid gap-4 md:grid-cols-2">
+              {sortedOptions.map((option) => {
                 const isActive =
                   selection?.amountCents === option.amount_cents && selection.mode === 'preset';
 
                 return (
                   <button
-                    className={`rounded-3xl border p-4 text-left transition-colors ${
+                    className={`group rounded-[30px] border p-5 text-left transition-all ${
                       isActive
-                        ? 'border-zinc-950 bg-zinc-950 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950'
-                        : 'border-zinc-200 bg-zinc-50/70 text-zinc-950 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-50'
+                        ? 'border-zinc-950 bg-zinc-950 text-white shadow-[0_26px_60px_rgba(15,23,42,0.22)] dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950'
+                        : option.recommended
+                          ? 'border-zinc-950/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,244,245,0.9))] shadow-[0_18px_48px_rgba(15,23,42,0.08)] hover:border-zinc-950/30 dark:border-zinc-700 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(39,39,42,0.88))]'
+                          : 'border-zinc-200 bg-white shadow-sm hover:border-zinc-300 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-zinc-800 dark:bg-zinc-950'
                     }`}
                     key={option.id}
                     onClick={() =>
@@ -667,36 +375,68 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                       })}
                     type="button"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <strong className="text-base font-semibold">{option.label}</strong>
                           {option.recommended ? (
                             <Badge variant={isActive ? 'secondary' : 'success'}>
                               {t('Recommended')}
                             </Badge>
                           ) : null}
+                          <span className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                            isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                          }`}
+                          >
+                            {t('Recharge pack')}
+                          </span>
                         </div>
-                        <p className={`text-sm ${isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                          {option.note}
-                        </p>
+                        <div className="space-y-1">
+                          <strong className="block text-[1.85rem] font-semibold tracking-tight">
+                            {option.amount_label}
+                          </strong>
+                          <p className={`text-sm leading-6 ${
+                            isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                          }`}
+                          >
+                            {option.note}
+                          </p>
+                        </div>
                       </div>
-                      <strong className="text-xl font-semibold">{option.amount_label}</strong>
+                      {isActive ? (
+                        <Badge variant="secondary">{t('Selected')}</Badge>
+                      ) : null}
                     </div>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <div className={`rounded-2xl border px-3 py-3 ${isActive ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10' : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950'}`}>
-                        <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'}`}>
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className={`rounded-[22px] border px-4 py-4 ${
+                        isActive
+                          ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10'
+                          : 'border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/70'
+                      }`}
+                      >
+                        <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                          isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                        }`}
+                        >
                           {t('Granted units')}
                         </span>
-                        <strong className="mt-2 block text-sm font-semibold">
+                        <strong className="mt-2 block text-base font-semibold">
                           {formatUnits(option.granted_units)}
                         </strong>
                       </div>
-                      <div className={`rounded-2xl border px-3 py-3 ${isActive ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10' : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950'}`}>
-                        <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                      <div className={`rounded-[22px] border px-4 py-4 ${
+                        isActive
+                          ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10'
+                          : 'border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/70'
+                      }`}
+                      >
+                        <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                          isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                        }`}
+                        >
                           {t('Effective ratio')}
                         </span>
-                        <strong className="mt-2 block text-sm font-semibold">
+                        <strong className="mt-2 block text-base font-semibold">
                           {option.effective_ratio_label}
                         </strong>
                       </div>
@@ -707,7 +447,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
             </div>
 
             <form
-              className="space-y-4 rounded-3xl border border-dashed border-zinc-300 bg-zinc-50/60 p-4 dark:border-zinc-700 dark:bg-zinc-900/50"
+              className="space-y-4 rounded-[30px] border border-dashed border-zinc-300 bg-[linear-gradient(180deg,rgba(250,250,250,0.96),rgba(244,244,245,0.92))] p-5 dark:border-zinc-700 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(39,39,42,0.82))]"
               data-slot="portal-recharge-custom-form"
               onSubmit={(event) => void handleCustomPreview(event)}
             >
@@ -715,8 +455,8 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
                   {t('Custom amount')}
                 </h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {t('Custom recharge follows the server-managed ratio policy and validation step.')}
+                <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                  {t('Need a tailored top-up? Enter a custom amount and the platform will refresh the payment information before you create the order.')}
                 </p>
               </div>
 
@@ -730,7 +470,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                   placeholder={t('Enter amount')}
                   value={customAmountInput}
                 />
-                <Button type="submit" variant="secondary">
+                <Button className="h-11 rounded-2xl px-5" type="submit" variant="secondary">
                   {t('Preview custom amount')}
                 </Button>
               </div>
@@ -753,26 +493,36 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         </Card>
 
         <Card
-          className="border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+          className="overflow-hidden border-zinc-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,244,245,0.94))] shadow-[0_26px_90px_rgba(15,23,42,0.09)] dark:border-zinc-800 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.98),rgba(39,39,42,0.92))]"
           data-slot="portal-recharge-quote-card"
         >
-          <CardContent className="space-y-5 p-5">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                {t('Create recharge order')}
-              </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">{quoteStatus}</p>
+          <CardContent className="space-y-5 p-5 sm:p-6">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{t('Payment information')}</Badge>
+                {selection?.mode === 'custom' ? (
+                  <Badge variant="warning">{t('Custom amount')}</Badge>
+                ) : selectedPresetOption?.recommended ? (
+                  <Badge variant="success">{t('Recommended')}</Badge>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-[1.55rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  {t('Payment information')}
+                </h2>
+                <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{quoteStatus}</p>
+              </div>
             </div>
 
             {quoteSnapshot ? (
               <div className="space-y-4">
-                <div className="rounded-3xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+                <div className="rounded-[28px] border border-zinc-200 bg-white/85 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/80">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
                       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                        {t('Recharge amount')}
+                        {selection?.mode === 'custom' ? t('Custom amount') : t('Selected package')}
                       </span>
-                      <strong className="mt-2 block text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                      <strong className="block text-[2.2rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
                         {quoteSnapshot.amountLabel}
                       </strong>
                     </div>
@@ -781,26 +531,26 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 </div>
 
                 <div className="grid gap-3">
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
                     <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Granted units')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.grantedUnitsLabel}</strong>
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
                     <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Effective ratio')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.effectiveRatioLabel}</strong>
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
                     <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Projected balance')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.projectedBalanceLabel}</strong>
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
                     <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Current balance')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">{formatBalance(summary, t)}</strong>
                   </div>
                 </div>
 
                 <Button
-                  className="h-11 w-full"
+                  className="h-12 w-full rounded-2xl text-sm font-semibold shadow-sm"
                   disabled={quoteLoading || createLoading || !selection?.amountCents}
                   onClick={() => void handleCreateRechargeOrder()}
                 >
@@ -809,8 +559,8 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
               </div>
             ) : (
               <EmptyState
-                description={t('Select a preset amount or preview a custom amount to inspect the server quote.')}
-                title={quoteLoading ? t('Loading quote') : t('No quote selected')}
+                description={t('Select a package or preview a custom amount to review payment information before you create the order.')}
+                title={quoteLoading ? t('Loading payment information') : t('No package selected')}
               />
             )}
           </CardContent>
@@ -828,7 +578,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 {t('Recharge history')}
               </h2>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {t('Recharge history keeps both preset top-ups and custom recharge orders on one table.')}
+                {t('Recent recharge orders stay visible here so finance operators can confirm payment progress without interrupting the purchase flow above.')}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

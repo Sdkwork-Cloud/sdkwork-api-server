@@ -52,7 +52,7 @@ test('portal exposes a dedicated recharge route and package instead of overloadi
   assert.match(accountPage, /onRecharge=\{\(\) => onNavigate\('recharge'\)\}/);
 });
 
-test('recharge page centers server-managed top-up options, custom recharge, and history on one workspace surface', () => {
+test('recharge page simplifies into a three-section commercial purchase surface', () => {
   const page = read('packages/sdkwork-router-portal-recharge/src/pages/index.tsx');
   const repository = read('packages/sdkwork-router-portal-recharge/src/repository/index.ts');
   const services = read('packages/sdkwork-router-portal-recharge/src/services/index.ts');
@@ -75,19 +75,30 @@ test('recharge page centers server-managed top-up options, custom recharge, and 
   assert.match(repository, /previewPortalCommerceQuote/);
   assert.match(repository, /createPortalCommerceOrder/);
   assert.match(repository, /listPortalCommerceOrders/);
+  assert.doesNotMatch(repository, /getPortalCommerceMembership/);
+  assert.doesNotMatch(repository, /getPortalBillingEventSummary/);
   assert.match(repository, /target_kind:\s*'custom_recharge'/);
-  assert.match(services, /buildPortalRecharge/);
+  assert.match(services, /buildPortalRechargeQuoteSnapshot/);
+  assert.match(services, /buildPortalRechargeHistoryRows/);
+  assert.doesNotMatch(services, /buildPortalRechargeFinanceProjection/);
+  assert.doesNotMatch(services, /buildPortalRechargeSummaryCards/);
   assert.match(pageTypes, /PortalRechargePageProps/);
+  assert.doesNotMatch(pageTypes, /membership: PortalCommerceMembership \| null;/);
+  assert.doesNotMatch(pageTypes, /billing_event_summary: BillingEventSummary;/);
+  assert.doesNotMatch(pageTypes, /PortalRechargeFinanceProjection/);
   assert.match(page, /data-slot="portal-recharge-page"/);
-  assert.match(page, /data-slot="portal-recharge-summary-grid"/);
   assert.match(page, /data-slot="portal-recharge-options"/);
   assert.match(page, /data-slot="portal-recharge-custom-form"/);
   assert.match(page, /data-slot="portal-recharge-quote-card"/);
   assert.match(page, /data-slot="portal-recharge-history-table"/);
+  assert.doesNotMatch(page, /data-slot="portal-recharge-summary-grid"/);
+  assert.doesNotMatch(page, /data-slot="portal-recharge-decision-support"/);
+  assert.doesNotMatch(page, /data-slot="portal-recharge-multimodal-demand"/);
   assert.match(page, /Recharge options/);
+  assert.match(page, /Recommended/);
   assert.match(page, /Custom amount/);
+  assert.match(page, /Payment information/);
   assert.match(page, /Recharge history/);
   assert.match(page, /Create recharge order/);
-  assert.match(page, /Balance/);
-  assert.match(page, /Effective ratio/);
+  assert.doesNotMatch(page, /Recharge decision support/);
 });
