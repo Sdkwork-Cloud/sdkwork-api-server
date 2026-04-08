@@ -19,6 +19,7 @@ Thumbs.db
 /artifacts/
 /.external/
 /bin/.sdkwork-target/
+/bin/.sdkwork-target-*/
 /tmp/
 **/.codex-local/
 **/node_modules__rebuild_*/

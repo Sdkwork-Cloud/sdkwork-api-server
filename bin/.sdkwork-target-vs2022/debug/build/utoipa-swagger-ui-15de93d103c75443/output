@@ -1,5 +1,0 @@
-OUT_DIR: D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\build\utoipa-swagger-ui-15de93d103c75443\out
-SWAGGER_UI_DOWNLOAD_URL: https://github.com/swagger-api/swagger-ui/archive/refs/tags/v5.17.14.zip
-using vendored Swagger UI
-zip_top_level_folder: "swagger-ui-5.17.14"
-SWAGGER_UI_OVERWRITE_FOLDER not found: "overwrite"

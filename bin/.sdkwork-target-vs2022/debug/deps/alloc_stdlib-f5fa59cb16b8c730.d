@@ -1,9 +1,0 @@
-D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\alloc_stdlib-f5fa59cb16b8c730.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\heap_alloc.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\std_alloc.rs
-
-D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\liballoc_stdlib-f5fa59cb16b8c730.rlib: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\heap_alloc.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\std_alloc.rs
-
-D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\liballoc_stdlib-f5fa59cb16b8c730.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\heap_alloc.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\std_alloc.rs
-
-C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\lib.rs:
-C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\heap_alloc.rs:
-C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\alloc-stdlib-0.2.2\src\std_alloc.rs:
