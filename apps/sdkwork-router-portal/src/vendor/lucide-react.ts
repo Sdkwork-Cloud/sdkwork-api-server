@@ -17,7 +17,6 @@ import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left.js';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.js';
 import ChevronUp from 'lucide-react/dist/esm/icons/chevron-up.js';
 import ChevronsUpDown from 'lucide-react/dist/esm/icons/chevrons-up-down.js';
-import Chrome from 'lucide-react/dist/esm/icons/chrome.js';
 import Circle from 'lucide-react/dist/esm/icons/circle.js';
 import Coins from 'lucide-react/dist/esm/icons/coins.js';
 import Download from 'lucide-react/dist/esm/icons/download.js';
@@ -34,7 +33,8 @@ import FileVideo from 'lucide-react/dist/esm/icons/file-video.js';
 import Folder from 'lucide-react/dist/esm/icons/folder.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
 import Gauge from 'lucide-react/dist/esm/icons/gauge.js';
-import Github from 'lucide-react/dist/esm/icons/github.js';
+import GitBranch from 'lucide-react/dist/esm/icons/git-branch.js';
+import Globe from 'lucide-react/dist/esm/icons/globe.js';
 import Hash from 'lucide-react/dist/esm/icons/hash.js';
 import ImagePlus from 'lucide-react/dist/esm/icons/image-plus.js';
 import Info from 'lucide-react/dist/esm/icons/info.js';
@@ -99,7 +99,6 @@ export {
   ChevronRight,
   ChevronUp,
   ChevronsUpDown,
-  Chrome,
   Circle,
   Coins,
   Download,
@@ -116,7 +115,8 @@ export {
   Folder,
   FolderOpen,
   Gauge,
-  Github,
+  GitBranch,
+  Globe,
   Hash,
   ImagePlus,
   Info,

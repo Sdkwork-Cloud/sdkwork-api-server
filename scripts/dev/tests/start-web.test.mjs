@@ -81,6 +81,42 @@ test('webHostEnv uses bare host:port upstreams and honors overrides', () => {
   assert.doesNotMatch(env.SDKWORK_GATEWAY_PROXY_TARGET, /^http:\/\//);
 });
 
+test('webHostEnv falls back to Visual Studio generator when Windows Ninja is unavailable', () => {
+  const env = webHostEnv(
+    '127.0.0.1:13001',
+    {},
+    {
+      baseEnv: {
+        CMAKE_GENERATOR: 'Ninja',
+        HOST_CMAKE_GENERATOR: 'Ninja',
+      },
+      platform: 'win32',
+      hasNinja: false,
+    },
+  );
+
+  assert.equal(env.CMAKE_GENERATOR, 'Visual Studio 17 2022');
+  assert.equal(env.HOST_CMAKE_GENERATOR, 'Visual Studio 17 2022');
+});
+
+test('webHostEnv preserves supported Windows generators when explicitly configured', () => {
+  const env = webHostEnv(
+    '127.0.0.1:13001',
+    {},
+    {
+      baseEnv: {
+        CMAKE_GENERATOR: 'Visual Studio 17 2022',
+        HOST_CMAKE_GENERATOR: 'Visual Studio 17 2022',
+      },
+      platform: 'win32',
+      hasNinja: false,
+    },
+  );
+
+  assert.equal(env.CMAKE_GENERATOR, 'Visual Studio 17 2022');
+  assert.equal(env.HOST_CMAKE_GENERATOR, 'Visual Studio 17 2022');
+});
+
 test('preview launchers can reuse existing dist output on Windows spawn EPERM build failures', () => {
   const scriptPaths = [
     path.join(import.meta.dirname, '..', 'start-admin.mjs'),

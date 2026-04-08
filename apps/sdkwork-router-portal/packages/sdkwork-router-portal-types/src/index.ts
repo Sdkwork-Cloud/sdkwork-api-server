@@ -1190,6 +1190,15 @@ export interface PortalCommercePaymentEventRequest {
   checkout_method_id?: string | null;
 }
 
+export interface PortalCommercePaymentAttemptCreateRequest {
+  payment_method_id: string;
+  idempotency_key?: string | null;
+  success_url?: string | null;
+  cancel_url?: string | null;
+  country_code?: string | null;
+  customer_email?: string | null;
+}
+
 export interface PortalCommercePaymentEventRecord {
   payment_event_id: string;
   order_id: string;
@@ -1205,6 +1214,59 @@ export interface PortalCommercePaymentEventRecord {
   received_at_ms: number;
   processed_at_ms?: number | null;
   order_status_after?: PortalCommerceOrderStatus | null;
+}
+
+export interface PaymentMethodRecord {
+  payment_method_id: string;
+  display_name: string;
+  description: string;
+  provider: string;
+  channel: string;
+  mode: string;
+  enabled: boolean;
+  sort_order: number;
+  capability_codes: string[];
+  supported_currency_codes: string[];
+  supported_country_codes: string[];
+  supported_order_kinds: string[];
+  callback_strategy: string;
+  webhook_path?: string | null;
+  webhook_tolerance_seconds: number;
+  replay_window_seconds: number;
+  max_retry_count: number;
+  config_json: string;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface CommercePaymentAttemptRecord {
+  payment_attempt_id: string;
+  order_id: string;
+  project_id: string;
+  user_id: string;
+  payment_method_id: string;
+  provider: string;
+  channel: string;
+  status: string;
+  idempotency_key: string;
+  attempt_sequence: number;
+  amount_minor: number;
+  currency_code: string;
+  captured_amount_minor: number;
+  refunded_amount_minor: number;
+  provider_payment_intent_id?: string | null;
+  provider_checkout_session_id?: string | null;
+  provider_reference?: string | null;
+  checkout_url?: string | null;
+  qr_code_payload?: string | null;
+  request_payload_json: string;
+  response_payload_json: string;
+  error_code?: string | null;
+  error_message?: string | null;
+  initiated_at_ms: number;
+  expires_at_ms?: number | null;
+  completed_at_ms?: number | null;
+  updated_at_ms: number;
 }
 
 export interface PortalCommerceCheckoutSessionMethod {
@@ -1234,6 +1296,7 @@ export interface PortalCommerceCheckoutSession {
   reference: string;
   payable_price_label: string;
   guidance: string;
+  payment_simulation_enabled: boolean;
   methods: PortalCommerceCheckoutSessionMethod[];
 }
 
@@ -1255,8 +1318,13 @@ export interface PortalCommerceOrder {
   coupon_redemption_id?: string | null;
   marketing_campaign_id?: string | null;
   subsidy_amount_minor?: number;
+  payment_method_id?: string | null;
+  latest_payment_attempt_id?: string | null;
   status: PortalCommerceOrderStatus;
+  settlement_status?: string;
   source: PortalDataSource;
+  refundable_amount_minor?: number;
+  refunded_amount_minor?: number;
   created_at_ms: number;
   updated_at_ms?: number;
 }
@@ -1297,6 +1365,7 @@ export interface PortalCommerceReconciliationSummary {
 
 export interface PortalCommerceOrderCenterResponse {
   project_id: string;
+  payment_simulation_enabled: boolean;
   membership: PortalCommerceMembership | null;
   reconciliation: PortalCommerceReconciliationSummary | null;
   orders: PortalCommerceOrderCenterEntry[];

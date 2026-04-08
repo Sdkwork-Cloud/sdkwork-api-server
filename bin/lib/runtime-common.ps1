@@ -38,7 +38,158 @@ function Get-RouterDefaultInstallHome {
 
 function Get-RouterDefaultDevHome {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $requestedDevHome = [string]$env:SDKWORK_ROUTER_DEV_HOME
+    if (-not [string]::IsNullOrWhiteSpace($requestedDevHome)) {
+        if ([System.IO.Path]::IsPathRooted($requestedDevHome)) {
+            return [System.IO.Path]::GetFullPath($requestedDevHome)
+        }
+
+        return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $requestedDevHome))
+    }
+
     return Join-Path $RepoRoot (Join-Path 'artifacts\runtime\dev' (Get-RouterRuntimePlatformKey))
+}
+
+function Resolve-RouterCargoExecutable {
+    if (Test-RouterWindowsPlatform) {
+        return 'cargo.exe'
+    }
+
+    return 'cargo'
+}
+
+function Get-RouterManagedCargoTargetDir {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $requestedTargetDir = [string]$env:CARGO_TARGET_DIR
+    if (-not [string]::IsNullOrWhiteSpace($requestedTargetDir)) {
+        if ([System.IO.Path]::IsPathRooted($requestedTargetDir)) {
+            return [System.IO.Path]::GetFullPath($requestedTargetDir)
+        }
+
+        return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $requestedTargetDir))
+    }
+
+    if (-not (Test-RouterWindowsPlatform)) {
+        return Join-Path $RepoRoot 'target'
+    }
+
+    return Join-Path $RepoRoot 'bin\.sdkwork-target-vs2022'
+}
+
+function Resolve-RouterUsableCargoTargetDir {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $requestedTargetDir = [string]$env:CARGO_TARGET_DIR
+    $preferredTargetDir = Get-RouterManagedCargoTargetDir -RepoRoot $RepoRoot
+    if (-not [string]::IsNullOrWhiteSpace($requestedTargetDir)) {
+        Ensure-RouterDirectory -DirectoryPath $preferredTargetDir
+        return $preferredTargetDir
+    }
+
+    $candidateDirectories = @($preferredTargetDir)
+    if (Test-RouterWindowsPlatform) {
+        $repoBinTargetDir = Join-Path $RepoRoot 'bin\.sdkwork-target-vs2022'
+        if ($repoBinTargetDir -notin $candidateDirectories) {
+            $candidateDirectories += $repoBinTargetDir
+        }
+    }
+
+    $repoTargetDir = Join-Path $RepoRoot 'target'
+    if ($repoTargetDir -notin $candidateDirectories) {
+        $candidateDirectories += $repoTargetDir
+    }
+
+    $lastErrorMessage = ''
+    foreach ($candidateDirectory in $candidateDirectories) {
+        try {
+            Ensure-RouterDirectory -DirectoryPath $candidateDirectory
+            return $candidateDirectory
+        } catch {
+            $lastErrorMessage = $_.Exception.Message
+        }
+    }
+
+    if ($lastErrorMessage) {
+        Throw-RouterError "failed to initialize a cargo target directory: $lastErrorMessage"
+    }
+
+    Throw-RouterError 'failed to initialize a cargo target directory'
+}
+
+function Get-RouterWindowsBackendWarmupCargoArgs {
+    param([string]$CargoBuildJobs = '')
+
+    $cargoArgs = @(
+        'build',
+        '-p', 'admin-api-service',
+        '-p', 'gateway-service',
+        '-p', 'portal-api-service'
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($CargoBuildJobs)) {
+        $cargoArgs += @('-j', $CargoBuildJobs)
+    }
+
+    return $cargoArgs
+}
+
+function Get-RouterWindowsBackendWarmupCommandDisplay {
+    param([string]$CargoBuildJobs = '')
+    $cargoArgs = Get-RouterWindowsBackendWarmupCargoArgs -CargoBuildJobs $CargoBuildJobs
+    return "cargo $($cargoArgs -join ' ')"
+}
+
+function Enable-RouterManagedCargoEnv {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $managedTargetDir = Resolve-RouterUsableCargoTargetDir -RepoRoot $RepoRoot
+
+    $targetDirWasDefaulted = $false
+    if ([string]::IsNullOrWhiteSpace([string]$env:CARGO_TARGET_DIR)) {
+        $env:CARGO_TARGET_DIR = $managedTargetDir
+        $targetDirWasDefaulted = $true
+    }
+
+    $buildJobsWasDefaulted = $false
+    if ((Test-RouterWindowsPlatform) -and [string]::IsNullOrWhiteSpace([string]$env:CARGO_BUILD_JOBS)) {
+        $env:CARGO_BUILD_JOBS = '1'
+        $buildJobsWasDefaulted = $true
+    }
+
+    return [pscustomobject]@{
+        Enabled = Test-RouterWindowsPlatform
+        CargoTargetDir = $managedTargetDir
+        CargoBuildJobs = [string]$env:CARGO_BUILD_JOBS
+        CargoTargetDirWasDefaulted = $targetDirWasDefaulted
+        CargoBuildJobsWasDefaulted = $buildJobsWasDefaulted
+    }
+}
+
+function Invoke-RouterWindowsBackendWarmupBuild {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$CargoBuildJobs = ''
+    )
+
+    if (-not (Test-RouterWindowsPlatform)) {
+        return
+    }
+
+    $cargoArgs = Get-RouterWindowsBackendWarmupCargoArgs -CargoBuildJobs $CargoBuildJobs
+    Write-RouterInfo "backend warm-up: $(Get-RouterWindowsBackendWarmupCommandDisplay -CargoBuildJobs $CargoBuildJobs)"
+
+    Push-Location $RepoRoot
+    try {
+        & (Resolve-RouterCargoExecutable) @cargoArgs
+        if ($LASTEXITCODE -ne 0) {
+            Throw-RouterError "backend warm-up cargo build failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 function Test-RouterWindowsPlatform {
@@ -99,6 +250,67 @@ function Get-RouterBinaryName {
 function Ensure-RouterDirectory {
     param([Parameter(Mandatory = $true)][string]$DirectoryPath)
     New-Item -ItemType Directory -Force -Path $DirectoryPath | Out-Null
+}
+
+function ConvertTo-RouterFileText {
+    param([AllowNull()][object]$Content)
+
+    if ($null -eq $Content) {
+        return ''
+    }
+
+    if ($Content -is [System.Array]) {
+        $lines = foreach ($entry in $Content) {
+            if ($null -eq $entry) {
+                ''
+            } else {
+                [string]$entry
+            }
+        }
+
+        return [string]::Join([Environment]::NewLine, $lines)
+    }
+
+    return [string]$Content
+}
+
+function Write-RouterUtf8File {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [AllowNull()][object]$Content,
+        [int]$RetryCount = 4,
+        [int]$RetryDelayMs = 75
+    )
+
+    $directory = Split-Path -Parent $FilePath
+    if (-not [string]::IsNullOrWhiteSpace($directory)) {
+        Ensure-RouterDirectory -DirectoryPath $directory
+    }
+
+    $payload = ConvertTo-RouterFileText -Content $Content
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    $lastException = $null
+
+    for ($attempt = 1; $attempt -le $RetryCount; $attempt++) {
+        try {
+            [System.IO.File]::WriteAllText($FilePath, $payload, $encoding)
+            return
+        } catch [System.UnauthorizedAccessException] {
+            $lastException = $_.Exception
+        } catch [System.IO.IOException] {
+            $lastException = $_.Exception
+        }
+
+        if ($attempt -lt $RetryCount) {
+            Start-Sleep -Milliseconds $RetryDelayMs
+        }
+    }
+
+    if ($null -ne $lastException) {
+        throw $lastException
+    }
+
+    Throw-RouterError "failed to write file: $FilePath"
 }
 
 function Test-RouterWindowsStylePath {
@@ -544,7 +756,7 @@ function Write-RouterManagedStateFile {
         (ConvertTo-RouterStateFileLine -Key 'SDKWORK_ROUTER_PORTAL_APP_URL' -Value $PortalAppUrl)
     )
 
-    Set-Content -Path $StateFile -Value $lines -Encoding utf8
+    Write-RouterUtf8File -FilePath $StateFile -Content $lines
 }
 
 function Clear-RouterStalePidFile {

@@ -79,6 +79,14 @@ The goal of this document is to capture what is already proven, what was fixed i
 62. Traffic analytics shell copy now lives in `ADMIN_ZH_TRAFFIC_TRANSLATIONS`, so the `zh-CN` catalog covers billing-event summary cards, group/capability/accounting spotlight empty states, routing-detail fallback labels, billing summary descriptions, and traffic inspection analytics copy with curated Simplified Chinese operator wording.
 63. API router rate-limit and routing-snapshot tail labels now extend `ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS`, so the `zh-CN` catalog localizes the remaining UI-facing `Window`/`Policies`/`Live windows`/`Manage routing profiles`/`Snapshot evidence` labels while intentionally preserving protocol/example literals such as `Authorization: Bearer {token}` and `sk-router-live-demo`.
 64. Pricing display-unit literals and the settings `Shell` label are now localized, so `commercialPricing.ts` no longer falls back to raw `USD / ...` unit strings or `{count} x {unit}` scaffolding, and the settings center no longer exposes the English `Shell` group label in `zh-CN`.
+65. Commercial settlement now snapshots quota and membership state before side effects, so if the final order write fails the current SQLite/Postgres path restores prior quota policy and project membership instead of leaving the order stuck in `pending_payment` with fulfilled side effects already applied.
+66. Commercial refund now restores the pre-refund quota policy when the final refunded-order write fails on the current SQLite/Postgres path, so failed refund persistence no longer silently returns quota while the order remains `fulfilled`.
+67. The storage contract now exposes explicit `delete_quota_policy` and `delete_project_membership` operations, giving the SQLite/Postgres backends a concrete rollback primitive for commercial compensation work while MySQL/libSQL remain out of scope for this P0 slice.
+68. Portal recharge settlement and refund now sync canonical account history for provisioned workspace accounts by issuing or refunding commerce-order credits through the billing kernel after the order reaches its final persisted state, and then advancing the account-commerce reconciliation checkpoint.
+69. Canonical portal account-history views now expose recharge order settlement and refund through the existing `ledger` history surface while intentionally keeping `request_settlements` empty for those orders, because recharge purchases are account-funding events rather than request-capture settlements.
+70. If canonical account-ledger sync fails after a recharge order has already reached `fulfilled`, the payment event is now persisted as failed with `order_status_after = fulfilled`, and replaying the same payment event repairs the canonical account history instead of getting stuck behind the already-final order state.
+71. If a refunded recharge order fails on the final order write after coupon rollback already executed, the current SQLite/Postgres path now compensates marketing budget/code/redemption atomically back to the pre-refund snapshot, marks the rollback evidence as `failed`, and still allows the same refund event to replay later and complete the rollback cleanly.
+72. Commerce quote/order creation and the portal marketing reservation API now reclaim expired coupon reservations inline for the current SQLite/Postgres path, so a timed-out stale reservation no longer leaves the coupon code hidden or the reserved budget double-counted when the same project retries immediately.
 
 ### Fresh verification evidence
 
@@ -257,6 +265,30 @@ The goal of this document is to capture what is already proven, what was fixed i
 - `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-review-rust' cargo test -p sdkwork-api-interface-http --test responses_route missing_model -- --nocapture`
   - PASS
 - `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-review-rust' cargo test -p sdkwork-api-app-gateway --test responses_api`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-commerce' cargo test -j 1 -p sdkwork-api-app-commerce --test marketing_checkout_closure -- --nocapture`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-commerce' cargo test -j 1 -p sdkwork-api-storage-postgres --test integration_postgres --no-run`
+  - PASS
+- `cargo fmt -p sdkwork-api-app-commerce -p sdkwork-api-interface-portal`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-commerce-account' cargo test -j 1 -p sdkwork-api-interface-portal --test portal_commerce -- --nocapture`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-commerce-account' cargo test -j 1 -p sdkwork-api-app-commerce --test marketing_checkout_closure -- --nocapture`
+  - PASS
+- `cargo fmt -p sdkwork-api-storage-core -p sdkwork-api-storage-sqlite -p sdkwork-api-storage-postgres -p sdkwork-api-app-commerce`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-coupon-comp' cargo test -j 1 -p sdkwork-api-app-commerce --test marketing_checkout_closure -- --nocapture`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-coupon-comp' cargo test -j 1 -p sdkwork-api-interface-portal --test portal_commerce -- --nocapture`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p0-coupon-comp' cargo check -p sdkwork-api-storage-postgres`
+  - PASS
+- `cargo fmt -p sdkwork-api-app-commerce -p sdkwork-api-interface-portal`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p1-coupon-reclaim' cargo test -j 1 -p sdkwork-api-app-commerce --test marketing_checkout_closure -- --nocapture`
+  - PASS
+- `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-p1-coupon-reclaim' cargo test -j 1 -p sdkwork-api-interface-portal --test marketing_coupon_routes -- --nocapture`
   - PASS
 - `RUSTFLAGS='-C debuginfo=0' CARGO_TARGET_DIR='target/codex-review-rust' cargo test -p sdkwork-api-interface-http --test responses_route`
   - PASS
@@ -587,15 +619,26 @@ Sampling confirms this is not limited to test code. Some `expect(...)` calls are
   - PASS
 - `node scripts/check-rust-verification-matrix.mjs --group product-runtime`
   - PASS
+- `node --test --experimental-test-isolation=none scripts/dev/tests/windows-rust-toolchain-guard.test.mjs`
+  - PASS
+- `node --test --experimental-test-isolation=none scripts/rust-verification-workflow.test.mjs`
+  - PASS
+- `node scripts/check-rust-verification-matrix.mjs --group workspace`
+  - PASS
+- `CARGO_TARGET_DIR=t3 cargo check --workspace -j 1`
+  - PASS on the Windows workstation once the build used a short target directory instead of the default long shared `target` path
 
 **Impact**
 
 - local service/runtime package-group compile confidence is now materially better than it was at the start of the review
+- the repository-owned verification entrypoint can now also prove a full Windows workspace build when it uses the managed short target-dir strategy
+- the hosted Rust verification workflow now exposes a manual `windows-latest` `workspace` lane, so future CI evidence can be collected without slowing the default PR split-package matrix
 - cross-platform release readiness still cannot be claimed from fresh hosted CI or non-Windows runtime evidence
 
 **Current required fix direction**
 
-- keep the package-group matrix as the required gate instead of returning to the monolithic `cargo check`
+- keep the package-group matrix as the required default gate and use the new `workspace` group as the local deep-validation path
+- keep Windows verification on the managed short target-dir flow; do not reintroduce `RUSTFLAGS='-C debuginfo=0'` as a blanket workaround
 - run the new GitHub workflow and record the first hosted execution result
 - extend verification beyond local Windows package compilation into Linux/macOS runtime or packaging evidence
 

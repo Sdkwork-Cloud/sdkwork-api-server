@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 
 function requireValue(argv, index, flag) {
   const value = argv[index + 1];
@@ -82,22 +83,72 @@ Options:
 `;
 }
 
-export function webHostEnv(bind, targets = {}) {
+function commandAvailable(command, platform = process.platform) {
+  const probe = platform === 'win32' ? 'where' : 'which';
+  const result = spawnSync(probe, [command], {
+    stdio: 'ignore',
+    windowsHide: platform === 'win32',
+  });
+  return result.status === 0;
+}
+
+export function withSupportedWindowsCmakeGenerator(
+  baseEnv = process.env,
+  {
+    platform = process.platform,
+    hasNinja = commandAvailable('ninja', platform),
+  } = {},
+) {
+  const env = { ...baseEnv };
+  if (platform !== 'win32') {
+    return env;
+  }
+
+  const requestedGenerator = String(env.CMAKE_GENERATOR ?? '').trim();
+  const requestedHostGenerator = String(env.HOST_CMAKE_GENERATOR ?? '').trim();
+  const wantsUnavailableNinja =
+    (requestedGenerator === 'Ninja' || requestedHostGenerator === 'Ninja') && !hasNinja;
+  const wantsUnsupportedFutureVisualStudio =
+    requestedGenerator.includes('2026') || requestedHostGenerator.includes('2026');
+
+  if (
+    requestedGenerator.length > 0 &&
+    requestedHostGenerator.length > 0 &&
+    !wantsUnavailableNinja &&
+    !wantsUnsupportedFutureVisualStudio
+  ) {
+    return env;
+  }
+
+  env.CMAKE_GENERATOR = 'Visual Studio 17 2022';
+  env.HOST_CMAKE_GENERATOR = 'Visual Studio 17 2022';
+  return env;
+}
+
+export function webHostEnv(bind, targets = {}, options = {}) {
   const {
     adminTarget = '127.0.0.1:9981',
     portalTarget = '127.0.0.1:9982',
     gatewayTarget = '127.0.0.1:9980',
   } = targets;
+  const {
+    baseEnv = process.env,
+    platform = process.platform,
+    hasNinja,
+  } = options;
 
-  return {
-    ...process.env,
+  return withSupportedWindowsCmakeGenerator({
+    ...baseEnv,
     SDKWORK_WEB_BIND: bind,
     SDKWORK_ADMIN_SITE_DIR: 'apps/sdkwork-router-admin/dist',
     SDKWORK_PORTAL_SITE_DIR: 'apps/sdkwork-router-portal/dist',
     SDKWORK_ADMIN_PROXY_TARGET: adminTarget,
     SDKWORK_PORTAL_PROXY_TARGET: portalTarget,
     SDKWORK_GATEWAY_PROXY_TARGET: gatewayTarget,
-  };
+  }, {
+    platform,
+    hasNinja,
+  });
 }
 
 export function publicEntryUrls(bind) {

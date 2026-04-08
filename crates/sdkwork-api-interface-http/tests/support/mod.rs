@@ -1,7 +1,7 @@
-use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use axum::Router;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::SigningKey;
 use sdkwork_api_app_identity::persist_gateway_api_key;
 use sdkwork_api_ext_provider_native_mock::FIXTURE_EXTENSION_ID;
@@ -14,8 +14,8 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::{
-    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
 };
 use std::thread::{self, JoinHandle};
 use std::time::{SystemTime, UNIX_EPOCH};

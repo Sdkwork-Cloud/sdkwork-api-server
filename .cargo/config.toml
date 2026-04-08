@@ -1,7 +1,8 @@
 [env]
 # Pingora pulls libz-ng-sys via flate2(zlib-ng). On Windows, recent toolchains
 # can cause cmake's generator probe to guess an unsupported future Visual Studio
-# version. Default to Ninja for direct cargo builds while still allowing release
-# scripts and CI jobs to override these values explicitly.
-CMAKE_GENERATOR = { value = "Ninja", force = false }
-HOST_CMAKE_GENERATOR = { value = "Ninja", force = false }
+# version, while Ninja is not guaranteed to be installed on developer machines.
+# Default to the supported MSVC generator and still allow scripts / CI to
+# override these values explicitly when needed.
+CMAKE_GENERATOR = { value = "Visual Studio 17 2022", force = false }
+HOST_CMAKE_GENERATOR = { value = "Visual Studio 17 2022", force = false }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -9,13 +9,36 @@ function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
+function readSourceTree(relativeDirectory) {
+  const sourceRoot = path.join(appRoot, relativeDirectory);
+  const chunks = [];
+
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath);
+        continue;
+      }
+
+      if (fullPath.endsWith('.ts') || fullPath.endsWith('.tsx')) {
+        chunks.push(readFileSync(fullPath, 'utf8'));
+      }
+    }
+  }
+
+  visit(sourceRoot);
+  return chunks.join('\n');
+}
+
 test('admin commercial workspace wires canonical billing investigation into types, API, workbench, and gateway pages', () => {
   const adminTypes = read('packages/sdkwork-router-admin-types/src/index.ts');
-  const adminApi = read('packages/sdkwork-router-admin-admin-api/src/index.ts');
+  const adminApi = readSourceTree('packages/sdkwork-router-admin-admin-api/src');
   const workbench = read('packages/sdkwork-router-admin-core/src/workbench.tsx');
   const snapshot = read('packages/sdkwork-router-admin-core/src/workbenchSnapshot.ts');
   const accessPage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx');
   const usagePage = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayUsagePage.tsx');
+  const commercialSource = readSourceTree('packages/sdkwork-router-admin-commercial/src');
 
   assert.match(adminTypes, /export interface CommercialAccountRecord/);
   assert.match(adminTypes, /export interface CommercialAccountSummary/);
@@ -77,17 +100,16 @@ test('admin commercial workspace wires canonical billing investigation into type
   assert.match(usagePage, /Request settlements/);
   assert.match(usagePage, /Pricing posture/);
 
-  const commercialPage = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
-  assert.match(commercialPage, /Settlement ledger/);
-  assert.match(commercialPage, /Refund timeline/);
-  assert.match(commercialPage, /Order payment audit/);
-  assert.match(commercialPage, /Order refund audit/);
-  assert.match(commercialPage, /Order audit detail/);
-  assert.match(commercialPage, /View order audit/);
-  assert.match(commercialPage, /Find order audit/);
-  assert.match(commercialPage, /normalizeCommercialOrderAuditLookupValue/);
-  assert.match(commercialPage, /buildCommercialLedgerTimelineRows/);
-  assert.match(commercialPage, /buildCommercialOrderPaymentAuditRows/);
-  assert.match(commercialPage, /commercialAccountLedger/);
-  assert.match(commercialPage, /commercePaymentEvents/);
+  assert.match(commercialSource, /Settlement ledger/);
+  assert.match(commercialSource, /Refund timeline/);
+  assert.match(commercialSource, /Order payment audit/);
+  assert.match(commercialSource, /Order refund audit/);
+  assert.match(commercialSource, /Order audit detail/);
+  assert.match(commercialSource, /View order audit/);
+  assert.match(commercialSource, /Find order audit/);
+  assert.match(commercialSource, /normalizeCommercialOrderAuditLookupValue/);
+  assert.match(commercialSource, /buildCommercialLedgerTimelineRows/);
+  assert.match(commercialSource, /buildCommercialOrderPaymentAuditRows/);
+  assert.match(commercialSource, /commercialAccountLedger/);
+  assert.match(commercialSource, /commercePaymentEvents/);
 });

@@ -1,0 +1,10 @@
+^C:\USERS\ADMIN\.CARGO\REGISTRY\SRC\INDEX.CRATES.IO-1949CF8C6B5B557F\LIBZ-NG-SYS-1.1.25\SRC\ZLIB-NG\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/admin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libz-ng-sys-1.1.25/src/zlib-ng -BD:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build --check-stamp-file D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

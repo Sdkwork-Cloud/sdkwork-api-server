@@ -17,6 +17,9 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   prepare:
@@ -98,6 +101,116 @@ jobs:
             console/pnpm-lock.yaml
             docs/pnpm-lock.yaml
 
+      - name: Materialize external release dependencies
+        shell: bash
+        env:
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+        run: node scripts/release/materialize-external-deps.mjs
+
+      - name: Materialize release window snapshot
+        shell: bash
+        env:
+          SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON: ${{ vars.SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON || '' }}
+        run: node scripts/release/materialize-release-window-snapshot.mjs
+
+      - name: Upload release window snapshot governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-window-snapshot-${{ matrix.platform }}-${{ matrix.arch }}
+          path: docs/release/release-window-snapshot-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release sync audit
+        shell: bash
+        env:
+          SDKWORK_RELEASE_SYNC_AUDIT_JSON: ${{ vars.SDKWORK_RELEASE_SYNC_AUDIT_JSON || '' }}
+          SDKWORK_API_ROUTER_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+        run: node scripts/release/materialize-release-sync-audit.mjs
+
+      - name: Upload release sync audit governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-sync-audit-${{ matrix.platform }}-${{ matrix.arch }}
+          path: docs/release/release-sync-audit-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release telemetry export
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: ${{ vars.SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON || '' }}
+          SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_PORTAL_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_PORTAL_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SUPPLEMENTAL_TARGETS_JSON: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SUPPLEMENTAL_TARGETS_JSON || '' }}
+          SDKWORK_RELEASE_TELEMETRY_GENERATED_AT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_GENERATED_AT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_KIND: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_KIND || 'observability-control-plane' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_PROVENANCE: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_PROVENANCE || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_FRESHNESS_MINUTES: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_FRESHNESS_MINUTES || '' }}
+        run: node scripts/release/materialize-release-telemetry-export.mjs
+
+      - name: Upload release telemetry export governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-telemetry-export-${{ matrix.platform }}-${{ matrix.arch }}
+          path: docs/release/release-telemetry-export-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release telemetry snapshot
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH: docs/release/release-telemetry-export-latest.json
+        run: node scripts/release/materialize-release-telemetry-snapshot.mjs
+
+      - name: Upload release telemetry snapshot governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-telemetry-snapshot-${{ matrix.platform }}-${{ matrix.arch }}
+          path: docs/release/release-telemetry-snapshot-latest.json
+          if-no-files-found: error
+
+      - name: Materialize SLO governance evidence
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH: docs/release/release-telemetry-snapshot-latest.json
+        run: node scripts/release/materialize-slo-governance-evidence.mjs
+
+      - name: Upload SLO governance evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-slo-evidence-${{ matrix.platform }}-${{ matrix.arch }}
+          path: docs/release/slo-governance-latest.json
+          if-no-files-found: error
+
+      - name: Generate governance evidence attestation
+        if: ${{ !github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            docs/release/release-window-snapshot-latest.json
+            docs/release/release-sync-audit-latest.json
+            docs/release/release-telemetry-export-latest.json
+            docs/release/release-telemetry-snapshot-latest.json
+            docs/release/slo-governance-latest.json
+
+      - name: Run release governance gate
+        shell: bash
+        env:
+          SDKWORK_API_ROUTER_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH: docs/release/release-window-snapshot-latest.json
+          SDKWORK_RELEASE_SYNC_AUDIT_PATH: docs/release/release-sync-audit-latest.json
+        run: node scripts/release/run-release-governance-checks.mjs --format json
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -145,6 +258,44 @@ jobs:
         shell: bash
         run: node scripts/release/run-desktop-release-build.mjs --app portal --target ${{ matrix.target }}
 
+      - name: Run installed native runtime smoke on Windows
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: node scripts/release/run-windows-installed-runtime-smoke.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --target ${{ matrix.target }} --evidence-path artifacts/release-governance/windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Upload Windows installed runtime smoke evidence
+        if: ${{ always() && matrix.platform == 'windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: artifacts/release-governance/windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+
+      - name: Generate Windows smoke evidence attestation
+        if: ${{ (!github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true') && matrix.platform == 'windows' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release-governance/windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Run installed native runtime smoke on Unix
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: node scripts/release/run-unix-installed-runtime-smoke.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --target ${{ matrix.target }} --evidence-path artifacts/release-governance/unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Upload Unix installed runtime smoke evidence
+        if: ${{ always() && matrix.platform != 'windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: artifacts/release-governance/unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+
+      - name: Generate Unix smoke evidence attestation
+        if: ${{ (!github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true') && matrix.platform != 'windows' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release-governance/unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
       - name: Collect native release assets
         shell: bash
         run: node scripts/release/package-release-assets.mjs native --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --target ${{ matrix.target }} --output-dir artifacts/release
@@ -155,6 +306,12 @@ jobs:
           name: release-assets-native-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/release/**/*
           if-no-files-found: error
+
+      - name: Generate native release assets attestation
+        if: ${{ !github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release/**/*
 
   web-release:
     name: Web release assets
@@ -183,6 +340,127 @@ jobs:
             console/pnpm-lock.yaml
             docs/pnpm-lock.yaml
 
+      - name: Materialize external release dependencies
+        shell: bash
+        env:
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+        run: node scripts/release/materialize-external-deps.mjs
+
+      - name: Materialize release window snapshot
+        shell: bash
+        env:
+          SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON: ${{ vars.SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON || '' }}
+        run: node scripts/release/materialize-release-window-snapshot.mjs
+
+      - name: Upload release window snapshot governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-window-snapshot-web
+          path: docs/release/release-window-snapshot-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release sync audit
+        shell: bash
+        env:
+          SDKWORK_RELEASE_SYNC_AUDIT_JSON: ${{ vars.SDKWORK_RELEASE_SYNC_AUDIT_JSON || '' }}
+          SDKWORK_API_ROUTER_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+        run: node scripts/release/materialize-release-sync-audit.mjs
+
+      - name: Upload release sync audit governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-sync-audit-web
+          path: docs/release/release-sync-audit-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release telemetry export
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: ${{ vars.SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON || '' }}
+          SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_PORTAL_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_PORTAL_PROMETHEUS_TEXT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SUPPLEMENTAL_TARGETS_JSON: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SUPPLEMENTAL_TARGETS_JSON || '' }}
+          SDKWORK_RELEASE_TELEMETRY_GENERATED_AT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_GENERATED_AT || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_KIND: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_KIND || 'observability-control-plane' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_PROVENANCE: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_PROVENANCE || '' }}
+          SDKWORK_RELEASE_TELEMETRY_SOURCE_FRESHNESS_MINUTES: ${{ vars.SDKWORK_RELEASE_TELEMETRY_SOURCE_FRESHNESS_MINUTES || '' }}
+        run: node scripts/release/materialize-release-telemetry-export.mjs
+
+      - name: Upload release telemetry export governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-telemetry-export-web
+          path: docs/release/release-telemetry-export-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release telemetry snapshot
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH: docs/release/release-telemetry-export-latest.json
+        run: node scripts/release/materialize-release-telemetry-snapshot.mjs
+
+      - name: Upload release telemetry snapshot governance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-telemetry-snapshot-web
+          path: docs/release/release-telemetry-snapshot-latest.json
+          if-no-files-found: error
+
+      - name: Materialize SLO governance evidence
+        shell: bash
+        env:
+          SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH: docs/release/release-telemetry-snapshot-latest.json
+        run: node scripts/release/materialize-slo-governance-evidence.mjs
+
+      - name: Upload SLO governance evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-slo-evidence-web
+          path: docs/release/slo-governance-latest.json
+          if-no-files-found: error
+
+      - name: Materialize release governance bundle
+        shell: bash
+        run: node scripts/release/materialize-release-governance-bundle.mjs
+
+      - name: Upload release governance bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-bundle-web
+          path: artifacts/release-governance-bundle/**/*
+          if-no-files-found: error
+
+      - name: Generate governance evidence attestation
+        if: ${{ !github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            docs/release/release-window-snapshot-latest.json
+            docs/release/release-sync-audit-latest.json
+            docs/release/release-telemetry-export-latest.json
+            docs/release/release-telemetry-snapshot-latest.json
+            docs/release/slo-governance-latest.json
+
+      - name: Run release governance gate
+        shell: bash
+        env:
+          SDKWORK_API_ROUTER_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
+          SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
+          SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
+          SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
+          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH: docs/release/release-window-snapshot-latest.json
+          SDKWORK_RELEASE_SYNC_AUDIT_PATH: docs/release/release-sync-audit-latest.json
+        run: node scripts/release/run-release-governance-checks.mjs --format json
+
       - name: Install web workspace dependencies
         shell: bash
         run: |
@@ -209,6 +487,12 @@ jobs:
           name: release-assets-web
           path: artifacts/release/**/*
           if-no-files-found: error
+
+      - name: Generate web release assets attestation
+        if: ${{ !github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release/**/*
 
   publish:
     name: Publish GitHub release

@@ -23,20 +23,7 @@ export function resolveWorkspaceTargetDir({
     return path.join(workspaceRoot, 'target');
   }
 
-  const userProfile = String(env.USERPROFILE ?? '').trim();
-  if (userProfile.length > 0) {
-    const workspaceName = path.basename(workspaceRoot).trim().toLowerCase() || 'workspace';
-    return path.join(userProfile, '.sdkwork-target', workspaceName);
-  }
-
-  const tempRoot = String(env.TEMP ?? env.TMP ?? '').trim()
-    || (env.USERPROFILE ? path.join(env.USERPROFILE, 'AppData', 'Local', 'Temp') : '');
-  if (tempRoot.length === 0) {
-    return path.join(workspaceRoot, 'target');
-  }
-
-  const workspaceName = path.basename(workspaceRoot).trim().toLowerCase() || 'workspace';
-  return path.join(tempRoot, 'srt', workspaceName);
+  return path.join(workspaceRoot, 'bin', '.sdkwork-target-vs2022');
 }
 
 export function withManagedWorkspaceTargetDir({

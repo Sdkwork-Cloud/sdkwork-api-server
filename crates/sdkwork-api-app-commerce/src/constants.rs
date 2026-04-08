@@ -1,0 +1,10 @@
+pub const DEFAULT_COUPON_RESERVATION_TTL_MS: u64 = 15 * 60 * 1_000;
+pub const COMMERCE_PAYMENT_PROVIDER_MANUAL_LAB: &str = "manual_lab";
+pub const COMMERCE_PAYMENT_PROVIDER_STRIPE: &str = "stripe";
+pub const COMMERCE_PAYMENT_PROVIDER_ALIPAY: &str = "alipay";
+pub const COMMERCE_PAYMENT_PROVIDER_WECHAT_PAY: &str = "wechat_pay";
+pub const COMMERCE_PAYMENT_PROVIDER_NO_PAYMENT_REQUIRED: &str = "no_payment_required";
+pub const COMMERCE_PAYMENT_CHANNEL_OPERATOR_SETTLEMENT: &str = "operator_settlement";
+pub const COMMERCE_PAYMENT_CHANNEL_HOSTED_CHECKOUT: &str = "hosted_checkout";
+pub const COMMERCE_PAYMENT_CHANNEL_SCAN_QR: &str = "scan_qr";
+pub const PORTAL_WORKSPACE_SCOPE_KEY_HASH: &str = "portal_workspace_scope";

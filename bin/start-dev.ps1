@@ -201,8 +201,19 @@ try {
         }
     }
 
+    $cargoEnv = Enable-RouterManagedCargoEnv -RepoRoot $repoRoot
+    if ($cargoEnv.Enabled) {
+        Write-RouterInfo "CARGO_TARGET_DIR=$($cargoEnv.CargoTargetDir)"
+        if (-not [string]::IsNullOrWhiteSpace($cargoEnv.CargoBuildJobs)) {
+            Write-RouterInfo "CARGO_BUILD_JOBS=$($cargoEnv.CargoBuildJobs)"
+        }
+        if ($DryRun) {
+            Write-RouterInfo "backend warm-up: $(Get-RouterWindowsBackendWarmupCommandDisplay -CargoBuildJobs $cargoEnv.CargoBuildJobs)"
+        }
+    }
+
     $planOutput = & node @planArgs
-    Set-Content -Path $planFile -Value $planOutput -Encoding utf8
+    Write-RouterUtf8File -FilePath $planFile -Content $planOutput
 
     if ($DryRun) {
         Get-Content $planFile
@@ -224,6 +235,10 @@ try {
         -BindAddresses $preflightBindAddresses `
         -ServiceLabel 'development workspace'
 
+    if ($cargoEnv.Enabled) {
+        Invoke-RouterWindowsBackendWarmupBuild -RepoRoot $repoRoot -CargoBuildJobs $cargoEnv.CargoBuildJobs
+    }
+
     if ($Foreground) {
         if (Test-Path $stopFile) { Remove-Item $stopFile -Force -ErrorAction SilentlyContinue }
         & node @startArgs
@@ -241,7 +256,7 @@ try {
         -StdoutLog $stdoutLog `
         -StderrLog $stderrLog
 
-    Set-Content -Path $pidFile -Value $process.Id -Encoding utf8
+    Write-RouterUtf8File -FilePath $pidFile -Content $process.Id
     Remove-RouterManagedStateFile -StateFile $stateFile
 
     $backendReady = (Wait-RouterHealthUrl -Url $gatewayHealthUrl -WaitSeconds $WaitSeconds -ProcessId $process.Id) `

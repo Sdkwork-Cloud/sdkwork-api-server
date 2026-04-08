@@ -34,7 +34,8 @@ test('standalone sdkwork-router-admin app root exists', () => {
 });
 
 test('app root exposes standalone browser and tauri scripts', () => {
-  const packageJson = JSON.parse(read('package.json'));
+  const packageJsonSource = read('package.json');
+  const packageJson = JSON.parse(packageJsonSource);
 
   assert.equal(typeof packageJson.scripts?.dev, 'string');
   assert.equal(typeof packageJson.scripts?.build, 'string');
@@ -42,6 +43,25 @@ test('app root exposes standalone browser and tauri scripts', () => {
   assert.equal(typeof packageJson.scripts?.preview, 'string');
   assert.equal(typeof packageJson.scripts?.['tauri:dev'], 'string');
   assert.equal(typeof packageJson.scripts?.['tauri:build'], 'string');
+  assert.match(packageJsonSource, /run-vite-cli\.mjs --host 0\.0\.0\.0/);
+  assert.match(packageJsonSource, /run-vite-cli\.mjs build/);
+  assert.match(packageJsonSource, /run-tsc-cli\.mjs --noEmit/);
+  assert.match(packageJsonSource, /run-vite-cli\.mjs preview --host 0\.0\.0\.0 --port 4173 --strictPort/);
+});
+
+test('admin typecheck stays on the repo-owned readable TypeScript launcher and local runtime shims', () => {
+  const packageJsonSource = read('package.json');
+  const tsconfig = read('tsconfig.json');
+  const viteEnv = read('src/vite-env.d.ts');
+
+  assert.match(packageJsonSource, /"typecheck": "node \.\.\/\.\.\/scripts\/dev\/run-tsc-cli\.mjs --noEmit"/);
+  assert.equal(existsSync(path.join(appRoot, 'src', 'types', 'node-runtime-shim.d.ts')), true);
+  assert.equal(existsSync(path.join(appRoot, 'src', 'types', 'vite-client-shim.d.ts')), true);
+  assert.equal(existsSync(path.join(appRoot, 'src', 'types', 'sdkwork-ui-pc-react-shim.d.ts')), true);
+  assert.doesNotMatch(tsconfig, /"types"\s*:\s*\[\s*"node"\s*,\s*"vite\/client"\s*\]/);
+  assert.match(tsconfig, /sdkwork-ui-pc-react-shim\.d\.ts/);
+  assert.match(viteEnv, /types\/vite-client-shim\.d\.ts/);
+  assert.match(viteEnv, /types\/node-runtime-shim\.d\.ts/);
 });
 
 test('required packages exist under packages/', () => {
@@ -583,6 +603,13 @@ test('vite config serves static assets from the /admin/ base path', () => {
 test('vite browser mode fixes the admin dev server port and proxies the admin API to the managed 9981 backend bind', () => {
   const viteConfig = read('vite.config.ts');
 
+  assert.match(viteConfig, /findReadableModuleResolution/);
+  assert.match(viteConfig, /readableExternalFallbackPlugin/);
+  assert.match(viteConfig, /loadAdminVitePlugins/);
+  assert.match(viteConfig, /defineAdminViteConfig/);
+  assert.match(viteConfig, /resolveReadablePackageRoot/);
+  assert.match(viteConfig, /react-router-dom/);
+  assert.match(viteConfig, /react-router/);
   assert.match(viteConfig, /server:\s*\{/);
   assert.match(viteConfig, /port:\s*5173/);
   assert.match(viteConfig, /strictPort:\s*true/);
@@ -608,7 +635,10 @@ test('admin root app enables the shared ui tailwind v4 substrate', () => {
   assert.equal(typeof packageJson.devDependencies?.['@tailwindcss/typography'], 'string');
   assert.equal(typeof packageJson.dependencies?.['@sdkwork/ui-pc-react'], 'string');
   assert.match(viteConfig, /@tailwindcss\/vite/);
-  assert.match(viteConfig, /plugins:\s*\[react\(\),\s*tailwindcss\(\)\]/);
+  assert.match(
+    viteConfig,
+    /plugins:\s*\[readableExternalFallbackPlugin\(\),\s*react\(\),\s*tailwindcss\(\)\]/,
+  );
   assert.equal(sharedUiStyleReferenced, true);
   assert.equal(sharedUiThemeReferenced, true);
   assert.match(main, /@sdkwork\/ui-pc-react\/styles\.css/);

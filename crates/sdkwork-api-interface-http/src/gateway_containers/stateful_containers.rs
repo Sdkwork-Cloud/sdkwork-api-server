@@ -1,0 +1,294 @@
+async fn containers_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    ExtractJson(request): ExtractJson<CreateContainerRequest>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            let container_id = response
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or(request.name.as_str());
+            if record_gateway_usage_for_project_with_route_key(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &request.name,
+                container_id,
+                10,
+                0.01,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return bad_gateway_openai_response("failed to relay upstream container create");
+        }
+    }
+
+    let response = match sdkwork_api_app_gateway::create_container(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return bad_gateway_openai_response(error.to_string()),
+    };
+
+    if record_gateway_usage_for_project_with_route_key(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &request.name,
+        response.id.as_str(),
+        10,
+        0.01,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(response).into_response()
+}
+
+async fn containers_list_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_list_containers_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                "containers",
+                5,
+                0.005,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return bad_gateway_openai_response("failed to relay upstream containers list");
+        }
+    }
+
+    let response = match sdkwork_api_app_gateway::list_containers(
+        request_context.tenant_id(),
+        request_context.project_id(),
+    ) {
+        Ok(response) => response,
+        Err(error) => return bad_gateway_openai_response(error.to_string()),
+    };
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        "containers",
+        5,
+        0.005,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(response).into_response()
+}
+
+async fn container_retrieve_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_get_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return bad_gateway_openai_response("failed to relay upstream container retrieve");
+        }
+    }
+
+    let response = match local_container_retrieve_result(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    ) {
+        Ok(response) => response,
+        Err(response) => return response,
+    };
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(response).into_response()
+}
+
+async fn container_delete_with_state_handler(
+    request_context: AuthenticatedGatewayRequest,
+    State(state): State<GatewayApiState>,
+    Path(container_id): Path<String>,
+) -> Response {
+    match sdkwork_api_app_gateway::relay_delete_container_from_store(
+        state.store.as_ref(),
+        &state.secret_manager,
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if record_gateway_usage_for_project(
+                state.store.as_ref(),
+                request_context.tenant_id(),
+                request_context.project_id(),
+                "containers",
+                &container_id,
+                4,
+                0.004,
+            )
+            .await
+            .is_err()
+            {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record usage",
+                )
+                    .into_response();
+            }
+
+            return Json(response).into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return bad_gateway_openai_response("failed to relay upstream container delete");
+        }
+    }
+
+    let response = match local_container_delete_result(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    ) {
+        Ok(response) => response,
+        Err(response) => return response,
+    };
+
+    if record_gateway_usage_for_project(
+        state.store.as_ref(),
+        request_context.tenant_id(),
+        request_context.project_id(),
+        "containers",
+        &container_id,
+        4,
+        0.004,
+    )
+    .await
+    .is_err()
+    {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record usage",
+        )
+            .into_response();
+    }
+
+    Json(response).into_response()
+}

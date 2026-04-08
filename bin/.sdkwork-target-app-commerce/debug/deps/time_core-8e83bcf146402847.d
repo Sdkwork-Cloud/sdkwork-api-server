@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-app-commerce\debug\deps\time_core-8e83bcf146402847.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\convert.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\hint.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\util.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-app-commerce\debug\deps\libtime_core-8e83bcf146402847.rlib: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\convert.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\hint.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\util.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-app-commerce\debug\deps\libtime_core-8e83bcf146402847.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\convert.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\hint.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\util.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\convert.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\hint.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\time-core-0.1.8\src\util.rs:

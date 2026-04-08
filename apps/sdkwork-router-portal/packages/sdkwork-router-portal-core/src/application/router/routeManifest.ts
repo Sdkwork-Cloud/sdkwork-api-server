@@ -233,6 +233,20 @@ export const portalProductModules: PortalProductModuleManifest[] = [
   },
 ];
 
+const portalRouteModulePackages: Record<PortalRouteKey, PortalRouteModuleId> = {
+  gateway: 'sdkwork-router-portal-gateway',
+  dashboard: 'sdkwork-router-portal-dashboard',
+  routing: 'sdkwork-router-portal-routing',
+  'api-keys': 'sdkwork-router-portal-api-keys',
+  usage: 'sdkwork-router-portal-usage',
+  user: 'sdkwork-router-portal-user',
+  credits: 'sdkwork-router-portal-credits',
+  recharge: 'sdkwork-router-portal-recharge',
+  billing: 'sdkwork-router-portal-billing',
+  settlements: 'sdkwork-router-portal-settlements',
+  account: 'sdkwork-router-portal-account',
+};
+
 const portalProductModuleById = Object.fromEntries(
   portalProductModules.map((productModule) => [productModule.moduleId, productModule]),
 ) as Record<PortalRouteModuleId, PortalProductModuleManifest>;
@@ -248,12 +262,7 @@ const portalProductModuleByRouteKey = portalProductModules.reduce(
   {} as Record<PortalRouteKey, PortalProductModuleManifest>,
 );
 
-const portalRouteModuleByKey = Object.fromEntries(
-  Object.entries(portalProductModuleByRouteKey).map(([routeKey, productModule]) => [
-    routeKey,
-    productModule.moduleId,
-  ]),
-) as Record<PortalRouteKey, PortalRouteModuleId>;
+const portalRouteModuleByKey = portalRouteModulePackages;
 
 export const portalRouteManifest: PortalRouteManifestEntry[] = portalRoutes.map((route) => ({
   ...route,

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 
 import {
   formatCurrency,
@@ -44,6 +44,7 @@ import type {
   BillingEventCapabilitySummary,
   BillingEventRecord,
   BillingEventSummary,
+  CommercePaymentAttemptRecord,
   CommercialAccountBalanceSnapshot,
   CommercialAccountBenefitLotRecord,
   CommercialAccountHoldRecord,
@@ -71,8 +72,9 @@ import type {
 import { BillingRecommendationCard } from '../components';
 import {
   cancelBillingOrder,
+  createBillingPaymentAttempt,
   createBillingOrder,
-  getBillingCheckoutSession,
+  getBillingCheckoutDetail,
   loadBillingPageData,
   previewBillingCheckout,
   sendBillingPaymentEvent,
@@ -80,12 +82,15 @@ import {
 } from '../repository';
 import {
   buildBillingEventAnalytics,
+  buildBillingCheckoutPresentation,
+  buildBillingCheckoutLaunchDecision,
   buildBillingEventCsvDocument,
   isRecommendedPack,
   isRecommendedPlan,
   recommendBillingChange,
 } from '../services';
 import type {
+  BillingCheckoutDetail,
   BillingEventAnalyticsViewModel,
   BillingCheckoutPreview,
   BillingPageData,
@@ -137,6 +142,11 @@ type OrderWorkbenchLane = 'all' | 'pending_payment' | 'failed' | 'timeline';
 
 type TranslateFn = (text: string, values?: Record<string, string | number>) => string;
 type CsvValue = string | number | boolean | null | undefined;
+type BillingCheckoutPresentationView = ReturnType<typeof buildBillingCheckoutPresentation>;
+
+const BillingEventsAuditTable = DataTable;
+const PaymentHistoryAuditTable = DataTable;
+const RefundHistoryAuditTable = DataTable;
 
 function csvValue(value: CsvValue): string {
   const normalized = value == null ? '' : String(value);
@@ -267,7 +277,7 @@ function checkoutMethodActionLabel(
     case 'cancel_order':
       return t('Cancel order');
     case 'provider_handoff':
-      return t('Provider handoff');
+      return t('Checkout access');
     default:
       return t('Actions');
   }
@@ -289,7 +299,7 @@ function checkoutMethodProviderLabel(
     case 'no_payment_required':
       return t('No payment required');
     default:
-      return t('Payment rail');
+      return t('Payment method');
   }
 }
 
@@ -299,7 +309,7 @@ function checkoutMethodChannelLabel(
 ): string {
   switch (channel) {
     case 'operator_settlement':
-      return t('Operator settlement');
+      return t('Manual settlement');
     case 'hosted_checkout':
       return t('Hosted checkout');
     case 'scan_qr':
@@ -315,13 +325,33 @@ function checkoutMethodSessionKindLabel(
 ): string {
   switch (sessionKind) {
     case 'operator_action':
-      return t('Operator action');
+      return t('Manual step');
     case 'hosted_checkout':
-      return t('Hosted checkout session');
+      return t('Hosted checkout flow');
     case 'qr_code':
-      return t('QR code session');
+      return t('QR checkout flow');
     default:
-      return t('Session');
+      return t('Checkout flow');
+  }
+}
+
+function checkoutMethodVerificationLabel(value: string | null | undefined, t: TranslateFn): string {
+  const normalized = value?.trim().toLowerCase() ?? '';
+
+  switch (normalized) {
+    case 'manual':
+      return t('Manual confirmation');
+    case 'webhook':
+    case 'webhook_signed':
+      return t('Signed callback check');
+    case 'stripe_signature':
+      return t('Stripe signature check');
+    case 'alipay_rsa_sha256':
+      return t('Alipay RSA-SHA256 check');
+    case 'wechatpay_rsa_sha256':
+      return t('WeChat Pay RSA-SHA256 check');
+    default:
+      return value?.trim() ? titleCaseToken(value) : t('Verification method');
   }
 }
 
@@ -356,6 +386,73 @@ function checkoutMethodAvailabilityTone(
   }
 }
 
+function paymentAttemptStatusLabel(
+  status: CommercePaymentAttemptRecord['status'],
+  t: TranslateFn,
+): string {
+  const normalized = status?.trim().toLowerCase() ?? '';
+
+  switch (normalized) {
+    case 'created':
+      return t('Created');
+    case 'provider_pending':
+      return t('Pending');
+    case 'requires_action':
+      return t('Action required');
+    case 'processing':
+      return t('Processing');
+    case 'succeeded':
+      return t('Succeeded');
+    case 'failed':
+      return t('Failed');
+    case 'canceled':
+    case 'cancelled':
+      return t('Canceled');
+    case 'expired':
+      return t('Expired');
+    case 'partially_refunded':
+    case 'partially-refunded':
+      return t('Partially refunded');
+    case 'refunded':
+      return t('Refunded');
+    default:
+      return status?.trim() ? titleCaseToken(status) : t('Status');
+  }
+}
+
+function paymentAttemptStatusTone(
+  status: CommercePaymentAttemptRecord['status'],
+): 'default' | 'secondary' | 'success' | 'warning' {
+  const normalized = status?.trim().toLowerCase() ?? '';
+
+  switch (normalized) {
+    case 'requires_action':
+    case 'provider_pending':
+    case 'processing':
+      return 'default';
+    case 'succeeded':
+      return 'success';
+    case 'failed':
+    case 'canceled':
+    case 'cancelled':
+    case 'expired':
+      return 'warning';
+    case 'refunded':
+    case 'partially_refunded':
+    case 'partially-refunded':
+    case 'created':
+    default:
+      return 'secondary';
+  }
+}
+
+function paymentAttemptReference(attempt: CommercePaymentAttemptRecord): string {
+  return attempt.provider_reference?.trim()
+    || attempt.provider_checkout_session_id?.trim()
+    || attempt.provider_payment_intent_id?.trim()
+    || attempt.payment_attempt_id;
+}
+
 function buildProviderEventReplayId(
   orderId: string,
   eventType: PortalCommercePaymentEventType,
@@ -379,7 +476,7 @@ function membershipDescription(
   }
 
   return t(
-    'No active membership is recorded yet. Settle a subscription order to activate monthly entitlement posture.',
+    'No active membership is recorded yet. Complete a subscription checkout to activate monthly entitlement posture.',
   );
 }
 
@@ -438,11 +535,11 @@ function orderWorkbenchDetail(lane: OrderWorkbenchLane, t: TranslateFn): string 
   switch (lane) {
     case 'pending_payment':
       return t(
-        'Pending payment queue keeps unpaid or unfulfilled orders visible until the workspace settles or cancels them.',
+        'Pending payment queue keeps unpaid or unfulfilled orders visible until payment completes or the order leaves the queue.',
       );
     case 'failed':
       return t(
-        'Failed payment isolates checkout attempts that need coupon, payment rail, or provider callback review.',
+        'Failed payment keeps checkout attempts that need coupon updates, a different payment method, or a fresh checkout visible for follow-up.',
       );
     case 'timeline':
       return t('Order timeline shows completed or closed outcomes after checkout attempts resolve.');
@@ -459,7 +556,7 @@ function checkoutModeLabel(
 ): string {
   switch (session?.mode) {
     case 'operator_settlement':
-      return t('Operator settlement');
+      return t('Manual settlement');
     case 'instant_fulfillment':
       return t('Instant fulfillment');
     default:
@@ -467,14 +564,14 @@ function checkoutModeLabel(
   }
 }
 
-function hasProviderHandoff(session: PortalCommerceCheckoutSession | null): boolean {
-  return Boolean(session?.methods.some((method) => method.supports_webhook));
+function hasProviderHandoff(methods: PortalCommerceCheckoutSessionMethod[]): boolean {
+  return methods.some((method) => method.supports_webhook);
 }
 
 function preferredProviderCallbackMethod(
-  session: PortalCommerceCheckoutSession | null,
+  methods: PortalCommerceCheckoutSessionMethod[],
 ): PortalCommerceCheckoutSessionMethod | null {
-  const callbackMethods = session?.methods.filter((method) => method.supports_webhook) ?? [];
+  const callbackMethods = methods.filter((method) => method.supports_webhook);
   return callbackMethods.find((method) => method.recommended) ?? callbackMethods[0] ?? null;
 }
 
@@ -523,6 +620,28 @@ function paymentHistoryRowKindLabel(
     default:
       return t('Timeline');
   }
+}
+
+function paymentHistoryRailCell(
+  row: BillingPaymentHistoryRow,
+  t: TranslateFn,
+): ReactNode {
+  const providerLabel = row.provider
+    ? checkoutMethodProviderLabel(row.provider, t)
+    : t('Not recorded');
+
+  if (!row.payment_method_name) {
+    return providerLabel;
+  }
+
+  return (
+    <div className="grid gap-1">
+      <strong className="text-zinc-950 dark:text-zinc-50">{providerLabel}</strong>
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        {row.payment_method_name}
+      </span>
+    </div>
+  );
 }
 
 function paymentProcessingStatusLabel(
@@ -913,6 +1032,152 @@ function downloadBillingEventsCsv(events: BillingEventRecord[]): void {
   downloadCsv('sdkwork-router-billing-events.csv', document.headers, document.rows);
 }
 
+function openPortalExternalUrl(href: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.open(href, '_blank', 'noopener,noreferrer');
+}
+
+function resolvePortalCheckoutReturnUrl(
+  orderId: string,
+  result: 'success' | 'cancel',
+): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const href = window.location?.href?.trim();
+  if (!href) {
+    return null;
+  }
+
+  try {
+    const url = new URL(href);
+    url.searchParams.set('billing_order_id', orderId);
+    url.searchParams.set('checkout_result', result);
+    return url.toString();
+  } catch {
+    return href;
+  }
+}
+
+function supportsFormalProviderCheckoutLaunch(
+  method: PortalCommerceCheckoutSessionMethod,
+): boolean {
+  return method.action === 'provider_handoff'
+    && method.availability === 'available'
+    && method.provider === 'stripe'
+    && method.channel === 'hosted_checkout';
+}
+
+function providerCheckoutLaunchActionLabel(
+  kind: 'resume_existing_attempt' | 'create_retry_attempt' | 'create_first_attempt',
+  t: TranslateFn,
+): string {
+  switch (kind) {
+    case 'resume_existing_attempt':
+      return t('Resume checkout');
+    case 'create_retry_attempt':
+      return t('Retry with new attempt');
+    case 'create_first_attempt':
+    default:
+      return t('Start checkout');
+  }
+}
+
+function providerCheckoutLaunchDecisionDetail(
+  kind: 'resume_existing_attempt' | 'create_retry_attempt' | 'create_first_attempt',
+  providerLabel: string,
+  t: TranslateFn,
+): string {
+  switch (kind) {
+    case 'resume_existing_attempt':
+      return t(
+        'The latest {provider} checkout can still be resumed, so the workbench will reopen the existing checkout.',
+        {
+          provider: providerLabel,
+        },
+      );
+    case 'create_retry_attempt':
+      return t(
+        'The latest {provider} attempt no longer has a reusable checkout link, so the workbench will create a fresh checkout attempt.',
+        {
+          provider: providerLabel,
+        },
+      );
+    case 'create_first_attempt':
+    default:
+      return t(
+        'No {provider} checkout attempt exists yet for this order. Start the first checkout now.',
+        {
+          provider: providerLabel,
+        },
+      );
+  }
+}
+
+function checkoutPresentationStatusText(
+  checkoutPresentation: BillingCheckoutPresentationView | null,
+  compatibilityStatusLabel: string,
+  t: TranslateFn,
+): string {
+  if (!checkoutPresentation?.status) {
+    return compatibilityStatusLabel;
+  }
+
+  switch (checkoutPresentation.status_source) {
+    case 'payment_attempt':
+      return paymentAttemptStatusLabel(checkoutPresentation.status, t);
+    case 'checkout_session':
+      return compatibilityStatusLabel;
+    case 'none':
+    default:
+      return t('Status');
+  }
+}
+
+function checkoutPresentationGuidanceText(
+  checkoutPresentation: BillingCheckoutPresentationView | null,
+  t: TranslateFn,
+): string {
+  if (!checkoutPresentation) {
+    return t('No checkout guidance is available for this order yet.');
+  }
+
+  switch (checkoutPresentation.guidance_source) {
+    case 'payment_attempt_error':
+    case 'checkout_session':
+      return checkoutPresentation.guidance ?? t('No checkout guidance is available for this order yet.');
+    case 'launch_decision':
+      return providerCheckoutLaunchDecisionDetail(
+        checkoutPresentation.launch_decision_kind ?? 'create_first_attempt',
+        checkoutPresentation.provider
+          ? checkoutMethodProviderLabel(checkoutPresentation.provider, t)
+          : t('Payment method'),
+        t,
+      );
+    case 'none':
+    default:
+      if (!checkoutPresentation.reference) {
+        return t('No checkout guidance is available for this order yet.');
+      }
+
+      if (checkoutPresentation.provider && checkoutPresentation.channel) {
+        return t('{reference} is the current {provider} / {channel} payment reference for this order.', {
+          reference: checkoutPresentation.reference,
+          provider: checkoutMethodProviderLabel(checkoutPresentation.provider, t),
+          channel: checkoutMethodChannelLabel(checkoutPresentation.channel, t),
+        });
+      }
+
+      return t('{reference} is the current checkout reference for this order.', {
+        reference: checkoutPresentation.reference,
+      });
+  }
+}
+
 export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
   const { t } = usePortalI18n();
   const [summary, setSummary] = useState<ProjectBillingSummary>(emptySummary);
@@ -926,6 +1191,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
   const [orders, setOrders] = useState<PortalCommerceOrder[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<BillingPaymentHistoryRow[]>([]);
   const [refundHistory, setRefundHistory] = useState<BillingPaymentHistoryRow[]>([]);
+  const [paymentSimulationEnabled, setPaymentSimulationEnabled] = useState(false);
   const [membership, setMembership] = useState<PortalCommerceMembership | null>(null);
   const [commercialReconciliation, setCommercialReconciliation] =
     useState<PortalCommerceReconciliationSummary | null>(null);
@@ -951,14 +1217,16 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
   const [queueActionOrderId, setQueueActionOrderId] = useState<string | null>(null);
   const [queueActionType, setQueueActionType] = useState<'settle' | 'cancel' | null>(null);
   const [checkoutSession, setCheckoutSession] = useState<PortalCommerceCheckoutSession | null>(null);
+  const [checkoutDetail, setCheckoutDetail] = useState<BillingCheckoutDetail | null>(null);
   const [checkoutSessionOrderId, setCheckoutSessionOrderId] = useState<string | null>(null);
+  const [providerCheckoutMethodId, setProviderCheckoutMethodId] = useState<string | null>(null);
   const [providerCallbackMethodId, setProviderCallbackMethodId] = useState<string | null>(null);
   const [providerEventOrderId, setProviderEventOrderId] = useState<string | null>(null);
   const [providerEventType, setProviderEventType] = useState<PortalCommercePaymentEventType | null>(
     null,
   );
   const [checkoutSessionStatus, setCheckoutSessionStatus] = useState(
-    t('Open session from Pending payment queue to inspect the payment rail.'),
+    t('Open the checkout workbench from Pending payment queue to inspect the selected payment method.'),
   );
   const [checkoutSessionLoading, setCheckoutSessionLoading] = useState(false);
   const deferredSearch = useDeferredValue(searchQuery.trim().toLowerCase());
@@ -981,7 +1249,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
         applyBillingPageData(data);
         setStatus(
           t(
-            'Billing posture now combines live quota evidence, checkout state, and the payment lifecycle timeline.',
+            'Billing view keeps live quota, checkout progress, and payment history in one place.',
           ),
         );
       })
@@ -1006,6 +1274,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
     setOrders(data.orders);
     setPaymentHistory(data.payment_history);
     setRefundHistory(data.refund_history);
+    setPaymentSimulationEnabled(data.payment_simulation_enabled);
     setMembership(data.membership);
     setCommercialReconciliation(data.commercial_reconciliation);
     setCommercialAccount(data.commercial_account);
@@ -1026,8 +1295,12 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
     if (!nextPendingOrder) {
       setCheckoutSessionOrderId(null);
       setCheckoutSession(null);
+      setCheckoutDetail(null);
+      setProviderCheckoutMethodId(null);
       setProviderCallbackMethodId(null);
-      setCheckoutSessionStatus(t('Open session from Pending payment queue to inspect the payment rail.'));
+      setCheckoutSessionStatus(
+        t('Open the checkout workbench from Pending payment queue to inspect the selected payment method.'),
+      );
       return;
     }
 
@@ -1057,24 +1330,43 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
   async function loadCheckoutSession(orderId: string): Promise<void> {
     setCheckoutSessionOrderId(orderId);
     setCheckoutSessionLoading(true);
-    setCheckoutSessionStatus(t('Loading checkout session for {orderId}...', { orderId }));
+    setCheckoutSessionStatus(t('Loading checkout for {orderId}...', { orderId }));
 
     try {
-      const session = await getBillingCheckoutSession(orderId);
-      const callbackMethod = preferredProviderCallbackMethod(session);
+      const detail = await getBillingCheckoutDetail(orderId);
+      const session = detail.checkout_session;
+      const checkoutPresentation = buildBillingCheckoutPresentation(detail);
+      const callbackMethod = preferredProviderCallbackMethod(detail.checkout_methods);
+      setCheckoutDetail(detail);
       setCheckoutSession(session);
+      setProviderCheckoutMethodId(null);
+      setPaymentSimulationEnabled(session.payment_simulation_enabled);
       setProviderCallbackMethodId(callbackMethod?.id ?? null);
-      setCheckoutSessionStatus(
-        t(
-          '{reference} maps this order into the current payment rail in {mode} mode.',
-          {
-            reference: session.reference,
-            mode: checkoutModeLabel(session, t),
-          },
-        ),
-      );
+      if (checkoutPresentation.reference) {
+        if (checkoutPresentation.provider && checkoutPresentation.channel) {
+          setCheckoutSessionStatus(
+            t('{reference} is the current {provider} / {channel} payment reference for this order.', {
+              reference: checkoutPresentation.reference,
+              provider: checkoutMethodProviderLabel(checkoutPresentation.provider, t),
+              channel: checkoutMethodChannelLabel(checkoutPresentation.channel, t),
+            }),
+          );
+        } else {
+          setCheckoutSessionStatus(
+            t('{reference} is the current checkout reference for this order.', {
+              reference: checkoutPresentation.reference,
+            }),
+          );
+        }
+      } else {
+        setCheckoutSessionStatus(
+          t('Open the checkout workbench from Pending payment queue to inspect the selected payment method.'),
+        );
+      }
     } catch (error) {
+      setCheckoutDetail(null);
       setCheckoutSession(null);
+      setProviderCheckoutMethodId(null);
       setProviderCallbackMethodId(null);
       setCheckoutSessionStatus(portalErrorMessage(error));
     } finally {
@@ -1154,7 +1446,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
       });
       await refreshBillingPage(
         t(
-          '{targetName} was queued in Pending payment queue. Settle it before quota or membership changes are applied.',
+          '{targetName} was queued in Pending payment queue. Open the checkout workbench to complete payment before quota or membership changes are applied.',
           {
             targetName: order.target_name,
           },
@@ -1224,16 +1516,16 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
     setProviderEventType(eventType);
     setStatus(
       eventType === 'settled'
-        ? t('Replaying {provider} settlement for {orderId}...', {
+        ? t('Applying {provider} settlement outcome for {orderId}...', {
             provider: providerLabel,
             orderId: checkoutSessionOrderId,
           })
         : eventType === 'failed'
-          ? t('Replaying {provider} failure for {orderId}...', {
+          ? t('Applying {provider} failure outcome for {orderId}...', {
               provider: providerLabel,
               orderId: checkoutSessionOrderId,
             })
-          : t('Replaying {provider} cancellation for {orderId}...', {
+          : t('Applying {provider} cancellation outcome for {orderId}...', {
               provider: providerLabel,
               orderId: checkoutSessionOrderId,
             }),
@@ -1252,16 +1544,16 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
       });
       await refreshBillingPage(
         eventType === 'settled'
-          ? t('{targetName} was settled through the {provider} callback flow.', {
+          ? t('{targetName} was settled after the {provider} payment confirmation.', {
               targetName: nextOrder.target_name,
               provider: providerLabel,
             })
           : eventType === 'failed'
-            ? t('{targetName} was marked failed after the {provider} callback.', {
+            ? t('{targetName} was marked failed after the {provider} payment confirmation.', {
                 targetName: nextOrder.target_name,
                 provider: providerLabel,
               })
-            : t('{targetName} was canceled through the {provider} callback flow.', {
+            : t('{targetName} was canceled after the {provider} payment confirmation.', {
                 targetName: nextOrder.target_name,
                 provider: providerLabel,
               }),
@@ -1272,6 +1564,80 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
     } finally {
       setProviderEventOrderId(null);
       setProviderEventType(null);
+    }
+  }
+
+  async function handleProviderCheckoutLaunch(
+    method: PortalCommerceCheckoutSessionMethod,
+  ): Promise<void> {
+    if (!checkoutSessionOrderId || !checkoutDetail || !supportsFormalProviderCheckoutLaunch(method)) {
+      return;
+    }
+
+    const targetName = checkoutDetail.order.target_name;
+    const providerLabel = checkoutMethodProviderLabel(method.provider, t);
+    const checkoutLaunchDecision = buildBillingCheckoutLaunchDecision({
+      checkout_method: method,
+      payment_attempts: checkoutDetail.payment_attempts,
+    });
+    const activeAttempt = checkoutLaunchDecision.kind === 'resume_existing_attempt'
+      ? checkoutLaunchDecision.latest_attempt
+      : null;
+
+    if (activeAttempt?.checkout_url) {
+      setStatus(
+        t('Reopening {provider} checkout for {targetName}...', {
+          provider: providerLabel,
+          targetName,
+        }),
+      );
+      openPortalExternalUrl(activeAttempt.checkout_url);
+      return;
+    }
+
+    setProviderCheckoutMethodId(method.id);
+    setStatus(
+      checkoutLaunchDecision.kind === 'create_retry_attempt'
+        ? t('Creating a fresh {provider} checkout attempt for {targetName}...', {
+            provider: providerLabel,
+            targetName,
+          })
+        : t('Starting {provider} checkout for {targetName}...', {
+            provider: providerLabel,
+            targetName,
+          }),
+    );
+
+    try {
+      const paymentAttempt = await createBillingPaymentAttempt(checkoutSessionOrderId, {
+        payment_method_id: method.id,
+        success_url: resolvePortalCheckoutReturnUrl(checkoutSessionOrderId, 'success'),
+        cancel_url: resolvePortalCheckoutReturnUrl(checkoutSessionOrderId, 'cancel'),
+      });
+
+      await loadCheckoutSession(checkoutSessionOrderId);
+
+      if (paymentAttempt.checkout_url) {
+        openPortalExternalUrl(paymentAttempt.checkout_url);
+        setStatus(
+          t('{targetName} now uses the {provider} checkout launch path.', {
+            targetName,
+            provider: providerLabel,
+          }),
+        );
+        return;
+      }
+
+      setStatus(
+        t('{targetName} created a {provider} checkout attempt, but no checkout link was returned.', {
+          targetName,
+          provider: providerLabel,
+        }),
+      );
+    } catch (error) {
+      setStatus(portalErrorMessage(error));
+    } finally {
+      setProviderCheckoutMethodId(null);
     }
   }
 
@@ -1291,16 +1657,59 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
   const selectedTargetKindLabel = checkoutSelection
     ? targetKindLabel(checkoutSelection.kind, t)
     : null;
-  const providerCallbackMethods = checkoutSession?.methods.filter((method) => method.supports_webhook) ?? [];
+  const checkoutMethods = checkoutDetail?.checkout_methods ?? checkoutSession?.methods ?? [];
+  const checkoutPresentation = checkoutDetail
+    ? buildBillingCheckoutPresentation(checkoutDetail)
+    : null;
+  const checkoutPaymentAttempts = checkoutDetail?.payment_attempts ?? [];
+  const latestCheckoutPaymentAttemptId =
+    checkoutDetail?.latest_payment_attempt?.payment_attempt_id ?? null;
+  const activeCheckoutOrder = checkoutDetail?.order ?? null;
+  const visibleCheckoutMethods = checkoutMethods.filter((method) => paymentSimulationEnabled || method.action !== 'settle_order');
+  const providerCallbackMethods = checkoutMethods.filter((method) => method.supports_webhook && paymentSimulationEnabled);
   const activeProviderCallbackMethod = providerCallbackMethods.find(
     (method) => method.id === providerCallbackMethodId,
-  ) ?? preferredProviderCallbackMethod(checkoutSession);
+  ) ?? preferredProviderCallbackMethod(checkoutMethods);
   const activeProviderLabel = activeProviderCallbackMethod
     ? checkoutMethodProviderLabel(activeProviderCallbackMethod.provider, t)
     : null;
   const activeProviderChannelLabel = activeProviderCallbackMethod
     ? checkoutMethodChannelLabel(activeProviderCallbackMethod.channel, t)
     : null;
+  const checkoutReference = checkoutPresentation?.reference
+    ?? checkoutSession?.reference
+    ?? t('Not recorded');
+  const checkoutRailProvider = checkoutPresentation?.provider
+    ?? checkoutDetail?.selected_payment_method?.provider
+    ?? (paymentSimulationEnabled ? checkoutSession?.provider : null)
+    ?? null;
+  const checkoutPaymentMethodName = checkoutPresentation?.payment_method_name
+    ?? checkoutDetail?.selected_payment_method?.display_name
+    ?? null;
+  const checkoutCompatibilityStatusLabel = checkoutSession
+    ? checkoutSessionStatusLabel(checkoutSession.session_status, t)
+    : t('Status');
+  const checkoutPresentationProviderLabel = checkoutPresentation?.provider
+    ? checkoutMethodProviderLabel(checkoutPresentation.provider, t)
+    : null;
+  const checkoutPresentationChannelLabel = checkoutPresentation?.channel
+    ? checkoutMethodChannelLabel(checkoutPresentation.channel, t)
+    : null;
+  const checkoutPrimaryRailLabel = checkoutPresentationProviderLabel
+    ? checkoutPresentationChannelLabel
+      ? t('{provider} / {channel}', {
+          provider: checkoutPresentationProviderLabel,
+          channel: checkoutPresentationChannelLabel,
+        })
+      : checkoutPresentationProviderLabel
+    : paymentSimulationEnabled
+      ? checkoutModeLabel(checkoutSession, t)
+      : t('Not recorded');
+  const checkoutPresentationStatusLabelText = checkoutPresentationStatusText(
+    checkoutPresentation,
+    checkoutCompatibilityStatusLabel,
+    t,
+  );
   const orderWorkbenchCopy = orderWorkbenchDetail(orderLane, t);
   const membershipPanelDescription = membershipDescription(membership, t);
   const orderEmptyTitle =
@@ -1346,7 +1755,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
       value: String(pendingPaymentCount),
     },
     {
-      detail: t('Payment attempts that closed on the failure path and need a fresh checkout decision.'),
+      detail: t('Checkout attempts that closed on the failure path and need a fresh checkout decision.'),
       label: t('Failed payment'),
       value: String(failedPaymentCount),
     },
@@ -1835,7 +2244,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
         <section className="grid gap-4 xl:grid-cols-4">
           <WorkspacePanel
             description={t(
-              'Commercial account exposes canonical balance, hold, and account identity state beside the workspace billing posture.',
+              'Commercial account keeps balance, holds, and account identity visible beside the workspace billing posture.',
             )}
             title={t('Commercial account')}
           >
@@ -1867,9 +2276,9 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
 
           <WorkspacePanel
             description={t(
-              'Commercial settlement rail keeps benefit lots, credit holds, and request settlement capture visible in one operator-facing posture.',
+              'Settlement coverage keeps benefit lots, credit holds, and request capture aligned in one billing snapshot.',
             )}
-            title={t('Commercial settlement rail')}
+            title={t('Settlement coverage')}
           >
             <div className="grid gap-3 text-sm text-zinc-600 dark:text-zinc-300">
               {commercialSettlementFacts.map((item) => (
@@ -2282,7 +2691,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                   </strong>
                   <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
                     {t(
-                      'Fallback reasoning is preserved so operators can distinguish degraded routing from normal preference selection.',
+                      'Fallback reasoning stays visible so you can distinguish degraded routing from the preferred routing path.',
                     )}
                   </p>
                 </article>
@@ -2320,7 +2729,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
             )}
             title={t('Recent billing events')}
           >
-            <DataTable
+            <BillingEventsAuditTable
               columns={[
                 {
                   id: 'event',
@@ -2572,31 +2981,9 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                           variant="secondary"
                         >
                           {checkoutSessionLoading && checkoutSessionOrderId === row.order_id
-                            ? t('Loading session...')
-                            : t('Open session')}
+                            ? t('Loading checkout...')
+                            : t('Open checkout')}
                         </Button>
-                        {isPendingPaymentOrder(row) ? (
-                          <>
-                            <Button
-                              disabled={queueActionOrderId !== null}
-                              onClick={() => void handleQueueAction(row, 'settle')}
-                              variant="primary"
-                            >
-                              {queueActionOrderId === row.order_id && queueActionType === 'settle'
-                                ? t('Settling...')
-                                : t('Settle order')}
-                            </Button>
-                            <Button
-                              disabled={queueActionOrderId !== null}
-                              onClick={() => void handleQueueAction(row, 'cancel')}
-                              variant="secondary"
-                            >
-                              {queueActionOrderId === row.order_id && queueActionType === 'cancel'
-                                ? t('Canceling...')
-                                : t('Cancel order')}
-                            </Button>
-                          </>
-                        ) : null}
                       </div>
                     ),
                   },
@@ -2628,11 +3015,11 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
               </div>
             )}
             description={t(
-              'Payment history keeps provider callbacks, manual settlement evidence, and refund closure in one operator-facing audit timeline.',
+              'Payment history keeps checkout outcomes, payment method evidence, and refund status visible in one billing timeline.',
             )}
             title={t('Payment history')}
           >
-            <DataTable
+            <PaymentHistoryAuditTable
               columns={[
                 {
                   id: 'order',
@@ -2660,12 +3047,12 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                 },
                 {
                   id: 'rail',
-                  header: t('Payment rail'),
-                  cell: (row: BillingPaymentHistoryRow) => checkoutMethodProviderLabel(row.provider, t),
+                  header: t('Payment method'),
+                  cell: (row: BillingPaymentHistoryRow) => paymentHistoryRailCell(row, t),
                 },
                 {
                   id: 'provider_event',
-                  header: t('Provider event'),
+                  header: t('Payment update reference'),
                   cell: (row: BillingPaymentHistoryRow) => row.provider_event_id ?? t('Not recorded'),
                 },
                 {
@@ -2712,11 +3099,11 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
               </div>
             )}
             description={t(
-              'Refund history isolates closed-loop refund outcomes so finance and support can verify provider, checkout reference, and final order state without reopening each order.',
+              'Refund history keeps completed refund outcomes, payment method evidence, and the resulting order status visible without reopening each order.',
             )}
             title={t('Refund history')}
           >
-            <DataTable
+            <RefundHistoryAuditTable
               columns={[
                 {
                   id: 'order',
@@ -2735,8 +3122,8 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                 },
                 {
                   id: 'rail',
-                  header: t('Payment rail'),
-                  cell: (row: BillingPaymentHistoryRow) => checkoutMethodProviderLabel(row.provider, t),
+                  header: t('Payment method'),
+                  cell: (row: BillingPaymentHistoryRow) => paymentHistoryRailCell(row, t),
                 },
                 {
                   id: 'reference',
@@ -2773,7 +3160,7 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
         <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <WorkspacePanel
             description={checkoutSessionStatus}
-            title={t('Checkout session')}
+            title={t('Checkout details')}
           >
             {checkoutSession ? (
               <div className="grid gap-4">
@@ -2781,25 +3168,34 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                   <div className="flex items-center justify-between gap-3">
                     <span>{t('Reference')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">
-                      {checkoutSession.reference}
+                      {checkoutReference}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span>{t('Payment rail')}</span>
+                    <span>{t('Payment method')}</span>
+                    <div className="grid justify-items-end gap-1 text-right">
+                      <strong className="text-zinc-950 dark:text-zinc-50">
+                        {checkoutRailProvider
+                          ? checkoutMethodProviderLabel(checkoutRailProvider, t)
+                          : t('Not recorded')}
+                      </strong>
+                      {checkoutPaymentMethodName ? (
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {checkoutPaymentMethodName}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{t('Primary method')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">
-                      {checkoutMethodProviderLabel(checkoutSession.provider, t)}
+                      {checkoutPrimaryRailLabel}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span>{t('Checkout mode')}</span>
+                    <span>{t('Current status')}</span>
                     <strong className="text-zinc-950 dark:text-zinc-50">
-                      {checkoutModeLabel(checkoutSession, t)}
-                    </strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>{t('Session status')}</span>
-                    <strong className="text-zinc-950 dark:text-zinc-50">
-                      {checkoutSessionStatusLabel(checkoutSession.session_status, t)}
+                      {checkoutPresentationStatusLabelText}
                     </strong>
                   </div>
                 </div>
@@ -2809,217 +3205,349 @@ export function PortalBillingPage({ onNavigate }: PortalBillingPageProps) {
                     {t('Guidance')}
                   </p>
                   <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
-                    {checkoutSession.guidance}
+                    {checkoutPresentationGuidanceText(checkoutPresentation, t)}
                   </p>
                 </div>
 
                 <div className="grid gap-3">
-                  {checkoutSession.methods.length ? (
-                    checkoutSession.methods.map((method) => (
-                      <article
-                        key={method.id}
-                        className={catalogCardClassName}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="grid gap-2">
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="default">{method.label}</Badge>
-                              <Badge variant="secondary">
-                                {checkoutMethodProviderLabel(method.provider, t)}
-                              </Badge>
-                              <Badge variant="secondary">
-                                {checkoutMethodChannelLabel(method.channel, t)}
-                              </Badge>
-                              <Badge variant="secondary">
-                                {checkoutMethodSessionKindLabel(method.session_kind, t)}
-                              </Badge>
-                              {method.recommended ? (
-                                <Badge variant="success">{t('Recommended')}</Badge>
-                              ) : null}
-                              {method.supports_webhook ? (
-                                <Badge variant="warning">{t('Webhook')}</Badge>
-                              ) : null}
-                              <Badge variant={checkoutMethodAvailabilityTone(method.availability)}>
-                                {checkoutMethodAvailabilityLabel(method.availability, t)}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-zinc-600 dark:text-zinc-300">{method.detail}</p>
-                            <div className="grid gap-2 rounded-[20px] border border-dashed border-zinc-300/80 bg-white/70 p-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
-                              <div className="grid gap-1">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span>{t('Session reference')}</span>
-                                  <code className="rounded bg-zinc-950/5 px-2 py-1 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
-                                    {method.session_reference}
-                                  </code>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span>{t('Webhook verification')}</span>
-                                  <code className="rounded bg-zinc-950/5 px-2 py-1 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
-                                    {method.webhook_verification}
-                                  </code>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span>{t('Refund support')}</span>
-                                  <strong className="text-zinc-950 dark:text-zinc-50">
-                                    {method.supports_refund ? t('Available') : t('Unavailable')}
-                                  </strong>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span>{t('Partial refund')}</span>
-                                  <strong className="text-zinc-950 dark:text-zinc-50">
-                                    {method.supports_partial_refund
-                                      ? t('Available')
-                                      : t('Unavailable')}
-                                  </strong>
-                                </div>
+                  {visibleCheckoutMethods.length ? (
+                    visibleCheckoutMethods.map((method) => {
+                      const providerLabel = checkoutMethodProviderLabel(method.provider, t);
+                      const checkoutLaunchDecision = supportsFormalProviderCheckoutLaunch(method)
+                        ? buildBillingCheckoutLaunchDecision({
+                            checkout_method: method,
+                            payment_attempts: checkoutPaymentAttempts,
+                          })
+                        : null;
+
+                      return (
+                        <article
+                          key={method.id}
+                          className={catalogCardClassName}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="grid gap-2">
+                              <div className="flex flex-wrap gap-2">
+                                <Badge variant="default">{method.label}</Badge>
+                                <Badge variant="secondary">
+                                  {providerLabel}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {checkoutMethodChannelLabel(method.channel, t)}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {checkoutMethodSessionKindLabel(method.session_kind, t)}
+                                </Badge>
+                                {method.recommended ? (
+                                  <Badge variant="success">{t('Recommended')}</Badge>
+                                ) : null}
+                                {method.supports_webhook ? (
+                                  <Badge variant="warning">{t('Payment outcomes')}</Badge>
+                                ) : null}
+                                <Badge variant={checkoutMethodAvailabilityTone(method.availability)}>
+                                  {checkoutMethodAvailabilityLabel(method.availability, t)}
+                                </Badge>
                               </div>
-                              {method.qr_code_payload ? (
+                              <p className="text-sm text-zinc-600 dark:text-zinc-300">{method.detail}</p>
+                              {checkoutLaunchDecision ? (
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  {providerCheckoutLaunchDecisionDetail(
+                                    checkoutLaunchDecision.kind,
+                                    providerLabel,
+                                    t,
+                                  )}
+                                </p>
+                              ) : null}
+                              <div className="grid gap-2 rounded-[20px] border border-dashed border-zinc-300/80 bg-white/70 p-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
                                 <div className="grid gap-1">
-                                  <span>{t('QR payload')}</span>
-                                  <code className="overflow-x-auto rounded bg-zinc-950/5 px-2 py-2 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
-                                    {method.qr_code_payload}
-                                  </code>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Checkout reference')}</span>
+                                    <code className="rounded bg-zinc-950/5 px-2 py-1 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
+                                      {method.session_reference}
+                                    </code>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Verification method')}</span>
+                                    <code className="rounded bg-zinc-950/5 px-2 py-1 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
+                                      {checkoutMethodVerificationLabel(method.webhook_verification, t)}
+                                    </code>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Refund coverage')}</span>
+                                    <strong className="text-zinc-950 dark:text-zinc-50">
+                                      {method.supports_refund ? t('Available') : t('Unavailable')}
+                                    </strong>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Partial refunds')}</span>
+                                    <strong className="text-zinc-950 dark:text-zinc-50">
+                                      {method.supports_partial_refund
+                                        ? t('Available')
+                                        : t('Unavailable')}
+                                    </strong>
+                                  </div>
                                 </div>
+                                {method.qr_code_payload ? (
+                                  <div className="grid gap-1">
+                                    <span>{t('QR code content')}</span>
+                                    <code className="overflow-x-auto rounded bg-zinc-950/5 px-2 py-2 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
+                                      {method.qr_code_payload}
+                                    </code>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="grid justify-items-end gap-3">
+                              <strong className="text-sm text-zinc-950 dark:text-zinc-50">
+                                {checkoutMethodActionLabel(method.action, t)}
+                              </strong>
+                              {supportsFormalProviderCheckoutLaunch(method) ? (
+                                <Button
+                                  disabled={providerCheckoutMethodId !== null}
+                                  onClick={() => void handleProviderCheckoutLaunch(method)}
+                                  variant="primary"
+                                >
+                                  {providerCheckoutMethodId === method.id
+                                    ? t('Opening checkout...')
+                                    : providerCheckoutLaunchActionLabel(
+                                        checkoutLaunchDecision?.kind ?? 'create_first_attempt',
+                                        t,
+                                      )}
+                                </Button>
+                              ) : method.action === 'settle_order' && paymentSimulationEnabled && activeCheckoutOrder ? (
+                                <Button
+                                  disabled={queueActionOrderId !== null}
+                                  onClick={() => void handleQueueAction(activeCheckoutOrder, 'settle')}
+                                  variant="primary"
+                                >
+                                  {queueActionOrderId === activeCheckoutOrder.order_id && queueActionType === 'settle'
+                                    ? t('Settling...')
+                                    : t('Settle order')}
+                                </Button>
+                              ) : method.action === 'cancel_order' && activeCheckoutOrder ? (
+                                <Button
+                                  disabled={queueActionOrderId !== null}
+                                  onClick={() => void handleQueueAction(activeCheckoutOrder, 'cancel')}
+                                  variant="secondary"
+                                >
+                                  {queueActionOrderId === activeCheckoutOrder.order_id && queueActionType === 'cancel'
+                                    ? t('Canceling...')
+                                    : t('Cancel order')}
+                                </Button>
                               ) : null}
                             </div>
                           </div>
-                          <strong className="text-sm text-zinc-950 dark:text-zinc-50">
-                            {checkoutMethodActionLabel(method.action, t)}
-                          </strong>
-                        </div>
-                      </article>
-                    ))
+                        </article>
+                      );
+                    })
                   ) : (
-                    <EmptyState
-                      description={t('This checkout session is already closed, so there are no remaining payment actions.')}
-                      title={t('No checkout methods remain')}
-                    />
+                      <EmptyState
+                        description={t('This checkout is already closed, so there are no remaining payment actions.')}
+                        title={t('No checkout methods remain')}
+                      />
                   )}
                 </div>
 
-                    {hasProviderHandoff(checkoutSession) ? (
-                  <div className={detailCardClassName}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="grid gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
-                          {t('Provider callbacks')}
-                        </p>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                          {t(
-                            'Simulate hosted payment callbacks so server mode can rehearse settlement, failure, and cancellation on the selected payment rail before a live provider is connected.',
-                          )}
-                        </p>
-                      </div>
-                      <Badge variant="warning">{t('Provider webhooks')}</Badge>
+                <div className={detailCardClassName}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="grid gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                            {t('Checkout attempts')}
+                      </p>
+                              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                                {t(
+                                  'Checkout attempts keep checkout access, retries, and checkout references visible inside the same workbench.',
+                                )}
+                              </p>
                     </div>
-                    {providerCallbackMethods.length > 1 ? (
-                      <div className="mt-4 grid gap-2 md:max-w-sm">
-                        <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
-                          {t('Callback rail')}
-                        </span>
-                        <Select
-                          onValueChange={(value: string) => setProviderCallbackMethodId(value)}
-                          value={activeProviderCallbackMethod?.id ?? ''}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('Choose provider rail')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {providerCallbackMethods.map((method) => (
-                              <SelectItem key={method.id} value={method.id}>
-                                {t('{provider} / {channel}', {
-                                  provider: checkoutMethodProviderLabel(method.provider, t),
-                                  channel: checkoutMethodChannelLabel(method.channel, t),
-                                })}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    {latestCheckoutPaymentAttemptId ? (
+                      <Badge variant="default">{t('Latest attempt')}</Badge>
                     ) : null}
-                    {activeProviderCallbackMethod ? (
-                      <div className="mt-4 rounded-[24px] border border-dashed border-zinc-300/80 bg-white/70 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
-                        {t('{provider} currently anchors the callback rehearsal on the {channel} rail.', {
-                          provider: activeProviderLabel ?? t('Provider'),
-                          channel: activeProviderChannelLabel ?? t('Payment channel'),
-                        })}
-                      </div>
-                    ) : null}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
-                        onClick={() => void handleProviderEvent('settled', activeProviderCallbackMethod)}
-                        variant="primary"
-                      >
-                        {providerEventOrderId === checkoutSessionOrderId
-                        && providerEventType === 'settled'
-                          ? t('Applying settlement...')
-                          : t('Simulate provider settlement')}
-                      </Button>
-                      <Button
-                        disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
-                        onClick={() => void handleProviderEvent('failed', activeProviderCallbackMethod)}
-                        variant="secondary"
-                      >
-                        {providerEventOrderId === checkoutSessionOrderId
-                        && providerEventType === 'failed'
-                          ? t('Applying failure...')
-                          : t('Simulate provider failure')}
-                      </Button>
-                      <Button
-                        disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
-                        onClick={() => void handleProviderEvent('canceled', activeProviderCallbackMethod)}
-                        variant="secondary"
-                      >
-                        {providerEventOrderId === checkoutSessionOrderId
-                        && providerEventType === 'canceled'
-                          ? t('Applying cancel...')
-                          : t('Simulate provider cancel')}
-                      </Button>
-                    </div>
                   </div>
+                  {checkoutPaymentAttempts.length ? (
+                    <div className="mt-4 grid gap-3">
+                      {checkoutPaymentAttempts.map((attempt) => (
+                        <article
+                          key={attempt.payment_attempt_id}
+                          className="rounded-[24px] border border-dashed border-zinc-300/80 bg-white/70 p-4 dark:border-zinc-700 dark:bg-zinc-950/40"
+                        >
+                          <div className="grid gap-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="grid gap-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge variant={paymentAttemptStatusTone(attempt.status)}>
+                                    {paymentAttemptStatusLabel(attempt.status, t)}
+                                  </Badge>
+                                  <Badge variant="secondary">
+                                    {t('Attempt #{sequence}', { sequence: attempt.attempt_sequence })}
+                                  </Badge>
+                                  {latestCheckoutPaymentAttemptId === attempt.payment_attempt_id ? (
+                                    <Badge variant="default">{t('Latest attempt')}</Badge>
+                                  ) : null}
+                                </div>
+                                <div className="grid gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Reference')}</span>
+                                    <code className="rounded bg-zinc-950/5 px-2 py-1 text-[11px] text-zinc-700 dark:bg-zinc-100/10 dark:text-zinc-200">
+                                      {paymentAttemptReference(attempt)}
+                                    </code>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Initiated')}</span>
+                                    <strong className="text-zinc-950 dark:text-zinc-50">
+                                      {formatDateTime(attempt.initiated_at_ms)}
+                                    </strong>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span>{t('Updated')}</span>
+                                    <strong className="text-zinc-950 dark:text-zinc-50">
+                                      {formatDateTime(attempt.updated_at_ms)}
+                                    </strong>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="grid justify-items-end gap-1 text-right">
+                                <strong className="text-sm text-zinc-950 dark:text-zinc-50">
+                                  {checkoutMethodProviderLabel(attempt.provider, t)}
+                                </strong>
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  {titleCaseToken(attempt.channel)}
+                                </span>
+                              </div>
+                            </div>
+                            {attempt.error_message ? (
+                              <div className="rounded-[18px] border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                                {attempt.error_message}
+                              </div>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <EmptyState
+                        description={t('No checkout attempts have been recorded for this order yet.')}
+                        title={t('No checkout attempts recorded yet')}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {paymentSimulationEnabled ? (
+                  hasProviderHandoff(checkoutMethods) ? (
+                    <div className={detailCardClassName}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="grid gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                            {t('Payment outcome sandbox')}
+                          </p>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                            {t(
+                              'Apply settlement, failure, or cancellation outcomes for the selected payment method before live payment confirmation is enabled.',
+                            )}
+                          </p>
+                        </div>
+                        <Badge variant="warning">{t('Sandbox only')}</Badge>
+                      </div>
+                      {providerCallbackMethods.length > 1 ? (
+                        <div className="mt-4 grid gap-2 md:max-w-sm">
+                          <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                            {t('Sandbox method')}
+                          </span>
+                          <Select
+                            onValueChange={(value: string) => setProviderCallbackMethodId(value)}
+                            value={activeProviderCallbackMethod?.id ?? ''}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={t('Choose sandbox method')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {providerCallbackMethods.map((method) => (
+                                <SelectItem key={method.id} value={method.id}>
+                                  {t('{provider} / {channel}', {
+                                    provider: checkoutMethodProviderLabel(method.provider, t),
+                                    channel: checkoutMethodChannelLabel(method.channel, t),
+                                  })}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+                      {activeProviderCallbackMethod ? (
+                        <div className="mt-4 rounded-[24px] border border-dashed border-zinc-300/80 bg-white/70 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
+                          {t('Payment outcomes will use {provider} on {channel}.', {
+                            provider: activeProviderLabel ?? t('Provider'),
+                            channel: activeProviderChannelLabel ?? t('Payment channel'),
+                          })}
+                        </div>
+                      ) : null}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
+                          onClick={() => void handleProviderEvent('settled', activeProviderCallbackMethod)}
+                          variant="primary"
+                        >
+                          {providerEventOrderId === checkoutSessionOrderId
+                          && providerEventType === 'settled'
+                            ? t('Applying settlement...')
+                            : t('Apply settlement outcome')}
+                        </Button>
+                        <Button
+                          disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
+                          onClick={() => void handleProviderEvent('failed', activeProviderCallbackMethod)}
+                          variant="secondary"
+                        >
+                          {providerEventOrderId === checkoutSessionOrderId
+                          && providerEventType === 'failed'
+                            ? t('Applying failure...')
+                            : t('Apply failure outcome')}
+                        </Button>
+                        <Button
+                          disabled={providerEventOrderId !== null || !activeProviderCallbackMethod}
+                          onClick={() => void handleProviderEvent('canceled', activeProviderCallbackMethod)}
+                          variant="secondary"
+                        >
+                          {providerEventOrderId === checkoutSessionOrderId
+                          && providerEventType === 'canceled'
+                            ? t('Applying cancel...')
+                            : t('Apply cancellation outcome')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null
                 ) : null}
               </div>
             ) : (
-                <EmptyState
-                  description={t('Open session from Pending payment queue to inspect the checkout flow for the selected order.')}
-                  title={t('No checkout session selected')}
-                />
+                    <EmptyState
+                      description={t('Open the checkout workbench from Pending payment queue to inspect the selected order.')}
+                      title={t('No checkout selected')}
+                    />
               )}
           </WorkspacePanel>
 
           <WorkspacePanel
-            description={t('One checkout flow keeps local desktop mode and server-hosted payment providers aligned under one payment rail.')}
-            title={t('Payment rail')}
+            description={t('Checkout workbench keeps checkout access, selected reference, and payable price aligned under one payment method.')}
+            title={t('Payment method')}
           >
             <div className="grid gap-3 text-sm text-zinc-600 dark:text-zinc-300">
               <div className="flex items-center justify-between gap-3">
-                <span>{t('Local desktop mode')}</span>
+                <span>{t('Primary method')}</span>
                 <strong className="text-zinc-950 dark:text-zinc-50">
-                  {t('Operator settlement')}
-                </strong>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>{t('Server mode handoff')}</span>
-                <strong className="text-zinc-950 dark:text-zinc-50">
-                  {activeProviderLabel
-                    ? t('{provider} / {channel}', {
-                        provider: activeProviderLabel,
-                        channel: activeProviderChannelLabel ?? t('Payment channel'),
-                      })
-                    : t('Provider handoff')}
+                  {checkoutPrimaryRailLabel}
                 </strong>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span>{t('Current selected reference')}</span>
                 <strong className="text-zinc-950 dark:text-zinc-50">
-                  {checkoutSession?.reference ?? t('Awaiting pending order')}
+                  {checkoutPresentation?.reference ?? t('Awaiting pending order')}
                 </strong>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span>{t('Payable price')}</span>
                 <strong className="text-zinc-950 dark:text-zinc-50">
-                  {checkoutSession?.payable_price_label ?? t('n/a')}
+                  {checkoutPresentation?.payable_price_label ?? checkoutSession?.payable_price_label ?? t('n/a')}
                 </strong>
               </div>
             </div>

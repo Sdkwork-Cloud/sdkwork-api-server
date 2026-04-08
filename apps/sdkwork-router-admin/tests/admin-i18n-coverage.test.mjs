@@ -1,13 +1,72 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { readdirSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import * as ts from 'typescript';
+import { pathToFileURL } from 'node:url';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const packageRoot = path.join(appRoot, 'packages');
 const ignoredDirectories = new Set(['build', 'dist', 'node_modules']);
+const packageRoots = [
+  appRoot,
+  path.resolve(appRoot, '..', 'sdkwork-router-portal'),
+];
+
+function isReadable(entryPath) {
+  try {
+    const descriptor = openSync(entryPath, 'r');
+    closeSync(descriptor);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolvePnpmPackageEntry(packageName, entryPath) {
+  const packagePrefix = packageName.startsWith('@')
+    ? `${packageName.slice(1).replace('/', '+')}@`
+    : `${packageName}@`;
+
+  for (const root of packageRoots) {
+    const linkedEntry = path.join(root, 'node_modules', packageName, entryPath);
+    if (existsSync(linkedEntry) && isReadable(linkedEntry)) {
+      return linkedEntry;
+    }
+
+    const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
+    if (!existsSync(pnpmRoot)) {
+      continue;
+    }
+
+    for (const entry of readdirSync(pnpmRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !entry.name.startsWith(packagePrefix)) {
+        continue;
+      }
+
+      const resolvedEntry = path.join(
+        pnpmRoot,
+        entry.name,
+        'node_modules',
+        packageName,
+        entryPath,
+      );
+      if (existsSync(resolvedEntry) && isReadable(resolvedEntry)) {
+        return resolvedEntry;
+      }
+    }
+  }
+
+  throw new Error(`Unable to resolve ${packageName}/${entryPath} from pnpm workspace layout`);
+}
+
+const tsModule = await import(
+  pathToFileURL(resolvePnpmPackageEntry('typescript', path.join('lib', 'typescript.js'))).href
+);
+const ts = tsModule.default ?? tsModule;
+const { default: jiti } = await import(
+  pathToFileURL(resolvePnpmPackageEntry('jiti', path.join('lib', 'jiti.mjs'))).href
+);
+const loadTsModule = jiti(import.meta.url, { moduleCache: false });
 
 function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
@@ -227,47 +286,18 @@ function collectObjectLiteralKeys(expression, variables, visited = new Set()) {
 }
 
 function collectZhCatalogKeys() {
-  const source = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
-  const sourceFile = ts.createSourceFile(
-    'packages/sdkwork-router-admin-core/src/i18n.tsx',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
+  const translationModule = loadTsModule(
+    path.join(
+      appRoot,
+      'packages',
+      'sdkwork-router-admin-core',
+      'src',
+      'i18nTranslations.ts',
+    ),
   );
-  const variables = new Map();
-
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) {
-      continue;
-    }
-
-    for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.initializer) {
-        variables.set(declaration.name.text, declaration.initializer);
-      }
-    }
-  }
-
-  const adminTranslations = variables.get('ADMIN_TRANSLATIONS');
-  const resolvedTranslations = adminTranslations ? unwrapExpression(adminTranslations) : null;
-  assert.ok(resolvedTranslations && ts.isObjectLiteralExpression(resolvedTranslations));
-
-  for (const property of resolvedTranslations.properties) {
-    if (
-      (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
-      getPropertyNameText(property.name) === 'zh-CN'
-    ) {
-      return collectObjectLiteralKeys(
-        ts.isPropertyAssignment(property)
-          ? property.initializer
-          : variables.get(property.name.text),
-        variables,
-      );
-    }
-  }
-
-  return new Set();
+  const catalog = translationModule?.ADMIN_TRANSLATIONS?.['zh-CN'];
+  assert.ok(catalog && typeof catalog === 'object');
+  return new Set(Object.keys(catalog));
 }
 
 function collectPropertyStringValues(relativePath, propertyNames) {
@@ -313,7 +343,7 @@ test('admin core owns locale options and i18n helpers without the legacy commons
   assert.match(i18n, /ADMIN_LOCALE_OPTIONS/);
   assert.match(i18n, /'en-US'/);
   assert.match(i18n, /'zh-CN'/);
-  assert.match(i18n, /const ADMIN_TRANSLATIONS|const translationCatalog|const ADMIN_TRANSLATION_CATALOG/);
+  assert.match(i18n, /ADMIN_TRANSLATIONS/);
   assert.match(i18n, /translateAdminText/);
   assert.match(i18n, /formatAdminDateTime/);
   assert.match(i18n, /formatAdminNumber/);

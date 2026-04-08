@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { createRequire } from 'node:module';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -22,6 +23,35 @@ function resolveSdkworkUiSourcePath(relativePath: string) {
   return path.resolve(sdkworkUiSourceRoot, relativePath);
 }
 
+function normalizeAliasPath(value: string) {
+  return value.replaceAll('\\', '/');
+}
+
+function resolvePnpmPackageRoot(packageName: string) {
+  const directRoot = path.resolve(configDir, 'node_modules', packageName);
+  if (existsSync(path.join(directRoot, 'package.json'))) {
+    return directRoot;
+  }
+
+  const pnpmRoot = path.resolve(configDir, 'node_modules', '.pnpm');
+  const candidateNames = existsSync(pnpmRoot)
+    ? readdirSync(pnpmRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${packageName}@`))
+        .map((entry) => entry.name)
+        .sort()
+        .reverse()
+    : [];
+
+  for (const candidateName of candidateNames) {
+    const candidateRoot = path.join(pnpmRoot, candidateName, 'node_modules', packageName);
+    if (existsSync(path.join(candidateRoot, 'package.json'))) {
+      return candidateRoot;
+    }
+  }
+
+  throw new Error(`unable to resolve ${packageName} from ${configDir}`);
+}
+
 function resolveProxyTarget(envValue: string | undefined, fallbackTarget: string) {
   const trimmedValue = envValue?.trim();
   if (!trimmedValue) {
@@ -41,6 +71,8 @@ const portalProxyTarget = resolveProxyTarget(
   process.env.SDKWORK_PORTAL_PROXY_TARGET ?? process.env.SDKWORK_PORTAL_BIND,
   defaultPortalProxyTarget,
 );
+const lucideReactRoot = resolvePnpmPackageRoot('lucide-react');
+const lucideReactIconsRoot = `${normalizeAliasPath(path.join(lucideReactRoot, 'dist', 'esm', 'icons'))}/`;
 
 function manualChunks(id: string) {
   if (!id.includes('node_modules')) {
@@ -121,6 +153,10 @@ export default defineConfig({
       {
         find: /^lucide-react$/,
         replacement: path.resolve(configDir, './src/vendor/lucide-react.ts'),
+      },
+      {
+        find: /^lucide-react\/dist\/esm\/icons\//,
+        replacement: lucideReactIconsRoot,
       },
       {
         find: /^@sdkwork\/ui-pc-react\/theme$/,

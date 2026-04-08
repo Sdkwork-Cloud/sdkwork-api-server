@@ -9,6 +9,23 @@ export function didChildExitFail(code, signal) {
   return Boolean(signal) || (code ?? 0) !== 0;
 }
 
+export function createSupervisorKeepAlive({
+  intervalMs = 0x3fffffff,
+  setIntervalImpl = setInterval,
+  clearIntervalImpl = clearInterval,
+} = {}) {
+  const timer = setIntervalImpl(() => {}, intervalMs);
+  let released = false;
+
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    clearIntervalImpl(timer);
+  };
+}
+
 function terminateWindowsProcessTree(child, forceSignal, spawnImpl) {
   if (!child?.pid) {
     return false;

@@ -12,6 +12,7 @@ serde_json.workspace = true
 sdkwork-api-config = { path = "../sdkwork-api-config" }
 sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
+sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
 sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
@@ -48,6 +49,7 @@ utoipa-swagger-ui.workspace = true
 [dev-dependencies]
 serial_test.workspace = true
 serde_json.workspace = true
+sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
 sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }

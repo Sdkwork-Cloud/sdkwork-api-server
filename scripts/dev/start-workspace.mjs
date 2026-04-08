@@ -12,6 +12,7 @@ import {
   workspaceHelpText,
 } from './workspace-launch-lib.mjs';
 import {
+  createSupervisorKeepAlive,
   createSignalController,
   didChildExitFail,
 } from './process-supervision.mjs';
@@ -120,12 +121,14 @@ function main() {
   const children = [];
   let exited = false;
   let stopFileWatcher = () => {};
+  const releaseKeepAlive = createSupervisorKeepAlive();
   const controller = createSignalController({
     label: 'start-workspace',
     children,
     onShutdownStart: () => {
       exited = true;
       stopFileWatcher();
+      releaseKeepAlive();
     },
   });
   controller.register();
@@ -150,10 +153,12 @@ function main() {
         return;
       }
 
-      if (didChildExitFail(code, signal)) {
-        exited = true;
-        void controller.shutdown(`${step.name} exit`, code ?? 1);
-      }
+      exited = true;
+      releaseKeepAlive();
+      void controller.shutdown(
+        `${step.name} exit`,
+        didChildExitFail(code, signal) ? code ?? 1 : 0,
+      );
     });
   }
 }

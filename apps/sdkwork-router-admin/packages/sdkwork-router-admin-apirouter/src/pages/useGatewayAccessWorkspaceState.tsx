@@ -81,6 +81,7 @@ export function useGatewayAccessWorkspaceState({
   const [search, setSearch] = useState('');
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+  const [isGroupsDialogOpen, setIsGroupsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createDraftState, setCreateDraftState] = useState<CreateDraft>(() =>
     createDraft(defaultTenantId, defaultProjectId),
@@ -534,6 +535,7 @@ export function useGatewayAccessWorkspaceState({
   return {
     search,
     isDetailDrawerOpen,
+    isGroupsDialogOpen,
     isCreateOpen,
     createDraftState,
     editingKey,
@@ -593,6 +595,7 @@ export function useGatewayAccessWorkspaceState({
     setRouteDraft,
     setSelectedClientId,
     setSelectedInstanceIds,
+    setIsGroupsDialogOpen,
     setPendingDelete,
   };
 }

@@ -16,6 +16,7 @@ test('check-rust-verification-matrix exposes grouped cross-platform cargo plans 
     'admin-service',
     'portal-service',
     'product-runtime',
+    'workspace',
   ]);
   assert.equal(typeof module.createRustVerificationPlan, 'function');
 
@@ -43,8 +44,8 @@ test('check-rust-verification-matrix exposes grouped cross-platform cargo plans 
     '--test',
     'openapi_route',
   ]);
-  assert.match(String(interfacePlan[0].env.RUSTFLAGS ?? ''), /-C debuginfo=0/);
-  assert.match(String(interfacePlan[0].env.CARGO_TARGET_DIR ?? ''), /target[\\/]+codex-review-rust/i);
+  assert.equal(interfacePlan[0].env.RUSTFLAGS, undefined);
+  assert.match(String(interfacePlan[0].env.CARGO_TARGET_DIR ?? ''), /target$/i);
 
   const productPlan = module.createRustVerificationPlan({
     workspaceRoot,
@@ -88,6 +89,31 @@ test('check-rust-verification-matrix exposes grouped cross-platform cargo plans 
   assert.deepEqual(windowsPlan[0].args.slice(-5), ['check', '-j', '1', '-p', 'gateway-service']);
   assert.equal(windowsPlan[0].env.CMAKE_GENERATOR, 'Visual Studio 17 2022');
   assert.equal(windowsPlan[0].env.HOST_CMAKE_GENERATOR, 'Visual Studio 17 2022');
+  assert.equal(
+    windowsPlan[0].env.CARGO_TARGET_DIR,
+    path.join(workspaceRoot, 'bin', '.sdkwork-target-vs2022'),
+  );
+  assert.doesNotMatch(
+    String(windowsPlan[0].env.CARGO_TARGET_DIR ?? ''),
+    /[\\/]Users[\\/][^\\/]+[\\/]\.sdkwork-target/i,
+  );
+  assert.equal(windowsPlan[0].env.RUSTFLAGS, undefined);
+
+  const workspacePlan = module.createRustVerificationPlan({
+    workspaceRoot,
+    group: 'workspace',
+    platform: 'win32',
+    env: {
+      USERPROFILE: process.env.USERPROFILE ?? '',
+      PATH: process.env.PATH ?? '',
+    },
+  });
+  assert.equal(workspacePlan.length, 1);
+  assert.deepEqual(workspacePlan[0].args.slice(-3), ['--workspace', '-j', '1']);
+  assert.equal(
+    workspacePlan[0].env.CARGO_TARGET_DIR,
+    path.join(workspaceRoot, 'bin', '.sdkwork-target-vs2022'),
+  );
 
   const fallbackWindowsPlan = module.createRustVerificationPlan({
     workspaceRoot,

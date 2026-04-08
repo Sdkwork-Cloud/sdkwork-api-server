@@ -5,15 +5,15 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "app:update-create": "node ../../../scripts/app-update-create.mjs",
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
+    "dev": "node ../../scripts/dev/run-vite-cli.mjs --host 0.0.0.0",
+    "build": "node ../../scripts/dev/run-vite-cli.mjs build",
+    "typecheck": "node ../../scripts/dev/run-tsc-cli.mjs --noEmit",
+    "preview": "node ../../scripts/dev/run-vite-cli.mjs preview --host 0.0.0.0 --port 4173 --strictPort",
     "tauri:dev": "node ../../scripts/run-tauri-cli.mjs dev",
     "tauri:build": "node ../../scripts/run-tauri-cli.mjs build"
   },
   "dependencies": {
-    "@sdkwork/ui-pc-react": "file:..\\..\\..\\sdkwork-ui\\sdkwork-ui-pc-react",
+    "@sdkwork/ui-pc-react": "file:../../../sdkwork-ui/sdkwork-ui-pc-react",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

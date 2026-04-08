@@ -76,11 +76,11 @@ test('app root exposes dev, build, typecheck, and preview scripts', () => {
   assert.match(packageJsonSource, /"@types\/node"/);
   assert.match(
     packageJsonSource,
-    /"dev": "vite --host 0\.0\.0\.0"/,
+    /"dev": "node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs --host 0\.0\.0\.0"/,
   );
   assert.match(
     packageJsonSource,
-    /"build": "vite build"/,
+    /"build": "node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs build"/,
   );
   assert.match(
     packageJsonSource,
@@ -88,8 +88,9 @@ test('app root exposes dev, build, typecheck, and preview scripts', () => {
   );
   assert.match(
     packageJsonSource,
-    /"preview": "vite preview --host 0\.0\.0\.0 --port 4174 --strictPort"/,
+    /"preview": "node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs preview --host 0\.0\.0\.0 --port 4174 --strictPort"/,
   );
+  assert.match(packageJsonSource, /run-vite-cli\.mjs/);
   assert.doesNotMatch(packageJsonSource, /run-frontend-tool/);
 });
 

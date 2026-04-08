@@ -535,19 +535,28 @@ async fn portal_billing_account_history_aggregates_workspace_finance_timeline() 
     assert_eq!(history_json["benefit_lots"].as_array().unwrap().len(), 2);
     assert_eq!(history_json["holds"].as_array().unwrap().len(), 1);
     assert_eq!(
-        history_json["request_settlements"].as_array().unwrap().len(),
+        history_json["request_settlements"]
+            .as_array()
+            .unwrap()
+            .len(),
         1
     );
     assert_eq!(history_json["ledger"].as_array().unwrap().len(), 1);
     assert_eq!(history_json["ledger"][0]["entry"]["ledger_entry_id"], 8401);
     assert_eq!(history_json["ledger_entries"].as_array().unwrap().len(), 1);
     assert_eq!(history_json["ledger_entries"][0]["ledger_entry_id"], 8401);
-    assert_eq!(history_json["ledger_entries"][0]["entry_type"], "settlement_capture");
+    assert_eq!(
+        history_json["ledger_entries"][0]["entry_type"],
+        "settlement_capture"
+    );
     assert_eq!(
         history_json["ledger_allocations"].as_array().unwrap().len(),
         1
     );
-    assert_eq!(history_json["ledger_allocations"][0]["ledger_entry_id"], 8401);
+    assert_eq!(
+        history_json["ledger_allocations"][0]["ledger_entry_id"],
+        8401
+    );
     assert_eq!(history_json["ledger_allocations"][0]["lot_id"], 8001);
     assert_eq!(
         history_json["ledger_allocations"][0]["quantity_delta"],

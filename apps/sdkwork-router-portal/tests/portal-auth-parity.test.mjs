@@ -85,8 +85,10 @@ test('portal auth visuals follow the claw-style split card layout instead of the
   const appRoutes = read('packages/sdkwork-router-portal-core/src/application/router/AppRoutes.tsx');
 
   assert.match(authPage, /QrCode/);
-  assert.match(authPage, /Github/);
-  assert.match(authPage, /Chrome/);
+  assert.match(authPage, /GitHub/);
+  assert.match(authPage, /Google/);
+  assert.match(authPage, /GitBranch/);
+  assert.match(authPage, /Globe/);
   assert.match(authPage, /Smartphone/);
   assert.match(authPage, /Button/);
   assert.match(authPage, /Input/);

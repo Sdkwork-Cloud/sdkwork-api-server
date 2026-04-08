@@ -21,28 +21,34 @@ test('portal billing exposes dedicated payment and refund history audit views', 
   assert.match(billingTypes, /export interface BillingPaymentHistoryRow {/);
   assert.match(billingTypes, /payment_history: BillingPaymentHistoryRow\[];/);
   assert.match(billingTypes, /refund_history: BillingPaymentHistoryRow\[];/);
+  assert.match(billingTypes, /payment_method_name\?: string \| null;/);
   assert.match(billingTypes, /checkout_reference\?: string \| null;/);
   assert.match(billingTypes, /checkout_session_status\?: PortalCommerceCheckoutSessionStatus \| null;/);
 
   assert.match(billingServices, /export function buildBillingPaymentHistory\(/);
   assert.match(billingServices, /export function buildBillingRefundHistory\(/);
+  assert.match(billingServices, /payment_method_name: source\.selected_payment_method\?\.display_name \?\? null,/);
+  assert.match(billingServices, /provider: resolveBillingHistoryProvider\(source\)/);
   assert.match(billingServices, /row_kind: 'refunded_order_state'/);
 
   assert.match(billingPage, /const \[paymentHistory, setPaymentHistory\] = useState<BillingPaymentHistoryRow\[]>\(\[]\);/);
   assert.match(billingPage, /const \[refundHistory, setRefundHistory\] = useState<BillingPaymentHistoryRow\[]>\(\[]\);/);
   assert.match(billingPage, /setPaymentHistory\(data\.payment_history\);/);
   assert.match(billingPage, /setRefundHistory\(data\.refund_history\);/);
+  assert.match(billingPage, /function paymentHistoryRailCell\(/);
   assert.match(billingPage, /function paymentHistoryRowKindLabel\(/);
   assert.match(billingPage, /function paymentEventTypeLabel\(/);
   assert.match(billingPage, /title=\{t\('Payment history'\)\}/);
   assert.match(billingPage, /title=\{t\('Refund history'\)\}/);
   assert.match(billingPage, /Order refund state/);
-  assert.match(billingPage, /Provider event/);
+  assert.match(billingPage, /Payment update reference/);
   assert.match(billingPage, /Processing/);
+  assert.doesNotMatch(billingPage, /Provider event/);
 
   assert.match(zhMessages, /'Payment history':/);
   assert.match(zhMessages, /'Refund history':/);
   assert.match(zhMessages, /'Order refund state':/);
-  assert.match(zhMessages, /'Provider event':/);
+  assert.match(zhMessages, /'Payment update reference':/);
   assert.match(zhMessages, /'Processing':/);
+  assert.doesNotMatch(zhMessages, /'Provider event':/);
 });

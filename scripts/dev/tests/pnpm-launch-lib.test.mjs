@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  frontendDistReady,
   frontendInstallRequired,
   frontendInstallStatus,
   pnpmArgumentPrefix,
@@ -174,7 +175,7 @@ test('preview installs can reuse existing dist on Windows spawn EPERM when expli
       stepArgs: ['--dir', 'apps/sdkwork-router-admin', 'install'],
       status: 1,
       errorMessage: 'spawnSync powershell.exe EPERM',
-      distExists: true,
+      distReady: true,
       allowInstallReuse: true,
     }),
     true,
@@ -185,8 +186,33 @@ test('preview installs can reuse existing dist on Windows spawn EPERM when expli
       stepArgs: ['--dir', 'apps/sdkwork-router-admin', 'install'],
       status: 1,
       errorMessage: 'spawnSync powershell.exe EPERM',
-      distExists: true,
+      distReady: true,
       allowInstallReuse: false,
+    }),
+    false,
+  );
+});
+
+test('frontendDistReady only accepts built static sites with an index.html entrypoint', () => {
+  withTempApp((appRoot) => {
+    const distRoot = path.join(appRoot, 'dist');
+    mkdirSync(distRoot, { recursive: true });
+
+    assert.equal(frontendDistReady(distRoot), false);
+
+    writeFileSync(path.join(distRoot, 'index.html'), '<!doctype html>');
+    assert.equal(frontendDistReady(distRoot), true);
+  });
+});
+
+test('build fallback refuses to reuse empty dist directories on Windows spawn EPERM', () => {
+  assert.equal(
+    shouldReuseExistingFrontendDist({
+      platform: 'win32',
+      stepArgs: ['--dir', 'apps/sdkwork-router-portal', 'build'],
+      status: 1,
+      errorMessage: 'spawnSync powershell.exe EPERM',
+      distReady: false,
     }),
     false,
   );

@@ -1,4 +1,4 @@
-use axum::body::{Body, to_bytes};
+use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use std::sync::{Mutex, OnceLock};
 use tower::ServiceExt;
@@ -40,7 +40,10 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["paths"]["/portal/marketing/reward-history"]["get"].is_object());
     assert!(json["paths"]["/portal/marketing/redemptions"]["get"].is_object());
     assert!(json["paths"]["/portal/marketing/codes"]["get"].is_object());
+    assert!(json["paths"]["/portal/commerce/orders/{order_id}"]["get"].is_object());
+    assert!(json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"].is_object());
     assert!(json["paths"]["/portal/commerce/order-center"]["get"].is_object());
+    assert!(json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"].is_object());
     assert!(json["paths"]["/portal/billing/account"]["get"].is_object());
     assert!(json["paths"]["/portal/billing/account-history"]["get"].is_object());
     assert!(json["paths"]["/portal/billing/account/balance"]["get"].is_object());
@@ -68,7 +71,10 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["components"]["schemas"]["PortalCouponRedemptionRollbackResponse"].is_object());
     assert!(json["components"]["schemas"]["PortalMarketingCodesResponse"].is_object());
     assert!(json["components"]["schemas"]["PortalMarketingRedemptionsResponse"].is_object());
+    assert!(json["components"]["schemas"]["PortalCommerceOrder"].is_object());
     assert!(json["components"]["schemas"]["PortalCommerceOrderCenterResponse"].is_object());
+    assert!(json["components"]["schemas"]["PaymentMethodRecord"].is_object());
+    assert!(json["components"]["schemas"]["CommercePaymentAttemptRecord"].is_object());
     assert!(json["components"]["schemas"]["PortalBillingAccountHistoryResponse"].is_object());
     assert!(json["components"]["schemas"]["PortalBillingAccountResponse"].is_object());
     assert!(json["components"]["schemas"]["AccountBalanceSnapshot"].is_object());
@@ -82,18 +88,18 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["components"]["schemas"]["AsyncJobAttemptRecord"].is_object());
     assert!(json["components"]["schemas"]["AsyncJobAssetRecord"].is_object());
     assert_eq!(
-        json["paths"]["/portal/auth/login"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-            ["$ref"],
+        json["paths"]["/portal/auth/login"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
         "#/components/schemas/LoginRequest"
     );
     assert_eq!(
-        json["paths"]["/portal/auth/login"]["post"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/auth/login"]["post"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalAuthSession"
     );
     assert_eq!(
-        json["paths"]["/portal/workspace"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/workspace"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalWorkspaceSummary"
     );
     assert_eq!(
@@ -101,8 +107,8 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         serde_json::json!([])
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/coupon-validations"]["post"]["requestBody"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/marketing/coupon-validations"]["post"]["requestBody"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalCouponValidationRequest"
     );
     assert_eq!(
@@ -111,58 +117,87 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "string"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/coupon-validations"]["post"]["responses"]["200"]["content"]
-            ["application/json"]["schema"]["$ref"],
+        json["paths"]["/portal/marketing/coupon-validations"]["post"]["responses"]["200"]
+            ["content"]["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalCouponValidationResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/coupon-reservations"]["post"]["requestBody"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/marketing/coupon-reservations"]["post"]["requestBody"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalCouponReservationRequest"
     );
     assert_eq!(
-        json["components"]["schemas"]["PortalCouponReservationRequest"]["properties"]["target_kind"]
-            ["type"],
+        json["components"]["schemas"]["PortalCouponReservationRequest"]["properties"]
+            ["target_kind"]["type"],
         "string"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/coupon-reservations"]["post"]["responses"]["200"]["content"]
-            ["application/json"]["schema"]["$ref"],
+        json["paths"]["/portal/marketing/coupon-reservations"]["post"]["responses"]["200"]
+            ["content"]["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalCouponReservationResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/my-coupons"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/marketing/my-coupons"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalMarketingCodesResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/redemptions"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/marketing/redemptions"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalMarketingRedemptionsResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/marketing/codes"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/marketing/codes"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalMarketingCodesResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/commerce/order-center"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/commerce/orders/{order_id}"]["get"]["parameters"][0]["name"],
+        "order_id"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/orders/{order_id}"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/PortalCommerceOrder"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"]["parameters"][0]
+            ["name"],
+        "order_id"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"]["responses"]["200"]
+            ["content"]["application/json"]["schema"]["items"]["$ref"],
+        "#/components/schemas/PaymentMethodRecord"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/order-center"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalCommerceOrderCenterResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"]["parameters"]
+            [0]["name"],
+        "payment_attempt_id"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"]["responses"]
+            ["200"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/CommercePaymentAttemptRecord"
+    );
+    assert_eq!(
+        json["paths"]["/portal/billing/account"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalBillingAccountResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account-history"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/billing/account-history"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalBillingAccountHistoryResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account/balance"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        json["paths"]["/portal/billing/account/balance"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
         "#/components/schemas/AccountBalanceSnapshot"
     );
     assert_eq!(
@@ -176,33 +211,33 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "#/components/schemas/AccountBenefitLotRecord"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account/holds"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/billing/account/holds"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/AccountHoldRecord"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account/request-settlements"]["get"]["responses"]["200"]["content"]
-            ["application/json"]["schema"]["items"]["$ref"],
+        json["paths"]["/portal/billing/account/request-settlements"]["get"]["responses"]["200"]
+            ["content"]["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/RequestSettlementRecord"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/account/ledger"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/billing/account/ledger"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/AccountLedgerHistoryEntry"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/pricing-plans"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/billing/pricing-plans"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/PricingPlanRecord"
     );
     assert_eq!(
-        json["paths"]["/portal/billing/pricing-rates"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/billing/pricing-rates"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/PricingRateRecord"
     );
     assert_eq!(
-        json["paths"]["/portal/async-jobs"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/async-jobs"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/AsyncJobRecord"
     );
     assert_eq!(
@@ -219,8 +254,8 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "job_id"
     );
     assert_eq!(
-        json["paths"]["/portal/async-jobs/{job_id}/assets"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["items"]["$ref"],
+        json["paths"]["/portal/async-jobs/{job_id}/assets"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/AsyncJobAssetRecord"
     );
     assert_eq!(
@@ -274,9 +309,7 @@ fn try_portal_router_returns_error_for_invalid_http_exposure_env() {
     }
 
     let error = result.expect_err("invalid env should return an error");
-    assert!(
-        error
-            .to_string()
-            .contains("invalid list value for SDKWORK_BROWSER_ALLOWED_ORIGINS")
-    );
+    assert!(error
+        .to_string()
+        .contains("invalid list value for SDKWORK_BROWSER_ALLOWED_ORIGINS"));
 }

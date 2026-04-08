@@ -205,6 +205,14 @@ export function frontendInstallRequired(options = {}) {
   return frontendInstallStatus(options) !== 'ready';
 }
 
+export function frontendDistReady(distDir = '') {
+  if (!distDir || !existsSync(distDir)) {
+    return false;
+  }
+
+  return existsSync(path.join(distDir, 'index.html'));
+}
+
 export function frontendViteConfigHealthy({
   appRoot,
   command = 'serve',
@@ -285,10 +293,10 @@ export function shouldReuseExistingFrontendDist({
   stdout = '',
   stderr = '',
   errorMessage = '',
-  distExists = false,
+  distReady = false,
   allowInstallReuse = false,
 } = {}) {
-  if (platform !== 'win32' || status === 0 || !distExists) {
+  if (platform !== 'win32' || status === 0 || !distReady) {
     return false;
   }
 

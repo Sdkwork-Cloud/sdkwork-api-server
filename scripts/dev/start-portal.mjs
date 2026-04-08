@@ -3,10 +3,12 @@
 import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  createSupervisorKeepAlive,
   createSignalController,
   didChildExitFail,
 } from './process-supervision.mjs';
 import {
+  frontendDistReady,
   frontendInstallStatus,
   frontendViteConfigHealthy,
   pnpmDisplayCommand,
@@ -86,7 +88,7 @@ function runStep(args, dryRun, distDir = '', allowInstallReuse = false) {
     stdout: result.stdout,
     stderr: result.stderr,
     errorMessage: result.error?.message ?? '',
-    distExists: Boolean(distDir) && existsSync(distDir),
+    distReady: frontendDistReady(distDir),
     allowInstallReuse,
   })) {
     console.warn(`[start-portal] ${command} failed with Windows spawn EPERM; reusing existing dist at ${distDir}`);
@@ -139,17 +141,20 @@ if (settings.dryRun) {
 const child = spawn(longRunningProcessSpec.command, longRunningProcessSpec.args, {
   ...pnpmSpawnOptions(),
 });
+const releaseKeepAlive = createSupervisorKeepAlive();
 let shuttingDown = false;
 const controller = createSignalController({
   label: 'start-portal',
   children: [child],
   onShutdownStart: () => {
     shuttingDown = true;
+    releaseKeepAlive();
   },
 });
 controller.register();
 
 child.on('exit', (code, signal) => {
+  releaseKeepAlive();
   if (shuttingDown) {
     return;
   }

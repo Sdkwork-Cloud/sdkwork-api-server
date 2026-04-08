@@ -150,6 +150,117 @@ function hasWslDistro(name) {
     .includes(name);
 }
 
+function resolveGitBashExecutable() {
+  const candidates = [
+    'C:/Program Files/Git/bin/bash.exe',
+    'C:/Program Files/Git/usr/bin/bash.exe',
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function hasUnixShellRuntime() {
+  if (process.platform === 'win32') {
+    return resolveGitBashExecutable() != null;
+  }
+
+  return true;
+}
+
+function canSpawnUnixShellFromNode() {
+  if (!hasUnixShellRuntime()) {
+    return false;
+  }
+
+  if (process.platform === 'win32') {
+    const bash = resolveGitBashExecutable();
+    const result = spawnSync(
+      bash,
+      ['-lc', 'exit 0'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      },
+    );
+
+    return !result.error && result.status === 0;
+  }
+
+  const result = spawnSync(
+    'sh',
+    ['-lc', 'exit 0'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  );
+
+  return !result.error && result.status === 0;
+}
+
+function toGitBashPath(value) {
+  const normalized = toPortablePath(value);
+  const driveMatch = normalized.match(/^([A-Za-z]):\/(.*)$/);
+  if (!driveMatch) {
+    return normalized;
+  }
+
+  return `/${driveMatch[1].toLowerCase()}/${driveMatch[2]}`;
+}
+
+function runUnixShellCommand(command, {
+  cwd = repoRoot,
+  env = process.env,
+  pathPrefix = [],
+} = {}) {
+  if (process.platform === 'win32') {
+    const bash = resolveGitBashExecutable();
+    if (!bash) {
+      throw new Error('Git Bash is required to run unix shell smoke tests on Windows.');
+    }
+
+    const exportedPathPrefix = pathPrefix
+      .map((entry) => quoteForBash(toGitBashPath(entry)))
+      .join(':');
+    const script = [
+      exportedPathPrefix ? `export PATH=${exportedPathPrefix}:$PATH` : '',
+      `cd ${quoteForBash(toGitBashPath(cwd))}`,
+      command,
+    ].filter(Boolean).join(' && ');
+
+    return spawnSync(
+      bash,
+      ['-lc', script],
+      {
+        cwd,
+        env,
+        encoding: 'utf8',
+      },
+    );
+  }
+
+  const script = [
+    pathPrefix.length > 0 ? `export PATH=${pathPrefix.map((entry) => quoteForBash(entry)).join(':')}:$PATH` : '',
+    command,
+  ].filter(Boolean).join(' && ');
+
+  return spawnSync(
+    'sh',
+    ['-lc', script],
+    {
+      cwd,
+      env,
+      encoding: 'utf8',
+    },
+  );
+}
+
 function runWslStartDryRun(runtimeHome, distro = 'Ubuntu-22.04') {
   const repoRootWsl = toWslPath(repoRoot);
   const runtimeHomeWsl = toWslPath(runtimeHome);
@@ -178,6 +289,130 @@ async function loadRouterOpsModule() {
   return import(
     pathToFileURL(path.join(repoRoot, 'bin', 'router-ops.mjs')).href
   );
+}
+
+function installUnixRuntimeSmokeFixture(runtimeHome) {
+  const runtimeBinDir = path.join(runtimeHome, 'bin');
+  const runtimeLibDir = path.join(runtimeBinDir, 'lib');
+  const adminSiteDir = path.join(runtimeHome, 'sites', 'admin', 'dist');
+  const portalSiteDir = path.join(runtimeHome, 'sites', 'portal', 'dist');
+  const configDir = path.join(runtimeHome, 'config');
+  const fakeBinDir = path.join(runtimeHome, 'test-bin');
+  const curlLogFile = path.join(runtimeHome, 'var', 'log', 'curl.log');
+  const runtimeBinaryPath = path.join(runtimeBinDir, 'router-product-service');
+
+  mkdirSync(runtimeLibDir, { recursive: true });
+  mkdirSync(adminSiteDir, { recursive: true });
+  mkdirSync(portalSiteDir, { recursive: true });
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(fakeBinDir, { recursive: true });
+  mkdirSync(path.join(runtimeHome, 'var', 'log'), { recursive: true });
+
+  writeFileSync(
+    path.join(runtimeBinDir, 'start.sh'),
+    readFileSync(path.join(repoRoot, 'bin', 'start.sh'), 'utf8'),
+    'utf8',
+  );
+  writeFileSync(
+    path.join(runtimeBinDir, 'stop.sh'),
+    readFileSync(path.join(repoRoot, 'bin', 'stop.sh'), 'utf8'),
+    'utf8',
+  );
+  writeFileSync(
+    path.join(runtimeLibDir, 'runtime-common.sh'),
+    readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.sh'), 'utf8'),
+    'utf8',
+  );
+  writeFileSync(path.join(adminSiteDir, 'index.html'), '<html>admin</html>\n', 'utf8');
+  writeFileSync(path.join(portalSiteDir, 'index.html'), '<html>portal</html>\n', 'utf8');
+  writeFileSync(
+    path.join(configDir, 'router.env'),
+    [
+      'SDKWORK_WEB_BIND="127.0.0.1:19483"',
+      'SDKWORK_GATEWAY_BIND="127.0.0.1:19480"',
+      'SDKWORK_ADMIN_BIND="127.0.0.1:19481"',
+      'SDKWORK_PORTAL_BIND="127.0.0.1:19482"',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  writeFileSync(
+    runtimeBinaryPath,
+    [
+      '#!/usr/bin/env sh',
+      '',
+      'if [ "$#" -ge 2 ] && [ "$1" = "--dry-run" ] && [ "$2" = "--plan-format" ]; then',
+      '  cat <<EOF',
+      '{',
+      '  "mode": "dry-run",',
+      '  "plan_format": "json",',
+      '  "public_web_bind": "127.0.0.1:19483",',
+      '  "database_url": "sqlite:///tmp/sdkwork-api-router.db",',
+      '  "config_dir": "/tmp/sdkwork-config",',
+      '  "config_file": null,',
+      '  "node_id_prefix": null,',
+      '  "binds": {',
+      '    "gateway": "127.0.0.1:19480",',
+      '    "admin": "127.0.0.1:19481",',
+      '    "portal": "127.0.0.1:19482"',
+      '  },',
+      '  "site_dirs": {',
+      '    "admin": "/tmp/admin",',
+      '    "portal": "/tmp/portal"',
+      '  },',
+      '  "upstreams": {',
+      '    "gateway": null,',
+      '    "admin": null,',
+      '    "portal": null',
+      '  }',
+      '}',
+      'EOF',
+      '  exit 0',
+      'fi',
+      '',
+      "trap 'exit 0' TERM INT",
+      'while :; do',
+      '  sleep 1',
+      'done',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  writeFileSync(
+    path.join(fakeBinDir, 'uname'),
+    [
+      '#!/usr/bin/env sh',
+      'if [ "${1:-}" = "-m" ]; then',
+      "  printf '%s\\n' 'x86_64'",
+      '  exit 0',
+      'fi',
+      "printf '%s\\n' 'Linux'",
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  writeFileSync(
+    path.join(fakeBinDir, 'curl'),
+    [
+      '#!/usr/bin/env sh',
+      'printf \'%s\\n\' "$*" >> "$CURL_LOG_FILE"',
+      'exit 0',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+
+  chmodSync(path.join(runtimeBinDir, 'start.sh'), 0o755);
+  chmodSync(path.join(runtimeBinDir, 'stop.sh'), 0o755);
+  chmodSync(path.join(runtimeLibDir, 'runtime-common.sh'), 0o755);
+  chmodSync(runtimeBinaryPath, 0o755);
+  chmodSync(path.join(fakeBinDir, 'uname'), 0o755);
+  chmodSync(path.join(fakeBinDir, 'curl'), 0o755);
+
+  return {
+    curlLogFile,
+    fakeBinDir,
+  };
 }
 
 test('createReleaseBuildPlan builds release binaries, web apps, and native package output', async () => {
@@ -249,7 +484,7 @@ test('createReleaseBuildPlan normalizes broken Windows CMake generator defaults 
   assert.equal(plan.steps[0].env.HOST_CMAKE_GENERATOR, 'Visual Studio 17 2022');
   assert.equal(
     plan.steps[0].env.CARGO_TARGET_DIR,
-    path.join('C:/Users/admin', '.sdkwork-target', 'sdkwork-api-router'),
+    path.join(repoRoot, 'bin', '.sdkwork-target-vs2022'),
   );
 });
 
@@ -347,7 +582,7 @@ test('createInstallPlan reads release binaries from the managed short Windows ta
   assert.ok(binaryCopy, 'expected router-product-service.exe copy entry');
   assert.equal(
     binaryCopy.sourcePath,
-    path.join('C:/Users/admin', '.sdkwork-target', 'sdkwork-api-router', 'x86_64-pc-windows-msvc', 'release', 'router-product-service.exe'),
+    path.join(repoRoot, 'bin', '.sdkwork-target-vs2022', 'x86_64-pc-windows-msvc', 'release', 'router-product-service.exe'),
   );
 });
 
@@ -570,7 +805,7 @@ test('generated launchd helper scripts execute against stubbed tools in a writab
   }
 });
 
-test('generated windows task helper scripts support stubbed schtasks execution for smoke testing', { skip: process.platform !== 'win32' }, async () => {
+test('generated windows task helper scripts support stubbed schtasks execution for smoke testing', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, async () => {
   const module = await loadModule();
   const tempRoot = createTempDir('service-wintask-');
   const serviceDir = path.join(tempRoot, 'service', 'windows-task');
@@ -1147,7 +1382,7 @@ test('start-dev.sh stretches the default readiness timeout for WSL launches from
   assert.match(startDevSh, /extending readiness timeout to \$\{WAIT_SECONDS\} seconds to accommodate frontend reinstalls/);
 });
 
-test('start.ps1 dry-run falls back to host-local release paths when router.env carries unix-style values', { skip: process.platform !== 'win32' }, () => {
+test('start.ps1 dry-run falls back to host-local release paths when router.env carries unix-style values', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, () => {
   const runtimeHome = createTempRuntimeHome('start-ps1-');
 
   try {
@@ -1219,7 +1454,67 @@ test('start.sh dry-run falls back to host-local release paths when router.env ca
   }
 });
 
-test('PowerShell bind preflight reports conflicting listeners before launch', { skip: process.platform !== 'win32' }, async () => {
+test('unix runtime entrypoints default to the installed home beside the packaged scripts when binaries are colocated', () => {
+  const startSh = readFileSync(path.join(repoRoot, 'bin', 'start.sh'), 'utf8');
+  const stopSh = readFileSync(path.join(repoRoot, 'bin', 'stop.sh'), 'utf8');
+
+  assert.match(startSh, /if \[ -f "\$SCRIPT_DIR\/\$\(router_binary_name router-product-service\)" \]; then[\s\S]*RUNTIME_HOME=\$\(CDPATH= cd -- "\$SCRIPT_DIR\/\.\." && pwd\)/);
+  assert.match(stopSh, /if \[ -f "\$SCRIPT_DIR\/\$\(router_binary_name router-product-service\)" \]; then[\s\S]*RUNTIME_HOME=\$\(CDPATH= cd -- "\$SCRIPT_DIR\/\.\." && pwd\)/);
+});
+
+test('installed unix runtime start.sh and stop.sh manage an installed home end-to-end', { skip: !canSpawnUnixShellFromNode() }, () => {
+  const runtimeHome = createTempRuntimeHome('installed-unix-runtime-');
+  const pidFile = path.join(runtimeHome, 'var', 'run', 'router-product-service.pid');
+  const stateFile = path.join(runtimeHome, 'var', 'run', 'router-product-service.state.env');
+  const runtimeHomeShell = process.platform === 'win32' ? toGitBashPath(runtimeHome) : runtimeHome;
+  const { curlLogFile, fakeBinDir } = installUnixRuntimeSmokeFixture(runtimeHome);
+
+  try {
+    const env = {
+      ...process.env,
+      CURL_LOG_FILE: process.platform === 'win32' ? toGitBashPath(curlLogFile) : curlLogFile,
+    };
+    const startResult = runUnixShellCommand(
+      `./bin/start.sh --home ${quoteForBash(runtimeHomeShell)} --wait-seconds 5`,
+      {
+        cwd: runtimeHome,
+        env,
+        pathPrefix: [fakeBinDir],
+      },
+    );
+    const startOutput = `${startResult.stdout}${startResult.stderr}`;
+
+    assert.equal(startResult.status, 0, startOutput);
+    assert.equal(existsSync(pidFile), true, 'expected installed runtime start to create a pid file');
+    assert.equal(existsSync(stateFile), true, 'expected installed runtime start to persist managed state');
+    assert.match(startOutput, /started router-product-service \(pid=\d+\)/);
+    assert.match(startOutput, /Mode: production release/);
+
+    const curlLog = readFileSync(curlLogFile, 'utf8');
+    assert.match(curlLog, /\/api\/v1\/health/);
+    assert.match(curlLog, /\/api\/admin\/health/);
+    assert.match(curlLog, /\/api\/portal\/health/);
+
+    const stopResult = runUnixShellCommand(
+      `./bin/stop.sh --home ${quoteForBash(runtimeHomeShell)} --wait-seconds 5`,
+      {
+        cwd: runtimeHome,
+        env,
+        pathPrefix: [fakeBinDir],
+      },
+    );
+    const stopOutput = `${stopResult.stdout}${stopResult.stderr}`;
+
+    assert.equal(stopResult.status, 0, stopOutput);
+    assert.equal(existsSync(pidFile), false, 'expected installed runtime stop to remove the pid file');
+    assert.equal(existsSync(stateFile), false, 'expected installed runtime stop to remove managed state');
+    assert.match(stopOutput, /stopped router-product-service pid=\d+/);
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
+test('PowerShell bind preflight reports conflicting listeners before launch', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, async () => {
   await withTcpListener(async ({ port }) => {
     const commonScript = quoteForPowerShellSingleQuotedString(
       path.join(repoRoot, 'bin', 'lib', 'runtime-common.ps1'),

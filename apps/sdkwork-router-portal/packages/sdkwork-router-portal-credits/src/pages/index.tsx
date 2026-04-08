@@ -13,7 +13,14 @@ import {
   Badge,
   DataTable,
 } from 'sdkwork-router-portal-commons/framework/display';
-import { Input } from 'sdkwork-router-portal-commons/framework/entry';
+import {
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from 'sdkwork-router-portal-commons/framework/entry';
 import {
   Card,
   CardContent,
@@ -481,6 +488,10 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
         ),
     [marketingCodes.items],
   );
+  const availableWalletItems = useMemo(
+    () => walletItems.filter((item) => item.code.status === 'available'),
+    [walletItems],
+  );
 
   const totalItems = rewardHistoryRows.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -499,6 +510,11 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
   const showingEnd = totalItems === 0 ? 0 : Math.min(currentPage * PAGE_SIZE, totalItems);
   const availableCouponCount = marketingCodes.summary.available_count;
   const redeemedRewardCount = marketingRedemptions.summary.redeemed_count;
+  const selectedWalletCouponCode = availableWalletItems.some(
+    (item) => item.code.code_value === couponCode,
+  )
+    ? couponCode
+    : '';
   const financeProjection = useMemo(
     () => buildFinanceProjection(summary, orders, billingEventSummary),
     [summary, orders, billingEventSummary],
@@ -596,7 +612,7 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
                 </div>
                 <div className="rounded-[24px] border border-primary-500/15 bg-primary-500/6 px-4 py-4 dark:border-primary-500/20 dark:bg-primary-500/8">
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
-                    {t('Available coupons')}
+                    {t('Eligible offers')}
                   </span>
                   <strong className="mt-2 block text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
                     {formatUnits(availableCouponCount)}
@@ -618,7 +634,26 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
                   {t('Redeem code')}
                 </span>
-                <div className="flex flex-col gap-3 lg:flex-row">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]">
+                  <Select
+                    disabled={!availableWalletItems.length}
+                    onValueChange={(value: string) => {
+                      setCouponCode(value);
+                      setRedeemStatus(defaultRedeemStatus);
+                    }}
+                    value={selectedWalletCouponCode}
+                  >
+                    <SelectTrigger className="h-12 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950">
+                      <SelectValue placeholder={t('Available coupons')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableWalletItems.map((item) => (
+                        <SelectItem key={item.code.coupon_code_id} value={item.code.code_value}>
+                          {item.code.code_value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     autoComplete="off"
                     className="h-12 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
@@ -913,19 +948,19 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
           />
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3" data-slot="portal-redeem-history-table">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
               {t('Reward history')}
             </h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {t(
-                'Reward history is synced with the latest workspace posture. {redeemed} redeemed / {rolledBack} rolled back.',
-                {
+              <span>{syncedStatus}</span>{' '}
+              <span>
+                {t('{redeemed} redeemed / {rolledBack} rolled back.', {
                   redeemed: marketingRedemptions.summary.redeemed_count,
                   rolledBack: marketingRedemptions.summary.rolled_back_count,
-                },
-              )}
+                })}
+              </span>
             </p>
           </div>
 

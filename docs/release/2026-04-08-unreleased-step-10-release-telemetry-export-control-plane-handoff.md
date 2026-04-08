@@ -1,0 +1,21 @@
+# Unreleased - Step 10 Release Telemetry Export Control-Plane Handoff
+
+- Date: 2026-04-08
+- Type: patch
+- Summary:
+  - added `materialize-release-telemetry-export.mjs` so release telemetry export is now produced as a governed artifact instead of remaining only an env-shaped upstream handoff
+  - standardized the export artifact path at `docs/release/release-telemetry-export-latest.json`
+  - updated the release workflow so native and web jobs both materialize, upload, and attest the telemetry export before snapshot and SLO derivation
+  - updated attestation verification so `release-telemetry-export` is now a required governed subject
+  - updated snapshot materialization so blocked-host replay can auto-discover the default export artifact when explicit input is absent
+- Verification:
+  - `materialize-release-telemetry-export.test.mjs`: `3 / 3`
+  - `materialize-release-telemetry-snapshot.test.mjs`: `4 / 4`
+  - `release-governance-runner.test.mjs`: `14 / 14`
+  - `release-attestation-verify.test.mjs`: `4 / 4`
+  - `release-workflow.test.mjs`: `13 / 13`
+  - default governance summary: `7` pass / `3` block / `0` fail
+- Remaining truth:
+  - this slice closes the governed export artifact boundary, not the live telemetry availability problem on the current local host
+  - `release-slo-governance` still blocks by default until telemetry export input is actually materialized
+  - `release-window-snapshot` and `release-sync-audit` still block on this host because Node -> Git execution remains denied

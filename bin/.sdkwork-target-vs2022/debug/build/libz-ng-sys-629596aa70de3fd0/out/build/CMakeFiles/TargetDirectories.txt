@@ -1,0 +1,10 @@
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/Experimental.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/Nightly.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/Continuous.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/NightlyMemoryCheck.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/zlib-ng.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/PACKAGE.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/RUN_TESTS.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/INSTALL.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/ALL_BUILD.dir
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/build/CMakeFiles/ZERO_CHECK.dir

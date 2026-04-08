@@ -1,4 +1,5 @@
 /target/
+/target-*/
 /console/dist/
 /docs/.vitepress/dist/
 /docs/.vitepress/cache/
@@ -17,6 +18,8 @@ Thumbs.db
 **/.codex-logs/
 /artifacts/
 /.external/
+/bin/.sdkwork-target/
+/tmp/
 **/.codex-local/
 **/node_modules__rebuild_*/
 **/.vite/

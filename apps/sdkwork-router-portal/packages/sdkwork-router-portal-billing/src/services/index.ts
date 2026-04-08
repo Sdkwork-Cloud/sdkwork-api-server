@@ -6,14 +6,22 @@ import type {
   BillingEventGroupSummary,
   BillingEventRecord,
   BillingEventSummary,
-  PortalCommerceOrderCenterEntry,
+  CommercePaymentAttemptRecord,
+  PaymentMethodRecord,
+  PortalCommerceCheckoutSession,
+  PortalCommerceCheckoutSessionMethod,
+  PortalCommerceOrder,
+  PortalCommercePaymentEventRecord,
   ProjectBillingSummary,
   RechargePack,
   SubscriptionPlan,
   UsageRecord,
 } from 'sdkwork-router-portal-types';
 
-import type { BillingRecommendation } from '../types';
+import type {
+  BillingCheckoutDetail,
+  BillingRecommendation,
+} from '../types';
 import type {
   BillingEventAnalyticsViewModel,
   BillingPaymentHistoryRow,
@@ -23,6 +31,459 @@ export type BillingEventCsvDocument = {
   headers: string[];
   rows: Array<Array<string | number>>;
 };
+
+export type BillingCheckoutLaunchDecisionKind =
+  | 'resume_existing_attempt'
+  | 'create_retry_attempt'
+  | 'create_first_attempt';
+
+export interface BillingCheckoutLaunchDecision {
+  kind: BillingCheckoutLaunchDecisionKind;
+  latest_attempt: CommercePaymentAttemptRecord | null;
+  matched_attempt_count: number;
+}
+
+export interface BillingCheckoutPresentation {
+  reference: string | null;
+  payable_price_label: string;
+  payment_method_name: string | null;
+  provider: PortalCommerceCheckoutSessionMethod['provider'] | null;
+  channel: PortalCommerceCheckoutSessionMethod['channel'] | null;
+  status_source: 'payment_attempt' | 'checkout_session' | 'none';
+  status: string | null;
+  guidance_source: 'payment_attempt_error' | 'launch_decision' | 'checkout_session' | 'none';
+  guidance: string | null;
+  launch_decision_kind: BillingCheckoutLaunchDecisionKind | null;
+  launch_method: PortalCommerceCheckoutSessionMethod | null;
+}
+
+export interface BillingPaymentHistorySource {
+  order: PortalCommerceOrder;
+  payment_events: PortalCommercePaymentEventRecord[];
+  latest_payment_event?: PortalCommercePaymentEventRecord | null;
+  compatibility_checkout_session?: PortalCommerceCheckoutSession | null;
+  latest_payment_attempt?: CommercePaymentAttemptRecord | null;
+  selected_payment_method?: PaymentMethodRecord | null;
+}
+
+function sortBillingCheckoutLaunchAttempts(
+  paymentAttempts: CommercePaymentAttemptRecord[],
+): CommercePaymentAttemptRecord[] {
+  return paymentAttempts
+    .slice()
+    .sort((left, right) => (
+      right.attempt_sequence - left.attempt_sequence
+      || right.updated_at_ms - left.updated_at_ms
+      || right.initiated_at_ms - left.initiated_at_ms
+    ));
+}
+
+function hasBillingCapability(method: PaymentMethodRecord, capabilityCode: string): boolean {
+  return method.capability_codes.some((capability) => (
+    capability.trim().toLowerCase() === capabilityCode.trim().toLowerCase()
+  ));
+}
+
+function resolveBillingCheckoutMethodProvider(
+  provider: string,
+  fallback?: PortalCommerceCheckoutSessionMethod['provider'],
+): PortalCommerceCheckoutSessionMethod['provider'] {
+  switch (provider.trim().toLowerCase()) {
+    case 'manual_lab':
+      return 'manual_lab';
+    case 'stripe':
+      return 'stripe';
+    case 'alipay':
+      return 'alipay';
+    case 'wechat_pay':
+      return 'wechat_pay';
+    case 'no_payment_required':
+      return 'no_payment_required';
+    default:
+      return fallback ?? 'manual_lab';
+  }
+}
+
+function resolveBillingCheckoutMethodChannel(
+  channel: string,
+  fallback?: PortalCommerceCheckoutSessionMethod['channel'],
+): PortalCommerceCheckoutSessionMethod['channel'] {
+  switch (channel.trim().toLowerCase()) {
+    case 'operator_settlement':
+      return 'operator_settlement';
+    case 'scan_qr':
+      return 'scan_qr';
+    case 'hosted_checkout':
+      return 'hosted_checkout';
+    default:
+      return fallback ?? 'hosted_checkout';
+  }
+}
+
+function resolveBillingCheckoutMethodSessionKind(
+  channel: PortalCommerceCheckoutSessionMethod['channel'],
+  fallback?: PortalCommerceCheckoutSessionMethod['session_kind'],
+): PortalCommerceCheckoutSessionMethod['session_kind'] {
+  switch (channel) {
+    case 'operator_settlement':
+      return 'operator_action';
+    case 'scan_qr':
+      return 'qr_code';
+    case 'hosted_checkout':
+      return 'hosted_checkout';
+    default:
+      return fallback ?? 'hosted_checkout';
+  }
+}
+
+function buildBillingCheckoutMethodKey(
+  method: Pick<PortalCommerceCheckoutSessionMethod, 'provider' | 'channel' | 'action'>,
+): string {
+  return `${method.provider}::${method.channel}::${method.action}`.toLowerCase();
+}
+
+function resolveBillingAttemptReference(
+  latestPaymentAttempt: CommercePaymentAttemptRecord | null,
+): string | null {
+  const providerReference = latestPaymentAttempt?.provider_reference?.trim();
+  if (providerReference) {
+    return providerReference;
+  }
+
+  const checkoutSessionId = latestPaymentAttempt?.provider_checkout_session_id?.trim();
+  if (checkoutSessionId) {
+    return checkoutSessionId;
+  }
+
+  return null;
+}
+
+function isReusableBillingCheckoutAttempt(
+  paymentAttempt: CommercePaymentAttemptRecord | null,
+  nowMs: number,
+): boolean {
+  const checkoutUrl = paymentAttempt?.checkout_url?.trim();
+  if (!checkoutUrl) {
+    return false;
+  }
+
+  if (paymentAttempt?.expires_at_ms != null && paymentAttempt.expires_at_ms <= nowMs) {
+    return false;
+  }
+
+  const normalizedStatus = paymentAttempt?.status?.trim().toLowerCase() ?? '';
+  switch (normalizedStatus) {
+    case 'failed':
+    case 'canceled':
+    case 'cancelled':
+    case 'expired':
+    case 'succeeded':
+    case 'refunded':
+    case 'partially_refunded':
+    case 'partially-refunded':
+      return false;
+    default:
+      return true;
+  }
+}
+
+export function buildBillingCheckoutLaunchDecision(input: {
+  checkout_method: Pick<PortalCommerceCheckoutSessionMethod, 'id' | 'action'>;
+  payment_attempts: CommercePaymentAttemptRecord[];
+  now_ms?: number;
+}): BillingCheckoutLaunchDecision {
+  const { checkout_method, payment_attempts, now_ms = Date.now() } = input;
+  if (checkout_method.action !== 'provider_handoff') {
+    return {
+      kind: 'create_first_attempt',
+      latest_attempt: null,
+      matched_attempt_count: 0,
+    };
+  }
+
+  const matchingAttempts = sortBillingCheckoutLaunchAttempts(
+    payment_attempts.filter((paymentAttempt) => (
+      paymentAttempt.payment_method_id === checkout_method.id
+    )),
+  );
+  const latestAttempt = matchingAttempts[0] ?? null;
+
+  if (isReusableBillingCheckoutAttempt(latestAttempt, now_ms)) {
+    return {
+      kind: 'resume_existing_attempt',
+      latest_attempt: latestAttempt,
+      matched_attempt_count: matchingAttempts.length,
+    };
+  }
+
+  if (latestAttempt) {
+    return {
+      kind: 'create_retry_attempt',
+      latest_attempt: latestAttempt,
+      matched_attempt_count: matchingAttempts.length,
+    };
+  }
+
+  return {
+    kind: 'create_first_attempt',
+    latest_attempt: null,
+    matched_attempt_count: 0,
+  };
+}
+
+function trimBillingText(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function findBillingCheckoutMethodById(
+  methods: PortalCommerceCheckoutSessionMethod[],
+  id: string | null,
+): PortalCommerceCheckoutSessionMethod | null {
+  if (!id) {
+    return null;
+  }
+
+  return methods.find((method) => method.id === id) ?? null;
+}
+
+function selectPrimaryBillingCheckoutMethod(
+  checkoutDetail: BillingCheckoutDetail,
+): PortalCommerceCheckoutSessionMethod | null {
+  const providerHandoffMethods = checkoutDetail.checkout_methods.filter((method) => (
+    method.action === 'provider_handoff'
+  ));
+  const preferredMethods = providerHandoffMethods.length
+    ? providerHandoffMethods
+    : checkoutDetail.checkout_methods;
+  const preferredIds = [
+    checkoutDetail.selected_payment_method?.payment_method_id ?? null,
+    checkoutDetail.latest_payment_attempt?.payment_method_id ?? null,
+    checkoutDetail.order.payment_method_id ?? null,
+  ];
+
+  for (const preferredId of preferredIds) {
+    const match = findBillingCheckoutMethodById(preferredMethods, preferredId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return preferredMethods.find((method) => method.recommended)
+    ?? preferredMethods[0]
+    ?? checkoutDetail.checkout_methods.find((method) => method.recommended)
+    ?? checkoutDetail.checkout_methods[0]
+    ?? null;
+}
+
+export function buildBillingCheckoutPresentation(
+  checkoutDetail: BillingCheckoutDetail,
+): BillingCheckoutPresentation {
+  const primaryMethod = selectPrimaryBillingCheckoutMethod(checkoutDetail);
+  const latestAttempt = checkoutDetail.latest_payment_attempt;
+  const compatibilityCheckoutSession = checkoutDetail.checkout_session;
+  const reference = resolveBillingAttemptReference(latestAttempt)
+    ?? trimBillingText(primaryMethod?.session_reference)
+    ?? trimBillingText(compatibilityCheckoutSession.reference);
+  const payablePriceLabel = trimBillingText(checkoutDetail.order.payable_price_label)
+    ?? trimBillingText(compatibilityCheckoutSession.payable_price_label)
+    ?? '';
+  const paymentMethodName = trimBillingText(checkoutDetail.selected_payment_method?.display_name)
+    ?? trimBillingText(primaryMethod?.label);
+  const latestAttemptStatus = trimBillingText(latestAttempt?.status);
+  const compatibilityStatus = trimBillingText(compatibilityCheckoutSession.session_status);
+  const latestAttemptError = trimBillingText(latestAttempt?.error_message);
+
+  if (latestAttemptError) {
+    return {
+      reference,
+      payable_price_label: payablePriceLabel,
+      payment_method_name: paymentMethodName,
+      provider: primaryMethod?.provider ?? compatibilityCheckoutSession.provider ?? null,
+      channel: primaryMethod?.channel ?? null,
+      status_source: latestAttemptStatus ? 'payment_attempt' : compatibilityStatus ? 'checkout_session' : 'none',
+      status: latestAttemptStatus ?? compatibilityStatus,
+      guidance_source: 'payment_attempt_error',
+      guidance: latestAttemptError,
+      launch_decision_kind: null,
+      launch_method: null,
+    };
+  }
+
+  if (primaryMethod?.action === 'provider_handoff') {
+    const launchDecision = buildBillingCheckoutLaunchDecision({
+      checkout_method: primaryMethod,
+      payment_attempts: checkoutDetail.payment_attempts,
+    });
+
+    return {
+      reference,
+      payable_price_label: payablePriceLabel,
+      payment_method_name: paymentMethodName,
+      provider: primaryMethod.provider,
+      channel: primaryMethod.channel,
+      status_source: latestAttemptStatus ? 'payment_attempt' : compatibilityStatus ? 'checkout_session' : 'none',
+      status: latestAttemptStatus ?? compatibilityStatus,
+      guidance_source: 'launch_decision',
+      guidance: null,
+      launch_decision_kind: launchDecision.kind,
+      launch_method: primaryMethod,
+    };
+  }
+
+  const compatibilityGuidance = trimBillingText(compatibilityCheckoutSession.guidance);
+
+  return {
+    reference,
+    payable_price_label: payablePriceLabel,
+    payment_method_name: paymentMethodName,
+    provider: primaryMethod?.provider ?? compatibilityCheckoutSession.provider ?? null,
+    channel: primaryMethod?.channel ?? null,
+    status_source: latestAttemptStatus ? 'payment_attempt' : compatibilityStatus ? 'checkout_session' : 'none',
+    status: latestAttemptStatus ?? compatibilityStatus,
+    guidance_source: compatibilityGuidance ? 'checkout_session' : 'none',
+    guidance: compatibilityGuidance,
+    launch_decision_kind: null,
+    launch_method: null,
+  };
+}
+
+function findMatchingCompatibilityCheckoutMethod(
+  checkoutSession: PortalCommerceCheckoutSession,
+  paymentMethod: PaymentMethodRecord,
+): PortalCommerceCheckoutSessionMethod | null {
+  const directMatch = checkoutSession.methods.find((method) => (
+    method.id === paymentMethod.payment_method_id
+  ));
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const provider = resolveBillingCheckoutMethodProvider(paymentMethod.provider);
+  const channel = resolveBillingCheckoutMethodChannel(paymentMethod.channel);
+
+  return checkoutSession.methods.find((method) => (
+    method.provider === provider && method.channel === channel
+  )) ?? null;
+}
+
+function buildFormalBillingCheckoutMethod(input: {
+  order: PortalCommerceOrder;
+  payment_method: PaymentMethodRecord;
+  latest_payment_attempt: CommercePaymentAttemptRecord | null;
+  selected_payment_method_id: string | null;
+  compatibility_checkout_method: PortalCommerceCheckoutSessionMethod | null;
+}): PortalCommerceCheckoutSessionMethod {
+  const {
+    order,
+    payment_method,
+    latest_payment_attempt,
+    selected_payment_method_id,
+    compatibility_checkout_method,
+  } = input;
+  const provider = resolveBillingCheckoutMethodProvider(
+    payment_method.provider,
+    compatibility_checkout_method?.provider,
+  );
+  const channel = resolveBillingCheckoutMethodChannel(
+    payment_method.channel,
+    compatibility_checkout_method?.channel,
+  );
+  const action: PortalCommerceCheckoutSessionMethod['action'] =
+    channel === 'operator_settlement'
+      ? 'settle_order'
+      : 'provider_handoff';
+  const attemptReference = latest_payment_attempt?.payment_method_id === payment_method.payment_method_id
+    ? resolveBillingAttemptReference(latest_payment_attempt)
+    : null;
+  const sessionReference = attemptReference
+    ?? compatibility_checkout_method?.session_reference
+    ?? payment_method.payment_method_id;
+  const callbackStrategy = payment_method.callback_strategy.trim();
+  const supportsWebhook = callbackStrategy.toLowerCase().includes('webhook');
+
+  return {
+    id: payment_method.payment_method_id,
+    label: payment_method.display_name,
+    detail: payment_method.description || compatibility_checkout_method?.detail || '',
+    action,
+    availability: payment_method.enabled ? 'available' : 'closed',
+    provider,
+    channel,
+    session_kind: resolveBillingCheckoutMethodSessionKind(
+      channel,
+      compatibility_checkout_method?.session_kind,
+    ),
+    session_reference: sessionReference,
+    qr_code_payload: latest_payment_attempt?.payment_method_id === payment_method.payment_method_id
+      ? (latest_payment_attempt.qr_code_payload ?? compatibility_checkout_method?.qr_code_payload ?? null)
+      : (compatibility_checkout_method?.qr_code_payload ?? null),
+    webhook_verification: callbackStrategy || compatibility_checkout_method?.webhook_verification || 'manual',
+    supports_refund: hasBillingCapability(payment_method, 'refund')
+      || Boolean(compatibility_checkout_method?.supports_refund),
+    supports_partial_refund: hasBillingCapability(payment_method, 'partial_refund')
+      || Boolean(compatibility_checkout_method?.supports_partial_refund),
+    recommended: payment_method.payment_method_id === selected_payment_method_id
+      || hasBillingCapability(payment_method, 'recommended')
+      || Boolean(compatibility_checkout_method?.recommended),
+    supports_webhook: supportsWebhook || Boolean(compatibility_checkout_method?.supports_webhook),
+  };
+}
+
+export function buildBillingCheckoutMethods(input: {
+  order: PortalCommerceOrder;
+  checkout_session: PortalCommerceCheckoutSession;
+  payment_methods: PaymentMethodRecord[];
+  latest_payment_attempt: CommercePaymentAttemptRecord | null;
+  selected_payment_method: PaymentMethodRecord | null;
+}): PortalCommerceCheckoutSessionMethod[] {
+  const {
+    order,
+    checkout_session,
+    payment_methods,
+    latest_payment_attempt,
+    selected_payment_method,
+  } = input;
+  if (order.status !== 'pending_payment' || checkout_session.session_status !== 'open') {
+    return checkout_session.methods;
+  }
+
+  const selectedPaymentMethodId = selected_payment_method?.payment_method_id
+    ?? order.payment_method_id
+    ?? latest_payment_attempt?.payment_method_id
+    ?? null;
+  const formalMethods = payment_methods
+    .map((payment_method) => {
+      const compatibilityCheckoutMethod = findMatchingCompatibilityCheckoutMethod(
+        checkout_session,
+        payment_method,
+      );
+      const formalMethod = buildFormalBillingCheckoutMethod({
+        order,
+        payment_method,
+        latest_payment_attempt,
+        selected_payment_method_id: selectedPaymentMethodId,
+        compatibility_checkout_method: compatibilityCheckoutMethod,
+      });
+
+      if (
+        formalMethod.action === 'settle_order'
+        && compatibilityCheckoutMethod
+        && compatibilityCheckoutMethod.action === 'settle_order'
+      ) {
+        return null;
+      }
+
+      return formalMethod;
+    })
+    .filter((method): method is PortalCommerceCheckoutSessionMethod => method !== null);
+  const formalMethodKeys = new Set(formalMethods.map((method) => buildBillingCheckoutMethodKey(method)));
+  const compatibilityFallbackMethods = checkout_session.methods.filter((method) => (
+    !formalMethodKeys.has(buildBillingCheckoutMethodKey(method))
+  ));
+
+  return [...compatibilityFallbackMethods, ...formalMethods];
+}
 
 function compareBillingPaymentHistoryRows(
   left: BillingPaymentHistoryRow,
@@ -37,81 +498,114 @@ function compareBillingPaymentHistoryRows(
     || left.id.localeCompare(right.id);
 }
 
+function resolveBillingHistoryProvider(
+  source: BillingPaymentHistorySource,
+  paymentEventProvider?: string | null,
+): string {
+  const directProvider = paymentEventProvider?.trim();
+  if (directProvider) {
+    return directProvider;
+  }
+
+  const paymentAttemptProvider = source.latest_payment_attempt?.provider?.trim();
+  if (paymentAttemptProvider) {
+    return paymentAttemptProvider;
+  }
+
+  const paymentMethodProvider = source.selected_payment_method?.provider?.trim();
+  if (paymentMethodProvider) {
+    return paymentMethodProvider;
+  }
+
+  return source.compatibility_checkout_session?.provider ?? '';
+}
+
+function resolveBillingCheckoutReference(
+  source: BillingPaymentHistorySource,
+): string | null {
+  return source.latest_payment_attempt?.provider_reference
+    ?? source.latest_payment_attempt?.provider_checkout_session_id
+    ?? source.compatibility_checkout_session?.reference
+    ?? null;
+}
+
 function buildPaymentEventHistoryRow(
-  entry: PortalCommerceOrderCenterEntry,
-  event: PortalCommerceOrderCenterEntry['payment_events'][number],
+  source: BillingPaymentHistorySource,
+  event: BillingPaymentHistorySource['payment_events'][number],
 ): BillingPaymentHistoryRow {
   return {
     row_kind: 'payment_event',
     id: event.payment_event_id,
-    order_id: entry.order.order_id,
-    target_name: entry.order.target_name,
-    target_kind: entry.order.target_kind,
-    payable_price_label: entry.order.payable_price_label,
-    order_status: entry.order.status,
+    order_id: source.order.order_id,
+    target_name: source.order.target_name,
+    target_kind: source.order.target_kind,
+    payable_price_label: source.order.payable_price_label,
+    order_status: source.order.status,
     order_status_after: event.order_status_after ?? null,
-    provider: event.provider,
+    provider: resolveBillingHistoryProvider(source, event.provider),
     event_type: event.event_type,
     payment_event_id: event.payment_event_id,
     provider_event_id: event.provider_event_id ?? null,
+    payment_method_name: source.selected_payment_method?.display_name ?? null,
     processing_status: event.processing_status,
     processing_message: event.processing_message ?? null,
-    checkout_reference: entry.checkout_session.reference,
-    checkout_session_status: entry.checkout_session.session_status,
-    guidance: entry.checkout_session.guidance,
+    checkout_reference: resolveBillingCheckoutReference(source),
+    checkout_session_status: source.compatibility_checkout_session?.session_status ?? null,
+    guidance: source.compatibility_checkout_session?.guidance ?? null,
     received_at_ms: event.received_at_ms,
     processed_at_ms: event.processed_at_ms ?? null,
   };
 }
 
-function hasRefundPaymentEvent(entry: PortalCommerceOrderCenterEntry): boolean {
-  return entry.payment_events.some((event) => event.event_type === 'refunded');
+function hasRefundPaymentEvent(source: BillingPaymentHistorySource): boolean {
+  return source.payment_events.some((event) => event.event_type === 'refunded');
 }
 
 function buildRefundedOrderStateRow(
-  entry: PortalCommerceOrderCenterEntry,
+  source: BillingPaymentHistorySource,
 ): BillingPaymentHistoryRow {
   const observedAtMs = Math.max(
-    entry.order.updated_at_ms ?? 0,
-    entry.latest_payment_event?.processed_at_ms ?? 0,
-    entry.latest_payment_event?.received_at_ms ?? 0,
+    source.order.updated_at_ms ?? 0,
+    source.latest_payment_event?.processed_at_ms ?? 0,
+    source.latest_payment_event?.received_at_ms ?? 0,
   );
 
   return {
     row_kind: 'refunded_order_state',
-    id: `refund-state:${entry.order.order_id}`,
-    order_id: entry.order.order_id,
-    target_name: entry.order.target_name,
-    target_kind: entry.order.target_kind,
-    payable_price_label: entry.order.payable_price_label,
-    order_status: entry.order.status,
+    id: `refund-state:${source.order.order_id}`,
+    order_id: source.order.order_id,
+    target_name: source.order.target_name,
+    target_kind: source.order.target_kind,
+    payable_price_label: source.order.payable_price_label,
+    order_status: source.order.status,
     order_status_after: 'refunded',
-    provider: entry.checkout_session.provider,
+    provider: resolveBillingHistoryProvider(source),
     event_type: 'refunded',
     payment_event_id: null,
     provider_event_id: null,
+    payment_method_name: source.selected_payment_method?.display_name ?? null,
     processing_status: null,
     processing_message: null,
-    checkout_reference: entry.checkout_session.reference,
-    checkout_session_status: entry.checkout_session.session_status,
-    guidance: entry.checkout_session.guidance,
+    checkout_reference: resolveBillingCheckoutReference(source),
+    checkout_session_status: source.compatibility_checkout_session?.session_status ?? null,
+    guidance: source.compatibility_checkout_session?.guidance ?? null,
     received_at_ms: observedAtMs,
     processed_at_ms: null,
   };
 }
 
 export function buildBillingPaymentHistory(
-  entries: PortalCommerceOrderCenterEntry[],
+  sources: BillingPaymentHistorySource[],
 ): BillingPaymentHistoryRow[] {
   const rows: BillingPaymentHistoryRow[] = [];
 
-  for (const entry of entries) {
-    for (const event of entry.payment_events) {
-      rows.push(buildPaymentEventHistoryRow(entry, event));
+  for (const source of sources) {
+    for (const event of source.payment_events) {
+      rows.push(buildPaymentEventHistoryRow(source, event));
     }
 
-    if (entry.order.status === 'refunded' && !hasRefundPaymentEvent(entry)) {
-      rows.push(buildRefundedOrderStateRow(entry));
+    if (source.order.status === 'refunded' && !hasRefundPaymentEvent(source)) {
+      rows.push(buildRefundedOrderStateRow(source));
     }
   }
 
@@ -119,9 +613,9 @@ export function buildBillingPaymentHistory(
 }
 
 export function buildBillingRefundHistory(
-  entries: PortalCommerceOrderCenterEntry[],
+  sources: BillingPaymentHistorySource[],
 ): BillingPaymentHistoryRow[] {
-  return buildBillingPaymentHistory(entries).filter((row) => row.event_type === 'refunded');
+  return buildBillingPaymentHistory(sources).filter((row) => row.event_type === 'refunded');
 }
 
 function buildDailyUsageSeries(usageRecords: UsageRecord[]): number[] {

@@ -1,0 +1,21 @@
+# Unreleased - Step 10 Release Sync Audit Governed Input
+
+- Date: 2026-04-08
+- Type: patch
+- Summary:
+  - extended `verify-release-sync.mjs` so release sync facts can now enter through governed inputs instead of only through host-local Git execution
+  - added governed input contracts for `--audit`, `--audit-json`, `SDKWORK_RELEASE_SYNC_AUDIT_PATH`, and `SDKWORK_RELEASE_SYNC_AUDIT_JSON`
+  - validated both artifact-envelope input and raw summary input, while keeping the default live audit path unchanged when no governed input is supplied
+  - updated `run-release-governance-checks.mjs` fallback replay so the top-level governance runner can consume governed sync-audit input on blocked hosts
+- Verification:
+  - `release-sync-audit.test.mjs`: `2 / 2`
+  - `release-governance-runner.test.mjs`: `13 / 13`
+  - `release-window-snapshot.test.mjs`: `5 / 5`
+  - governance summary:
+    - default: `7` pass / `3` block / `0` fail
+    - with governed sync audit input: `8` pass / `2` block / `0` fail
+    - with governed sync audit plus governed release-window input: `9` pass / `1` block / `0` fail
+- Remaining truth:
+  - the current local host still blocks live Node -> Git execution by default
+  - `release-slo-governance` remains blocked until governed telemetry input is supplied
+  - this slice adds an honest governed ingress path; it does not claim host-policy recovery

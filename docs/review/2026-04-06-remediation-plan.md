@@ -140,6 +140,8 @@
     - `sdkwork-router-admin-traffic` is reduced to zero effective semantic-English hits in the current inventory
     - `sdkwork-router-admin-pricing` is reduced to zero effective semantic-English hits in the current inventory
 - [x] Keep the test green between slices instead of allowing the backlog to expand.
+- [x] 2026-04-07 recovery slice: normalized the corrupted admin translation source modules and introduced `ADMIN_ZH_RECOVERY_TRANSLATIONS` so 158 newly used payment/control-plane keys are explicitly registered and the structural gate remains green.
+- [ ] Replace the English-valued recovery slice for payment method, webhook, refund, and reconciliation surfaces with curated Simplified Chinese translations in verified batches.
 
 ### Task 5: Close the verification gap for product runtime and services
 
@@ -161,7 +163,17 @@
 - Modify business crates after evidence-backed review
 
 - [ ] Payment/order/refund/account-history transactional closure review
+  - [x] P0 slice 1: harden commercial side-effect consistency for the current SQLite/Postgres path so failed final order writes no longer leave quota or membership mutations behind.
+  - [x] Add explicit `delete_quota_policy` and `delete_project_membership` store operations to support commercial rollback on SQLite/Postgres.
+  - [x] Add regression coverage proving failed `fulfilled` and `refunded` order writes restore prior commercial state instead of leaving half-applied business effects behind.
+  - [x] Continue with canonical account-history/request-settlement linkage for commerce orders.
+  - [x] For account-provisioned workspaces, settled/refunded recharge orders now sync canonical account ledger history and advance the commerce reconciliation checkpoint, while recharge orders intentionally continue to leave `request_settlements` empty because they are not request-capture records.
+  - [x] Add replay recovery coverage proving a failed canonical account-ledger write leaves the order `fulfilled`, records the payment event as failed with the latest order status, and repairs the canonical account history when the same payment event is replayed.
+  - [x] Close refund compensation for coupon rollback evidence when final refunded-order persistence fails.
+  - [x] Failed refunded-order persistence now compensates coupon marketing state atomically on SQLite/Postgres by restoring budget/code/redemption back to the pre-refund snapshot, marking the rollback audit as `failed`, and preserving replayability so the same refund event can later complete the rollback cleanly.
 - [ ] Coupon concurrency, rollback, and inventory restoration review
+  - [x] Inline reclaim expired coupon reservations on the SQLite/Postgres commerce and portal reservation path so stale timed-out reservations no longer block a fresh order or direct portal reservation attempt for the same coupon code.
+  - [x] Add regression coverage proving an expired reservation is marked `expired`, budget is rebalanced instead of double-counted, and a fresh reservation can be created immediately on both the commerce order path and `/portal/marketing/coupon-reservations`.
 - [ ] Traffic control, failure recovery, monitoring, and auto-failover review
 - [ ] Performance/load verification design and benchmarks
 - [ ] Cross-platform packaging/runtime review
@@ -170,5 +182,6 @@
 
 1. Reclassify the remaining fixed-structure request-path `expect(...)` samples as hygiene debt unless a real failure surface is proven; current review found no meaningful invalid-input or domain-error trigger in the sampled local fallbacks for model list, chat-completion list, conversation create/list, thread create, or image edit/variation.
 2. Treat the remaining admin i18n residuals as intentional literals unless product requirements later call for localized brand/example handling.
-3. Resume the broader commercial-system review starting with payment/order/refund/account-history transactional closure.
-4. Follow with coupon concurrency/rollback and traffic-control/failure-recovery/monitoring review tasks from Task 6.
+3. Continue the coupon-domain P1 review with the next stale-state/observability slice: catalog visibility, recovery telemetry, and any remaining retry/concurrency gaps around coupon reservations.
+4. Follow with traffic-control/failure-recovery/monitoring review tasks from Task 6.
+5. Keep MySQL/libSQL deferred; commercial persistence hardening continues on SQLite/Postgres only until the business closure backlog is done.

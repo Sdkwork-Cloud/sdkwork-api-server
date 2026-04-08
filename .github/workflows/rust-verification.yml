@@ -58,3 +58,25 @@ jobs:
       - name: Run package-group verification
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.group == '' || github.event.inputs.group == matrix.group }}
         run: node scripts/check-rust-verification-matrix.mjs --group ${{ matrix.group }}
+
+  rust-verification-windows-workspace:
+    name: Rust verification (workspace / windows)
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.group == 'workspace' }}
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run workspace verification
+        run: node scripts/check-rust-verification-matrix.mjs --group workspace

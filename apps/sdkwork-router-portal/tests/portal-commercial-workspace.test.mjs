@@ -73,6 +73,9 @@ test('portal commercial workspace routes canonical account surfaces through repo
   assert.match(billingRepository, /getPortalCommercialAccount/);
   assert.match(billingRepository, /getPortalCommercialAccountHistory/);
   assert.match(billingRepository, /getPortalCommerceOrderCenter/);
+  assert.match(billingRepository, /getPortalCommerceOrder/);
+  assert.match(billingRepository, /listPortalCommercePaymentMethods/);
+  assert.match(billingRepository, /getPortalCommercePaymentAttempt/);
   assert.match(billingRepository, /commercial_reconciliation: order_center\.reconciliation/);
   assert.match(billingRepository, /commercial_history\.request_settlements/);
   assert.match(billingRepository, /listPortalCommercialPricingRates/);
@@ -81,7 +84,7 @@ test('portal commercial workspace routes canonical account surfaces through repo
   assert.match(billingPage, /Commercial account/);
   assert.match(billingPage, /Commerce reconciliation/);
   assert.match(billingPage, /Backlog orders/);
-  assert.match(billingPage, /Commercial settlement rail/);
+  assert.match(billingPage, /Settlement coverage/);
   assert.match(billingPage, /Pricing posture/);
 });
 

@@ -2,9 +2,9 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use sdkwork_api_domain_marketing::{
     CampaignBudgetRecord, CampaignBudgetStatus, CouponBenefitSpec, CouponCodeRecord,
-    CouponCodeStatus, CouponDistributionKind, CouponRestrictionSpec, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord, MarketingCampaignStatus,
-    MarketingSubjectScope,
+    CouponCodeStatus, CouponDistributionKind, CouponReservationRecord, CouponReservationStatus,
+    CouponRestrictionSpec, CouponTemplateRecord, CouponTemplateStatus, MarketingBenefitKind,
+    MarketingCampaignRecord, MarketingCampaignStatus, MarketingSubjectScope,
 };
 use sdkwork_api_domain_rate_limit::RateLimitPolicy;
 use sdkwork_api_storage_core::AdminStore;
@@ -211,10 +211,13 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
         .unwrap();
     assert_eq!(my_coupons.status(), StatusCode::OK);
     let my_coupons_json = read_json(my_coupons).await;
-    assert_eq!(my_coupons_json.as_array().unwrap().len(), 1);
-    assert_eq!(my_coupons_json[0]["code"]["code_value"], "LAUNCH20");
+    assert_eq!(my_coupons_json["summary"]["total_count"], 1);
+    assert_eq!(my_coupons_json["summary"]["available_count"], 0);
+    assert_eq!(my_coupons_json["summary"]["reserved_count"], 1);
+    assert_eq!(my_coupons_json["items"].as_array().unwrap().len(), 1);
+    assert_eq!(my_coupons_json["items"][0]["code"]["code_value"], "LAUNCH20");
     assert_eq!(
-        my_coupons_json[0]["latest_reservation"]["reservation_status"],
+        my_coupons_json["items"][0]["latest_reservation"]["reservation_status"],
         "reserved"
     );
 
@@ -301,6 +304,115 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
         reward_history_json[0]["rollbacks"][0]["rollback_type"],
         "refund"
     );
+}
+
+#[tokio::test]
+async fn portal_marketing_reservation_reclaims_expired_reservation_inline() {
+    let pool = memory_pool().await;
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_records(&store).await;
+
+    let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+    let token = portal_token(app.clone()).await;
+    let project_id = workspace_project_id(app.clone(), &token).await;
+
+    let original_code = store
+        .find_coupon_code_record_by_value("LAUNCH20")
+        .await
+        .unwrap()
+        .unwrap();
+    let reserved_code = original_code
+        .clone()
+        .with_status(CouponCodeStatus::Reserved)
+        .with_updated_at_ms(10);
+    store
+        .insert_coupon_code_record(&reserved_code)
+        .await
+        .unwrap();
+
+    let original_budget = store
+        .list_campaign_budget_records()
+        .await
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    let reserved_budget = original_budget
+        .clone()
+        .with_reserved_budget_minor(1_200)
+        .with_updated_at_ms(10);
+    store
+        .insert_campaign_budget_record(&reserved_budget)
+        .await
+        .unwrap();
+
+    let expired_reservation = CouponReservationRecord::new(
+        "reservation_portal_expired",
+        reserved_code.coupon_code_id.clone(),
+        MarketingSubjectScope::Project,
+        project_id.clone(),
+        1,
+    )
+    .with_status(CouponReservationStatus::Reserved)
+    .with_budget_reserved_minor(1_200)
+    .with_created_at_ms(0)
+    .with_updated_at_ms(10);
+    store
+        .insert_coupon_reservation_record(&expired_reservation)
+        .await
+        .unwrap();
+
+    let reserved = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/marketing/coupon-reservations")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"coupon_code\":\"LAUNCH20\",\"subject_scope\":\"project\",\"target_kind\":\"recharge_pack\",\"reserve_amount_minor\":1200,\"ttl_ms\":300000}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(reserved.status(), StatusCode::CREATED);
+    let reserved_json = read_json(reserved).await;
+    assert_eq!(
+        reserved_json["reservation"]["reservation_status"],
+        "reserved"
+    );
+    assert_eq!(reserved_json["code"]["status"], "reserved");
+
+    let reservations = store.list_coupon_reservation_records().await.unwrap();
+    assert_eq!(reservations.len(), 2);
+    let stale_reservation = reservations
+        .iter()
+        .find(|reservation| reservation.coupon_reservation_id == "reservation_portal_expired")
+        .unwrap();
+    assert_eq!(
+        stale_reservation.reservation_status,
+        CouponReservationStatus::Expired
+    );
+    let active_reservation = reservations
+        .iter()
+        .find(|reservation| reservation.coupon_reservation_id != "reservation_portal_expired")
+        .unwrap();
+    assert_eq!(
+        active_reservation.reservation_status,
+        CouponReservationStatus::Reserved
+    );
+    assert_eq!(active_reservation.budget_reserved_minor, 1_200);
+
+    let refreshed_budget = store
+        .list_campaign_budget_records()
+        .await
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    assert_eq!(refreshed_budget.reserved_budget_minor, 1_200);
 }
 
 #[tokio::test]

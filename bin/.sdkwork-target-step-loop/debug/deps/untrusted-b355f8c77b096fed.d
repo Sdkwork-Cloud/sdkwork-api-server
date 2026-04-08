@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-step-loop\debug\deps\untrusted-b355f8c77b096fed.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\input.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\no_panic.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\reader.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-step-loop\debug\deps\libuntrusted-b355f8c77b096fed.rlib: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\input.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\no_panic.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\reader.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-step-loop\debug\deps\libuntrusted-b355f8c77b096fed.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\input.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\no_panic.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\reader.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\input.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\no_panic.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\untrusted-0.9.0\src\reader.rs:

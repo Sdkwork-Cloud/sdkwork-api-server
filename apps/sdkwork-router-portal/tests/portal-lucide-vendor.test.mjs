@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -7,6 +7,33 @@ const appRoot = path.resolve(import.meta.dirname, '..');
 
 function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
+}
+
+function resolvePackageRoot(packageName) {
+  const directRoot = path.join(appRoot, 'node_modules', packageName);
+  if (existsSync(path.join(directRoot, 'package.json'))) {
+    return directRoot;
+  }
+
+  const pnpmRoot = path.join(appRoot, 'node_modules', '.pnpm');
+  if (!existsSync(pnpmRoot)) {
+    throw new Error(`unable to find pnpm store for ${packageName}`);
+  }
+
+  const candidates = readdirSync(pnpmRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${packageName}@`))
+    .map((entry) => entry.name)
+    .sort()
+    .reverse();
+
+  for (const candidate of candidates) {
+    const packageRoot = path.join(pnpmRoot, candidate, 'node_modules', packageName);
+    if (existsSync(path.join(packageRoot, 'package.json'))) {
+      return packageRoot;
+    }
+  }
+
+  throw new Error(`unable to resolve ${packageName} package root`);
 }
 
 function collectLucideImports(source) {
@@ -32,6 +59,11 @@ function collectLucideImports(source) {
   }
 
   return imports;
+}
+
+function collectVendorIconFiles(source) {
+  return [...source.matchAll(/import\s+\w+\s+from\s+['"]lucide-react\/dist\/esm\/icons\/([^'"]+)['"]/g)]
+    .map((match) => match[1]);
 }
 
 test('lucide vendor exports every runtime icon consumed by portal and linked sdkwork-ui sources', () => {
@@ -102,6 +134,21 @@ test('lucide vendor exports every runtime icon consumed by portal and linked sdk
       vendorSource,
       new RegExp(`\\b${icon}\\b`),
       `missing lucide vendor export for ${icon}`,
+    );
+  }
+});
+
+test('lucide vendor only imports icon files that exist in the pinned lucide-react package', () => {
+  const vendorSource = read('src/vendor/lucide-react.ts');
+  const lucideRoot = resolvePackageRoot('lucide-react');
+  const iconsRoot = path.join(lucideRoot, 'dist', 'esm', 'icons');
+
+  for (const iconFile of collectVendorIconFiles(vendorSource)) {
+    const iconPath = path.join(iconsRoot, iconFile);
+    assert.equal(
+      existsSync(iconPath),
+      true,
+      `missing lucide icon file ${iconFile} under ${iconsRoot}`,
     );
   }
 });

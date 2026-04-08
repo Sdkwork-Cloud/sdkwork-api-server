@@ -37,13 +37,13 @@ function loadRechargeServices() {
   );
 }
 
-test('recharge page keeps pending payment queue visible and routes operators back to billing settlement flow', () => {
+test('recharge page keeps pending payment queue visible and routes users back to the billing workbench', () => {
   const page = read('packages/sdkwork-router-portal-recharge/src/pages/index.tsx');
 
   assert.match(page, /PortalRechargePage\(\{ onNavigate \}: PortalRechargePageProps\)/);
   assert.doesNotMatch(page, /onNavigate:\s*_onNavigate/);
   assert.match(page, /Pending payment queue/);
-  assert.match(page, /Open billing queue/);
+  assert.match(page, /Open billing workbench/);
   assert.match(page, /onClick=\{\(\) => onNavigate\('billing'\)\}/);
 });
 

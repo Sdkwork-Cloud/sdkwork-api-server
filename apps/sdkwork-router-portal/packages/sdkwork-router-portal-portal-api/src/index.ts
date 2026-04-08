@@ -3,6 +3,7 @@ import type {
   BillingEventRecord,
   BillingEventSummary,
   CampaignBudgetRecord,
+  CommercePaymentAttemptRecord,
   CommercialAccountHistorySnapshot,
   CommercialAccountBalanceSnapshot,
   CommercialAccountBenefitLotRecord,
@@ -20,8 +21,10 @@ import type {
   GatewayApiKeyRecord,
   LedgerEntry,
   MarketingCampaignRecord,
+  PaymentMethodRecord,
   PortalCommerceCheckoutSession,
   PortalCommercePaymentEventRequest,
+  PortalCommercePaymentAttemptCreateRequest,
   PortalCommerceQuote,
   PortalCommerceOrder,
   PortalCommerceOrderCenterResponse,
@@ -921,6 +924,16 @@ export function createPortalCommerceOrder(
   );
 }
 
+export function getPortalCommerceOrder(
+  orderId: string,
+  token?: string,
+): Promise<PortalCommerceOrder> {
+  return getJson<PortalCommerceOrder>(
+    `/commerce/orders/${encodeURIComponent(orderId)}`,
+    requiredPortalToken(token),
+  );
+}
+
 export function settlePortalCommerceOrder(
   orderId: string,
   token?: string,
@@ -969,11 +982,53 @@ export function listPortalCommerceOrders(token?: string): Promise<PortalCommerce
   return getJson<PortalCommerceOrder[]>('/commerce/orders', requiredPortalToken(token));
 }
 
+export function listPortalCommercePaymentMethods(
+  orderId: string,
+  token?: string,
+): Promise<PaymentMethodRecord[]> {
+  return getJson<PaymentMethodRecord[]>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/payment-methods`,
+    requiredPortalToken(token),
+  );
+}
+
+export function listPortalCommercePaymentAttempts(
+  orderId: string,
+  token?: string,
+): Promise<CommercePaymentAttemptRecord[]> {
+  return getJson<CommercePaymentAttemptRecord[]>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/payment-attempts`,
+    requiredPortalToken(token),
+  );
+}
+
+export function createPortalCommercePaymentAttempt(
+  orderId: string,
+  input: PortalCommercePaymentAttemptCreateRequest,
+  token?: string,
+): Promise<CommercePaymentAttemptRecord> {
+  return postJson<PortalCommercePaymentAttemptCreateRequest, CommercePaymentAttemptRecord>(
+    `/commerce/orders/${encodeURIComponent(orderId)}/payment-attempts`,
+    input,
+    requiredPortalToken(token),
+  );
+}
+
 export function getPortalCommerceOrderCenter(
   token?: string,
 ): Promise<PortalCommerceOrderCenterResponse> {
   return getJson<PortalCommerceOrderCenterResponse>(
     '/commerce/order-center',
+    requiredPortalToken(token),
+  );
+}
+
+export function getPortalCommercePaymentAttempt(
+  paymentAttemptId: string,
+  token?: string,
+): Promise<CommercePaymentAttemptRecord> {
+  return getJson<CommercePaymentAttemptRecord>(
+    `/commerce/payment-attempts/${encodeURIComponent(paymentAttemptId)}`,
     requiredPortalToken(token),
   );
 }

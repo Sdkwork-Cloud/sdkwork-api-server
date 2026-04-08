@@ -4,6 +4,7 @@ import type {
   BillingEventGroupSummary,
   BillingEventRecord,
   BillingEventSummary,
+  CommercePaymentAttemptRecord,
   CommercialAccountBalanceSnapshot,
   CommercialAccountBenefitLotRecord,
   CommercialAccountHoldRecord,
@@ -11,6 +12,9 @@ import type {
   CommercialPricingPlanRecord,
   CommercialPricingRateRecord,
   CommercialRequestSettlementRecord,
+  PaymentMethodRecord,
+  PortalCommerceCheckoutSession,
+  PortalCommerceCheckoutSessionMethod,
   PortalCommerceCheckoutSessionStatus,
   PortalCommerceMembership,
   PortalCommerceReconciliationSummary,
@@ -67,6 +71,7 @@ export interface BillingPaymentHistoryRow {
   event_type: PortalCommercePaymentEventType;
   payment_event_id?: string | null;
   provider_event_id?: string | null;
+  payment_method_name?: string | null;
   processing_status?: PortalCommercePaymentEventProcessingStatus | null;
   processing_message?: string | null;
   checkout_reference?: string | null;
@@ -86,6 +91,7 @@ export interface BillingPageData {
   orders: PortalCommerceOrder[];
   payment_history: BillingPaymentHistoryRow[];
   refund_history: BillingPaymentHistoryRow[];
+  payment_simulation_enabled: boolean;
   membership: PortalCommerceMembership | null;
   commercial_reconciliation: PortalCommerceReconciliationSummary | null;
   commercial_account: CommercialAccountSummary | null;
@@ -95,6 +101,16 @@ export interface BillingPageData {
   commercial_request_settlements: CommercialRequestSettlementRecord[];
   commercial_pricing_plans: CommercialPricingPlanRecord[];
   commercial_pricing_rates: CommercialPricingRateRecord[];
+}
+
+export interface BillingCheckoutDetail {
+  order: PortalCommerceOrder;
+  checkout_session: PortalCommerceCheckoutSession;
+  checkout_methods: PortalCommerceCheckoutSessionMethod[];
+  payment_attempts: CommercePaymentAttemptRecord[];
+  payment_methods: PaymentMethodRecord[];
+  latest_payment_attempt: CommercePaymentAttemptRecord | null;
+  selected_payment_method: PaymentMethodRecord | null;
 }
 
 export interface BillingEventAnalyticsTotals {

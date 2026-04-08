@@ -28,6 +28,7 @@ function readFirstExistingClaw(candidates) {
 test('portal theme stylesheet keeps the claw-studio token and scrollbar foundation intact', () => {
   const portalTheme = readFromApp('src/theme.css');
   const clawTheme = readFromClaw('packages/sdkwork-claw-shell/src/styles/index.css');
+  const clawWorkspaceSourceDirectivePattern = /@source "(?:\.\.\/){3,}";/;
 
   const requiredThemeSnippets = [
     '--theme-primary-50: #eff6ff;',
@@ -48,10 +49,10 @@ test('portal theme stylesheet keeps the claw-studio token and scrollbar foundati
     assert.match(portalTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  assert.match(clawTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.match(clawTheme, clawWorkspaceSourceDirectivePattern);
   assert.match(portalTheme, /@source "\.\/";/);
   assert.match(portalTheme, /@source "\.\.\/packages";/);
-  assert.doesNotMatch(portalTheme, /@source "\.\.\/\.\.\/\.\.\/\.\.\/";/);
+  assert.doesNotMatch(portalTheme, clawWorkspaceSourceDirectivePattern);
   assert.match(portalTheme, /\.ghost-scrollbar \{/);
 });
 

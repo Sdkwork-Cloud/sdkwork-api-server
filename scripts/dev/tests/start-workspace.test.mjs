@@ -256,3 +256,20 @@ test('start-workspace monitors an optional cooperative stop file', () => {
   assert.match(script, /stop signal file detected/);
   assert.match(script, /controller\.shutdown\('stop-file', 0\)/);
 });
+
+test('long-running dev launchers keep their supervisor process alive until shutdown', () => {
+  const scriptNames = [
+    'start-admin.mjs',
+    'start-console.mjs',
+    'start-portal.mjs',
+    'start-stack.mjs',
+    'start-web.mjs',
+    'start-workspace.mjs',
+  ];
+
+  for (const scriptName of scriptNames) {
+    const script = readFileSync(path.join(import.meta.dirname, '..', scriptName), 'utf8');
+    assert.match(script, /createSupervisorKeepAlive/);
+    assert.match(script, /releaseKeepAlive/);
+  }
+});

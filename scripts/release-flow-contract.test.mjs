@@ -63,22 +63,32 @@ test('web workspace scripts stay portable across Windows, native Unix, and WSL-m
   const adminPackage = JSON.parse(read('apps/sdkwork-router-admin/package.json'));
   const portalPackage = JSON.parse(read('apps/sdkwork-router-portal/package.json'));
   const pnpmLaunchLib = read('scripts/dev/pnpm-launch-lib.mjs');
+  const runTscCli = read('scripts/dev/run-tsc-cli.mjs');
 
-  for (const pkg of [adminPackage, portalPackage]) {
-    assert.match(pkg.scripts.dev, /^vite(?:\s|$)/);
-    assert.match(pkg.scripts.build, /^vite(?:\s|$)/);
-    assert.match(pkg.scripts.typecheck, /^tsc(?:\s|$)/);
-    assert.match(pkg.scripts.preview, /^vite(?:\s|$)/);
-    assert.doesNotMatch(pkg.scripts.dev, /run-frontend-tool/);
-    assert.doesNotMatch(pkg.scripts.build, /run-frontend-tool/);
-    assert.doesNotMatch(pkg.scripts.typecheck, /run-frontend-tool/);
-    assert.doesNotMatch(pkg.scripts.preview, /run-frontend-tool/);
-  }
+  assert.match(adminPackage.scripts.dev, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.match(adminPackage.scripts.build, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.match(adminPackage.scripts.typecheck, /^node \.\.\/\.\.\/scripts\/dev\/run-tsc-cli\.mjs(?:\s|$)/);
+  assert.match(adminPackage.scripts.preview, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.match(portalPackage.scripts.dev, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.match(portalPackage.scripts.build, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.match(portalPackage.scripts.typecheck, /^tsc(?:\s|$)/);
+  assert.match(portalPackage.scripts.preview, /^node \.\.\/\.\.\/scripts\/dev\/run-vite-cli\.mjs(?:\s|$)/);
+  assert.doesNotMatch(adminPackage.scripts.dev, /run-frontend-tool/);
+  assert.doesNotMatch(adminPackage.scripts.build, /run-frontend-tool/);
+  assert.doesNotMatch(adminPackage.scripts.typecheck, /run-frontend-tool/);
+  assert.doesNotMatch(adminPackage.scripts.preview, /run-frontend-tool/);
+  assert.doesNotMatch(portalPackage.scripts.dev, /run-frontend-tool/);
+  assert.doesNotMatch(portalPackage.scripts.build, /run-frontend-tool/);
+  assert.doesNotMatch(portalPackage.scripts.typecheck, /run-frontend-tool/);
+  assert.doesNotMatch(portalPackage.scripts.preview, /run-frontend-tool/);
 
   assert.match(pnpmLaunchLib, /requiredBinCommands/);
   assert.match(pnpmLaunchLib, /node_modules', '\.bin'/);
   assert.match(pnpmLaunchLib, /platform === 'win32'/);
   assert.match(pnpmLaunchLib, /\.cmd/);
+  assert.match(runTscCli, /resolveReadablePackageEntry/);
+  assert.match(runTscCli, /typescript/);
+  assert.match(runTscCli, /lib', 'tsc\.js'/);
 });
 
 test('desktop tauri configs enable bundling for native release packaging', () => {

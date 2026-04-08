@@ -210,7 +210,7 @@ function membershipDetail(
   t: ReturnType<typeof usePortalI18n>['t'],
 ) {
   if (!membership) {
-    return t('No active membership is recorded yet. Settle a subscription order to activate monthly entitlement posture.');
+    return t('No active membership is recorded yet. Complete a subscription checkout to activate monthly entitlement posture.');
   }
 
   return t('{planName} is the active workspace membership and defines the current subscription entitlement baseline.', {
@@ -838,7 +838,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 })}
               </Badge>
               <Button onClick={() => onNavigate('billing')} variant="secondary">
-                {t('Open billing queue')}
+                {t('Open billing workbench')}
               </Button>
             </div>
           </div>

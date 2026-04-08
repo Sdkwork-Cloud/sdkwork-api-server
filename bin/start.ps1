@@ -192,7 +192,7 @@ try {
                 -PortalSiteDir $env:SDKWORK_PORTAL_SITE_DIR
         }
 
-        Set-Content -Path $planFile -Value $planOutput -Encoding utf8
+        Write-RouterUtf8File -FilePath $planFile -Content $planOutput
         Get-Content $planFile
         return
     }
@@ -211,7 +211,7 @@ try {
     Assert-RouterDirectoryExists -Label 'portal site directory' -DirectoryPath $env:SDKWORK_PORTAL_SITE_DIR
 
     $planOutput = & $env:SDKWORK_ROUTER_BINARY --dry-run --plan-format json
-    Set-Content -Path $planFile -Value $planOutput -Encoding utf8
+    Write-RouterUtf8File -FilePath $planFile -Content $planOutput
 
     if ($Foreground) {
         & $env:SDKWORK_ROUTER_BINARY
@@ -227,7 +227,7 @@ try {
         -StdoutLog $stdoutLog `
         -StderrLog $stderrLog
 
-    Set-Content -Path $pidFile -Value $process.Id -Encoding utf8
+    Write-RouterUtf8File -FilePath $pidFile -Content $process.Id
     Remove-RouterManagedStateFile -StateFile $stateFile
 
     $ready = (Wait-RouterHealthUrl -Url $gatewayHealthUrl -WaitSeconds $WaitSeconds -ProcessId $process.Id) `

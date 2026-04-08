@@ -10,6 +10,7 @@ axum.workspace = true
 sdkwork-api-config = { path = "../sdkwork-api-config" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
 sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
+sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-jobs = { path = "../sdkwork-api-app-jobs" }
@@ -37,6 +38,7 @@ utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
 
 [dev-dependencies]
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }

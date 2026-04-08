@@ -1,7 +1,3 @@
-import {
-  formatCurrency,
-  formatUnits,
-} from 'sdkwork-router-portal-commons';
 import type {
   BillingEventAccountingModeSummary,
   BillingEventCapabilitySummary,
@@ -26,6 +22,22 @@ export type PortalRechargeAmountValidationResult =
   | 'below_minimum'
   | 'above_maximum'
   | 'step_mismatch';
+
+const rechargeCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const rechargeUnitsFormatter = new Intl.NumberFormat('en-US');
+
+function formatCurrency(amount: number): string {
+  return rechargeCurrencyFormatter.format(amount);
+}
+
+function formatUnits(units: number): string {
+  return rechargeUnitsFormatter.format(units);
+}
 
 function emptyBillingEventSummary(): BillingEventSummary {
   return {

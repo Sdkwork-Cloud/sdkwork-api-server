@@ -1,3 +1,5 @@
+export * from './commercePayments';
+
 export type AdminRouteKey =
   | 'overview'
   | 'users'
@@ -292,6 +294,17 @@ export type CommerceOrderStatus =
   | 'failed'
   | 'refunded';
 
+export type CommerceSettlementStatus =
+  | 'not_required'
+  | 'pending'
+  | 'requires_action'
+  | 'authorized'
+  | 'settled'
+  | 'failed'
+  | 'canceled'
+  | 'partially_refunded'
+  | 'refunded';
+
 export type CommercePaymentEventType =
   | 'settled'
   | 'failed'
@@ -318,13 +331,56 @@ export interface CommerceOrderRecord {
   payable_price_label: string;
   granted_units: number;
   bonus_units: number;
+  currency_code: string;
+  pricing_plan_id?: string | null;
+  pricing_plan_version?: number | null;
+  pricing_snapshot_json: string;
   applied_coupon_code?: string | null;
   coupon_reservation_id?: string | null;
   coupon_redemption_id?: string | null;
   marketing_campaign_id?: string | null;
   subsidy_amount_minor: number;
+  payment_method_id?: string | null;
+  latest_payment_attempt_id?: string | null;
   status: CommerceOrderStatus;
+  settlement_status: CommerceSettlementStatus;
   source: string;
+  refundable_amount_minor: number;
+  refunded_amount_minor: number;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface PaymentMethodRecord {
+  payment_method_id: string;
+  display_name: string;
+  description: string;
+  provider: string;
+  channel: string;
+  mode: string;
+  enabled: boolean;
+  sort_order: number;
+  capability_codes: string[];
+  supported_currency_codes: string[];
+  supported_country_codes: string[];
+  supported_order_kinds: string[];
+  callback_strategy: string;
+  webhook_path?: string | null;
+  webhook_tolerance_seconds: number;
+  replay_window_seconds: number;
+  max_retry_count: number;
+  config_json: string;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+export interface PaymentMethodCredentialBindingRecord {
+  binding_id: string;
+  payment_method_id: string;
+  usage_kind: string;
+  credential_tenant_id: string;
+  credential_provider_id: string;
+  credential_key_reference: string;
   created_at_ms: number;
   updated_at_ms: number;
 }

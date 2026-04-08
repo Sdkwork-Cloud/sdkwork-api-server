@@ -1,0 +1,9 @@
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/zlibstatic-ngd.lib
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/include/zlib-ng.h
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/include/zlib_name_mangling-ng.h
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/include/zconf-ng.h
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/pkgconfig/zlib-ng.pc
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/cmake/zlib-ng/zlib-ng-targets.cmake
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/cmake/zlib-ng/zlib-ng-targets-debug.cmake
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/cmake/zlib-ng/zlib-ng-config.cmake
+D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router/bin/.sdkwork-target-vs2022/debug/build/libz-ng-sys-629596aa70de3fd0/out/lib/cmake/zlib-ng/zlib-ng-config-version.cmake

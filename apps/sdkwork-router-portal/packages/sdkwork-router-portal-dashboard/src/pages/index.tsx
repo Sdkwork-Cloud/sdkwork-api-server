@@ -681,7 +681,7 @@ export function PortalDashboardPage({
                     : t('Awaiting traffic')}
                 </div>
               )}
-              description={t('Traffic trend now lives on a shared workspace panel while keeping the portal-specific multi-series token telemetry.')}
+              description={t('Traffic posture now lives on a shared workspace panel while keeping the portal-specific multi-series token telemetry.')}
               title={t('Traffic trend')}
             >
               <DashboardTokenTrendChart

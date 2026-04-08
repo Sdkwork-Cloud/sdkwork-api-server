@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import test from 'node:test';
 
 import {
+  createSupervisorKeepAlive,
   createSignalController,
   didChildExitFail,
   waitForChildExit,
@@ -105,4 +106,28 @@ test('createSignalController exits only after supervised children stop', async (
 
   assert.deepEqual(exitCalls, [7]);
   assert.match(logs.join('\n'), /received SIGTERM, stopping child processes/);
+});
+
+test('createSupervisorKeepAlive registers a live interval and releases it on cleanup', () => {
+  const intervalCalls = [];
+  const clearCalls = [];
+  const fakeTimer = { id: 'keep-alive' };
+
+  const release = createSupervisorKeepAlive({
+    intervalMs: 42,
+    setIntervalImpl(handler, intervalMs) {
+      intervalCalls.push({ handlerType: typeof handler, intervalMs });
+      return fakeTimer;
+    },
+    clearIntervalImpl(timer) {
+      clearCalls.push(timer);
+    },
+  });
+
+  assert.deepEqual(intervalCalls, [{ handlerType: 'function', intervalMs: 42 }]);
+  assert.deepEqual(clearCalls, []);
+
+  release();
+
+  assert.deepEqual(clearCalls, [fakeTimer]);
 });

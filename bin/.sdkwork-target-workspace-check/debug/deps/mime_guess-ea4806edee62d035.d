@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\mime_guess-ea4806edee62d035.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\impl_bin_search.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\mime_types.rs D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\build\mime_guess-ea6713afaad4f28f\out\mime_types_generated.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\libmime_guess-ea4806edee62d035.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\impl_bin_search.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\mime_types.rs D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\build\mime_guess-ea6713afaad4f28f\out\mime_types_generated.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\impl_bin_search.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mime_guess-2.0.5\src\mime_types.rs:
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\build\mime_guess-ea6713afaad4f28f\out\mime_types_generated.rs:
+
+# env-dep:MIME_TYPES_GENERATED_PATH=D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-api-router\\bin/.sdkwork-target-workspace-check\\debug\\build\\mime_guess-ea6713afaad4f28f\\out\\mime_types_generated.rs

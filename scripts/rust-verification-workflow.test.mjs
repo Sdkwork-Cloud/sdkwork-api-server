@@ -31,4 +31,9 @@ test('repository exposes a cached package-group Rust verification workflow', () 
     workflow,
     /node scripts\/check-rust-verification-matrix\.mjs --group \$\{\{ matrix\.group \}\}/,
   );
+  assert.match(workflow, /rust-verification-windows-workspace:/);
+  assert.match(workflow, /runs-on:\s*windows-latest/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow, /github\.event\.inputs\.group == 'workspace'/);
+  assert.match(workflow, /node scripts\/check-rust-verification-matrix\.mjs --group workspace/);
 });

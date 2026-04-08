@@ -9,10 +9,12 @@ import {
   webHostEnv,
 } from './web-launch-lib.mjs';
 import {
+  createSupervisorKeepAlive,
   createSignalController,
   didChildExitFail,
 } from './process-supervision.mjs';
 import {
+  frontendDistReady,
   frontendInstallStatus,
   frontendViteConfigHealthy,
   pnpmDisplayCommand,
@@ -51,7 +53,7 @@ function runPnpmStep(args, dryRun, label, env, distDir = '', allowInstallReuse =
     stdout: result.stdout,
     stderr: result.stderr,
     errorMessage: result.error?.message ?? '',
-    distExists: Boolean(distDir) && existsSync(distDir),
+    distReady: frontendDistReady(distDir),
     allowInstallReuse,
   });
 
@@ -129,17 +131,20 @@ const child = spawn(cargoExecutable(), webArgs, {
   stdio: 'inherit',
   env,
 });
+const releaseKeepAlive = createSupervisorKeepAlive();
 let shuttingDown = false;
 const controller = createSignalController({
   label: 'start-web',
   children: [child],
   onShutdownStart: () => {
     shuttingDown = true;
+    releaseKeepAlive();
   },
 });
 controller.register();
 
 child.on('exit', (code, signal) => {
+  releaseKeepAlive();
   if (shuttingDown) {
     return;
   }

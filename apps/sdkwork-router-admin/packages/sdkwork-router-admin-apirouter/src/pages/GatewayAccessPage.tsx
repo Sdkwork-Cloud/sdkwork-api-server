@@ -6,7 +6,6 @@ import {
   Label,
 } from '@sdkwork/ui-pc-react';
 import { Plus, Search } from 'lucide-react';
-import { useState } from 'react';
 import {
   countCurrentlyEffectiveCommercialPricingPlans,
   commercialPricingChargeUnitLabel,
@@ -83,10 +82,10 @@ export function GatewayAccessPage({
   onDeleteApiKey,
 }: GatewayAccessPageProps) {
   const { formatNumber, t } = useAdminI18n();
-  const [isGroupsDialogOpen, setIsGroupsDialogOpen] = useState(false);
   const {
     search,
     isDetailDrawerOpen,
+    isGroupsDialogOpen,
     isCreateOpen,
     createDraftState,
     editingKey,
@@ -142,6 +141,7 @@ export function GatewayAccessPage({
     setRouteDraft,
     setSelectedClientId,
     setSelectedInstanceIds,
+    setIsGroupsDialogOpen,
     setPendingDelete,
   } = useGatewayAccessWorkspaceState({
     snapshot,

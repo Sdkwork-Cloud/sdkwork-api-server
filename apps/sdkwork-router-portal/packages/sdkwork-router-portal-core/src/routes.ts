@@ -54,19 +54,19 @@ export const portalRoutes: PortalRouteDefinition[] = [
     detailKey: 'Coupons, invites, and activation rewards',
   },
   {
-    key: 'recharge',
-    group: 'revenue',
-    labelKey: 'Recharge',
-    eyebrowKey: 'Balance',
-    detailKey: 'Top up balance with server-managed recharge options',
-  },
-  {
     key: 'billing',
     group: 'revenue',
     labelKey: 'Billing',
     eyebrowKey: 'Commerce',
     detailKey: 'Plans, recharge packs, and billing recovery',
     sidebarVisible: false,
+  },
+  {
+    key: 'recharge',
+    group: 'revenue',
+    labelKey: 'Recharge',
+    eyebrowKey: 'Balance',
+    detailKey: 'Top up balance with server-managed recharge options',
   },
   {
     key: 'settlements',

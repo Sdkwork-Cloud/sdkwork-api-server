@@ -199,6 +199,24 @@ pub fn gemini_stream_from_openai(response: ProviderStreamOutput) -> ProviderStre
     })
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GeminiCompatAction {
+    GenerateContent,
+    StreamGenerateContent,
+    CountTokens,
+}
+
+pub fn parse_gemini_compat_tail(tail: &str) -> Option<(String, GeminiCompatAction)> {
+    let (model, action) = tail.split_once(':')?;
+    let action = match action {
+        "generateContent" => GeminiCompatAction::GenerateContent,
+        "streamGenerateContent" => GeminiCompatAction::StreamGenerateContent,
+        "countTokens" => GeminiCompatAction::CountTokens,
+        _ => return None,
+    };
+    Some((model.to_owned(), action))
+}
+
 #[derive(Default)]
 struct GeminiStreamState {
     model: String,
@@ -622,4 +640,44 @@ fn passthrough_fields(source: &Map<String, Value>, known_fields: &[&str]) -> Map
         .filter(|(key, _)| !known_fields.contains(&key.as_str()))
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{GeminiCompatAction, parse_gemini_compat_tail};
+
+    #[test]
+    fn parses_generate_content_tail() {
+        assert_eq!(
+            parse_gemini_compat_tail("gemini-2.5-pro:generateContent"),
+            Some((
+                "gemini-2.5-pro".to_owned(),
+                GeminiCompatAction::GenerateContent,
+            ))
+        );
+    }
+
+    #[test]
+    fn parses_stream_generate_content_tail() {
+        assert_eq!(
+            parse_gemini_compat_tail("gemini-2.5-pro:streamGenerateContent"),
+            Some((
+                "gemini-2.5-pro".to_owned(),
+                GeminiCompatAction::StreamGenerateContent,
+            ))
+        );
+    }
+
+    #[test]
+    fn parses_count_tokens_tail_with_empty_model() {
+        assert_eq!(
+            parse_gemini_compat_tail(":countTokens"),
+            Some((String::new(), GeminiCompatAction::CountTokens))
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_action() {
+        assert_eq!(parse_gemini_compat_tail("gemini-2.5-pro:unsupported"), None);
+    }
 }

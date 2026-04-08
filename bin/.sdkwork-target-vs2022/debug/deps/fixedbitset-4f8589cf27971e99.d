@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\fixedbitset-4f8589cf27971e99.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\sse2.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\range.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\libfixedbitset-4f8589cf27971e99.rlib: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\sse2.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\range.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-vs2022\debug\deps\libfixedbitset-4f8589cf27971e99.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\sse2.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\range.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\mod.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\block\sse2.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fixedbitset-0.5.7\src\range.rs:

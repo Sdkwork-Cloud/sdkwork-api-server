@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\matchit-76206c515ab37933.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\error.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\escape.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\params.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\router.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\tree.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\libmatchit-76206c515ab37933.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\error.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\escape.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\params.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\router.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\tree.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\error.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\escape.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\params.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\router.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\matchit-0.8.4\src\tree.rs:

@@ -934,7 +934,6 @@ dependencies = [
  "crc32fast",
  "libz-ng-sys",
  "miniz_oxide",
- "zlib-rs",
 ]
 
 [[package]]
@@ -2231,6 +2230,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "sdkwork-api-app-credential",
  "sdkwork-api-app-runtime",
  "sdkwork-api-config",
  "sdkwork-api-interface-portal",
@@ -2822,7 +2822,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "hmac",
+ "reqwest",
+ "sdkwork-api-app-billing",
  "sdkwork-api-app-coupon",
+ "sdkwork-api-app-credential",
+ "sdkwork-api-app-identity",
  "sdkwork-api-app-marketing",
  "sdkwork-api-domain-billing",
  "sdkwork-api-domain-commerce",
@@ -2832,6 +2837,9 @@ dependencies = [
  "sdkwork-api-storage-sqlite",
  "serde",
  "serde_json",
+ "serde_urlencoded",
+ "sha2 0.10.9",
+ "sqlx",
  "tokio",
  "utoipa",
 ]
@@ -3263,6 +3271,7 @@ dependencies = [
  "axum",
  "sdkwork-api-app-billing",
  "sdkwork-api-app-catalog",
+ "sdkwork-api-app-commerce",
  "sdkwork-api-app-coupon",
  "sdkwork-api-app-credential",
  "sdkwork-api-app-extension",
@@ -3288,6 +3297,7 @@ dependencies = [
  "sdkwork-api-domain-routing",
  "sdkwork-api-domain-tenant",
  "sdkwork-api-domain-usage",
+ "sdkwork-api-ext-provider-native-mock",
  "sdkwork-api-extension-core",
  "sdkwork-api-extension-host",
  "sdkwork-api-observability",
@@ -3365,6 +3375,7 @@ dependencies = [
  "sdkwork-api-app-billing",
  "sdkwork-api-app-commerce",
  "sdkwork-api-app-coupon",
+ "sdkwork-api-app-credential",
  "sdkwork-api-app-identity",
  "sdkwork-api-app-jobs",
  "sdkwork-api-app-marketing",
@@ -3374,6 +3385,7 @@ dependencies = [
  "sdkwork-api-config",
  "sdkwork-api-domain-billing",
  "sdkwork-api-domain-catalog",
+ "sdkwork-api-domain-commerce",
  "sdkwork-api-domain-identity",
  "sdkwork-api-domain-jobs",
  "sdkwork-api-domain-marketing",
@@ -5273,8 +5285,6 @@ dependencies = [
 [[package]]
 name = "zip"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12598812502ed0105f607f941c386f43d441e00148fce9dec3ca5ffb0bde9308"
 dependencies = [
  "arbitrary",
  "crc32fast",
@@ -5283,12 +5293,6 @@ dependencies = [
  "memchr",
  "zopfli",
 ]
-
-[[package]]
-name = "zlib-rs"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3be3d40e40a133f9c916ee3f9f4fa2d9d63435b5fbe1bfc6d9dae0aa0ada1513"
 
 [[package]]
 name = "zmij"

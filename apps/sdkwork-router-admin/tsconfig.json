@@ -15,16 +15,15 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["node", "vite/client"],
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "motion/react": ["src/vendor/motion-react.tsx"],
-      "@sdkwork/ui-pc-react": ["node_modules/@sdkwork/ui-pc-react/dist/index.d.ts"],
-      "@sdkwork/ui-pc-react/theme": ["node_modules/@sdkwork/ui-pc-react/dist/theme/index.d.ts"],
-      "@sdkwork/ui-pc-react/*": ["node_modules/@sdkwork/ui-pc-react/dist/*"],
+      "@sdkwork/ui-pc-react": ["src/types/sdkwork-ui-pc-react-shim.d.ts"],
+      "@sdkwork/ui-pc-react/theme": ["../../../sdkwork-ui/sdkwork-ui-pc-react/dist/theme/index.d.ts"],
+      "@sdkwork/ui-pc-react/*": ["../../../sdkwork-ui/sdkwork-ui-pc-react/dist/*"],
       "@sdkwork/ui-pc-react/styles.css": [
-        "node_modules/@sdkwork/ui-pc-react/dist/sdkwork-ui.css"
+        "../../../sdkwork-ui/sdkwork-ui-pc-react/dist/sdkwork-ui.css"
       ],
       "sdkwork-router-admin-apirouter": ["packages/sdkwork-router-admin-apirouter/src/index.ts"],
       "sdkwork-router-admin-admin-api": ["packages/sdkwork-router-admin-admin-api/src/index.ts"],

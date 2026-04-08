@@ -1,0 +1,10 @@
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\litemap-1e5b82dff19e2743.d: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\map.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\slice_impl.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\liblitemap-1e5b82dff19e2743.rlib: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\map.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\slice_impl.rs
+
+D:\javasource\spring-ai-plus\spring-ai-plus-business\apps\sdkwork-api-router\bin/.sdkwork-target-workspace-check\debug\deps\liblitemap-1e5b82dff19e2743.rmeta: C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\lib.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\map.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\mod.rs C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\slice_impl.rs
+
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\lib.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\map.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\mod.rs:
+C:\Users\admin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\litemap-0.8.2\src\store\slice_impl.rs:

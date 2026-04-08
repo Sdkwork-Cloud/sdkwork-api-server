@@ -14,7 +14,7 @@ test('portal auth entry mirrors claw-studio visual hierarchy instead of the cust
 
   assert.match(authPage, /qrLogin|QrCode/);
   assert.match(authPage, /welcomeBack|Create workspace|resetPassword|Recover access/);
-  assert.match(authPage, /continueWith|Github|Chrome/);
+  assert.match(authPage, /continueWith|GitHub|Google|GitBranch|Globe/);
   assert.doesNotMatch(authPage, /Preview the first launch path/);
   assert.doesNotMatch(authPage, /Start in four moves/);
   assert.doesNotMatch(authPage, /Why teams trust this portal/);
@@ -118,38 +118,203 @@ test('redeem and billing pages expose coupon activation and payment decision sup
 
   assert.match(creditsPage, /portal-redeem-entry-card/);
   assert.match(creditsPage, /portal-redeem-invite-card/);
-  assert.match(creditsPage, /portal-redeem-history-table/);
+  assert.match(creditsPage, /portal-redeem-wallet-table/);
+  assert.match(creditsPage, /portal-redeem-reward-history-table/);
   assert.match(creditsPage, /Redeem code/);
-  assert.match(creditsPage, /Redeem history/);
+  assert.match(creditsPage, /My coupons/);
+  assert.match(creditsPage, /Reward history/);
   assert.match(creditsPage, /Invite rewards/);
   assert.match(creditsPage, /Copy invite link/);
   assert.match(billingPage, /Active membership/);
   assert.match(billingPage, /Estimated runway/);
   assert.match(billingPage, /Recommended bundle/);
   assert.match(billingPage, /Pending payment queue/);
-  assert.match(billingPage, /Checkout session/);
-  assert.match(billingPage, /Open session/);
-  assert.match(billingPage, /Payment rail/);
-  assert.match(billingPage, /Operator settlement/);
-  assert.match(billingPage, /Provider callbacks/);
-  assert.match(billingPage, /Simulate provider settlement/);
-  assert.match(billingPage, /Simulate provider failure/);
+  assert.match(billingPage, /Checkout details/);
+  assert.match(billingPage, /Open checkout/);
+  assert.match(billingPage, /Payment method/);
+  assert.match(
+    billingPage,
+    /Commercial account keeps balance, holds, and account identity visible beside the workspace billing posture\./,
+  );
+  assert.match(billingPage, /Pending payment queue keeps unpaid or unfulfilled orders visible until payment completes or the order leaves the queue\./);
+  assert.match(billingPage, /Checkout attempts that closed on the failure path and need a fresh checkout decision\./);
+  assert.match(
+    billingPage,
+    /Failed payment keeps checkout attempts that need coupon updates, a different payment method, or a fresh checkout visible for follow-up\./,
+  );
+  assert.match(
+    billingPage,
+    /\{reference\} is the current \{provider\} \/ \{channel\} payment reference for this order\./,
+  );
+  assert.match(
+    billingPage,
+    /Billing view keeps live quota, checkout progress, and payment history in one place\./,
+  );
+  assert.match(billingPage, /Payment history keeps checkout outcomes, payment method evidence, and refund status visible in one billing timeline\./);
+  assert.match(billingPage, /Refund history keeps completed refund outcomes, payment method evidence, and the resulting order status visible without reopening each order\./);
+  assert.match(billingPage, /Fallback reasoning stays visible so you can distinguish degraded routing from the preferred routing path\./);
+  assert.match(billingPage, /Manual settlement/);
+  assert.doesNotMatch(billingPage, /Operator settlement/);
+  assert.match(billingPage, /Settlement coverage/);
+  assert.match(billingPage, /Payment outcome sandbox/);
+  assert.match(billingPage, /Sandbox method/);
+  assert.match(billingPage, /Primary method/);
+  assert.match(billingPage, /Checkout access/);
+  assert.match(billingPage, /Checkout attempts/);
+  assert.match(billingPage, /Checkout attempts keep checkout access, retries, and checkout references visible inside the same workbench\./);
+  assert.match(billingPage, /No checkout attempts recorded yet/);
+  assert.match(billingPage, /Checkout workbench keeps checkout access, selected reference, and payable price aligned under one payment method\./);
+  assert.match(billingPage, /No checkout guidance is available for this order yet\./);
+  assert.match(billingPage, /Payment outcomes/);
+  assert.match(billingPage, /Apply settlement, failure, or cancellation outcomes for the selected payment method before live payment confirmation is enabled\./);
+  assert.match(billingPage, /Choose sandbox method/);
+  assert.match(billingPage, /Payment outcomes will use \{provider\} on \{channel\}\./);
+  assert.match(billingPage, /Verification method/);
+  assert.match(billingPage, /Checkout reference/);
+  assert.match(billingPage, /Manual confirmation/);
+  assert.match(billingPage, /Manual step/);
+  assert.match(billingPage, /Signed callback check/);
+  assert.match(billingPage, /Stripe signature check/);
+  assert.match(billingPage, /Alipay RSA-SHA256 check/);
+  assert.match(billingPage, /WeChat Pay RSA-SHA256 check/);
+  assert.match(billingPage, /QR code content/);
+  assert.match(billingPage, /Hosted checkout flow/);
+  assert.match(billingPage, /QR checkout flow/);
+  assert.match(billingPage, /Applying \{provider\} settlement outcome for \{orderId\}\.\.\./);
+  assert.match(billingPage, /Applying \{provider\} failure outcome for \{orderId\}\.\.\./);
+  assert.match(billingPage, /Applying \{provider\} cancellation outcome for \{orderId\}\.\.\./);
+  assert.match(billingPage, /was settled after the \{provider\} payment confirmation\./);
+  assert.match(billingPage, /was marked failed after the \{provider\} payment confirmation\./);
+  assert.match(billingPage, /was canceled after the \{provider\} payment confirmation\./);
+  assert.match(billingPage, /This checkout is already closed, so there are no remaining payment actions\./);
+  assert.match(billingPage, /Apply settlement outcome/);
+  assert.match(billingPage, /Apply failure outcome/);
+  assert.match(billingPage, /Apply cancellation outcome/);
+  assert.match(billingPage, /Opening checkout\.\.\./);
+  assert.match(billingPage, /Start checkout/);
+  assert.match(billingPage, /Resume checkout/);
+  assert.match(billingPage, /fresh checkout attempt/);
+  assert.match(billingPage, /created a \{provider\} checkout attempt, but no checkout link was returned\./);
+  assert.match(billingPage, /now uses the \{provider\} checkout launch path\./);
+  assert.match(billingPage, /Start the first checkout now\./);
   assert.match(billingPage, /Failed payment/);
   assert.match(billingPage, /Settle order/);
   assert.match(billingPage, /Cancel order/);
   assert.match(billingPage, /Order timeline/);
+  assert.match(billingPage, /Payment update reference/);
+  assert.doesNotMatch(billingPage, /Commercial settlement rail/);
+  assert.doesNotMatch(billingPage, /\bPayment rail\b/);
+  assert.doesNotMatch(billingPage, /\bPrimary rail\b/);
+  assert.doesNotMatch(billingPage, /\bEvent rail\b/);
+  assert.doesNotMatch(billingPage, /selected payment rail/);
+  assert.doesNotMatch(billingPage, /payment rail evidence/);
+  assert.doesNotMatch(billingPage, /sandbox rail/);
+  assert.doesNotMatch(billingPage, /Provider callbacks/);
+  assert.doesNotMatch(billingPage, /Provider webhooks/);
+  assert.doesNotMatch(billingPage, /Simulate provider settlement/);
+  assert.doesNotMatch(billingPage, /Simulate provider failure/);
+  assert.doesNotMatch(billingPage, /callback rehearsal/);
+  assert.doesNotMatch(billingPage, /callback flow/);
+  assert.doesNotMatch(billingPage, /provider callback/);
+  assert.doesNotMatch(billingPage, /provider handoff/);
+  assert.doesNotMatch(billingPage, /Provider events/);
+  assert.doesNotMatch(billingPage, /Provider event/);
+  assert.doesNotMatch(billingPage, /Launching provider checkout/);
+  assert.doesNotMatch(billingPage, /Launch provider checkout/);
+  assert.doesNotMatch(billingPage, /Resume provider checkout/);
+  assert.doesNotMatch(billingPage, /Launch the first provider checkout now/);
+  assert.doesNotMatch(billingPage, /payment attempt/);
+  assert.doesNotMatch(billingPage, /payment attempts/);
+  assert.doesNotMatch(billingPage, /Replay provider settlement, failure, or cancellation events/);
+  assert.doesNotMatch(billingPage, /Replaying \{provider\} settlement/);
+  assert.doesNotMatch(billingPage, /Replaying \{provider\} failure/);
+  assert.doesNotMatch(billingPage, /Replaying \{provider\} cancellation/);
+  assert.doesNotMatch(billingPage, /Replay settlement event/);
+  assert.doesNotMatch(billingPage, /Replay failure event/);
+  assert.doesNotMatch(billingPage, /Replay cancel event/);
+  assert.doesNotMatch(
+    billingPage,
+    /Formal order-scoped checkout attempts keep checkout access, retries, and checkout references visible inside the same workbench\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /Commercial account exposes canonical balance, hold, and account identity state beside the workspace billing posture\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /Failed payment isolates checkout attempts that need coupon updates, a different payment method, or a fresh checkout attempt\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /Billing posture now combines live quota evidence, checkout state, and the payment lifecycle timeline\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /\{reference\} anchors the current \{provider\} \/ \{channel\} payment method for this order\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /Formal checkout keeps checkout access, selected reference, and payable price aligned under one payment method\./,
+  );
+  assert.doesNotMatch(billingPage, /No formal guidance is available for this order yet\./);
+  assert.doesNotMatch(
+    billingPage,
+    /\{targetName\} created a formal \{provider\} checkout attempt, but no checkout URL was returned\./,
+  );
+  assert.doesNotMatch(
+    billingPage,
+    /\{targetName\} now uses the formal \{provider\} checkout launch path\./,
+  );
+  assert.doesNotMatch(billingPage, /Payment event sandbox/);
+  assert.doesNotMatch(billingPage, /Event target/);
+  assert.doesNotMatch(billingPage, /Choose event target/);
+  assert.doesNotMatch(billingPage, /active sandbox target/);
+  assert.doesNotMatch(billingPage, /Event signature/);
+  assert.doesNotMatch(billingPage, /Checkout session/);
+  assert.doesNotMatch(billingPage, /Open session/);
+  assert.doesNotMatch(billingPage, /Loading session/);
+  assert.doesNotMatch(billingPage, /Loading checkout session/);
+  assert.doesNotMatch(billingPage, /existing provider session/);
+  assert.doesNotMatch(billingPage, /Manual action/);
+  assert.doesNotMatch(billingPage, /Hosted checkout session/);
+  assert.doesNotMatch(billingPage, /QR code session/);
+  assert.doesNotMatch(billingPage, /This checkout session is already closed, so there are no remaining payment actions\./);
+  assert.doesNotMatch(billingPage, /Session reference/);
+  assert.doesNotMatch(billingPage, /QR payload/);
+  assert.doesNotMatch(billingPage, /operator-facing posture/);
+  assert.doesNotMatch(billingPage, /workspace settles or cancels them/);
+  assert.doesNotMatch(billingPage, /provider callback review/);
+  assert.doesNotMatch(billingPage, /operator-facing audit timeline/);
+  assert.doesNotMatch(billingPage, /closed-loop refund outcomes/);
+  assert.doesNotMatch(billingPage, /refund closure/);
+  assert.doesNotMatch(billingPage, /operators can distinguish degraded routing from normal preference selection/);
+  assert.doesNotMatch(billingPage, /verify provider, checkout reference, and final order state without reopening each order/);
   assert.match(creditsPage, /Redeem/);
-  assert.match(creditsRepository, /previewPortalCommerceQuote/);
-  assert.match(creditsRepository, /createPortalCommerceOrder/);
+  assert.match(creditsRepository, /validatePortalCoupon/);
+  assert.match(creditsRepository, /reservePortalCouponRedemption/);
+  assert.match(creditsRepository, /confirmPortalCouponRedemption/);
   assert.match(creditsRepository, /listPortalCommerceOrders/);
-  assert.match(billingRepository, /getPortalCommerceMembership/);
+  assert.match(creditsRepository, /listPortalMarketingMyCoupons/);
+  assert.match(creditsRepository, /listPortalMarketingRewardHistory/);
+  assert.match(creditsRepository, /listPortalMarketingRedemptions/);
+  assert.match(billingRepository, /getPortalCommerceCatalog/);
+  assert.match(billingRepository, /getPortalCommerceOrderCenter/);
+  assert.match(billingRepository, /getPortalCommerceOrder/);
+  assert.match(billingRepository, /listPortalCommercePaymentMethods/);
+  assert.match(billingRepository, /getPortalCommercePaymentAttempt/);
+  assert.match(billingRepository, /getBillingCheckoutDetail/);
+  assert.match(billingRepository, /getPortalCommercialAccountHistory/);
   assert.match(billingRepository, /previewPortalCommerceQuote/);
   assert.match(billingRepository, /createPortalCommerceOrder/);
   assert.match(billingRepository, /getPortalCommerceCheckoutSession/);
   assert.match(billingRepository, /sendPortalCommercePaymentEvent/);
   assert.match(billingRepository, /settlePortalCommerceOrder/);
   assert.match(billingRepository, /cancelPortalCommerceOrder/);
-  assert.match(billingRepository, /listPortalCommerceOrders/);
+  assert.match(billingRepository, /membership:\s*order_center\.membership/);
+  assert.match(billingRepository, /commercial_reconciliation:\s*order_center\.reconciliation/);
+  assert.match(billingPage, /getBillingCheckoutDetail/);
+  assert.match(billingPage, /checkoutDetail\?\.latest_payment_attempt/);
+  assert.match(billingPage, /checkoutDetail\?\.selected_payment_method/);
   assert.doesNotMatch(creditsComponents, /portalx-/);
   assert.doesNotMatch(billingComponents, /portalx-/);
 });
@@ -491,10 +656,13 @@ test('redeem page simplifies into entry, invite rewards, and redemption history 
   const creditsPage = read('packages/sdkwork-router-portal-credits/src/pages/index.tsx');
   const tableCount = creditsPage.match(/<DataTable/g)?.length ?? 0;
 
-  assert.equal(tableCount, 1);
+  assert.equal(tableCount, 2);
   assert.match(creditsPage, /Invite rewards/);
   assert.match(creditsPage, /Redeem code/);
-  assert.match(creditsPage, /Redeem history/);
+  assert.match(creditsPage, /My coupons/);
+  assert.match(creditsPage, /Reward history/);
+  assert.match(creditsPage, /portal-redeem-wallet-table/);
+  assert.match(creditsPage, /portal-redeem-reward-history-table/);
   assert.doesNotMatch(creditsPage, /More filters|Hide filters/);
   assert.doesNotMatch(creditsPage, /View mode/);
   assert.doesNotMatch(creditsPage, /portal-redeem-toolbar/);

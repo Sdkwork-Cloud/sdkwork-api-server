@@ -7,6 +7,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { withSupportedWindowsCmakeGenerator } from './run-tauri-cli.mjs';
+import { withManagedWorkspaceTargetDir } from './workspace-target-dir.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +17,7 @@ export const VERIFICATION_GROUPS = [
   'admin-service',
   'portal-service',
   'product-runtime',
+  'workspace',
 ];
 
 function resolveRustRunner(platform = process.platform, env = process.env) {
@@ -48,11 +50,14 @@ function verificationBaseEnv({
   platform = process.platform,
   env = process.env,
 } = {}) {
-  const baseEnv = withSupportedWindowsCmakeGenerator(env, platform);
+  const baseEnv = withManagedWorkspaceTargetDir({
+    workspaceRoot,
+    env: withSupportedWindowsCmakeGenerator(env, platform),
+    platform,
+  });
   return {
     ...baseEnv,
-    CARGO_TARGET_DIR: baseEnv.CARGO_TARGET_DIR ?? path.join(workspaceRoot, 'target', 'codex-review-rust'),
-    RUSTFLAGS: baseEnv.RUSTFLAGS ?? '-C debuginfo=0',
+    CARGO_TARGET_DIR: baseEnv.CARGO_TARGET_DIR ?? path.join(workspaceRoot, 'target'),
   };
 }
 
@@ -157,6 +162,16 @@ export function createRustVerificationPlan({
           label: 'router product service cargo check',
           workspaceRoot,
           cargoArgs: ['check', '-j', '1', '-p', 'router-product-service'],
+          platform,
+          env,
+        }),
+      ];
+    case 'workspace':
+      return [
+        cargoStep({
+          label: 'workspace cargo check',
+          workspaceRoot,
+          cargoArgs: ['check', '--workspace', '-j', '1'],
           platform,
           env,
         }),
