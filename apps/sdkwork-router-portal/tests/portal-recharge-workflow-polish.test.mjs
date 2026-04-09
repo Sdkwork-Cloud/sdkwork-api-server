@@ -42,11 +42,17 @@ test('recharge page keeps pending payment queue visible and routes users back to
 
   assert.match(page, /PortalRechargePage\(\{ onNavigate \}: PortalRechargePageProps\)/);
   assert.doesNotMatch(page, /onNavigate:\s*_onNavigate/);
+  assert.match(page, /data-slot="portal-recharge-selection-hero"/);
+  assert.match(page, /data-slot="portal-recharge-posture-strip"/);
   assert.match(page, /Payment information/);
   assert.match(page, /Recommended/);
   assert.match(page, /Pending payment queue/);
   assert.match(page, /Open billing workbench/);
   assert.match(page, /onClick=\{\(\) => onNavigate\('billing'\)\}/);
+  assert.match(page, /Current balance/);
+  assert.match(page, /Pending follow-up/);
+  assert.match(page, /Recommended next top-up/);
+  assert.match(page, /data-slot="portal-recharge-quote-note"/);
   assert.doesNotMatch(page, /Recharge decision support/);
 });
 
