@@ -17,6 +17,21 @@ export type PortalRechargeAmountValidationResult =
   | 'above_maximum'
   | 'step_mismatch';
 
+export interface PortalRechargeOptionMerchandising {
+  badge: string;
+  intentLabel: string;
+  supportLabel: string;
+}
+
+export interface PortalRechargePendingPaymentSpotlight {
+  headline: string;
+  detail: string;
+  latestOrderLabel: string;
+  ctaLabel: string;
+  count: number;
+  latestOrder: PortalCommerceOrder;
+}
+
 const rechargeCurrencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -74,6 +89,73 @@ export function buildPortalRechargeHistoryRows(
     .filter((order) => order.target_kind === 'custom_recharge' || order.target_kind === 'recharge_pack')
     .slice()
     .sort((left, right) => right.created_at_ms - left.created_at_ms);
+}
+
+export function buildPortalRechargeOptionMerchandising(input: {
+  option: PortalRechargeOption;
+  options: PortalRechargeOption[];
+  t: TranslateFn;
+}): PortalRechargeOptionMerchandising {
+  const { option, options, t } = input;
+  const rankedOptions = (options ?? [])
+    .slice()
+    .sort((left, right) => left.amount_cents - right.amount_cents);
+  const optionIndex = rankedOptions.findIndex((candidate) => candidate.id === option.id);
+  const lastIndex = rankedOptions.length - 1;
+
+  if (option.recommended) {
+    return {
+      badge: t('Recommended default'),
+      intentLabel: t('Best fit for steady usage'),
+      supportLabel: t('The safest default when you want clean value and low decision friction.'),
+    };
+  }
+
+  if (optionIndex <= 0) {
+    return {
+      badge: t('Quick coverage'),
+      intentLabel: t('Best for immediate runway'),
+      supportLabel: t('Keep service continuity covered without overfunding the workspace.'),
+    };
+  }
+
+  if (optionIndex === lastIndex) {
+    return {
+      badge: t('Reserve build'),
+      intentLabel: t('Built for scale planning'),
+      supportLabel: t('Use the larger reserve when you want longer runway and fewer manual top-ups.'),
+    };
+  }
+
+  return {
+    badge: t('Planned growth'),
+    intentLabel: t('Ready for the next usage step'),
+    supportLabel: option.note?.trim() || t('A balanced top-up when you want more headroom without jumping to a larger reserve.'),
+  };
+}
+
+export function buildPortalRechargePendingPaymentSpotlight(input: {
+  orders: PortalCommerceOrder[] | null | undefined;
+  t: TranslateFn;
+}): PortalRechargePendingPaymentSpotlight | null {
+  const { orders, t } = input;
+  const pendingOrders = buildPortalRechargeHistoryRows(orders)
+    .filter((order) => order.status === 'pending_payment');
+
+  if (pendingOrders.length === 0) {
+    return null;
+  }
+
+  return {
+    headline: t('Pending settlement queue'),
+    detail: t('{count} orders waiting for payment completion in billing.', {
+      count: pendingOrders.length,
+    }),
+    latestOrderLabel: t('Latest pending order'),
+    ctaLabel: t('Open billing to complete payment'),
+    count: pendingOrders.length,
+    latestOrder: pendingOrders[0],
+  };
 }
 
 export function validatePortalRechargeAmount(

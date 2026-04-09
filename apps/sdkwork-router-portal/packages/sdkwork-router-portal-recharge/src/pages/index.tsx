@@ -33,17 +33,32 @@ import {
 } from '../repository';
 import {
   buildPortalRechargeHistoryRows,
+  buildPortalRechargeOptionMerchandising,
+  buildPortalRechargePendingPaymentSpotlight,
   buildPortalRechargeQuoteSnapshot,
   formatRechargeAmountInput,
   parseRechargeAmountInput,
   validatePortalRechargeAmount,
 } from '../services';
+import type { PortalRechargePendingPaymentSpotlight } from '../services';
 import type {
   PortalRechargePageProps,
   PortalRechargeSelection,
 } from '../types';
+import {
+  buildPortalRechargeMobileActionState,
+  buildPortalRechargePrimaryActionState,
+  resolvePortalRechargePostOrderHandoffActive,
+} from './presentation';
+import type {
+  PortalRechargeMobileActionState,
+  PortalRechargePrimaryActionState,
+} from './presentation';
 
 const PAGE_SIZE = 8;
+type TranslateFn = ReturnType<typeof usePortalI18n>['t'];
+type NavigateFn = PortalRechargePageProps['onNavigate'];
+type PortalRechargeActionMode = PortalRechargePrimaryActionState['mode'];
 
 const rechargeCurrencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -141,20 +156,226 @@ function resolveRechargeValidationMessage(
   }
 }
 
-function resolveOptionSupportText(
-  option: PortalRechargeOption,
-  isActive: boolean,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
+function resolveOptionSupportText(input: {
+  isActive: boolean;
+  merchandising: {
+    supportLabel: string;
+  };
+  t: ReturnType<typeof usePortalI18n>['t'];
+}) {
+  const { isActive, merchandising, t } = input;
   if (isActive) {
     return t('Live quote ready for this selection.');
   }
 
-  if (option.recommended) {
-    return t('Best balance between immediate runway and effective unit return.');
+  return merchandising.supportLabel;
+}
+
+function resolveCustomSelectionStory(
+  t: TranslateFn,
+) {
+  return {
+    badge: t('Operator choice'),
+    intentLabel: t('Precision funding for an exact target'),
+    supportLabel: t('Use a custom amount when the preset packages are close but you already know the exact funding move.'),
+  };
+}
+
+function triggerPortalRechargeAction(input: {
+  mode: PortalRechargeActionMode;
+  onNavigate: NavigateFn;
+  onCreateOrder: () => void;
+}) {
+  const { mode, onNavigate, onCreateOrder } = input;
+  if (mode === 'billing_handoff') {
+    onNavigate('billing');
+    return;
   }
 
-  return option.note?.trim() || t('Server-managed pricing keeps this amount ready for fast checkout.');
+  onCreateOrder();
+}
+
+function PortalRechargePrimaryActionButton(input: {
+  actionState: PortalRechargePrimaryActionState;
+  onNavigate: NavigateFn;
+  onCreateOrder: () => void;
+}) {
+  const { actionState, onNavigate, onCreateOrder } = input;
+
+  return (
+    <Button
+      className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,var(--theme-primary-950),var(--theme-primary-600))] text-sm font-semibold text-white shadow-[0_18px_42px_rgba(15,23,42,0.24)] hover:opacity-95 dark:bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-500))]"
+      data-slot="portal-recharge-primary-cta"
+      disabled={actionState.disabled}
+      onClick={() =>
+        triggerPortalRechargeAction({
+          mode: actionState.mode,
+          onNavigate,
+          onCreateOrder,
+        })}
+    >
+      {actionState.label}
+    </Button>
+  );
+}
+
+function PortalRechargePostOrderHandoffPanel(input: {
+  active: boolean;
+  amountLabel: string;
+  t: TranslateFn;
+  onNavigate: NavigateFn;
+  onReset: () => void;
+}) {
+  const { active, amountLabel, t, onNavigate, onReset } = input;
+  if (!active) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-[26px] border border-emerald-200/75 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(255,255,255,0.96))] p-4 shadow-[0_16px_38px_rgba(6,95,70,0.08)] dark:border-emerald-900/35 dark:bg-[linear-gradient(180deg,rgba(9,26,20,0.96),rgba(8,18,16,0.94))]"
+      data-slot="portal-recharge-post-order-handoff"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+            {t('Order ready for payment')}
+          </span>
+          <h3 className="text-lg font-semibold text-emerald-950 dark:text-emerald-50">
+            {t('Continue in billing')}
+          </h3>
+          <p className="text-sm leading-6 text-emerald-800 dark:text-emerald-200">
+            {t('The latest recharge order has been created and is now waiting for settlement in billing.')}
+          </p>
+        </div>
+        <Badge variant="success">{amountLabel}</Badge>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[22rem] text-sm leading-6 text-emerald-800 dark:text-emerald-200">
+          {t('Finish payment capture before starting another recharge cycle to keep the settlement trail clean.')}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={onReset} variant="secondary">
+            {t('Create another order')}
+          </Button>
+          <Button onClick={() => onNavigate('billing')} variant="secondary">
+            {t('Continue in billing')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PortalRechargePendingSettlementCallout(input: {
+  pendingPaymentSpotlight: PortalRechargePendingPaymentSpotlight | null;
+  t: TranslateFn;
+  onNavigate: NavigateFn;
+}) {
+  const { pendingPaymentSpotlight, t, onNavigate } = input;
+  if (!pendingPaymentSpotlight) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-[26px] border border-amber-200/75 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(255,255,255,0.96))] p-4 shadow-[0_16px_38px_rgba(120,53,15,0.08)] dark:border-amber-900/35 dark:bg-[linear-gradient(180deg,rgba(28,20,10,0.96),rgba(18,14,10,0.94))]"
+      data-slot="portal-recharge-next-step-callout"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+            {pendingPaymentSpotlight.headline ?? t('Pending settlement queue')}
+          </span>
+          <h3 className="text-lg font-semibold text-amber-950 dark:text-amber-50">
+            {pendingPaymentSpotlight.latestOrderLabel ?? t('Latest pending order')}
+          </h3>
+          <p className="text-sm leading-6 text-amber-800 dark:text-amber-200">
+            {pendingPaymentSpotlight.detail}
+          </p>
+        </div>
+        <Badge variant="warning">
+          {t('{count} Pending payment queue', {
+            count: pendingPaymentSpotlight.count,
+          })}
+        </Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[20px] border border-amber-200/70 bg-white/82 px-4 py-3 dark:border-amber-900/30 dark:bg-amber-950/12">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+            {pendingPaymentSpotlight.latestOrderLabel ?? t('Latest pending order')}
+          </span>
+          <strong className="mt-2 block text-base font-semibold text-amber-950 dark:text-amber-50">
+            {pendingPaymentSpotlight.latestOrder.payable_price_label}
+          </strong>
+        </div>
+        <div className="rounded-[20px] border border-amber-200/70 bg-white/82 px-4 py-3 dark:border-amber-900/30 dark:bg-amber-950/12">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+            {t('Recorded')}
+          </span>
+          <strong className="mt-2 block text-base font-semibold text-amber-950 dark:text-amber-50">
+            {formatDateTime(pendingPaymentSpotlight.latestOrder.created_at_ms)}
+          </strong>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[22rem] text-sm leading-6 text-amber-800 dark:text-amber-200">
+          {t('The recharge order is already created. Billing is the next step to complete settlement and clear the queue.')}
+        </p>
+        <Button onClick={() => onNavigate('billing')} variant="secondary">
+          {pendingPaymentSpotlight.ctaLabel ?? t('Open billing to complete payment')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PortalRechargeMobileActionBar(input: {
+  visible: boolean;
+  actionState: PortalRechargeMobileActionState;
+  onNavigate: NavigateFn;
+  onCreateOrder: () => void;
+}) {
+  const { visible, actionState, onNavigate, onCreateOrder } = input;
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-primary-200/70 bg-white/92 px-4 py-3 shadow-[0_-18px_40px_rgba(15,23,42,0.12)] backdrop-blur xl:hidden dark:border-primary-900/35 dark:bg-[rgba(8,12,22,0.94)]"
+      data-slot="portal-recharge-mobile-cta"
+    >
+      <div className="mx-auto flex max-w-[88rem] items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+            {actionState.eyebrow}
+          </span>
+          <strong className="mt-1 block truncate text-base font-semibold text-primary-950 dark:text-primary-50">
+            {actionState.amountLabel}
+          </strong>
+          <p className="truncate text-sm text-zinc-600 dark:text-zinc-300">
+            {actionState.supportingText}
+          </p>
+        </div>
+        <Button
+          className="h-11 rounded-2xl bg-[linear-gradient(135deg,var(--theme-primary-950),var(--theme-primary-600))] px-4 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] hover:opacity-95 dark:bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-500))]"
+          disabled={actionState.disabled}
+          onClick={() =>
+            triggerPortalRechargeAction({
+              mode: actionState.mode,
+              onNavigate,
+              onCreateOrder,
+            })}
+        >
+          {actionState.buttonLabel}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
@@ -174,6 +395,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   const [selection, setSelection] = useState<PortalRechargeSelection | null>(null);
   const [customAmountInput, setCustomAmountInput] = useState('');
   const [page, setPage] = useState(1);
+  const [lastCreatedOrderId, setLastCreatedOrderId] = useState<string | null>(null);
 
   async function refreshRechargePage(input?: { preserveSelection?: boolean }) {
     setStatus(loadingStatus);
@@ -276,10 +498,28 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         : null,
     [selection, sortedOptions],
   );
+  const optionMerchandisingById = useMemo(
+    () =>
+      new Map(
+        sortedOptions.map((option) => [
+          option.id,
+          buildPortalRechargeOptionMerchandising({
+            option,
+            options: sortedOptions,
+            t,
+          }),
+        ]),
+      ),
+    [sortedOptions, t],
+  );
   const rechargeOrders = useMemo(() => buildPortalRechargeHistoryRows(orders), [orders]);
   const pendingPaymentOrders = useMemo(
     () => rechargeOrders.filter((order) => order.status === 'pending_payment'),
     [rechargeOrders],
+  );
+  const pendingPaymentSpotlight = useMemo(
+    () => buildPortalRechargePendingPaymentSpotlight({ orders, t }),
+    [orders, t],
   );
   const totalPages = Math.max(1, Math.ceil(rechargeOrders.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(page, 1), totalPages);
@@ -300,10 +540,49 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   const pageStatus = status !== syncedStatus ? status : '';
   const currentBalanceLabel = formatBalance(summary, t);
   const recommendedAmountLabel = recommendedOption?.amount_label ?? formatMoney(policy?.suggested_amount_cents);
+  const selectionStory = useMemo(() => {
+    if (selection?.mode === 'custom') {
+      return resolveCustomSelectionStory(t);
+    }
+
+    if (selectedPresetOption) {
+      return optionMerchandisingById.get(selectedPresetOption.id) ?? null;
+    }
+
+    if (recommendedOption) {
+      return optionMerchandisingById.get(recommendedOption.id) ?? null;
+    }
+
+    return null;
+  }, [optionMerchandisingById, recommendedOption, selectedPresetOption, selection, t]);
   const selectedAmountLabel = quoteSnapshot?.amountLabel
     ?? selectedPresetOption?.amount_label
     ?? formatMoney(selection?.amountCents ?? recommendedOption?.amount_cents ?? null);
   const pendingFollowUpLabel = t('{count} orders', { count: pendingPaymentOrders.length });
+  const mobileGrantedUnitsLabel = quoteSnapshot?.grantedUnitsLabel
+    ?? (selectedPresetOption ? formatUnits(selectedPresetOption.granted_units) : t('Preview to confirm units'));
+  const hasActiveSelection = Boolean(selection?.amountCents);
+  const postOrderHandoffActive = resolvePortalRechargePostOrderHandoffActive({
+    lastCreatedOrderId,
+    pendingPaymentSpotlight,
+  });
+  const handoffAmountLabel = pendingPaymentSpotlight?.latestOrder.payable_price_label ?? selectedAmountLabel;
+  const primaryActionState = buildPortalRechargePrimaryActionState({
+    postOrderHandoffActive,
+    quoteLoading,
+    createLoading,
+    hasSelection: hasActiveSelection,
+    t,
+  });
+  const mobileActionState = buildPortalRechargeMobileActionState({
+    postOrderHandoffActive,
+    selectedAmountLabel,
+    grantedUnitsLabel: mobileGrantedUnitsLabel,
+    quoteLoading,
+    createLoading,
+    hasSelection: hasActiveSelection,
+    t,
+  });
 
   useEffect(() => {
     setPage((current) => Math.min(Math.max(current, 1), totalPages));
@@ -326,6 +605,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     }
 
     startTransition(() => {
+      setLastCreatedOrderId(null);
       setSelection({
         amountCents,
         mode: 'custom',
@@ -350,9 +630,10 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     setQuoteStatus(t('Creating order...'));
 
     try {
-      await createPortalRechargeOrder({
+      const createdOrder = await createPortalRechargeOrder({
         amount_cents: selection.amountCents,
       });
+      setLastCreatedOrderId(createdOrder.order_id);
       await refreshRechargePage({ preserveSelection: true });
       setQuoteStatus(t('Order created. Complete payment in billing.'));
       setPage(1);
@@ -363,8 +644,17 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     }
   }
 
+  function handleResumePurchaseFlow() {
+    setLastCreatedOrderId(null);
+    setQuoteStatus(t('Ready to create order.'));
+  }
+
+  function handleCreateRechargeOrderClick() {
+    void handleCreateRechargeOrder();
+  }
+
   return (
-    <div className="space-y-6" data-slot="portal-recharge-page">
+    <div className="space-y-6 pb-28 xl:pb-0" data-slot="portal-recharge-page">
       {pageStatus ? (
         <div
           className="rounded-[26px] border border-primary-200/65 bg-primary-50/90 px-4 py-3 text-sm text-primary-800 shadow-sm dark:border-primary-900/35 dark:bg-primary-950/35 dark:text-primary-200"
@@ -458,12 +748,57 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
             </div>
 
             <div
+              className="grid gap-3 lg:grid-cols-3"
+              data-slot="portal-recharge-guidance-band"
+            >
+              <div className="rounded-[24px] border border-primary-200/60 bg-white/92 px-4 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.05)] dark:border-primary-900/30 dark:bg-primary-950/18">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                  {t('Step 1')}
+                </span>
+                <strong className="mt-2 block text-base font-semibold text-primary-950 dark:text-primary-50">
+                  {t('Select package')}
+                </strong>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  {t('Start with the package that matches your current funding posture or switch to a precise custom amount.')}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-primary-200/60 bg-primary-50/82 px-4 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.05)] dark:border-primary-900/30 dark:bg-primary-950/20">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                  {t('Step 2')}
+                </span>
+                <strong className="mt-2 block text-base font-semibold text-primary-950 dark:text-primary-50">
+                  {t('Checkout summary')}
+                </strong>
+                <p className="mt-2 text-sm leading-6 text-primary-700 dark:text-primary-300">
+                  {t('Confirm granted units, projected balance, and pricing rule before you create the order.')}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-primary-200/60 bg-white/92 px-4 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.05)] dark:border-primary-900/30 dark:bg-primary-950/18">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                  {t('Step 3')}
+                </span>
+                <strong className="mt-2 block text-base font-semibold text-primary-950 dark:text-primary-50">
+                  {t('Create order in billing')}
+                </strong>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  {t('The order is created here, then billing handles the settlement follow-up without losing context.')}
+                </p>
+              </div>
+            </div>
+
+            <div
               className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
               data-slot="portal-recharge-options-grid"
             >
               {sortedOptions.map((option) => {
                 const isActive =
                   selection?.amountCents === option.amount_cents && selection.mode === 'preset';
+                const merchandising = optionMerchandisingById.get(option.id)
+                  ?? buildPortalRechargeOptionMerchandising({
+                    option,
+                    options: sortedOptions,
+                    t,
+                  });
 
                 return (
                   <button
@@ -477,6 +812,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                     key={option.id}
                     onClick={() =>
                       startTransition(() => {
+                        setLastCreatedOrderId(null);
                         setSelection({
                           amountCents: option.amount_cents,
                           mode: 'preset',
@@ -503,6 +839,9 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                                 {t('Recommended')}
                               </Badge>
                             ) : null}
+                            <Badge variant={isActive ? 'secondary' : 'warning'}>
+                              {merchandising.badge}
+                            </Badge>
                             <span className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
                               isActive ? 'text-primary-100' : 'text-primary-700 dark:text-primary-300'
                             }`}
@@ -513,6 +852,12 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                           <strong className="block text-[2rem] font-semibold tracking-tight">
                             {option.amount_label}
                           </strong>
+                          <p className={`text-sm font-medium leading-6 ${
+                            isActive ? 'text-white' : 'text-primary-800 dark:text-primary-100'
+                          }`}
+                          >
+                            {merchandising.intentLabel}
+                          </p>
                         </div>
                         <span
                           aria-hidden="true"
@@ -528,7 +873,11 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                         isActive ? 'text-primary-100' : 'text-zinc-600 dark:text-zinc-300'
                       }`}
                       >
-                        {resolveOptionSupportText(option, isActive, t)}
+                        {resolveOptionSupportText({
+                          isActive,
+                          merchandising,
+                          t,
+                        })}
                       </p>
 
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -624,6 +973,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                         : 'border-primary-200/70 bg-white/88 text-primary-950 placeholder:text-primary-400 dark:border-primary-900/35 dark:bg-primary-950/16 dark:text-primary-50 dark:placeholder:text-primary-300'}
                       inputMode="decimal"
                       onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        setLastCreatedOrderId(null);
                         setCustomAmountInput(event.target.value);
                         setQuoteStatus(defaultQuoteStatus);
                       }}
@@ -666,6 +1016,34 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 </div>
               </form>
             </div>
+
+            <div
+              className="grid gap-3 rounded-[30px] border border-primary-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.94))] p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)] dark:border-primary-900/30 dark:bg-[linear-gradient(180deg,rgba(10,16,28,0.96),rgba(8,12,22,0.94))] lg:grid-cols-[minmax(0,1fr)_auto]"
+              data-slot="portal-recharge-selection-story"
+            >
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                  {t('Selection story')}
+                </span>
+                <h3 className="text-xl font-semibold tracking-tight text-primary-950 dark:text-primary-50">
+                  {selectionStory?.intentLabel ?? t('Best fit for steady usage')}
+                </h3>
+                <p className="max-w-[42rem] text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  {selectionStory?.supportLabel ?? t('Choose a recharge path to see the live quote and settlement story in one place.')}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-primary-200/60 bg-primary-50/78 px-4 py-4 dark:border-primary-900/28 dark:bg-primary-950/22">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                  {selection?.mode === 'custom' ? t('Custom operator path') : selectionStory?.badge ?? t('Recommended default')}
+                </span>
+                <strong className="mt-2 block text-2xl font-semibold tracking-tight text-primary-950 dark:text-primary-50">
+                  {selectedAmountLabel}
+                </strong>
+                <p className="mt-2 text-sm leading-6 text-primary-700 dark:text-primary-300">
+                  {t('The selected amount is already wired into the live quote and ready for order creation.')}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -683,7 +1061,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
             />
             <div className="relative space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{t('Payment information')}</Badge>
+                <Badge variant="secondary">{t('Checkout summary')}</Badge>
                 {selection?.mode === 'custom' ? (
                   <Badge variant="warning">{t('Custom amount')}</Badge>
                 ) : selectedPresetOption?.recommended ? (
@@ -728,41 +1106,87 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3" data-slot="portal-recharge-quote-metrics">
-                  <div className="rounded-[22px] border border-primary-200/60 bg-white/88 px-4 py-4 dark:border-primary-900/30 dark:bg-primary-950/18">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
-                      {t('Granted units')}
-                    </span>
-                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
-                      {quoteSnapshot.grantedUnitsLabel}
-                    </strong>
+                <div
+                  className="space-y-4 rounded-[26px] border border-primary-200/60 bg-white/90 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-primary-900/30 dark:bg-primary-950/18"
+                  data-slot="portal-recharge-quote-breakdown"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                        {t('Checkout summary')}
+                      </span>
+                      <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                        {t('Review the commercial outcome before you create the order and hand off settlement to billing.')}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {selection?.mode === 'custom' ? t('Operator choice') : selectionStory?.badge ?? t('Recommended default')}
+                    </Badge>
                   </div>
-                  <div className="rounded-[22px] border border-primary-200/60 bg-white/88 px-4 py-4 dark:border-primary-900/30 dark:bg-primary-950/18">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
-                      {t('Effective ratio')}
-                    </span>
-                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
-                      {quoteSnapshot.effectiveRatioLabel}
-                    </strong>
-                  </div>
-                  <div className="rounded-[22px] border border-primary-200/60 bg-white/88 px-4 py-4 dark:border-primary-900/30 dark:bg-primary-950/18">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
-                      {t('Projected balance')}
-                    </span>
-                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
-                      {quoteSnapshot.projectedBalanceLabel}
-                    </strong>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-primary-200/55 bg-primary-50/78 px-4 py-3 dark:border-primary-900/28 dark:bg-primary-950/22">
+                      <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                        {t('Current balance')}
+                      </span>
+                      <strong className="text-sm font-semibold text-primary-950 dark:text-primary-50">
+                        {currentBalanceLabel}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-primary-200/55 bg-white/86 px-4 py-3 dark:border-primary-900/28 dark:bg-primary-950/12">
+                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t('Granted units')}
+                      </span>
+                      <strong className="text-sm font-semibold text-primary-950 dark:text-primary-50">
+                        {quoteSnapshot.grantedUnitsLabel}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-primary-200/55 bg-white/86 px-4 py-3 dark:border-primary-900/28 dark:bg-primary-950/12">
+                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t('Effective ratio')}
+                      </span>
+                      <strong className="text-sm font-semibold text-primary-950 dark:text-primary-50">
+                        {quoteSnapshot.effectiveRatioLabel}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-primary-200/55 bg-white/86 px-4 py-3 dark:border-primary-900/28 dark:bg-primary-950/12">
+                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t('Projected balance')}
+                      </span>
+                      <strong className="text-sm font-semibold text-primary-950 dark:text-primary-50">
+                        {quoteSnapshot.projectedBalanceLabel}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-primary-200/55 bg-white/86 px-4 py-3 dark:border-primary-900/28 dark:bg-primary-950/12">
+                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t('Settlement path')}
+                      </span>
+                      <strong className="text-sm font-semibold text-primary-950 dark:text-primary-50">
+                        {t('Create order in billing')}
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
-                <Button
-                  className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,var(--theme-primary-950),var(--theme-primary-600))] text-sm font-semibold text-white shadow-[0_18px_42px_rgba(15,23,42,0.24)] hover:opacity-95 dark:bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-500))]"
-                  data-slot="portal-recharge-primary-cta"
-                  disabled={quoteLoading || createLoading || !selection?.amountCents}
-                  onClick={() => void handleCreateRechargeOrder()}
-                >
-                  {createLoading ? t('Creating...') : t('Create recharge order')}
-                </Button>
+                <PortalRechargePrimaryActionButton
+                  actionState={primaryActionState}
+                  onCreateOrder={handleCreateRechargeOrderClick}
+                  onNavigate={onNavigate}
+                />
+
+                <PortalRechargePostOrderHandoffPanel
+                  active={postOrderHandoffActive}
+                  amountLabel={handoffAmountLabel}
+                  onNavigate={onNavigate}
+                  onReset={handleResumePurchaseFlow}
+                  t={t}
+                />
+
+                <PortalRechargePendingSettlementCallout
+                  onNavigate={onNavigate}
+                  pendingPaymentSpotlight={pendingPaymentSpotlight}
+                  t={t}
+                />
               </div>
             ) : (
               <EmptyState
@@ -773,6 +1197,13 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <PortalRechargeMobileActionBar
+        actionState={mobileActionState}
+        onCreateOrder={handleCreateRechargeOrderClick}
+        onNavigate={onNavigate}
+        visible={hasActiveSelection}
+      />
 
       <Card
         className="border-primary-200/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,249,255,0.94))] shadow-sm dark:border-primary-900/35 dark:bg-[linear-gradient(180deg,rgba(10,14,24,0.96),rgba(8,12,22,0.94))]"
