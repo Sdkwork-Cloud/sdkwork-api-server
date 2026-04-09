@@ -88,9 +88,13 @@ test('recharge page simplifies into a three-section commercial purchase surface'
   assert.doesNotMatch(pageTypes, /PortalRechargeFinanceProjection/);
   assert.match(page, /data-slot="portal-recharge-page"/);
   assert.match(page, /data-slot="portal-recharge-options"/);
+  assert.match(page, /data-slot="portal-recharge-selection-hero"/);
+  assert.match(page, /data-slot="portal-recharge-posture-strip"/);
   assert.match(page, /data-slot="portal-recharge-custom-form"/);
   assert.match(page, /data-slot="portal-recharge-quote-card"/);
+  assert.match(page, /data-slot="portal-recharge-quote-note"/);
   assert.match(page, /data-slot="portal-recharge-history-table"/);
+  assert.match(page, /data-slot="portal-recharge-history-header"/);
   assert.doesNotMatch(page, /data-slot="portal-recharge-summary-grid"/);
   assert.doesNotMatch(page, /data-slot="portal-recharge-decision-support"/);
   assert.doesNotMatch(page, /data-slot="portal-recharge-multimodal-demand"/);
@@ -100,5 +104,8 @@ test('recharge page simplifies into a three-section commercial purchase surface'
   assert.match(page, /Payment information/);
   assert.match(page, /Recharge history/);
   assert.match(page, /Create recharge order/);
+  assert.match(page, /Current balance/);
+  assert.match(page, /Pending follow-up/);
+  assert.match(page, /Checkout stays in billing after order creation\./);
   assert.doesNotMatch(page, /Recharge decision support/);
 });
