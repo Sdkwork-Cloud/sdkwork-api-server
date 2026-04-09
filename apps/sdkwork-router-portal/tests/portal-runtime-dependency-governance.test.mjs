@@ -37,7 +37,13 @@ test('vite config forces shared singleton resolution for linked framework runtim
   assert.match(viteConfig, /find:\s*\/\^react-dom\\\/client\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^react\\\/jsx-runtime\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^react\\\/jsx-dev-runtime\$\/,/);
+  assert.match(viteConfig, /find:\s*\/\^react-router-dom\$\/,/);
+  assert.match(viteConfig, /find:\s*\/\^zustand\$\/,/);
+  assert.match(viteConfig, /find:\s*\/\^zustand\\\/\//);
+  assert.match(viteConfig, /find:\s*\/\^clsx\$\/,/);
+  assert.match(viteConfig, /find:\s*\/\^tailwind-merge\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^lucide-react\$\/,/);
+  assert.match(viteConfig, /find:\s*\/\^sdkwork-router-portal-commons\\\/\//);
   assert.match(viteConfig, /find:\s*\/\^@sdkwork\\\/ui-pc-react\\\/theme\$\//);
   assert.match(viteConfig, /find:\s*\/\^@sdkwork\\\/ui-pc-react\\\/components\\\/ui\\\/actions\$\//);
   assert.match(viteConfig, /find:\s*\/\^@sdkwork\\\/ui-pc-react\\\/components\\\/ui\\\/data-display\$\//);

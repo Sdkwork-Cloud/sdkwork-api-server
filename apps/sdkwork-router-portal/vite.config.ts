@@ -71,6 +71,16 @@ const portalProxyTarget = resolveProxyTarget(
   process.env.SDKWORK_PORTAL_PROXY_TARGET ?? process.env.SDKWORK_PORTAL_BIND,
   defaultPortalProxyTarget,
 );
+const portalCommonsSourceRoot = path.resolve(
+  configDir,
+  './packages/sdkwork-router-portal-commons/src',
+);
+const portalCommonsSubpathRoot = `${normalizeAliasPath(portalCommonsSourceRoot)}/`;
+const reactRouterDomRoot = normalizeAliasPath(resolvePnpmPackageRoot('react-router-dom'));
+const zustandRoot = normalizeAliasPath(resolvePnpmPackageRoot('zustand'));
+const zustandSubpathRoot = `${zustandRoot}/`;
+const clsxRoot = normalizeAliasPath(resolvePnpmPackageRoot('clsx'));
+const tailwindMergeRoot = normalizeAliasPath(resolvePnpmPackageRoot('tailwind-merge'));
 const lucideReactRoot = resolvePnpmPackageRoot('lucide-react');
 const lucideReactIconsRoot = `${normalizeAliasPath(path.join(lucideReactRoot, 'dist', 'esm', 'icons'))}/`;
 
@@ -151,6 +161,26 @@ export default defineConfig({
         replacement: resolveAppDependency('react/jsx-dev-runtime'),
       },
       {
+        find: /^react-router-dom$/,
+        replacement: reactRouterDomRoot,
+      },
+      {
+        find: /^zustand$/,
+        replacement: zustandRoot,
+      },
+      {
+        find: /^zustand\//,
+        replacement: zustandSubpathRoot,
+      },
+      {
+        find: /^clsx$/,
+        replacement: clsxRoot,
+      },
+      {
+        find: /^tailwind-merge$/,
+        replacement: tailwindMergeRoot,
+      },
+      {
         find: /^lucide-react$/,
         replacement: path.resolve(configDir, './src/vendor/lucide-react.ts'),
       },
@@ -212,6 +242,10 @@ export default defineConfig({
           configDir,
           './src/vendor/motion-react.tsx',
         ),
+      },
+      {
+        find: /^sdkwork-router-portal-commons\//,
+        replacement: portalCommonsSubpathRoot,
       },
       {
         find: /^sdkwork-router-portal-console$/,
