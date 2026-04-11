@@ -1,0 +1,19 @@
+{
+  "update_id": "2026-04-global-pricing-governance-linkage",
+  "release_version": "2026.04.19",
+  "description": "Link repository bootstrap pricing into explicit official, proxy, and local cost-versus-retail plan classes so request metering can explain upstream reference pricing and internal commercial billing together.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness",
+    "2026-04-account-kernel-commercial-foundation",
+    "2026-04-global-asia-account-kernel-operations",
+    "2026-04-global-official-route-account-kernel",
+    "2026-04-global-provider-operations-account-kernel",
+    "2026-04-global-openrouter-channel-account-kernel"
+  ],
+  "pricing": [
+    "pricing/2026-04-global-pricing-governance-linkage.json"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-global-pricing-governance-linkage.json"
+  ]
+}

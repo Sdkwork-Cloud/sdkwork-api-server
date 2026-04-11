@@ -288,7 +288,7 @@ const PORTAL_OPENAPI_DOCUMENT: &str = r##"{
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "$ref": "#/components/schemas/PortalMarketingRewardHistoryItem"
                   }
                 }
               }
@@ -334,6 +334,28 @@ const PORTAL_OPENAPI_DOCUMENT: &str = r##"{
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PortalMarketingCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/commerce/catalog": {
+      "get": {
+        "tags": ["commerce"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canonical commerce catalog with compatibility views and explicit product and offer semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalCommerceCatalog"
                 }
               }
             }
@@ -911,22 +933,265 @@ const PORTAL_OPENAPI_DOCUMENT: &str = r##"{
       "PortalCouponRedemptionRollbackResponse": {
         "type": "object"
       },
-      "PortalMarketingCodesResponse": {
+      "PortalCouponApplicabilitySummary": {
         "type": "object"
+      },
+      "PortalCouponEffectSummary": {
+        "type": "object"
+      },
+      "PortalCouponOwnershipSummary": {
+        "type": "object"
+      },
+      "PortalCouponAccountArrivalLotItem": {
+        "type": "object",
+        "properties": {
+          "lot_id": {
+            "type": "integer"
+          },
+          "benefit_type": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "original_quantity": {
+            "type": "number"
+          },
+          "remaining_quantity": {
+            "type": "number"
+          },
+          "issued_at_ms": {
+            "type": "integer"
+          },
+          "expires_at_ms": {
+            "type": "integer"
+          },
+          "scope_order_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PortalCouponAccountArrivalSummary": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string"
+          },
+          "account_id": {
+            "type": "integer"
+          },
+          "benefit_lot_count": {
+            "type": "integer"
+          },
+          "credited_quantity": {
+            "type": "number"
+          },
+          "benefit_lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortalCouponAccountArrivalLotItem"
+            }
+          }
+        }
+      },
+      "CouponTemplateRecord": {
+        "type": "object"
+      },
+      "MarketingCampaignRecord": {
+        "type": "object"
+      },
+      "CouponCodeRecord": {
+        "type": "object"
+      },
+      "CouponReservationRecord": {
+        "type": "object"
+      },
+      "CouponRedemptionRecord": {
+        "type": "object"
+      },
+      "CouponRollbackRecord": {
+        "type": "object"
+      },
+      "PortalMarketingCodeItem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/CouponCodeRecord"
+          },
+          "template": {
+            "$ref": "#/components/schemas/CouponTemplateRecord"
+          },
+          "campaign": {
+            "$ref": "#/components/schemas/MarketingCampaignRecord"
+          },
+          "applicability": {
+            "$ref": "#/components/schemas/PortalCouponApplicabilitySummary"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/PortalCouponEffectSummary"
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/PortalCouponOwnershipSummary"
+          },
+          "latest_reservation": {
+            "$ref": "#/components/schemas/CouponReservationRecord"
+          },
+          "latest_redemption": {
+            "$ref": "#/components/schemas/CouponRedemptionRecord"
+          }
+        }
+      },
+      "PortalMarketingRewardHistoryItem": {
+        "type": "object",
+        "properties": {
+          "redemption": {
+            "$ref": "#/components/schemas/CouponRedemptionRecord"
+          },
+          "code": {
+            "$ref": "#/components/schemas/CouponCodeRecord"
+          },
+          "template": {
+            "$ref": "#/components/schemas/CouponTemplateRecord"
+          },
+          "campaign": {
+            "$ref": "#/components/schemas/MarketingCampaignRecord"
+          },
+          "applicability": {
+            "$ref": "#/components/schemas/PortalCouponApplicabilitySummary"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/PortalCouponEffectSummary"
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/PortalCouponOwnershipSummary"
+          },
+          "account_arrival": {
+            "$ref": "#/components/schemas/PortalCouponAccountArrivalSummary"
+          },
+          "rollbacks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CouponRollbackRecord"
+            }
+          }
+        }
+      },
+      "PortalMarketingCodesResponse": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortalMarketingCodeItem"
+            }
+          }
+        }
       },
       "PortalMarketingRedemptionsResponse": {
         "type": "object"
       },
+      "PortalApiProduct": {
+        "type": "object",
+        "required": ["product_id", "product_kind", "target_id", "display_name", "source"],
+        "properties": {
+          "product_id": { "type": "string" },
+          "product_kind": { "type": "string" },
+          "target_id": { "type": "string" },
+          "display_name": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      },
+      "PortalProductOffer": {
+        "type": "object",
+        "required": ["offer_id", "product_id", "product_kind", "display_name", "quote_kind", "quote_target_kind", "quote_target_id", "source"],
+        "properties": {
+          "offer_id": { "type": "string" },
+          "product_id": { "type": "string" },
+          "product_kind": { "type": "string" },
+          "display_name": { "type": "string" },
+          "quote_kind": { "type": "string" },
+          "quote_target_kind": { "type": "string" },
+          "quote_target_id": { "type": "string" },
+          "publication_id": { "type": "string" },
+          "publication_kind": { "type": "string" },
+          "publication_status": { "type": "string" },
+          "publication_revision_id": { "type": "string" },
+          "publication_version": { "type": "integer", "format": "uint64", "minimum": 0 },
+          "publication_source_kind": { "type": "string" },
+          "publication_effective_from_ms": { "type": ["integer", "null"], "format": "uint64", "minimum": 0 },
+          "pricing_plan_id": { "type": ["string", "null"] },
+          "pricing_plan_version": { "type": ["integer", "null"], "format": "uint64", "minimum": 0 },
+          "pricing_rate_id": { "type": ["string", "null"] },
+          "pricing_metric_code": { "type": ["string", "null"] },
+          "price_label": { "type": ["string", "null"] },
+          "source": { "type": "string" }
+        }
+      },
+      "PortalCommerceCatalog": {
+        "type": "object",
+        "required": ["products", "offers", "plans", "packs", "recharge_options", "coupons"],
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PortalApiProduct" }
+          },
+          "offers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PortalProductOffer" }
+          },
+          "plans": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "packs": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "recharge_options": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "custom_recharge_policy": { "type": ["object", "null"] },
+          "coupons": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
+      },
       "PortalCommerceOrder": {
         "type": "object",
-        "required": ["order_id", "project_id", "user_id", "target_kind", "target_id", "target_name", "status"],
+        "required": ["order_id", "project_id", "user_id", "target_kind", "target_id", "target_name", "transaction_kind", "status"],
         "properties": {
           "order_id": { "type": "string" },
           "project_id": { "type": "string" },
           "user_id": { "type": "string" },
           "target_kind": { "type": "string" },
+          "product_kind": { "type": "string" },
+          "transaction_kind": { "type": "string" },
+          "product_id": { "type": "string" },
+          "offer_id": { "type": "string" },
+          "publication_id": { "type": "string" },
+          "publication_kind": { "type": "string" },
+          "publication_status": { "type": "string" },
+          "publication_revision_id": { "type": "string" },
+          "publication_version": { "type": "integer", "format": "uint64", "minimum": 0 },
+          "publication_source_kind": { "type": "string" },
+          "publication_effective_from_ms": { "type": ["integer", "null"], "format": "uint64", "minimum": 0 },
           "target_id": { "type": "string" },
           "target_name": { "type": "string" },
+          "pricing_plan_id": { "type": ["string", "null"] },
+          "pricing_plan_version": { "type": ["integer", "null"] },
+          "pricing_rate_id": { "type": ["string", "null"] },
+          "pricing_metric_code": { "type": ["string", "null"] },
           "payment_method_id": { "type": ["string", "null"] },
           "latest_payment_attempt_id": { "type": ["string", "null"] },
           "status": { "type": "string" }
@@ -1084,5 +1349,3 @@ where
         .route("/portal/openapi.json", get(portal_openapi_handler))
         .route("/portal/docs", get(portal_docs_index_handler))
 }
-
-

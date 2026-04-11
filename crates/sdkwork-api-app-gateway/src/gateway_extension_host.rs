@@ -67,56 +67,100 @@ struct BuiltConfiguredExtensionHost {
 
 pub fn builtin_extension_host() -> ExtensionHost {
     let mut host = ExtensionHost::new();
+    register_builtin_openai_provider(&mut host, "sdkwork.provider.openai.official", "openai");
+    for (extension_id, adapter_kind) in [
+        ("sdkwork.provider.xai", "xai"),
+        ("sdkwork.provider.deepseek", "deepseek"),
+        ("sdkwork.provider.qwen", "qwen"),
+        ("sdkwork.provider.doubao", "doubao"),
+        ("sdkwork.provider.hunyuan", "hunyuan"),
+        ("sdkwork.provider.moonshot", "moonshot"),
+        ("sdkwork.provider.zhipu", "zhipu"),
+        ("sdkwork.provider.mistral", "mistral"),
+        ("sdkwork.provider.cohere", "cohere"),
+        ("sdkwork.provider.siliconflow", "siliconflow"),
+    ] {
+        register_builtin_openai_compatible_provider(&mut host, extension_id, adapter_kind);
+    }
+    register_builtin_openrouter_provider(&mut host);
+    register_builtin_ollama_provider(&mut host);
+    host
+}
+
+fn register_builtin_openai_provider(host: &mut ExtensionHost, extension_id: &str, adapter_kind: &str) {
     host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
-        ExtensionManifest::new(
-            "sdkwork.provider.openai.official",
-            ExtensionKind::Provider,
-            "0.1.0",
-            ExtensionRuntime::Builtin,
-        )
-        .with_supported_modality(ExtensionModality::Image)
-        .with_supported_modality(ExtensionModality::Audio)
-        .with_supported_modality(ExtensionModality::Video)
-        .with_supported_modality(ExtensionModality::File)
-        .with_supported_modality(ExtensionModality::Embedding),
-        "openai",
+        openai_protocol_manifest(extension_id),
+        adapter_kind,
         |base_url| Box::new(OpenAiProviderAdapter::new(base_url)),
     ));
+}
+
+fn register_builtin_openai_compatible_provider(
+    host: &mut ExtensionHost,
+    extension_id: &str,
+    adapter_kind: &str,
+) {
     host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
-        ExtensionManifest::new(
-            "sdkwork.provider.openrouter",
-            ExtensionKind::Provider,
-            "0.1.0",
-            ExtensionRuntime::Builtin,
-        )
-        .with_supported_modality(ExtensionModality::Image)
-        .with_supported_modality(ExtensionModality::Audio)
-        .with_supported_modality(ExtensionModality::Video)
-        .with_supported_modality(ExtensionModality::File)
-        .with_supported_modality(ExtensionModality::Embedding),
+        openai_protocol_manifest(extension_id),
+        adapter_kind,
+        |base_url| Box::new(OpenAiProviderAdapter::new(base_url)),
+    ));
+}
+
+fn register_builtin_openrouter_provider(host: &mut ExtensionHost) {
+    host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
+        rich_builtin_manifest("sdkwork.provider.openrouter", ExtensionProtocol::OpenAi),
         "openrouter",
         |base_url| Box::new(OpenRouterProviderAdapter::new(base_url)),
     ));
+}
+
+fn register_builtin_ollama_provider(host: &mut ExtensionHost) {
     host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
-        ExtensionManifest::new(
-            "sdkwork.provider.ollama",
-            ExtensionKind::Provider,
-            "0.1.0",
-            ExtensionRuntime::Builtin,
-        )
-        .with_supported_modality(ExtensionModality::Image)
-        .with_supported_modality(ExtensionModality::Audio)
-        .with_supported_modality(ExtensionModality::Video)
-        .with_supported_modality(ExtensionModality::File)
-        .with_supported_modality(ExtensionModality::Embedding),
+        rich_builtin_manifest("sdkwork.provider.ollama", ExtensionProtocol::Custom),
         "ollama",
         |base_url| Box::new(OllamaProviderAdapter::new(base_url)),
     ));
-    host
+}
+
+fn openai_protocol_manifest(extension_id: &str) -> ExtensionManifest {
+    rich_builtin_manifest(extension_id, ExtensionProtocol::OpenAi)
+}
+
+fn rich_builtin_manifest(extension_id: &str, protocol: ExtensionProtocol) -> ExtensionManifest {
+    ExtensionManifest::new(
+        extension_id,
+        ExtensionKind::Provider,
+        "0.1.0",
+        ExtensionRuntime::Builtin,
+    )
+    .with_protocol(protocol)
+    .with_supported_modality(ExtensionModality::Image)
+    .with_supported_modality(ExtensionModality::Audio)
+    .with_supported_modality(ExtensionModality::Video)
+    .with_supported_modality(ExtensionModality::File)
+    .with_supported_modality(ExtensionModality::Embedding)
 }
 
 pub(crate) fn provider_runtime_key(provider: &ProxyProvider) -> &str {
     &provider.extension_id
+}
+
+pub(crate) fn preferred_provider_runtime_key(
+    host: &ExtensionHost,
+    provider: &ProxyProvider,
+) -> String {
+    for runtime_key in [
+        provider.extension_id.as_str(),
+        provider.protocol_kind(),
+        provider.adapter_kind.as_str(),
+    ] {
+        if !runtime_key.trim().is_empty() && host.can_resolve_provider(runtime_key) {
+            return runtime_key.to_owned();
+        }
+    }
+
+    provider_runtime_key(provider).to_owned()
 }
 
 pub(crate) fn configured_extension_host() -> Result<ExtensionHost> {
@@ -426,16 +470,13 @@ fn register_discovered_extension(
         return false;
     }
 
-    if package.manifest.runtime == ExtensionRuntime::NativeDynamic {
+    if package.manifest.runtime.supports_raw_provider_execution() {
         return host
             .register_discovered_native_dynamic_provider(package)
             .is_ok();
     }
 
-    match (
-        package.manifest.kind.clone(),
-        package.manifest.protocol.clone(),
-    ) {
+    match (package.manifest.kind.clone(), package.manifest.protocol) {
         (ExtensionKind::Provider, Some(ExtensionProtocol::OpenAi)) => {
             host.register_discovered_provider(package, "openai", |base_url| {
                 Box::new(OpenAiProviderAdapter::new(base_url))

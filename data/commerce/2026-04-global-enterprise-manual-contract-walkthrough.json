@@ -1,0 +1,118 @@
+{
+  "orders": [
+    {
+      "order_id": "order-global-enterprise-contract-2026",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "target_kind": "enterprise_contract",
+      "target_id": "contract-global-enterprise-2026",
+      "target_name": "Global Enterprise Annual Contract",
+      "list_price_cents": 549900,
+      "payable_price_cents": 499900,
+      "list_price_label": "$5499 / year",
+      "payable_price_label": "$4999 / year",
+      "granted_units": 120000000,
+      "bonus_units": 18000000,
+      "currency_code": "USD",
+      "pricing_plan_id": "global-enterprise-commercial",
+      "pricing_plan_version": 1,
+      "pricing_snapshot_json": "{\"plan_code\":\"global-enterprise-commercial\",\"cost_posture\":\"global-official-direct-cost\",\"retail_posture\":\"global-official-direct-retail\",\"preferred_provider\":\"provider-openai-official\",\"drafting_provider\":\"provider-anthropic-official\"}",
+      "applied_coupon_code": "ENTERPRISE500",
+      "coupon_reservation_id": null,
+      "coupon_redemption_id": null,
+      "marketing_campaign_id": "campaign-enterprise-contract-2026",
+      "subsidy_amount_minor": 50000,
+      "payment_method_id": "payment-bank-transfer-manual",
+      "latest_payment_attempt_id": "attempt-global-enterprise-contract-2026",
+      "status": "pending_payment",
+      "settlement_status": "pending",
+      "source": "bootstrap_update",
+      "refundable_amount_minor": 499900,
+      "refunded_amount_minor": 0,
+      "created_at_ms": 1710000500000,
+      "updated_at_ms": 1710000501500
+    }
+  ],
+  "payment_attempts": [
+    {
+      "payment_attempt_id": "attempt-global-enterprise-contract-2026",
+      "order_id": "order-global-enterprise-contract-2026",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "payment_method_id": "payment-bank-transfer-manual",
+      "provider": "bank_transfer",
+      "channel": "manual_review",
+      "status": "pending_review",
+      "idempotency_key": "attempt:order-global-enterprise-contract-2026:1",
+      "attempt_sequence": 1,
+      "amount_minor": 499900,
+      "currency_code": "USD",
+      "captured_amount_minor": 0,
+      "refunded_amount_minor": 0,
+      "provider_payment_intent_id": null,
+      "provider_checkout_session_id": null,
+      "provider_reference": "invoice-global-enterprise-contract-2026",
+      "checkout_url": null,
+      "qr_code_payload": null,
+      "request_payload_json": "{\"order_id\":\"order-global-enterprise-contract-2026\",\"workflow\":\"manual_review\",\"invoice_terms\":\"net_30\"}",
+      "response_payload_json": "{\"status\":\"pending_review\",\"queue\":\"finance-enterprise\"}",
+      "error_code": null,
+      "error_message": null,
+      "initiated_at_ms": 1710000500200,
+      "expires_at_ms": null,
+      "completed_at_ms": null,
+      "updated_at_ms": 1710000501200
+    }
+  ],
+  "payment_events": [
+    {
+      "payment_event_id": "payment-event-global-enterprise-contract-2026",
+      "order_id": "order-global-enterprise-contract-2026",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "provider": "bank_transfer",
+      "provider_event_id": "manual_global_enterprise_contract_review",
+      "dedupe_key": "bank_transfer:manual_global_enterprise_contract_review",
+      "event_type": "manual.review.submitted",
+      "payload_json": "{\"id\":\"manual_global_enterprise_contract_review\",\"provider\":\"bank_transfer\",\"status\":\"pending_review\"}",
+      "processing_status": "received",
+      "processing_message": "awaiting enterprise finance approval",
+      "received_at_ms": 1710000501250,
+      "processed_at_ms": null,
+      "order_status_after": "pending_payment"
+    }
+  ],
+  "webhook_inbox_records": [],
+  "refunds": [],
+  "reconciliation_runs": [
+    {
+      "reconciliation_run_id": "recon-run-global-enterprise-contract-2026",
+      "provider": "bank_transfer",
+      "payment_method_id": "payment-bank-transfer-manual",
+      "scope_started_at_ms": 1710000500000,
+      "scope_ended_at_ms": 1710000560000,
+      "status": "running",
+      "summary_json": "{\"pending_manual_review\":1,\"matched\":0,\"refunds\":0,\"discrepancies\":1}",
+      "created_at_ms": 1710000501600,
+      "updated_at_ms": 1710000501800,
+      "completed_at_ms": null
+    }
+  ],
+  "reconciliation_items": [
+    {
+      "reconciliation_item_id": "recon-item-global-enterprise-contract-2026",
+      "reconciliation_run_id": "recon-run-global-enterprise-contract-2026",
+      "order_id": "order-global-enterprise-contract-2026",
+      "payment_attempt_id": "attempt-global-enterprise-contract-2026",
+      "refund_id": null,
+      "external_reference": "bank_transfer:manual_global_enterprise_contract_review",
+      "discrepancy_type": "manual_payment_review",
+      "status": "open",
+      "expected_amount_minor": 499900,
+      "provider_amount_minor": null,
+      "detail_json": "{\"note\":\"enterprise annual contract is waiting for finance approval and invoice settlement confirmation\"}",
+      "created_at_ms": 1710000501850,
+      "updated_at_ms": 1710000501850
+    }
+  ]
+}

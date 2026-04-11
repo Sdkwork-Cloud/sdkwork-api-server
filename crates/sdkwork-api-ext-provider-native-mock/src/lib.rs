@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::raw::c_char;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -21,7 +21,10 @@ pub const FIXTURE_EXTENSION_ID: &str = "sdkwork.provider.native.mock";
 const LIFECYCLE_LOG_ENV: &str = "SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG";
 const INVOCATION_LOG_ENV: &str = "SDKWORK_NATIVE_MOCK_INVOCATION_LOG";
 const JSON_DELAY_MS_ENV: &str = "SDKWORK_NATIVE_MOCK_JSON_DELAY_MS";
+const JSON_DELAY_SEQUENCE_MS_ENV: &str = "SDKWORK_NATIVE_MOCK_JSON_DELAY_SEQUENCE_MS";
+const JSON_RESULT_SEQUENCE_ENV: &str = "SDKWORK_NATIVE_MOCK_JSON_RESULT_SEQUENCE";
 const STREAM_DELAY_MS_ENV: &str = "SDKWORK_NATIVE_MOCK_STREAM_DELAY_MS";
+const STREAM_RESULT_SEQUENCE_ENV: &str = "SDKWORK_NATIVE_MOCK_STREAM_RESULT_SEQUENCE";
 
 fn manifest_json() -> &'static CString {
     static MANIFEST_JSON: OnceLock<CString> = OnceLock::new();
@@ -55,6 +58,26 @@ fn manifest_json() -> &'static CString {
                 ))
                 .with_capability(CapabilityDescriptor::new(
                     "responses.stream",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "anthropic.messages.create",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "anthropic.messages.count_tokens",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "gemini.generate_content",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "gemini.stream_generate_content",
+                    CompatibilityLevel::Native,
+                ))
+                .with_capability(CapabilityDescriptor::new(
+                    "gemini.count_tokens",
                     CompatibilityLevel::Native,
                 ))
                 .with_capability(CapabilityDescriptor::new(
@@ -154,10 +177,14 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_json(
         .and_then(|payload| serde_json::from_str::<ProviderInvocation>(&payload).ok());
     append_invocation_event("execute_json_start");
     sleep_for_env_delay(JSON_DELAY_MS_ENV);
+    let sequenced_result = invocation.as_ref().and_then(json_result_from_sequence);
 
-    let result = match invocation {
-        Some(invocation)
-            if invocation.operation == "chat.completions.create" && !invocation.expects_stream =>
+    let result = match (sequenced_result, invocation) {
+        (Some(result), _) => result,
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "chat.completions.create" && !invocation.expects_stream =>
         {
             ProviderInvocationResult::json(serde_json::json!({
                 "id": "chatcmpl_native_dynamic",
@@ -167,8 +194,10 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_json(
                 "provider": "native_dynamic"
             }))
         }
-        Some(invocation)
-            if invocation.operation == "responses.create" && !invocation.expects_stream =>
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "responses.create" && !invocation.expects_stream =>
         {
             ProviderInvocationResult::json(serde_json::json!({
                 "id": "resp_native_dynamic",
@@ -178,14 +207,77 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_json(
                 "provider": "native_dynamic"
             }))
         }
-        Some(invocation) if invocation.expects_stream => {
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "anthropic.messages.create" && !invocation.expects_stream =>
+        {
+            ProviderInvocationResult::json(serde_json::json!({
+                "id": "msg_native_dynamic",
+                "type": "message",
+                "role": "assistant",
+                "model": invocation.body["model"],
+                "content": [{
+                    "type": "text",
+                    "text": "Hello from native dynamic anthropic"
+                }],
+                "stop_reason": "end_turn",
+                "stop_sequence": serde_json::Value::Null,
+                "usage": {
+                    "input_tokens": 13,
+                    "output_tokens": 8
+                }
+            }))
+        }
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "anthropic.messages.count_tokens"
+            && !invocation.expects_stream =>
+        {
+            ProviderInvocationResult::json(serde_json::json!({
+                "input_tokens": 42
+            }))
+        }
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "gemini.generate_content" && !invocation.expects_stream =>
+        {
+            ProviderInvocationResult::json(serde_json::json!({
+                "candidates": [{
+                    "content": {
+                        "role": "model",
+                        "parts": [{
+                            "text": "Hello from native dynamic gemini"
+                        }]
+                    },
+                    "finishReason": "STOP"
+                }],
+                "usageMetadata": {
+                    "promptTokenCount": 12,
+                    "candidatesTokenCount": 6,
+                    "totalTokenCount": 18
+                }
+            }))
+        }
+        (
+            None,
+            Some(invocation),
+        ) if invocation.operation == "gemini.count_tokens" && !invocation.expects_stream =>
+        {
+            ProviderInvocationResult::json(serde_json::json!({
+                "totalTokens": 42
+            }))
+        }
+        (None, Some(invocation)) if invocation.expects_stream => {
             ProviderInvocationResult::unsupported("stream output is not implemented in the fixture")
         }
-        Some(invocation) => ProviderInvocationResult::unsupported(format!(
+        (None, Some(invocation)) => ProviderInvocationResult::unsupported(format!(
             "operation {} is not implemented in the fixture",
             invocation.operation
         )),
-        None => ProviderInvocationResult::error("invalid invocation payload"),
+        (None, None) => ProviderInvocationResult::error("invalid invocation payload"),
     };
     append_invocation_event("execute_json_finish");
 
@@ -206,9 +298,11 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
         .and_then(|payload| serde_json::from_str::<ProviderInvocation>(&payload).ok());
     let writer = unsafe { writer.as_ref() };
     append_invocation_event("execute_stream_start");
+    let sequenced_result = invocation.as_ref().and_then(stream_result_from_sequence);
 
-    let result = match (invocation, writer) {
-        (Some(invocation), Some(writer))
+    let result = match (sequenced_result, invocation, writer) {
+        (Some(result), _, _) => result,
+        (None, Some(invocation), Some(writer))
             if invocation.operation == "chat.completions.create" && invocation.expects_stream =>
         {
             let content_type = "text/event-stream";
@@ -248,7 +342,7 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
                 }
             }
         }
-        (Some(invocation), Some(writer))
+        (None, Some(invocation), Some(writer))
             if invocation.operation == "responses.create" && invocation.expects_stream =>
         {
             let content_type = "text/event-stream";
@@ -281,7 +375,78 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
                 }
             }
         }
-        (Some(invocation), Some(writer))
+        (None, Some(invocation), Some(writer))
+            if invocation.operation == "anthropic.messages.create" && invocation.expects_stream =>
+        {
+            let content_type = "text/event-stream";
+            let first_frame = format!(
+                concat!(
+                    "event: message_start\n",
+                    "data: {{\"type\":\"message_start\",\"message\":{{\"id\":\"msg_native_dynamic_stream\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"{}\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{{\"input_tokens\":13,\"output_tokens\":0}}}}}}\n\n",
+                    "event: content_block_start\n",
+                    "data: {{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{{\"type\":\"text\",\"text\":\"\"}}}}\n\n",
+                    "event: content_block_delta\n",
+                    "data: {{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"Hello from native dynamic anthropic\"}}}}\n\n",
+                    "event: content_block_stop\n",
+                    "data: {{\"type\":\"content_block_stop\",\"index\":0}}\n\n",
+                    "event: message_delta\n",
+                    "data: {{\"type\":\"message_delta\",\"delta\":{{\"stop_reason\":\"end_turn\",\"stop_sequence\":null}},\"usage\":{{\"output_tokens\":8}}}}\n\n",
+                    "event: message_stop\n",
+                    "data: {{\"type\":\"message_stop\"}}\n\n"
+                ),
+                invocation.body["model"].as_str().unwrap_or("claude-3-7-sonnet"),
+            );
+
+            if !writer.set_content_type(content_type) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before content type was set",
+                )
+            } else {
+                sleep_for_env_delay(STREAM_DELAY_MS_ENV);
+                if !writer.write_chunk(first_frame.as_bytes()) {
+                    ProviderStreamInvocationResult::error(
+                        "host stream receiver closed before all chunks were written",
+                    )
+                } else {
+                    ProviderStreamInvocationResult::streamed(content_type)
+                }
+            }
+        }
+        (None, Some(invocation), Some(writer))
+            if invocation.operation == "gemini.stream_generate_content"
+                && invocation.expects_stream =>
+        {
+            let content_type = "text/event-stream";
+            let chunk = serde_json::json!({
+                "candidates": [{
+                    "content": {
+                        "role": "model",
+                        "parts": [{
+                            "text": "Hello from native dynamic gemini"
+                        }]
+                    },
+                    "finishReason": "STOP"
+                }]
+            })
+            .to_string();
+            let first_frame = format!("data: {chunk}\n\n");
+
+            if !writer.set_content_type(content_type) {
+                ProviderStreamInvocationResult::error(
+                    "host stream receiver closed before content type was set",
+                )
+            } else {
+                sleep_for_env_delay(STREAM_DELAY_MS_ENV);
+                if !writer.write_chunk(first_frame.as_bytes()) {
+                    ProviderStreamInvocationResult::error(
+                        "host stream receiver closed before all chunks were written",
+                    )
+                } else {
+                    ProviderStreamInvocationResult::streamed(content_type)
+                }
+            }
+        }
+        (None, Some(invocation), Some(writer))
             if invocation.operation == "audio.speech.create" && invocation.expects_stream =>
         {
             let response_format = invocation.body["response_format"].as_str().unwrap_or("mp3");
@@ -310,7 +475,7 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
                 }
             }
         }
-        (Some(invocation), Some(writer))
+        (None, Some(invocation), Some(writer))
             if invocation.operation == "files.content" && invocation.expects_stream =>
         {
             let content_type = "application/jsonl";
@@ -331,7 +496,7 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
                 }
             }
         }
-        (Some(invocation), Some(writer))
+        (None, Some(invocation), Some(writer))
             if invocation.operation == "videos.content" && invocation.expects_stream =>
         {
             let content_type = "video/mp4";
@@ -352,12 +517,12 @@ pub unsafe extern "C" fn sdkwork_extension_provider_execute_stream_json(
                 }
             }
         }
-        (Some(invocation), Some(_)) => ProviderStreamInvocationResult::unsupported(format!(
+        (None, Some(invocation), Some(_)) => ProviderStreamInvocationResult::unsupported(format!(
             "stream operation {} is not implemented in the fixture",
             invocation.operation
         )),
-        (_, None) => ProviderStreamInvocationResult::error("stream writer is missing"),
-        (None, Some(_)) => ProviderStreamInvocationResult::error("invalid invocation payload"),
+        (None, _, None) => ProviderStreamInvocationResult::error("stream writer is missing"),
+        (None, None, Some(_)) => ProviderStreamInvocationResult::error("invalid invocation payload"),
     };
     append_invocation_event("execute_stream_finish");
 
@@ -394,6 +559,13 @@ fn append_invocation_event(event: &str) {
 }
 
 fn sleep_for_env_delay(key: &str) {
+    if let Some(delay_ms) = delay_for_env_sequence(key) {
+        if delay_ms != 0 {
+            thread::sleep(Duration::from_millis(delay_ms));
+        }
+        return;
+    }
+
     let Ok(delay_ms) = std::env::var(key) else {
         return;
     };
@@ -404,4 +576,127 @@ fn sleep_for_env_delay(key: &str) {
         return;
     }
     thread::sleep(Duration::from_millis(delay_ms));
+}
+
+fn json_result_from_sequence(invocation: &ProviderInvocation) -> Option<ProviderInvocationResult> {
+    let action = next_env_sequence_value(JSON_RESULT_SEQUENCE_ENV)?;
+    match action.as_str() {
+        "success" => None,
+        "error" | "non_retryable" => Some(ProviderInvocationResult::error(format!(
+            "native mock non-retryable error for {}",
+            invocation.operation
+        ))),
+        _ if action.starts_with("retryable") => {
+            let retry_after_ms = action
+                .split_once('@')
+                .and_then(|(_, value)| value.parse::<u64>().ok());
+            Some(ProviderInvocationResult::retryable_error(
+                format!("native mock retryable error for {}", invocation.operation),
+                Some("provider_overloaded"),
+                retry_after_ms,
+            ))
+        }
+        _ => Some(ProviderInvocationResult::error(format!(
+            "native mock unknown sequence action {action} for {}",
+            invocation.operation
+        ))),
+    }
+}
+
+fn stream_result_from_sequence(
+    invocation: &ProviderInvocation,
+) -> Option<ProviderStreamInvocationResult> {
+    let action = next_env_sequence_value(STREAM_RESULT_SEQUENCE_ENV)?;
+    match action.as_str() {
+        "success" => None,
+        "error" | "non_retryable" => Some(ProviderStreamInvocationResult::error(format!(
+            "native mock non-retryable error for {}",
+            invocation.operation
+        ))),
+        _ if action.starts_with("retryable") => {
+            let retry_after_ms = action
+                .split_once('@')
+                .and_then(|(_, value)| value.parse::<u64>().ok());
+            Some(ProviderStreamInvocationResult::retryable_error(
+                format!("native mock retryable error for {}", invocation.operation),
+                Some("provider_overloaded"),
+                retry_after_ms,
+            ))
+        }
+        _ => Some(ProviderStreamInvocationResult::error(format!(
+            "native mock unknown sequence action {action} for {}",
+            invocation.operation
+        ))),
+    }
+}
+
+#[derive(Clone)]
+struct DelaySequenceState {
+    sequence: String,
+    next_index: usize,
+}
+
+fn delay_sequence_state() -> &'static Mutex<std::collections::HashMap<String, DelaySequenceState>>
+{
+    static STATE: OnceLock<Mutex<std::collections::HashMap<String, DelaySequenceState>>> =
+        OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn delay_for_env_sequence(key: &str) -> Option<u64> {
+    let sequence_key = match key {
+        JSON_DELAY_MS_ENV => JSON_DELAY_SEQUENCE_MS_ENV,
+        _ => return None,
+    };
+
+    let sequence = std::env::var(sequence_key).ok()?;
+    let values = sequence
+        .split(',')
+        .map(|value| value.trim().parse::<u64>().ok())
+        .collect::<Option<Vec<_>>>()?;
+    if values.is_empty() {
+        return None;
+    }
+
+    let mut state = delay_sequence_state().lock().ok()?;
+    let entry = state
+        .entry(sequence_key.to_owned())
+        .or_insert_with(|| DelaySequenceState {
+        sequence: sequence.clone(),
+        next_index: 0,
+    });
+    if entry.sequence != sequence {
+        entry.sequence = sequence;
+        entry.next_index = 0;
+    }
+
+    let index = entry.next_index.min(values.len().saturating_sub(1));
+    entry.next_index = entry.next_index.saturating_add(1);
+    values.get(index).copied()
+}
+
+fn next_env_sequence_value(key: &str) -> Option<String> {
+    let sequence = std::env::var(key).ok()?;
+    let values = sequence
+        .split(',')
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        return None;
+    }
+
+    let mut state = delay_sequence_state().lock().ok()?;
+    let entry = state.entry(key.to_owned()).or_insert_with(|| DelaySequenceState {
+        sequence: sequence.clone(),
+        next_index: 0,
+    });
+    if entry.sequence != sequence {
+        entry.sequence = sequence;
+        entry.next_index = 0;
+    }
+
+    let index = entry.next_index.min(values.len().saturating_sub(1));
+    entry.next_index = entry.next_index.saturating_add(1);
+    values.get(index).cloned()
 }

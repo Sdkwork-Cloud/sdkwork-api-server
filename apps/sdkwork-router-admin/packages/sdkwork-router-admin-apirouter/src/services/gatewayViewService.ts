@@ -2,7 +2,7 @@ import type {
   AdminWorkspaceSnapshot,
   ChannelRecord,
   CredentialRecord,
-  ProxyProviderRecord,
+  ProviderCatalogRecord,
 } from 'sdkwork-router-admin-types';
 
 export interface GatewayModelCatalogOption {
@@ -15,7 +15,7 @@ export interface GatewayModelCatalogOption {
 }
 
 export interface GatewayRouteInventoryRow {
-  provider: ProxyProviderRecord;
+  provider: ProviderCatalogRecord;
   channels: ChannelRecord[];
   credentials: CredentialRecord[];
   model_count: number;
@@ -42,7 +42,7 @@ function sortUniqueChannels(channels: ChannelRecord[]): ChannelRecord[] {
   return result.sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function providerChannelIds(provider: ProxyProviderRecord): string[] {
+function providerChannelIds(provider: ProviderCatalogRecord): string[] {
   const channelIds = new Set<string>([provider.channel_id]);
   for (const binding of provider.channel_bindings) {
     channelIds.add(binding.channel_id);

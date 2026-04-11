@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use sdkwork_api_app_credential::{
-    CredentialSecretManager, persist_credential_with_secret_and_manager,
+    persist_credential_with_secret_and_manager, CredentialSecretManager,
 };
 use sdkwork_api_app_gateway::{
     configure_gateway_provider_max_in_flight_limit, relay_chat_completion_from_store_with_options,
@@ -20,8 +20,8 @@ use sdkwork_api_domain_routing::RoutingPolicy;
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
 use sdkwork_api_observability::HttpMetricsRegistry;
 use sdkwork_api_provider_core::ProviderRequestOptions;
-use sdkwork_api_storage_sqlite::{SqliteAdminStore, run_migrations};
-use serde_json::{Value, json};
+use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
+use serde_json::{json, Value};
 use serial_test::serial;
 use tokio::sync::Notify;
 

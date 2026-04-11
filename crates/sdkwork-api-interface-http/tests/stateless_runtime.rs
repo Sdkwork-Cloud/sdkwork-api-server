@@ -27,3 +27,21 @@ fn stateless_gateway_config_accepts_custom_identity_and_upstream() {
     assert_eq!(upstream.base_url(), "https://example.com/v1");
     assert_eq!(upstream.api_key(), "sk-stateless");
 }
+
+#[test]
+fn stateless_gateway_config_accepts_default_plugin_upstream_shortcut() {
+    let config = StatelessGatewayConfig::new()
+        .with_identity("tenant-openrouter", "project-openrouter")
+        .try_with_default_plugin_upstream(
+            "openrouter",
+            "https://openrouter.ai/api/v1",
+            "sk-openrouter",
+        )
+        .expect("default plugin upstream should be accepted");
+
+    let upstream = config.upstream().expect("upstream should be configured");
+    assert_eq!(upstream.runtime_key(), "openrouter");
+    assert_eq!(upstream.protocol_kind(), "openai");
+    assert_eq!(upstream.base_url(), "https://openrouter.ai/api/v1");
+    assert_eq!(upstream.api_key(), "sk-openrouter");
+}

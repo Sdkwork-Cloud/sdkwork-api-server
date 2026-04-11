@@ -327,7 +327,6 @@ const ADMIN_ZH_MARKETING_TRANSLATIONS: Record<string, string> = {
   "Disable code": "\u505c\u7528\u5238\u7801",
   "Enable code": "\u542f\u7528\u5238\u7801",
   "Governance controls": "\u6cbb\u7406\u63a7\u5236",
-  "Legacy coupon compatibility": "\u65e7\u7248\u4f18\u60e0\u5238\u517c\u5bb9",
   "No budget linked": "\u672a\u5173\u8054\u9884\u7b97",
   "No campaign linked": "\u672a\u5173\u8054\u6d3b\u52a8",
   "No code linked": "\u672a\u5173\u8054\u5238\u7801",
@@ -335,8 +334,6 @@ const ADMIN_ZH_MARKETING_TRANSLATIONS: Record<string, string> = {
   "Pause campaign": "\u6682\u505c\u6d3b\u52a8",
   "Template status": "\u6a21\u677f\u72b6\u6001",
   "Template, campaign, budget, and code status controls let operators stop risk exposure or restore offers without editing the whole record.": "\u6a21\u677f\u3001\u6d3b\u52a8\u3001\u9884\u7b97\u548c\u5238\u7801\u72b6\u6001\u63a7\u5236\u53ef\u8ba9\u8fd0\u8425\u5728\u4e0d\u4fee\u6539\u6574\u6761\u8bb0\u5f55\u7684\u60c5\u51b5\u4e0b\u6b62\u635f\u6216\u6062\u590d\u4f18\u60e0\u3002",
-  "This record remains available for the compatibility layer while canonical marketing templates, budgets, codes, and rollbacks are governed in the marketing workbench.": "\u8be5\u8bb0\u5f55\u4ecd\u4fdd\u7559\u7ed9\u517c\u5bb9\u5c42\u4f7f\u7528\uff0c\u89c4\u8303\u5316\u7684\u8425\u9500\u6a21\u677f\u3001\u9884\u7b97\u3001\u5238\u7801\u548c\u56de\u6eda\u7531\u8425\u9500\u5de5\u4f5c\u53f0\u7edf\u4e00\u6cbb\u7406\u3002",
-  "Use this panel to review the historical coupon posture while the marketing control plane tracks the enterprise lifecycle around issuance and redemption.": "\u53ef\u5728\u6b64\u9762\u677f\u67e5\u770b\u5386\u53f2\u4f18\u60e0\u5238\u6001\u52bf\uff0c\u540c\u65f6\u7531\u8425\u9500\u63a7\u5236\u9762\u8ddf\u8e2a\u53d1\u653e\u548c\u5151\u6362\u76f8\u5173\u7684\u4f01\u4e1a\u7ea7\u751f\u547d\u5468\u671f\u3002",
   "missing": "\u7f3a\u5931",
 };
 

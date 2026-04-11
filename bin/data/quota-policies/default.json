@@ -1,0 +1,46 @@
+{
+  "quota_policies": [
+    {
+      "policy_id": "quota-default-live",
+      "project_id": "project_global_default",
+      "max_units": 50000000,
+      "enabled": true
+    },
+    {
+      "policy_id": "quota-default-staging",
+      "project_id": "project_global_default",
+      "max_units": 10000000,
+      "enabled": true
+    }
+  ],
+  "rate_limit_policies": [
+    {
+      "policy_id": "rate-limit-default-live",
+      "project_id": "project_global_default",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": null,
+      "requests_per_window": 600,
+      "window_seconds": 60,
+      "burst_requests": 900,
+      "enabled": true,
+      "notes": "default live responses rate limit",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "policy_id": "rate-limit-default-embeddings",
+      "project_id": "project_global_default",
+      "api_key_hash": null,
+      "route_key": "embeddings",
+      "model_name": null,
+      "requests_per_window": 300,
+      "window_seconds": 60,
+      "burst_requests": 450,
+      "enabled": true,
+      "notes": "default embeddings rate limit",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ]
+}

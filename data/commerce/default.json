@@ -1,0 +1,155 @@
+{
+  "orders": [
+    {
+      "order_id": "order-global-growth-bootstrap",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "target_kind": "subscription_plan",
+      "target_id": "plan-global-growth",
+      "target_name": "Global Growth",
+      "list_price_cents": 49900,
+      "payable_price_cents": 39900,
+      "list_price_label": "$499 / month",
+      "payable_price_label": "$399 / month",
+      "granted_units": 10000000,
+      "bonus_units": 1000000,
+      "currency_code": "USD",
+      "pricing_plan_id": "global-default-commercial",
+      "pricing_plan_version": 1,
+      "pricing_snapshot_json": "{\"plan_code\":\"global-default-commercial\",\"billing_interval\":\"monthly\",\"included_units\":10000000}",
+      "applied_coupon_code": "LAUNCH100",
+      "coupon_reservation_id": null,
+      "coupon_redemption_id": null,
+      "marketing_campaign_id": "campaign-launch-q2",
+      "subsidy_amount_minor": 10000,
+      "payment_method_id": "payment-stripe-hosted",
+      "latest_payment_attempt_id": "attempt-global-growth-bootstrap",
+      "status": "fulfilled",
+      "settlement_status": "settled",
+      "source": "bootstrap",
+      "refundable_amount_minor": 36000,
+      "refunded_amount_minor": 3900,
+      "created_at_ms": 1710000200000,
+      "updated_at_ms": 1710000200500
+    }
+  ],
+  "payment_attempts": [
+    {
+      "payment_attempt_id": "attempt-global-growth-bootstrap",
+      "order_id": "order-global-growth-bootstrap",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "payment_method_id": "payment-stripe-hosted",
+      "provider": "stripe",
+      "channel": "hosted_checkout",
+      "status": "succeeded",
+      "idempotency_key": "attempt:order-global-growth-bootstrap:1",
+      "attempt_sequence": 1,
+      "amount_minor": 39900,
+      "currency_code": "USD",
+      "captured_amount_minor": 39900,
+      "refunded_amount_minor": 3900,
+      "provider_payment_intent_id": "pi_global_growth_bootstrap",
+      "provider_checkout_session_id": "cs_global_growth_bootstrap",
+      "provider_reference": "stripe-payment-reference-global-growth-bootstrap",
+      "checkout_url": "https://checkout.stripe.com/pay/cs_global_growth_bootstrap",
+      "qr_code_payload": null,
+      "request_payload_json": "{\"order_id\":\"order-global-growth-bootstrap\",\"amount_minor\":39900,\"currency_code\":\"USD\"}",
+      "response_payload_json": "{\"payment_intent\":\"pi_global_growth_bootstrap\",\"status\":\"succeeded\"}",
+      "error_code": null,
+      "error_message": null,
+      "initiated_at_ms": 1710000200200,
+      "expires_at_ms": 1710000800200,
+      "completed_at_ms": 1710000200800,
+      "updated_at_ms": 1710000200900
+    }
+  ],
+  "payment_events": [
+    {
+      "payment_event_id": "payment-event-global-growth-bootstrap",
+      "order_id": "order-global-growth-bootstrap",
+      "project_id": "project_global_default",
+      "user_id": "bootstrap-system",
+      "provider": "stripe",
+      "provider_event_id": "evt_global_growth_bootstrap",
+      "dedupe_key": "stripe:evt_global_growth_bootstrap",
+      "event_type": "checkout.session.completed",
+      "payload_json": "{\"id\":\"evt_global_growth_bootstrap\",\"provider\":\"stripe\",\"mode\":\"subscription\"}",
+      "processing_status": "processed",
+      "processing_message": "bootstrap sample settled",
+      "received_at_ms": 1710000200600,
+      "processed_at_ms": 1710000200900,
+      "order_status_after": "fulfilled"
+    }
+  ],
+  "webhook_inbox_records": [
+    {
+      "webhook_inbox_id": "webhook-inbox-global-growth-bootstrap",
+      "provider": "stripe",
+      "payment_method_id": "payment-stripe-hosted",
+      "provider_event_id": "evt_global_growth_bootstrap",
+      "dedupe_key": "stripe:evt_global_growth_bootstrap",
+      "signature_header": "t=1710000200,v1=bootstrapsig",
+      "payload_json": "{\"id\":\"evt_global_growth_bootstrap\",\"type\":\"checkout.session.completed\",\"mode\":\"subscription\"}",
+      "processing_status": "processed",
+      "retry_count": 0,
+      "max_retry_count": 8,
+      "last_error_message": null,
+      "next_retry_at_ms": null,
+      "first_received_at_ms": 1710000200550,
+      "last_received_at_ms": 1710000200600,
+      "processed_at_ms": 1710000200900
+    }
+  ],
+  "refunds": [
+    {
+      "refund_id": "refund-global-growth-bootstrap",
+      "order_id": "order-global-growth-bootstrap",
+      "payment_attempt_id": "attempt-global-growth-bootstrap",
+      "payment_method_id": "payment-stripe-hosted",
+      "provider": "stripe",
+      "provider_refund_id": "re_global_growth_bootstrap",
+      "idempotency_key": "refund:order-global-growth-bootstrap:1",
+      "reason": "launch_credit_adjustment",
+      "status": "succeeded",
+      "amount_minor": 3900,
+      "currency_code": "USD",
+      "request_payload_json": "{\"amount_minor\":3900,\"reason\":\"launch_credit_adjustment\"}",
+      "response_payload_json": "{\"refund_id\":\"re_global_growth_bootstrap\",\"status\":\"succeeded\"}",
+      "created_at_ms": 1710000300000,
+      "updated_at_ms": 1710000300400,
+      "completed_at_ms": 1710000300400
+    }
+  ],
+  "reconciliation_runs": [
+    {
+      "reconciliation_run_id": "recon-run-global-growth-bootstrap",
+      "provider": "stripe",
+      "payment_method_id": "payment-stripe-hosted",
+      "scope_started_at_ms": 1710000000000,
+      "scope_ended_at_ms": 1710000600000,
+      "status": "completed",
+      "summary_json": "{\"matched\":1,\"refunds\":1,\"discrepancies\":1}",
+      "created_at_ms": 1710000400000,
+      "updated_at_ms": 1710000400500,
+      "completed_at_ms": 1710000400500
+    }
+  ],
+  "reconciliation_items": [
+    {
+      "reconciliation_item_id": "recon-item-global-growth-bootstrap",
+      "reconciliation_run_id": "recon-run-global-growth-bootstrap",
+      "order_id": "order-global-growth-bootstrap",
+      "payment_attempt_id": "attempt-global-growth-bootstrap",
+      "refund_id": "refund-global-growth-bootstrap",
+      "external_reference": "stripe:evt_global_growth_bootstrap",
+      "discrepancy_type": "manual_refund_review",
+      "status": "open",
+      "expected_amount_minor": 3900,
+      "provider_amount_minor": 3900,
+      "detail_json": "{\"note\":\"bootstrap refund captured and queued for finance review\"}",
+      "created_at_ms": 1710000400600,
+      "updated_at_ms": 1710000400600
+    }
+  ]
+}

@@ -1,0 +1,212 @@
+[
+  {
+    "external_name": "gpt-4.1",
+    "provider_id": "provider-openai-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "gpt-4.1-mini",
+    "provider_id": "provider-openai-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "gpt-4o-mini",
+    "provider_id": "provider-openai-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "text-embedding-3-small",
+    "provider_id": "provider-openai-official",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 8192
+  },
+  {
+    "external_name": "text-embedding-3-large",
+    "provider_id": "provider-openai-official",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 8192
+  },
+  {
+    "external_name": "claude-3-7-sonnet",
+    "provider_id": "provider-anthropic-official",
+    "capabilities": ["responses"],
+    "streaming": true,
+    "context_window": 200000
+  },
+  {
+    "external_name": "claude-3-5-haiku",
+    "provider_id": "provider-anthropic-official",
+    "capabilities": ["responses"],
+    "streaming": true,
+    "context_window": 200000
+  },
+  {
+    "external_name": "gemini-2.5-pro",
+    "provider_id": "provider-gemini-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 1048576
+  },
+  {
+    "external_name": "gemini-2.5-flash",
+    "provider_id": "provider-gemini-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 1048576
+  },
+  {
+    "external_name": "text-embedding-004",
+    "provider_id": "provider-gemini-official",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 2048
+  },
+  {
+    "external_name": "grok-4",
+    "provider_id": "provider-xai-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 256000
+  },
+  {
+    "external_name": "grok-3-mini",
+    "provider_id": "provider-xai-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 131072
+  },
+  {
+    "external_name": "deepseek-chat",
+    "provider_id": "provider-deepseek-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "deepseek-reasoner",
+    "provider_id": "provider-deepseek-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "qwen-max",
+    "provider_id": "provider-qwen-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 1000000
+  },
+  {
+    "external_name": "qwen-plus",
+    "provider_id": "provider-qwen-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 131072
+  },
+  {
+    "external_name": "text-embedding-v3",
+    "provider_id": "provider-qwen-official",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 8192
+  },
+  {
+    "external_name": "doubao-seed-1.6",
+    "provider_id": "provider-doubao-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 256000
+  },
+  {
+    "external_name": "doubao-seed-1.6-thinking",
+    "provider_id": "provider-doubao-official",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 256000
+  },
+  {
+    "external_name": "openai/gpt-4.1-mini",
+    "provider_id": "provider-openrouter-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "anthropic/claude-3.7-sonnet",
+    "provider_id": "provider-openrouter-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 200000
+  },
+  {
+    "external_name": "google/gemini-2.5-pro",
+    "provider_id": "provider-openrouter-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 1048576
+  },
+  {
+    "external_name": "deepseek/deepseek-chat",
+    "provider_id": "provider-openrouter-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "qwen/qwen-max",
+    "provider_id": "provider-openrouter-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 1000000
+  },
+  {
+    "external_name": "deepseek-ai/DeepSeek-V3",
+    "provider_id": "provider-siliconflow-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "Qwen/Qwen2.5-72B-Instruct",
+    "provider_id": "provider-siliconflow-main",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 131072
+  },
+  {
+    "external_name": "BAAI/bge-m3",
+    "provider_id": "provider-siliconflow-main",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 8192
+  },
+  {
+    "external_name": "llama3.2:latest",
+    "provider_id": "provider-ollama-local",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 8192
+  },
+  {
+    "external_name": "qwen2.5:14b",
+    "provider_id": "provider-ollama-local",
+    "capabilities": ["responses", "chat_completions"],
+    "streaming": true,
+    "context_window": 32768
+  },
+  {
+    "external_name": "nomic-embed-text:latest",
+    "provider_id": "provider-ollama-local",
+    "capabilities": ["embeddings"],
+    "streaming": false,
+    "context_window": 8192
+  }
+]

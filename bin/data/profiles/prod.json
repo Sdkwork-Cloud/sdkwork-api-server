@@ -1,0 +1,46 @@
+{
+  "profile_id": "prod",
+  "description": "Commercial-ready production bootstrap profile with official provider mappings, routing defaults, pricing, payments, and marketing scaffolding.",
+  "channels": [
+    "channels/default.json"
+  ],
+  "providers": [
+    "providers/default.json"
+  ],
+  "official_provider_configs": [
+    "official-provider-configs/default.json"
+  ],
+  "models": [
+    "models/default.json"
+  ],
+  "channel_models": [
+    "channel-models/default.json"
+  ],
+  "model_prices": [
+    "model-prices/default.json"
+  ],
+  "tenants": [
+    "tenants/default.json"
+  ],
+  "projects": [
+    "projects/default.json"
+  ],
+  "routing": [
+    "routing/default.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/default.json"
+  ],
+  "quota_policies": [
+    "quota-policies/default.json"
+  ],
+  "pricing": [
+    "pricing/default.json"
+  ],
+  "payment_methods": [
+    "payment-methods/default.json"
+  ],
+  "marketing": [
+    "marketing/default.json"
+  ]
+}

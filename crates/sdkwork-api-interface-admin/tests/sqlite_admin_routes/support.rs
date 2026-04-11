@@ -232,6 +232,26 @@ pub(super) fn native_dynamic_manifest(entrypoint: &Path) -> String {
             sdkwork_api_extension_core::CompatibilityLevel::Native,
         ))
         .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+            "anthropic.messages.create",
+            sdkwork_api_extension_core::CompatibilityLevel::Native,
+        ))
+        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+            "anthropic.messages.count_tokens",
+            sdkwork_api_extension_core::CompatibilityLevel::Native,
+        ))
+        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+            "gemini.generate_content",
+            sdkwork_api_extension_core::CompatibilityLevel::Native,
+        ))
+        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+            "gemini.stream_generate_content",
+            sdkwork_api_extension_core::CompatibilityLevel::Native,
+        ))
+        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+            "gemini.count_tokens",
+            sdkwork_api_extension_core::CompatibilityLevel::Native,
+        ))
+        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
             "audio.speech.create",
             sdkwork_api_extension_core::CompatibilityLevel::Native,
         ))

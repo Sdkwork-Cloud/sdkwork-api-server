@@ -1,0 +1,62 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI"
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic Claude"
+  },
+  {
+    "id": "gemini",
+    "name": "Google Gemini"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek"
+  },
+  {
+    "id": "qwen",
+    "name": "Alibaba Qwen"
+  },
+  {
+    "id": "doubao",
+    "name": "Doubao"
+  },
+  {
+    "id": "xai",
+    "name": "xAI Grok"
+  },
+  {
+    "id": "moonshot",
+    "name": "Moonshot Kimi"
+  },
+  {
+    "id": "zhipu",
+    "name": "Zhipu GLM"
+  },
+  {
+    "id": "hunyuan",
+    "name": "Tencent Hunyuan"
+  },
+  {
+    "id": "mistral",
+    "name": "Mistral AI"
+  },
+  {
+    "id": "cohere",
+    "name": "Cohere"
+  },
+  {
+    "id": "meta",
+    "name": "Meta Llama"
+  },
+  {
+    "id": "baai",
+    "name": "BAAI"
+  },
+  {
+    "id": "nomic",
+    "name": "Nomic"
+  }
+]

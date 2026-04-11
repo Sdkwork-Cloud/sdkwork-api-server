@@ -1,0 +1,23 @@
+[
+  {
+    "lot_id": 8001005,
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "account_id": 7001001,
+    "user_id": 3001,
+    "benefit_type": "cash_credit",
+    "source_type": "grant",
+    "source_id": null,
+    "scope_json": "{\"project_id\":\"project_global_default\",\"reserve_kind\":\"provider-operations\"}",
+    "original_quantity": 3500000.0,
+    "remaining_quantity": 3394600.0,
+    "held_quantity": 0.0,
+    "priority": 17,
+    "acquired_unit_cost": 0.0,
+    "issued_at_ms": 1710000471000,
+    "expires_at_ms": null,
+    "status": "active",
+    "created_at_ms": 1710000471000,
+    "updated_at_ms": 1710000484000
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "update_id": "2026-04-global-openrouter-channel-account-kernel",
+  "release_version": "2026.04.18",
+  "description": "Add account-kernel evidence for the channel-specific OpenRouter bootstrap routes so proxy-first xAI, Moonshot, and Mistral flows are inspectable end-to-end by default.",
+  "depends_on": [
+    "2026-04-global-openrouter-channel-coverage",
+    "2026-04-account-kernel-commercial-foundation"
+  ],
+  "account_benefit_lots": [
+    "account-benefit-lots/2026-04-global-openrouter-channel-account-kernel.json"
+  ],
+  "account_holds": [
+    "account-holds/2026-04-global-openrouter-channel-account-kernel.json"
+  ],
+  "account_ledger": [
+    "account-ledger/2026-04-global-openrouter-channel-account-kernel.json"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-global-openrouter-channel-account-kernel.json"
+  ],
+  "request_settlements": [
+    "request-settlements/2026-04-global-openrouter-channel-account-kernel.json"
+  ]
+}

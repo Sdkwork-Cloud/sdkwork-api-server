@@ -1,0 +1,12 @@
+[
+  {
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "account_id": 7001001,
+    "project_id": "project_global_default",
+    "last_order_updated_at_ms": 1710000200500,
+    "last_order_created_at_ms": 1710000200000,
+    "last_order_id": "order-global-growth-bootstrap",
+    "updated_at_ms": 1710000400600
+  }
+]

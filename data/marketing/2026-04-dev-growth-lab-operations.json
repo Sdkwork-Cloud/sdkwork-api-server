@@ -1,0 +1,84 @@
+{
+  "coupons": [
+    {
+      "id": "coupon-growth-lab-apac-30",
+      "code": "GROWTHAPAC30",
+      "discount_label": "$30 APAC launch credit",
+      "audience": "growth_lab_apac",
+      "remaining": 400,
+      "active": true,
+      "note": "Bootstrap credit for the growth_lab workspace APAC launch rehearsal flows.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710001503000
+    }
+  ],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-growth-lab-apac-30",
+      "template_key": "growth-lab-apac-credit-30",
+      "display_name": "Growth Lab APAC Credit 30",
+      "status": "active",
+      "distribution_kind": "unique_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 3000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 3000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 10000,
+        "first_order_only": true,
+        "new_customer_only": false,
+        "exclusive_group": "growth-lab-apac",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 1,
+        "eligible_target_kinds": [
+          "subscription_plan",
+          "recharge_pack"
+        ]
+      },
+      "created_at_ms": 1710001503000,
+      "updated_at_ms": 1710001503000
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-growth-lab-apac-launch",
+      "coupon_template_id": "template-growth-lab-apac-30",
+      "display_name": "Growth Lab APAC Launch",
+      "status": "active",
+      "start_at_ms": 1710001503000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710001503000,
+      "updated_at_ms": 1710001503000
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-growth-lab-apac-launch",
+      "marketing_campaign_id": "campaign-growth-lab-apac-launch",
+      "status": "active",
+      "total_budget_minor": 1500000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710001503000,
+      "updated_at_ms": 1710001503000
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-growth-lab-apac-30",
+      "coupon_template_id": "template-growth-lab-apac-30",
+      "code_value": "GLABAPAC3000",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710001503000,
+      "updated_at_ms": 1710001503000
+    }
+  ]
+}

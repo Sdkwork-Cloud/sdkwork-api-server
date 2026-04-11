@@ -68,6 +68,7 @@ test('windows installed runtime smoke script exposes a parseable CLI contract fo
     '-WaitSeconds',
     '120',
   ]);
+  assert.equal(plan.startCommand.stdio, 'ignore');
   assert.deepEqual(plan.stopCommand.args, [
     '-NoProfile',
     '-ExecutionPolicy',

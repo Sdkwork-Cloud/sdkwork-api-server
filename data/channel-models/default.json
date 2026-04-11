@@ -1,0 +1,460 @@
+[
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1",
+    "model_display_name": "GPT-4.1",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Primary OpenAI flagship for premium production traffic."
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "model_display_name": "GPT-4.1 Mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Low-cost OpenAI default for general traffic."
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4o-mini",
+    "model_display_name": "GPT-4o Mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Fast OpenAI omni model for interactive workloads."
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-small",
+    "model_display_name": "text-embedding-3-small",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "OpenAI cost-efficient embedding tier."
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-large",
+    "model_display_name": "text-embedding-3-large",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "OpenAI high-recall embedding tier."
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "model_display_name": "Claude 3.7 Sonnet",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 200000,
+    "description": "Anthropic flagship reasoning and coding model."
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-5-haiku",
+    "model_display_name": "Claude 3.5 Haiku",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 200000,
+    "description": "Anthropic low-latency model for cost-aware traffic."
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "model_display_name": "Gemini 2.5 Pro",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1048576,
+    "description": "Google flagship large-context model."
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-flash",
+    "model_display_name": "Gemini 2.5 Flash",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1048576,
+    "description": "Google fast model for latency-sensitive requests."
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "text-embedding-004",
+    "model_display_name": "text-embedding-004",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 2048,
+    "description": "Gemini ecosystem embedding model."
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "model_display_name": "DeepSeek Chat",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "DeepSeek commercial chat API default."
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-reasoner",
+    "model_display_name": "DeepSeek Reasoner",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "DeepSeek reasoning API model."
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-v3",
+    "model_display_name": "DeepSeek V3",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Canonical DeepSeek V3 route target for proxy and open-weight providers."
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-max",
+    "model_display_name": "Qwen Max",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000,
+    "description": "Qwen flagship commercial model."
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-plus",
+    "model_display_name": "Qwen Plus",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "description": "Balanced Qwen production model."
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "text-embedding-v3",
+    "model_display_name": "text-embedding-v3",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Qwen embedding model."
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-72b-instruct",
+    "model_display_name": "Qwen2.5 72B Instruct",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "description": "Canonical open-weight Qwen route target for proxy providers."
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-14b-instruct",
+    "model_display_name": "Qwen2.5 14B Instruct",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 32768,
+    "description": "Compact Qwen canonical model for local and edge runtimes."
+  },
+  {
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6",
+    "model_display_name": "Doubao Seed 1.6",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "Doubao commercial default."
+  },
+  {
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6-thinking",
+    "model_display_name": "Doubao Seed 1.6 Thinking",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "Doubao reasoning tier."
+  },
+  {
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "model_display_name": "Grok 4",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "xAI frontier model."
+  },
+  {
+    "channel_id": "xai",
+    "model_id": "grok-3-mini",
+    "model_display_name": "Grok 3 Mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "description": "xAI fast chat model."
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "model_display_name": "Kimi K2.5",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Moonshot flagship reasoning model."
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "moonshot-v1-128k",
+    "model_display_name": "Moonshot v1 128K",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Moonshot long-context commercial model."
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "glm-5",
+    "model_display_name": "GLM-5",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Zhipu flagship model."
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "glm-4.7",
+    "model_display_name": "GLM-4.7",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Zhipu balanced production model."
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "embedding-3",
+    "model_display_name": "Embedding-3",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Zhipu embedding model."
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-turbos-latest",
+    "model_display_name": "Hunyuan TurboS Latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "Tencent Hunyuan low-latency default."
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-t1-latest",
+    "model_display_name": "Hunyuan T1 Latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "Tencent Hunyuan reasoning model."
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-embedding",
+    "model_display_name": "Hunyuan Embedding",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Tencent Hunyuan embedding model."
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-large-latest",
+    "model_display_name": "Mistral Large Latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Mistral flagship model."
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-small-latest",
+    "model_display_name": "Mistral Small Latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Mistral low-cost general model."
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-embed",
+    "model_display_name": "Mistral Embed",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Mistral embedding model."
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "command-a-03-2025",
+    "model_display_name": "Command A 03 2025",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "description": "Cohere enterprise flagship."
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "command-r7b-12-2024",
+    "model_display_name": "Command R7B 12 2024",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Cohere efficient chat model."
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "embed-v4.0",
+    "model_display_name": "Embed v4.0",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Cohere embedding default."
+  },
+  {
+    "channel_id": "meta",
+    "model_id": "llama-3.2-3b-instruct",
+    "model_display_name": "Llama 3.2 3B Instruct",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 8192,
+    "description": "Canonical Meta Llama route target for local and proxy deployment."
+  },
+  {
+    "channel_id": "baai",
+    "model_id": "bge-m3",
+    "model_display_name": "BGE M3",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "BAAI multilingual embedding model."
+  },
+  {
+    "channel_id": "nomic",
+    "model_id": "nomic-embed-text-v1.5",
+    "model_display_name": "Nomic Embed Text v1.5",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "Nomic local embedding model."
+  }
+]

@@ -67,6 +67,9 @@ test('credits workspace routes canonical marketing wallet inventory and reward h
   assert.match(page, /Apply during checkout/);
   assert.match(page, /portal-redeem-wallet-table/);
   assert.match(page, /portal-redeem-reward-history-table/);
+  assert.match(page, /Arrived to account/);
+  assert.match(page, /No linked account lot evidence yet/);
+  assert.match(page, /No account arrival for checkout discount/);
 });
 
 test('credits services classify marketing coupon validation into self-service, checkout-only, and blocked flows', () => {

@@ -30,10 +30,16 @@ pub enum ExtensionModality {
     Music,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExtensionProtocol {
     #[serde(rename = "openai")]
     OpenAi,
+    #[serde(rename = "anthropic")]
+    Anthropic,
+    #[serde(rename = "gemini")]
+    Gemini,
+    #[serde(rename = "custom")]
+    Custom,
     #[serde(rename = "openrouter")]
     OpenRouter,
     #[serde(rename = "ollama")]
@@ -140,15 +146,38 @@ impl ExtensionRuntime {
             Self::Connector => "connector",
         }
     }
+
+    pub fn supports_raw_provider_execution(&self) -> bool {
+        matches!(self, Self::NativeDynamic)
+    }
+
+    pub fn supports_structured_retry_hints(&self) -> bool {
+        self.supports_raw_provider_execution()
+    }
 }
 
 impl ExtensionProtocol {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::OpenAi => "openai",
+            Self::Anthropic => "anthropic",
+            Self::Gemini => "gemini",
+            Self::Custom => "custom",
             Self::OpenRouter => "openrouter",
             Self::Ollama => "ollama",
         }
+    }
+
+    pub fn protocol_capability(self) -> Self {
+        match self {
+            Self::OpenRouter => Self::OpenAi,
+            Self::Ollama => Self::Custom,
+            other => other,
+        }
+    }
+
+    pub fn capability_key(self) -> &'static str {
+        self.protocol_capability().as_str()
     }
 }
 
@@ -195,6 +224,9 @@ impl FromStr for ExtensionProtocol {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "openai" => Ok(Self::OpenAi),
+            "anthropic" => Ok(Self::Anthropic),
+            "gemini" => Ok(Self::Gemini),
+            "custom" => Ok(Self::Custom),
             "openrouter" => Ok(Self::OpenRouter),
             "ollama" => Ok(Self::Ollama),
             other => Err(ParseExtensionProtocolError(format!(
@@ -295,6 +327,10 @@ impl ExtensionManifest {
     pub fn with_protocol(mut self, protocol: ExtensionProtocol) -> Self {
         self.protocol = Some(protocol);
         self
+    }
+
+    pub fn protocol_capability(&self) -> Option<ExtensionProtocol> {
+        self.protocol.map(ExtensionProtocol::protocol_capability)
     }
 
     pub fn with_runtime_compat_version(

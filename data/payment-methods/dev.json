@@ -1,0 +1,81 @@
+{
+  "payment_methods": [
+    {
+      "payment_method_id": "payment-stripe-test",
+      "display_name": "Stripe Test Checkout",
+      "description": "Sandbox checkout for local demo and staging verification.",
+      "provider": "stripe",
+      "channel": "hosted_checkout",
+      "mode": "test",
+      "enabled": true,
+      "sort_order": 5,
+      "capability_codes": ["checkout", "refund", "sandbox"],
+      "supported_currency_codes": ["USD"],
+      "supported_country_codes": ["US", "SG"],
+      "supported_order_kinds": ["subscription_plan", "recharge_pack", "custom_recharge"],
+      "callback_strategy": "webhook_signed",
+      "webhook_path": "/api/portal/commerce/webhooks/stripe/test",
+      "webhook_tolerance_seconds": 300,
+      "replay_window_seconds": 300,
+      "max_retry_count": 8,
+      "config_json": "{\"provider\":\"stripe\",\"mode\":\"test\"}",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "payment_method_id": "payment-dev-manual-credit",
+      "display_name": "Manual Dev Credit Approval",
+      "description": "Manual review flow for operator-driven sandbox credit grants.",
+      "provider": "manual_credit",
+      "channel": "manual_review",
+      "mode": "test",
+      "enabled": true,
+      "sort_order": 95,
+      "capability_codes": ["checkout", "manual_review", "sandbox"],
+      "supported_currency_codes": ["USD", "CNY"],
+      "supported_country_codes": [],
+      "supported_order_kinds": ["custom_recharge", "enterprise_contract"],
+      "callback_strategy": "manual_audit",
+      "webhook_path": null,
+      "webhook_tolerance_seconds": 300,
+      "replay_window_seconds": 300,
+      "max_retry_count": 3,
+      "config_json": "{\"provider\":\"manual_credit\",\"approval\":\"operator\"}",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ],
+  "credential_bindings": [],
+  "project_memberships": [
+    {
+      "membership_id": "membership-local-demo-growth",
+      "project_id": "project_local_demo",
+      "user_id": "bootstrap-system",
+      "plan_id": "plan-dev-growth",
+      "plan_name": "Developer Growth",
+      "price_cents": 0,
+      "price_label": "Included in bootstrap",
+      "cadence": "monthly",
+      "included_units": 3000000,
+      "status": "active",
+      "source": "bootstrap",
+      "activated_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "membership_id": "membership-partner-demo-growth",
+      "project_id": "project_partner_demo",
+      "user_id": "bootstrap-system",
+      "plan_id": "plan-partner-sandbox",
+      "plan_name": "Partner Sandbox",
+      "price_cents": 9900,
+      "price_label": "$99 / month",
+      "cadence": "monthly",
+      "included_units": 5000000,
+      "status": "active",
+      "source": "bootstrap",
+      "activated_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ]
+}

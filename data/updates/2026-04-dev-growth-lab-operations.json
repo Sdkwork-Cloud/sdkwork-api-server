@@ -1,0 +1,30 @@
+{
+  "update_id": "2026-04-dev-growth-lab-operations",
+  "release_version": "2026.04.11-dev",
+  "description": "Add growth_lab identity, commerce, billing, job, and marketing samples so developer deployments start with an operable APAC sandbox workspace.",
+  "depends_on": [
+    "2026-04-global-extension-activation",
+    "2026-04-dev-experience-expansion"
+  ],
+  "identities": [
+    "identities/2026-04-dev-growth-lab-operations.json"
+  ],
+  "observability": [
+    "observability/2026-04-dev-growth-lab-operations.json"
+  ],
+  "payment_methods": [
+    "payment-methods/2026-04-dev-growth-lab-operations.json"
+  ],
+  "marketing": [
+    "marketing/2026-04-dev-growth-lab-operations.json"
+  ],
+  "commerce": [
+    "commerce/2026-04-dev-growth-lab-operations.json"
+  ],
+  "billing": [
+    "billing/2026-04-dev-growth-lab-operations.json"
+  ],
+  "jobs": [
+    "jobs/2026-04-dev-growth-lab-operations.json"
+  ]
+}

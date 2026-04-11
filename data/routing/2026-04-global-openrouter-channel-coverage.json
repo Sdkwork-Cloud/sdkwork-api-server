@@ -1,0 +1,130 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-global-openrouter-xai",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global OpenRouter xAI",
+      "slug": "global-openrouter-xai",
+      "description": "Proxy-first profile for Grok traffic through OpenRouter with official xAI fallback.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 16,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000485000,
+      "updated_at_ms": 1710000485000
+    },
+    {
+      "profile_id": "profile-global-openrouter-moonshot",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global OpenRouter Moonshot",
+      "slug": "global-openrouter-moonshot",
+      "description": "Proxy-first profile for Kimi traffic through OpenRouter with official Moonshot fallback.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000486000,
+      "updated_at_ms": 1710000486000
+    },
+    {
+      "profile_id": "profile-global-openrouter-mistral",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global OpenRouter Mistral",
+      "slug": "global-openrouter-mistral",
+      "description": "Proxy-first profile for Mistral traffic through OpenRouter with official Mistral fallback.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000487000,
+      "updated_at_ms": 1710000487000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-openrouter-xai-responses",
+      "capability": "responses",
+      "model_pattern": "grok-*",
+      "enabled": true,
+      "priority": 75,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 16,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1500
+    },
+    {
+      "policy_id": "policy-openrouter-moonshot-responses",
+      "capability": "responses",
+      "model_pattern": "kimi-*",
+      "enabled": true,
+      "priority": 74,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1500
+    },
+    {
+      "policy_id": "policy-openrouter-mistral-responses",
+      "capability": "responses",
+      "model_pattern": "mistral-large-*",
+      "enabled": true,
+      "priority": 73,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1500
+    }
+  ],
+  "project_preferences": []
+}

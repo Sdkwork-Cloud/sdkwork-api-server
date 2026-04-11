@@ -34,7 +34,15 @@ test('admin coupon workspace pulls canonical marketing governance records into t
   assert.match(workbench, /listMarketingCouponRedemptions/);
   assert.match(workbench, /listMarketingCouponRollbacks/);
   assert.match(adminApi, /updateMarketingCouponTemplateStatus/);
+  assert.match(adminApi, /publishMarketingCouponTemplate/);
+  assert.match(adminApi, /scheduleMarketingCouponTemplate/);
+  assert.match(adminApi, /retireMarketingCouponTemplate/);
+  assert.match(adminApi, /listMarketingCouponTemplateLifecycleAudits/);
   assert.match(adminApi, /updateMarketingCampaignStatus/);
+  assert.match(adminApi, /publishMarketingCampaign/);
+  assert.match(adminApi, /scheduleMarketingCampaign/);
+  assert.match(adminApi, /retireMarketingCampaign/);
+  assert.match(adminApi, /listMarketingCampaignLifecycleAudits/);
   assert.match(adminApi, /updateMarketingCampaignBudgetStatus/);
   assert.match(adminApi, /updateMarketingCouponCodeStatus/);
   assert.match(workbenchActions, /handleUpdateMarketingCouponTemplateStatus/);
@@ -59,7 +67,7 @@ test('admin coupon workspace pulls canonical marketing governance records into t
   assert.match(couponsPage, /onUpdateMarketingCampaignStatus/);
   assert.match(couponsPage, /onUpdateMarketingCampaignBudgetStatus/);
   assert.match(couponsPage, /onUpdateMarketingCouponCodeStatus/);
-  assert.match(detailPanel, /Legacy coupon compatibility/);
+  assert.doesNotMatch(detailPanel, /Legacy coupon compatibility/);
   assert.match(detailPanel, /Governance controls/);
   assert.match(detailPanel, /Template status/);
   assert.match(detailPanel, /Campaign status/);

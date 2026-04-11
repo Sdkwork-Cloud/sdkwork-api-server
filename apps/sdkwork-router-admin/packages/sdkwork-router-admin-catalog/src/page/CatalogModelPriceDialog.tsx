@@ -15,12 +15,17 @@ import {
   FormGrid,
   FormSection,
   Input,
+  Textarea,
 } from '@sdkwork/ui-pc-react';
-import { useAdminI18n } from 'sdkwork-router-admin-core';
+import {
+  recommendedModelPriceSourceKind,
+  useAdminI18n,
+} from 'sdkwork-router-admin-core';
 import type { AdminPageProps } from 'sdkwork-router-admin-types';
 
 import {
   DialogField,
+  MODEL_PRICE_SOURCE_OPTIONS,
   PRICE_UNIT_OPTIONS,
   SelectField,
   type ModelPriceDraft,
@@ -46,6 +51,33 @@ export function CatalogModelPriceDialog({
   snapshot,
 }: CatalogModelPriceDialogProps) {
   const { t } = useAdminI18n();
+  const eligibleProviderIds = new Set(
+    snapshot.providerModels
+      .filter(
+        (record) =>
+          record.channel_id === modelPriceDraft.channel_id
+          && record.model_id === modelPriceDraft.model_id
+          && record.is_active,
+      )
+      .map((record) => record.proxy_provider_id),
+  );
+  const providerOptions = snapshot.providers
+    .filter((provider) =>
+      eligibleProviderIds.size === 0 || eligibleProviderIds.has(provider.id),
+    )
+    .map((provider) => ({
+      label: `${provider.display_name} (${provider.id})`,
+      value: provider.id,
+    }));
+  const selectedProvider = snapshot.providers.find(
+    (provider) => provider.id === modelPriceDraft.proxy_provider_id,
+  );
+  const selectedProviderModel = snapshot.providerModels.find(
+    (record) =>
+      record.proxy_provider_id === modelPriceDraft.proxy_provider_id
+      && record.channel_id === modelPriceDraft.channel_id
+      && record.model_id === modelPriceDraft.model_id,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -55,7 +87,7 @@ export function CatalogModelPriceDialog({
             {editingModelPriceKey ? t('Edit model pricing') : t('Add model pricing')}
           </DialogTitle>
           <DialogDescription>
-            {t('Provider-specific pricing rows stay aligned with the selected publication.')}
+            {t('Provider-specific pricing rows stay aligned with provider-supported canonical publications and keep official, proxy, and local pricing posture explicit.')}
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-6" onSubmit={onSubmit}>
@@ -70,17 +102,32 @@ export function CatalogModelPriceDialog({
               <SelectField
                 label={t('Provider')}
                 onValueChange={(value) =>
-                  setModelPriceDraft((current) => ({
-                    ...current,
-                    proxy_provider_id: value,
-                  }))
+                  setModelPriceDraft((current) => {
+                    const provider = snapshot.providers.find((entry) => entry.id === value);
+                    return {
+                      ...current,
+                      proxy_provider_id: value,
+                      price_source_kind:
+                        recommendedModelPriceSourceKind(provider),
+                    };
+                  })
                 }
-                options={snapshot.providers.map((provider) => ({
-                  label: `${provider.display_name} (${provider.id})`,
-                  value: provider.id,
-                }))}
+                options={providerOptions}
                 value={modelPriceDraft.proxy_provider_id}
               />
+              <DialogField
+                label={t('Provider model mapping')}
+                description={selectedProviderModel
+                  ? t('Provider model id: {id}', {
+                      id: selectedProviderModel.provider_model_id,
+                    })
+                  : t('Pricing can only be attached to provider-model records that already exist.')}
+              >
+                <Input
+                  disabled
+                  value={selectedProviderModel?.provider_model_family || t('Provider model family not set')}
+                />
+              </DialogField>
               <DialogField htmlFor="price-currency" label={t('Currency code')}>
                 <Input
                   id="price-currency"
@@ -108,6 +155,36 @@ export function CatalogModelPriceDialog({
                 }))}
                 value={modelPriceDraft.price_unit}
               />
+              <SelectField
+                label={t('Price source')}
+                onValueChange={(value) =>
+                  setModelPriceDraft((current) => ({
+                    ...current,
+                    price_source_kind: value,
+                  }))
+                }
+                options={MODEL_PRICE_SOURCE_OPTIONS.map((option) => ({
+                  label: t(option.label),
+                  value: option.value,
+                }))}
+                value={modelPriceDraft.price_source_kind}
+              />
+              <DialogField
+                label={t('Pricing guidance')}
+                description={selectedProvider
+                  ? t(
+                      'Recommended source kind for this provider is {kind}. Official providers usually stay official, proxy providers stay proxy, and Ollama/local runtimes stay local.',
+                      {
+                        kind: recommendedModelPriceSourceKind(selectedProvider),
+                      },
+                    )
+                  : t('Select a provider-model to inherit the recommended pricing posture.')}
+              >
+                <Input
+                  disabled
+                  value={selectedProvider?.display_name ?? t('No provider selected')}
+                />
+              </DialogField>
               <DialogField htmlFor="price-input" label={t('Input price')}>
                 <Input
                   id="price-input"
@@ -192,6 +269,54 @@ export function CatalogModelPriceDialog({
                 ]}
                 value={modelPriceDraft.is_active ? 'active' : 'inactive'}
               />
+              <DialogField
+                htmlFor="price-billing-notes"
+                label={t('Billing notes')}
+                description={t('Describe official billing posture, pass-through proxy policy, or local cost-allocation assumptions.')}
+              >
+                <Textarea
+                  id="price-billing-notes"
+                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      billing_notes: event.target.value,
+                    }))
+                  }
+                  rows={4}
+                  value={modelPriceDraft.billing_notes}
+                />
+              </DialogField>
+              <DialogField
+                htmlFor="price-pricing-tiers-json"
+                label={t('Pricing tiers JSON')}
+                description={t('Optional JSON array for prompt-length, modality, cache-window, or request-specific price tiers.')}
+              >
+                <Textarea
+                  id="price-pricing-tiers-json"
+                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                    setModelPriceDraft((current) => ({
+                      ...current,
+                      pricing_tiers_json: event.target.value,
+                    }))
+                  }
+                  placeholder={`[
+  {
+    "tier_id": "default",
+    "display_name": "Default",
+    "condition_kind": "default",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2.5,
+    "output_price": 10,
+    "cache_read_price": 0.3,
+    "cache_write_price": 1,
+    "request_price": 0
+  }
+]`}
+                  rows={10}
+                  value={modelPriceDraft.pricing_tiers_json}
+                />
+              </DialogField>
             </FormGrid>
           </FormSection>
           <FormActions>

@@ -39,6 +39,36 @@ pub trait MarketingStore: AdminStore {
             .find(|record| record.template_key == template_key))
     }
 
+    async fn insert_coupon_template_lifecycle_audit_record(
+        &self,
+        _record: &CouponTemplateLifecycleAuditRecord,
+    ) -> Result<CouponTemplateLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_coupon_template_lifecycle_audit_record",
+        ))
+    }
+
+    async fn list_coupon_template_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_coupon_template_lifecycle_audit_records",
+        ))
+    }
+
+    async fn list_coupon_template_lifecycle_audit_records_for_template(
+        &self,
+        coupon_template_id: &str,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        Ok(AdminStore::list_coupon_template_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.coupon_template_id == coupon_template_id)
+            .collect())
+    }
+
     async fn insert_marketing_campaign_record(
         &self,
         _record: &MarketingCampaignRecord,
@@ -67,6 +97,36 @@ pub trait MarketingStore: AdminStore {
             .collect())
     }
 
+    async fn insert_marketing_campaign_lifecycle_audit_record(
+        &self,
+        _record: &MarketingCampaignLifecycleAuditRecord,
+    ) -> Result<MarketingCampaignLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_marketing_campaign_lifecycle_audit_record",
+        ))
+    }
+
+    async fn list_marketing_campaign_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_marketing_campaign_lifecycle_audit_records",
+        ))
+    }
+
+    async fn list_marketing_campaign_lifecycle_audit_records_for_campaign(
+        &self,
+        marketing_campaign_id: &str,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        Ok(AdminStore::list_marketing_campaign_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.marketing_campaign_id == marketing_campaign_id)
+            .collect())
+    }
+
     async fn insert_campaign_budget_record(
         &self,
         _record: &CampaignBudgetRecord,
@@ -92,6 +152,36 @@ pub trait MarketingStore: AdminStore {
             .await?
             .into_iter()
             .filter(|record| record.marketing_campaign_id == marketing_campaign_id)
+            .collect())
+    }
+
+    async fn insert_campaign_budget_lifecycle_audit_record(
+        &self,
+        _record: &CampaignBudgetLifecycleAuditRecord,
+    ) -> Result<CampaignBudgetLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_campaign_budget_lifecycle_audit_record",
+        ))
+    }
+
+    async fn list_campaign_budget_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_campaign_budget_lifecycle_audit_records",
+        ))
+    }
+
+    async fn list_campaign_budget_lifecycle_audit_records_for_budget(
+        &self,
+        campaign_budget_id: &str,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        Ok(AdminStore::list_campaign_budget_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.campaign_budget_id == campaign_budget_id)
             .collect())
     }
 
@@ -140,6 +230,36 @@ pub trait MarketingStore: AdminStore {
             .await?
             .into_iter()
             .filter(|record| record.is_redeemable_at(now_ms))
+            .collect())
+    }
+
+    async fn insert_coupon_code_lifecycle_audit_record(
+        &self,
+        _record: &CouponCodeLifecycleAuditRecord,
+    ) -> Result<CouponCodeLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_coupon_code_lifecycle_audit_record",
+        ))
+    }
+
+    async fn list_coupon_code_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_coupon_code_lifecycle_audit_records",
+        ))
+    }
+
+    async fn list_coupon_code_lifecycle_audit_records_for_code(
+        &self,
+        coupon_code_id: &str,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        Ok(AdminStore::list_coupon_code_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.coupon_code_id == coupon_code_id)
             .collect())
     }
 

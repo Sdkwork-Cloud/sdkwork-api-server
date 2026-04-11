@@ -60,8 +60,95 @@ pub(crate) struct UpdateCouponTemplateStatusRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CloneCouponTemplateRequest {
+    pub(crate) coupon_template_id: String,
+    pub(crate) template_key: String,
+    #[serde(default)]
+    pub(crate) display_name: Option<String>,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CompareCouponTemplateRequest {
+    pub(crate) target_coupon_template_id: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct SubmitCouponTemplateForApprovalRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ApproveCouponTemplateRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RejectCouponTemplateRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct PublishCouponTemplateRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ScheduleCouponTemplateRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RetireCouponTemplateRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct UpdateMarketingCampaignStatusRequest {
     pub(crate) status: MarketingCampaignStatus,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CloneMarketingCampaignRequest {
+    pub(crate) marketing_campaign_id: String,
+    #[serde(default)]
+    pub(crate) display_name: Option<String>,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CompareMarketingCampaignRequest {
+    pub(crate) target_marketing_campaign_id: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct SubmitMarketingCampaignForApprovalRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ApproveMarketingCampaignRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RejectMarketingCampaignRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct PublishMarketingCampaignRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ScheduleMarketingCampaignRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RetireMarketingCampaignRequest {
+    pub(crate) reason: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -70,8 +157,28 @@ pub(crate) struct UpdateCampaignBudgetStatusRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ActivateCampaignBudgetRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CloseCampaignBudgetRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct UpdateCouponCodeStatusRequest {
     pub(crate) status: CouponCodeStatus,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct DisableCouponCodeRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RestoreCouponCodeRequest {
+    pub(crate) reason: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -118,24 +225,59 @@ pub(crate) struct CreateChannelRequest {
     pub(crate) name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct CreateProviderRequest {
     pub(crate) id: String,
     pub(crate) channel_id: String,
     #[serde(default)]
     pub(crate) extension_id: Option<String>,
     #[serde(default)]
+    pub(crate) protocol_kind: Option<String>,
+    #[serde(default)]
     pub(crate) channel_bindings: Vec<CreateProviderChannelBindingRequest>,
-    pub(crate) adapter_kind: String,
+    #[serde(default)]
+    pub(crate) adapter_kind: Option<String>,
+    #[serde(default)]
+    pub(crate) default_plugin_family: Option<String>,
     pub(crate) base_url: String,
     pub(crate) display_name: String,
+    #[serde(default)]
+    pub(crate) supported_models: Option<Vec<CreateProviderModelRequest>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct CreateProviderChannelBindingRequest {
     pub(crate) channel_id: String,
     #[serde(default)]
     pub(crate) is_primary: bool,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CreateProviderModelRequest {
+    pub(crate) channel_id: String,
+    pub(crate) model_id: String,
+    #[serde(default)]
+    pub(crate) provider_model_id: Option<String>,
+    #[serde(default)]
+    pub(crate) provider_model_family: Option<String>,
+    #[serde(default)]
+    pub(crate) capabilities: Vec<ModelCapability>,
+    #[serde(default)]
+    pub(crate) streaming: Option<bool>,
+    #[serde(default)]
+    pub(crate) context_window: Option<u64>,
+    #[serde(default)]
+    pub(crate) max_output_tokens: Option<u64>,
+    #[serde(default)]
+    pub(crate) supports_prompt_caching: bool,
+    #[serde(default)]
+    pub(crate) supports_reasoning_usage: bool,
+    #[serde(default)]
+    pub(crate) supports_tool_usage_metrics: bool,
+    #[serde(default)]
+    pub(crate) is_default_route: bool,
+    #[serde(default = "default_true")]
+    pub(crate) is_active: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,6 +286,56 @@ pub(crate) struct CreateCredentialRequest {
     pub(crate) provider_id: String,
     pub(crate) key_reference: String,
     pub(crate) secret_value: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpsertOfficialProviderConfigRequest {
+    pub(crate) provider_id: String,
+    pub(crate) base_url: String,
+    pub(crate) enabled: bool,
+    #[serde(default)]
+    pub(crate) api_key: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct OfficialProviderConfigResponse {
+    pub(crate) provider_id: String,
+    pub(crate) base_url: String,
+    pub(crate) enabled: bool,
+    pub(crate) secret_configured: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub(crate) struct ListProvidersQuery {
+    #[serde(default)]
+    pub(crate) tenant_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ProviderCatalogResponse {
+    #[serde(flatten)]
+    pub(crate) provider: ProxyProvider,
+    pub(crate) integration: sdkwork_api_app_catalog::ProviderIntegrationView,
+    pub(crate) execution: sdkwork_api_app_gateway::ProviderExecutionView,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) credential_readiness:
+        Option<sdkwork_api_app_credential::ProviderCredentialReadinessView>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ProviderCreateResponse {
+    #[serde(flatten)]
+    pub(crate) provider: ProxyProvider,
+    pub(crate) integration: sdkwork_api_app_catalog::ProviderIntegrationView,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct TenantProviderReadinessResponse {
+    pub(crate) id: String,
+    pub(crate) display_name: String,
+    pub(crate) protocol_kind: String,
+    pub(crate) integration: sdkwork_api_app_catalog::ProviderIntegrationView,
+    pub(crate) credential_readiness: sdkwork_api_app_credential::ProviderCredentialReadinessView,
 }
 
 #[derive(Debug, Deserialize)]
@@ -204,6 +396,18 @@ fn default_pricing_status() -> String {
     "draft".to_owned()
 }
 
+fn default_model_price_source_kind() -> String {
+    "reference".to_owned()
+}
+
+fn default_provider_account_owner_scope() -> String {
+    "platform".to_owned()
+}
+
+fn default_provider_account_weight() -> u32 {
+    100
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct CreateModelPriceRequest {
     pub(crate) channel_id: String,
@@ -223,8 +427,55 @@ pub(crate) struct CreateModelPriceRequest {
     pub(crate) cache_write_price: f64,
     #[serde(default)]
     pub(crate) request_price: f64,
+    #[serde(default = "default_model_price_source_kind")]
+    pub(crate) price_source_kind: String,
+    #[serde(default)]
+    pub(crate) billing_notes: Option<String>,
+    #[serde(default)]
+    pub(crate) pricing_tiers: Vec<ModelPriceTier>,
     #[serde(default = "default_true")]
     pub(crate) is_active: bool,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CreateProviderAccountRequest {
+    pub(crate) provider_account_id: String,
+    pub(crate) provider_id: String,
+    pub(crate) display_name: String,
+    pub(crate) account_kind: String,
+    #[serde(default = "default_provider_account_owner_scope")]
+    pub(crate) owner_scope: String,
+    #[serde(default)]
+    pub(crate) owner_tenant_id: Option<String>,
+    pub(crate) execution_instance_id: String,
+    #[serde(default)]
+    pub(crate) base_url_override: Option<String>,
+    #[serde(default)]
+    pub(crate) region: Option<String>,
+    #[serde(default)]
+    pub(crate) priority: i32,
+    #[serde(default = "default_provider_account_weight")]
+    pub(crate) weight: u32,
+    #[serde(default = "default_true")]
+    pub(crate) enabled: bool,
+    #[serde(default)]
+    pub(crate) routing_tags: Vec<String>,
+    #[serde(default)]
+    pub(crate) health_score_hint: Option<f64>,
+    #[serde(default)]
+    pub(crate) latency_ms_hint: Option<u64>,
+    #[serde(default)]
+    pub(crate) cost_hint: Option<f64>,
+    #[serde(default)]
+    pub(crate) success_rate_hint: Option<f64>,
+    #[serde(default)]
+    pub(crate) throughput_hint: Option<f64>,
+    #[serde(default)]
+    pub(crate) max_concurrency: Option<u32>,
+    #[serde(default)]
+    pub(crate) daily_budget: Option<f64>,
+    #[serde(default)]
+    pub(crate) notes: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -238,18 +489,6 @@ pub(crate) struct CreateProjectRequest {
     pub(crate) tenant_id: String,
     pub(crate) id: String,
     pub(crate) name: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct CreateCouponRequest {
-    pub(crate) id: String,
-    pub(crate) code: String,
-    pub(crate) discount_label: String,
-    pub(crate) audience: String,
-    pub(crate) remaining: u64,
-    pub(crate) active: bool,
-    pub(crate) note: String,
-    pub(crate) expires_on: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -472,6 +711,21 @@ pub(crate) struct ScheduleCommercialPricingPlanRequest {}
 
 #[derive(Debug, Deserialize, Default)]
 pub(crate) struct RetireCommercialPricingPlanRequest {}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct PublishCommercialCatalogPublicationRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct ScheduleCommercialCatalogPublicationRequest {
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct RetireCommercialCatalogPublicationRequest {
+    pub(crate) reason: String,
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct CreateCommercialPricingRateRequest {

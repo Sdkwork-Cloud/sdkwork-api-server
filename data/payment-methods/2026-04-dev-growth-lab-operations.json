@@ -1,0 +1,21 @@
+{
+  "payment_methods": [],
+  "credential_bindings": [],
+  "project_memberships": [
+    {
+      "membership_id": "membership-growth-lab-apac",
+      "project_id": "project_growth_lab",
+      "user_id": "bootstrap-system",
+      "plan_id": "plan-growth-lab-apac",
+      "plan_name": "Growth Lab APAC",
+      "price_cents": 14900,
+      "price_label": "$149 / month",
+      "cadence": "monthly",
+      "included_units": 8000000,
+      "status": "active",
+      "source": "bootstrap_update",
+      "activated_at_ms": 1710001502000,
+      "updated_at_ms": 1710001502000
+    }
+  ]
+}

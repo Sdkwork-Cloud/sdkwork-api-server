@@ -41,8 +41,9 @@ use sdkwork_api_app_commerce::{
     list_portal_commerce_payment_methods, list_project_commerce_orders,
     load_portal_commerce_catalog, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_portal_commerce_payment_attempt,
-    load_project_membership, preview_portal_commerce_quote, process_portal_stripe_webhook,
-    reclaim_expired_coupon_reservations_for_code_if_needed,
+    load_project_membership, portal_commerce_product_kind,
+    portal_commerce_transaction_kind, preview_portal_commerce_quote,
+    process_portal_stripe_webhook, reclaim_expired_coupon_reservations_for_code_if_needed,
     settle_portal_commerce_order_with_billing, submit_portal_commerce_order, CommerceError,
     CommercePaymentAttemptRecord, PaymentMethodRecord, PortalCommerceCatalog,
     PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
@@ -64,8 +65,8 @@ use sdkwork_api_app_jobs::{
     find_async_job, list_async_job_assets, list_async_job_attempts, list_async_jobs,
 };
 use sdkwork_api_app_marketing::{
-    confirm_coupon_redemption, project_legacy_coupon_campaign, reserve_coupon_redemption,
-    rollback_coupon_redemption, validate_coupon_stack, CouponValidationDecision,
+    confirm_coupon_redemption, reserve_coupon_redemption, rollback_coupon_redemption,
+    validate_coupon_stack, CouponValidationDecision,
 };
 use sdkwork_api_app_rate_limit::{
     check_coupon_rate_limit, coupon_actor_bucket, CouponRateLimitAction,
@@ -696,12 +697,12 @@ async fn load_portal_commerce_reconciliation_summary(
         .unwrap_or_default();
     let latest_order_updated_at_ms = order_center_entries
         .iter()
-        .map(|entry| entry.order.updated_at_ms)
+        .map(|entry| entry.order.order.updated_at_ms)
         .max()
         .unwrap_or_default();
     let backlog_order_count = order_center_entries
         .iter()
-        .filter(|entry| entry.order.updated_at_ms > last_reconciled_order_updated_at_ms)
+        .filter(|entry| entry.order.order.updated_at_ms > last_reconciled_order_updated_at_ms)
         .count();
 
     Ok(Some(PortalCommerceReconciliationSummary {

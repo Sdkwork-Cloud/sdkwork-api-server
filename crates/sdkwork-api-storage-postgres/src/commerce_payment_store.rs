@@ -215,48 +215,7 @@ impl PostgresAdminStore {
             .await?
             .is_some()
         {
-            sqlx::query(
-                "UPDATE ai_commerce_payment_attempts
-                 SET order_id = $1, project_id = $2, user_id = $3, payment_method_id = $4,
-                     provider = $5, channel = $6, status = $7, idempotency_key = $8,
-                     attempt_sequence = $9, amount_minor = $10, currency_code = $11,
-                     captured_amount_minor = $12, refunded_amount_minor = $13,
-                     provider_payment_intent_id = $14, provider_checkout_session_id = $15,
-                     provider_reference = $16, checkout_url = $17, qr_code_payload = $18,
-                     request_payload_json = $19, response_payload_json = $20, error_code = $21,
-                     error_message = $22, initiated_at_ms = $23, expires_at_ms = $24,
-                     completed_at_ms = $25, updated_at_ms = $26
-                 WHERE payment_attempt_id = $27",
-            )
-            .bind(&attempt.order_id)
-            .bind(&attempt.project_id)
-            .bind(&attempt.user_id)
-            .bind(&attempt.payment_method_id)
-            .bind(&attempt.provider)
-            .bind(&attempt.channel)
-            .bind(&attempt.status)
-            .bind(&attempt.idempotency_key)
-            .bind(i64::from(attempt.attempt_sequence))
-            .bind(i64::try_from(attempt.amount_minor)?)
-            .bind(&attempt.currency_code)
-            .bind(i64::try_from(attempt.captured_amount_minor)?)
-            .bind(i64::try_from(attempt.refunded_amount_minor)?)
-            .bind(&attempt.provider_payment_intent_id)
-            .bind(&attempt.provider_checkout_session_id)
-            .bind(&attempt.provider_reference)
-            .bind(&attempt.checkout_url)
-            .bind(&attempt.qr_code_payload)
-            .bind(&attempt.request_payload_json)
-            .bind(&attempt.response_payload_json)
-            .bind(&attempt.error_code)
-            .bind(&attempt.error_message)
-            .bind(i64::try_from(attempt.initiated_at_ms)?)
-            .bind(attempt.expires_at_ms.map(i64::try_from).transpose()?)
-            .bind(attempt.completed_at_ms.map(i64::try_from).transpose()?)
-            .bind(i64::try_from(attempt.updated_at_ms)?)
-            .bind(&attempt.payment_attempt_id)
-            .execute(&self.pool)
-            .await?;
+            self.update_commerce_payment_attempt_row(attempt).await?;
             return Ok(attempt.clone());
         }
 
@@ -275,7 +234,7 @@ impl PostgresAdminStore {
             ));
         }
 
-        sqlx::query(
+        let insert_result = sqlx::query(
             "INSERT INTO ai_commerce_payment_attempts (
                 payment_attempt_id,
                 order_id,
@@ -338,8 +297,88 @@ impl PostgresAdminStore {
         .bind(attempt.completed_at_ms.map(i64::try_from).transpose()?)
         .bind(i64::try_from(attempt.updated_at_ms)?)
         .execute(&self.pool)
+        .await;
+
+        match insert_result {
+            Ok(_) => Ok(attempt.clone()),
+            Err(error) if postgres_error_is_unique_violation(&error) => {
+                if self
+                    .find_commerce_payment_attempt(&attempt.payment_attempt_id)
+                    .await?
+                    .is_some()
+                {
+                    self.update_commerce_payment_attempt_row(attempt).await?;
+                    return Ok(attempt.clone());
+                }
+
+                if let Some(existing) = self
+                    .find_commerce_payment_attempt_by_idempotency_key(&attempt.idempotency_key)
+                    .await?
+                {
+                    if existing.order_id == attempt.order_id
+                        && existing.payment_method_id == attempt.payment_method_id
+                    {
+                        return Ok(existing);
+                    }
+                    return Err(anyhow!(
+                        "payment attempt idempotency key {} already belongs to another order or payment method",
+                        attempt.idempotency_key
+                    ));
+                }
+
+                Err(error.into())
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    async fn update_commerce_payment_attempt_row(
+        &self,
+        attempt: &CommercePaymentAttemptRecord,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE ai_commerce_payment_attempts
+             SET order_id = $1, project_id = $2, user_id = $3, payment_method_id = $4,
+                 provider = $5, channel = $6, status = $7, idempotency_key = $8,
+                 attempt_sequence = $9, amount_minor = $10, currency_code = $11,
+                 captured_amount_minor = $12, refunded_amount_minor = $13,
+                 provider_payment_intent_id = $14, provider_checkout_session_id = $15,
+                 provider_reference = $16, checkout_url = $17, qr_code_payload = $18,
+                 request_payload_json = $19, response_payload_json = $20, error_code = $21,
+                 error_message = $22, initiated_at_ms = $23, expires_at_ms = $24,
+                 completed_at_ms = $25, updated_at_ms = $26
+             WHERE payment_attempt_id = $27",
+        )
+        .bind(&attempt.order_id)
+        .bind(&attempt.project_id)
+        .bind(&attempt.user_id)
+        .bind(&attempt.payment_method_id)
+        .bind(&attempt.provider)
+        .bind(&attempt.channel)
+        .bind(&attempt.status)
+        .bind(&attempt.idempotency_key)
+        .bind(i64::from(attempt.attempt_sequence))
+        .bind(i64::try_from(attempt.amount_minor)?)
+        .bind(&attempt.currency_code)
+        .bind(i64::try_from(attempt.captured_amount_minor)?)
+        .bind(i64::try_from(attempt.refunded_amount_minor)?)
+        .bind(&attempt.provider_payment_intent_id)
+        .bind(&attempt.provider_checkout_session_id)
+        .bind(&attempt.provider_reference)
+        .bind(&attempt.checkout_url)
+        .bind(&attempt.qr_code_payload)
+        .bind(&attempt.request_payload_json)
+        .bind(&attempt.response_payload_json)
+        .bind(&attempt.error_code)
+        .bind(&attempt.error_message)
+        .bind(i64::try_from(attempt.initiated_at_ms)?)
+        .bind(attempt.expires_at_ms.map(i64::try_from).transpose()?)
+        .bind(attempt.completed_at_ms.map(i64::try_from).transpose()?)
+        .bind(i64::try_from(attempt.updated_at_ms)?)
+        .bind(&attempt.payment_attempt_id)
+        .execute(&self.pool)
         .await?;
-        Ok(attempt.clone())
+        Ok(())
     }
 
     pub async fn list_commerce_payment_attempts(
@@ -430,4 +469,93 @@ impl PostgresAdminStore {
             .map(Self::map_postgres_commerce_payment_attempt_row)
             .collect()
     }
+
+    pub async fn insert_catalog_publication_lifecycle_audit_record(
+        &self,
+        record: &CatalogPublicationLifecycleAuditRecord,
+    ) -> Result<CatalogPublicationLifecycleAuditRecord> {
+        sqlx::query(
+            "INSERT INTO ai_catalog_publication_lifecycle_audit (
+                audit_id,
+                publication_id,
+                publication_revision_id,
+                publication_version,
+                publication_source_kind,
+                action,
+                outcome,
+                operator_id,
+                request_id,
+                operator_reason,
+                publication_status_before,
+                publication_status_after,
+                governed_pricing_plan_id,
+                governed_pricing_status_before,
+                governed_pricing_status_after,
+                decision_reasons_json,
+                recorded_at_ms
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+            )
+            ON CONFLICT(audit_id) DO UPDATE SET
+                publication_id = excluded.publication_id,
+                publication_revision_id = excluded.publication_revision_id,
+                publication_version = excluded.publication_version,
+                publication_source_kind = excluded.publication_source_kind,
+                action = excluded.action,
+                outcome = excluded.outcome,
+                operator_id = excluded.operator_id,
+                request_id = excluded.request_id,
+                operator_reason = excluded.operator_reason,
+                publication_status_before = excluded.publication_status_before,
+                publication_status_after = excluded.publication_status_after,
+                governed_pricing_plan_id = excluded.governed_pricing_plan_id,
+                governed_pricing_status_before = excluded.governed_pricing_status_before,
+                governed_pricing_status_after = excluded.governed_pricing_status_after,
+                decision_reasons_json = excluded.decision_reasons_json,
+                recorded_at_ms = excluded.recorded_at_ms",
+        )
+        .bind(&record.audit_id)
+        .bind(&record.publication_id)
+        .bind(&record.publication_revision_id)
+        .bind(i64::try_from(record.publication_version)?)
+        .bind(&record.publication_source_kind)
+        .bind(record.action.as_str())
+        .bind(record.outcome.as_str())
+        .bind(&record.operator_id)
+        .bind(&record.request_id)
+        .bind(&record.operator_reason)
+        .bind(&record.publication_status_before)
+        .bind(&record.publication_status_after)
+        .bind(record.governed_pricing_plan_id.map(i64::try_from).transpose()?)
+        .bind(&record.governed_pricing_status_before)
+        .bind(&record.governed_pricing_status_after)
+        .bind(encode_string_list(&record.decision_reasons)?)
+        .bind(i64::try_from(record.recorded_at_ms)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    pub async fn list_catalog_publication_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CatalogPublicationLifecycleAuditRecord>> {
+        let rows = sqlx::query(
+            "SELECT audit_id, publication_id, publication_revision_id, publication_version,
+                    publication_source_kind, action, outcome, operator_id, request_id,
+                    operator_reason, publication_status_before, publication_status_after,
+                    governed_pricing_plan_id, governed_pricing_status_before,
+                    governed_pricing_status_after, decision_reasons_json, recorded_at_ms
+             FROM ai_catalog_publication_lifecycle_audit
+             ORDER BY recorded_at_ms DESC, audit_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(Self::map_postgres_catalog_publication_lifecycle_audit_row)
+            .collect()
+    }
+}
+
+fn postgres_error_is_unique_violation(error: &sqlx::Error) -> bool {
+    matches!(error, sqlx::Error::Database(database_error) if database_error.is_unique_violation())
 }

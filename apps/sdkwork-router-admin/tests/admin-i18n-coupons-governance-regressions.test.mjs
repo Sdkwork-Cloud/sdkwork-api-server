@@ -62,7 +62,6 @@ test('coupon governance shell and detail copy is localized through the dedicated
     'Disable code',
     'Enable code',
     'Governance controls',
-    'Legacy coupon compatibility',
     'No budget linked',
     'No campaign linked',
     'No code linked',
@@ -70,8 +69,6 @@ test('coupon governance shell and detail copy is localized through the dedicated
     'Pause campaign',
     'Template status',
     'Template, campaign, budget, and code status controls let operators stop risk exposure or restore offers without editing the whole record.',
-    'This record remains available for the compatibility layer while canonical marketing templates, budgets, codes, and rollbacks are governed in the marketing workbench.',
-    'Use this panel to review the historical coupon posture while the marketing control plane tracks the enterprise lifecycle around issuance and redemption.',
     'missing',
   ];
 

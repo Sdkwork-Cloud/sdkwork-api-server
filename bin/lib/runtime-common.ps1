@@ -252,6 +252,227 @@ function Ensure-RouterDirectory {
     New-Item -ItemType Directory -Force -Path $DirectoryPath | Out-Null
 }
 
+function Get-RouterPnpmVirtualStoreDir {
+    param([Parameter(Mandatory = $true)][string]$NodeModulesPath)
+
+    $modulesFile = Join-Path $NodeModulesPath '.modules.yaml'
+    if (-not (Test-Path $modulesFile -PathType Leaf)) {
+        return ''
+    }
+
+    foreach ($rawLine in Get-Content $modulesFile -ErrorAction SilentlyContinue) {
+        $line = [string]$rawLine
+        if ($line -match '^\s*virtualStoreDir:\s*(?<value>.+?)\s*$') {
+            return $Matches.value.Trim()
+        }
+    }
+
+    return ''
+}
+
+function Resolve-RouterAbsolutePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$BasePath,
+        [Parameter(Mandatory = $true)][string]$CandidatePath
+    )
+
+    if ([System.IO.Path]::IsPathRooted($CandidatePath)) {
+        return [System.IO.Path]::GetFullPath($CandidatePath)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $BasePath $CandidatePath))
+}
+
+function Test-RouterPnpmNodeModulesHealthy {
+    param([Parameter(Mandatory = $true)][string]$NodeModulesPath)
+
+    if (-not (Test-Path $NodeModulesPath -PathType Container)) {
+        return $false
+    }
+
+    $expectedVirtualStoreDir = [System.IO.Path]::GetFullPath((Join-Path $NodeModulesPath '.pnpm'))
+    if (-not (Test-Path $expectedVirtualStoreDir -PathType Container)) {
+        return $false
+    }
+
+    $configuredVirtualStoreDir = Get-RouterPnpmVirtualStoreDir -NodeModulesPath $NodeModulesPath
+    if ([string]::IsNullOrWhiteSpace($configuredVirtualStoreDir)) {
+        return $false
+    }
+
+    $resolvedConfiguredVirtualStoreDir = Resolve-RouterAbsolutePath `
+        -BasePath $NodeModulesPath `
+        -CandidatePath $configuredVirtualStoreDir
+
+    return $resolvedConfiguredVirtualStoreDir.Equals(
+        $expectedVirtualStoreDir,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )
+}
+
+function Test-RouterPackageManifestPresent {
+    param(
+        [Parameter(Mandatory = $true)][string]$NodeModulesPath,
+        [Parameter(Mandatory = $true)][string]$PackageName
+    )
+
+    $manifestPath = $NodeModulesPath
+    foreach ($segment in ($PackageName -split '/')) {
+        $manifestPath = Join-Path $manifestPath $segment
+    }
+    $manifestPath = Join-Path $manifestPath 'package.json'
+
+    return Test-Path $manifestPath -PathType Leaf
+}
+
+function Test-RouterPortalFrontendDependencyLinksUsable {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $portalRoot = Join-Path $RepoRoot 'apps\sdkwork-router-portal'
+    $portalNodeModules = Join-Path $portalRoot 'node_modules'
+    if (-not (Test-Path $portalNodeModules -PathType Container)) {
+        return $false
+    }
+
+    $requiredRootPackages = @(
+        'react-router-dom',
+        'zustand',
+        'sdkwork-router-portal-commons',
+        '@radix-ui/react-slot',
+        '@tanstack/react-table',
+        'cmdk',
+        'class-variance-authority',
+        'react-hook-form',
+        'react-day-picker',
+        'react-resizable-panels',
+        'sonner'
+    )
+
+    foreach ($packageName in $requiredRootPackages) {
+        if (-not (Test-RouterPackageManifestPresent -NodeModulesPath $portalNodeModules -PackageName $packageName)) {
+            return $false
+        }
+    }
+
+    $coreNodeModules = Join-Path $portalRoot 'packages\sdkwork-router-portal-core\node_modules'
+    return Test-RouterPackageManifestPresent -NodeModulesPath $coreNodeModules -PackageName 'react-router-dom'
+}
+
+function Resolve-RouterPortalPnpmPackageRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$PortalNodeModulesPath,
+        [Parameter(Mandatory = $true)][string]$PackagePrefix
+    )
+
+    $pnpmRoot = Join-Path $PortalNodeModulesPath '.pnpm'
+    if (-not (Test-Path $pnpmRoot -PathType Container)) {
+        return ''
+    }
+
+    $match = Get-ChildItem $pnpmRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "$PackagePrefix@*" } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+
+    if ($null -eq $match) {
+        return ''
+    }
+
+    return $match.FullName
+}
+
+function Set-RouterJunction {
+    param(
+        [Parameter(Mandatory = $true)][string]$LinkPath,
+        [Parameter(Mandatory = $true)][string]$TargetPath
+    )
+
+    if (-not (Test-Path $TargetPath -PathType Container)) {
+        return $false
+    }
+
+    $parentPath = Split-Path -Parent $LinkPath
+    Ensure-RouterDirectory -DirectoryPath $parentPath
+
+    try {
+        $existing = Get-Item -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue
+        if ($existing) {
+            $hasPackageManifest = Test-Path (Join-Path $LinkPath 'package.json') -PathType Leaf
+            if ($hasPackageManifest) {
+                return $true
+            }
+
+            Remove-Item -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -ItemType Junction -Path $LinkPath -Target ([System.IO.Path]::GetFullPath($TargetPath)) | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Repair-RouterPortalFrontendNodeModules {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    if (-not (Test-RouterWindowsPlatform)) {
+        return $false
+    }
+
+    $portalRoot = Join-Path $RepoRoot 'apps\sdkwork-router-portal'
+    $portalNodeModules = Join-Path $portalRoot 'node_modules'
+    $uiNodeModules = Join-Path (Split-Path -Parent $RepoRoot) 'sdkwork-ui\sdkwork-ui-pc-react\node_modules'
+
+    if (-not (Test-Path $portalNodeModules -PathType Container) -or -not (Test-Path $uiNodeModules -PathType Container)) {
+        return $false
+    }
+
+    $reactRouterRoot = Resolve-RouterPortalPnpmPackageRoot `
+        -PortalNodeModulesPath $portalNodeModules `
+        -PackagePrefix 'react-router-dom'
+    $zustandRoot = Resolve-RouterPortalPnpmPackageRoot `
+        -PortalNodeModulesPath $portalNodeModules `
+        -PackagePrefix 'zustand'
+
+    if ([string]::IsNullOrWhiteSpace($reactRouterRoot) -or [string]::IsNullOrWhiteSpace($zustandRoot)) {
+        return $false
+    }
+
+    $rootLinks = [ordered]@{
+        'react-router-dom' = Join-Path $reactRouterRoot 'node_modules\react-router-dom'
+        'zustand' = Join-Path $zustandRoot 'node_modules\zustand'
+        'sdkwork-router-portal-commons' = Join-Path $portalRoot 'packages\sdkwork-router-portal-commons'
+        '@radix-ui' = Join-Path $uiNodeModules '@radix-ui'
+        '@tanstack' = Join-Path $uiNodeModules '@tanstack'
+        'cmdk' = Join-Path $uiNodeModules 'cmdk'
+        'class-variance-authority' = Join-Path $uiNodeModules 'class-variance-authority'
+        'react-hook-form' = Join-Path $uiNodeModules 'react-hook-form'
+        'react-day-picker' = Join-Path $uiNodeModules 'react-day-picker'
+        'react-resizable-panels' = Join-Path $uiNodeModules 'react-resizable-panels'
+        'sonner' = Join-Path $uiNodeModules 'sonner'
+    }
+
+    $repaired = $false
+    foreach ($linkName in $rootLinks.Keys) {
+        if (Set-RouterJunction -LinkPath (Join-Path $portalNodeModules $linkName) -TargetPath $rootLinks[$linkName]) {
+            $repaired = $true
+        }
+    }
+
+    $rootReactRouterPath = Join-Path $portalNodeModules 'react-router-dom'
+    foreach ($packageDirectory in Get-ChildItem (Join-Path $portalRoot 'packages') -Directory -ErrorAction SilentlyContinue) {
+        $packageNodeModules = Join-Path $packageDirectory.FullName 'node_modules'
+        if (-not (Test-Path $packageNodeModules -PathType Container)) {
+            continue
+        }
+
+        if (Set-RouterJunction -LinkPath (Join-Path $packageNodeModules 'react-router-dom') -TargetPath $rootReactRouterPath) {
+            $repaired = $true
+        }
+    }
+
+    return $repaired
+}
+
 function ConvertTo-RouterFileText {
     param([AllowNull()][object]$Content)
 
@@ -656,11 +877,24 @@ function Remove-RouterManagedStateFile {
 function ConvertTo-RouterStateFileLine {
     param(
         [Parameter(Mandatory = $true)][string]$Key,
-        [Parameter(Mandatory = $true)][string]$Value
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value
     )
 
     $escapedValue = $Value.Replace('\', '\\').Replace('"', '\"')
     return "$Key=`"$escapedValue`""
+}
+
+function Get-RouterManagedStateValue {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$State,
+        [Parameter(Mandatory = $true)][string]$Key
+    )
+
+    if (-not $State.ContainsKey($Key)) {
+        return ''
+    }
+
+    return [string]$State[$Key]
 }
 
 function Get-RouterManagedState {
@@ -702,24 +936,27 @@ function Get-RouterManagedState {
     }
 
     $processId = 0
-    [void][int]::TryParse([string]$state.SDKWORK_ROUTER_MANAGED_PID, [ref]$processId)
+    [void][int]::TryParse((Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_MANAGED_PID'), [ref]$processId)
 
     $unifiedAccessEnabled = $false
     if ($state.ContainsKey('SDKWORK_ROUTER_UNIFIED_ACCESS_ENABLED')) {
-        [void][bool]::TryParse([string]$state.SDKWORK_ROUTER_UNIFIED_ACCESS_ENABLED, [ref]$unifiedAccessEnabled)
+        [void][bool]::TryParse(
+            (Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_UNIFIED_ACCESS_ENABLED'),
+            [ref]$unifiedAccessEnabled
+        )
     }
 
     return [pscustomobject]@{
         ProcessId = $processId
-        ProcessFingerprint = [string]$state.SDKWORK_ROUTER_PROCESS_FINGERPRINT
-        Mode = [string]$state.SDKWORK_ROUTER_MODE
-        WebBind = [string]$state.SDKWORK_WEB_BIND
-        GatewayBind = [string]$state.SDKWORK_GATEWAY_BIND
-        AdminBind = [string]$state.SDKWORK_ADMIN_BIND
-        PortalBind = [string]$state.SDKWORK_PORTAL_BIND
+        ProcessFingerprint = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_PROCESS_FINGERPRINT'
+        Mode = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_MODE'
+        WebBind = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_WEB_BIND'
+        GatewayBind = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_GATEWAY_BIND'
+        AdminBind = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ADMIN_BIND'
+        PortalBind = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_PORTAL_BIND'
         UnifiedAccessEnabled = $unifiedAccessEnabled
-        AdminAppUrl = [string]$state.SDKWORK_ROUTER_ADMIN_APP_URL
-        PortalAppUrl = [string]$state.SDKWORK_ROUTER_PORTAL_APP_URL
+        AdminAppUrl = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_ADMIN_APP_URL'
+        PortalAppUrl = Get-RouterManagedStateValue -State $state -Key 'SDKWORK_ROUTER_PORTAL_APP_URL'
     }
 }
 

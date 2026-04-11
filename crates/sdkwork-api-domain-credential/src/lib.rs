@@ -52,3 +52,37 @@ impl UpstreamCredential {
         self
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OfficialProviderConfig {
+    pub provider_id: String,
+    pub key_reference: String,
+    pub base_url: String,
+    pub enabled: bool,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
+impl OfficialProviderConfig {
+    pub fn new(
+        provider_id: impl Into<String>,
+        key_reference: impl Into<String>,
+        base_url: impl Into<String>,
+        enabled: bool,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            key_reference: key_reference.into(),
+            base_url: base_url.into(),
+            enabled,
+            created_at_ms: 0,
+            updated_at_ms: 0,
+        }
+    }
+
+    pub fn with_timestamps(mut self, created_at_ms: u64, updated_at_ms: u64) -> Self {
+        self.created_at_ms = created_at_ms;
+        self.updated_at_ms = updated_at_ms;
+        self
+    }
+}

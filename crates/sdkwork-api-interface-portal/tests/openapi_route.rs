@@ -40,10 +40,13 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["paths"]["/portal/marketing/reward-history"]["get"].is_object());
     assert!(json["paths"]["/portal/marketing/redemptions"]["get"].is_object());
     assert!(json["paths"]["/portal/marketing/codes"]["get"].is_object());
+    assert!(json["paths"]["/portal/commerce/catalog"]["get"].is_object());
     assert!(json["paths"]["/portal/commerce/orders/{order_id}"]["get"].is_object());
     assert!(json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"].is_object());
     assert!(json["paths"]["/portal/commerce/order-center"]["get"].is_object());
-    assert!(json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"].is_object());
+    assert!(
+        json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"].is_object()
+    );
     assert!(json["paths"]["/portal/billing/account"]["get"].is_object());
     assert!(json["paths"]["/portal/billing/account-history"]["get"].is_object());
     assert!(json["paths"]["/portal/billing/account/balance"]["get"].is_object());
@@ -69,8 +72,16 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["components"]["schemas"]["PortalCouponRedemptionConfirmResponse"].is_object());
     assert!(json["components"]["schemas"]["PortalCouponRedemptionRollbackRequest"].is_object());
     assert!(json["components"]["schemas"]["PortalCouponRedemptionRollbackResponse"].is_object());
+    assert!(json["components"]["schemas"]["PortalCouponApplicabilitySummary"].is_object());
+    assert!(json["components"]["schemas"]["PortalCouponEffectSummary"].is_object());
+    assert!(json["components"]["schemas"]["PortalCouponOwnershipSummary"].is_object());
+    assert!(json["components"]["schemas"]["PortalMarketingCodeItem"].is_object());
+    assert!(json["components"]["schemas"]["PortalMarketingRewardHistoryItem"].is_object());
     assert!(json["components"]["schemas"]["PortalMarketingCodesResponse"].is_object());
     assert!(json["components"]["schemas"]["PortalMarketingRedemptionsResponse"].is_object());
+    assert!(json["components"]["schemas"]["PortalCommerceCatalog"].is_object());
+    assert!(json["components"]["schemas"]["PortalApiProduct"].is_object());
+    assert!(json["components"]["schemas"]["PortalProductOffer"].is_object());
     assert!(json["components"]["schemas"]["PortalCommerceOrder"].is_object());
     assert!(json["components"]["schemas"]["PortalCommerceOrderCenterResponse"].is_object());
     assert!(json["components"]["schemas"]["PaymentMethodRecord"].is_object());
@@ -142,6 +153,11 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "#/components/schemas/PortalMarketingCodesResponse"
     );
     assert_eq!(
+        json["paths"]["/portal/marketing/reward-history"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["items"]["$ref"],
+        "#/components/schemas/PortalMarketingRewardHistoryItem"
+    );
+    assert_eq!(
         json["paths"]["/portal/marketing/redemptions"]["get"]["responses"]["200"]["content"]
             ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalMarketingRedemptionsResponse"
@@ -150,6 +166,78 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         json["paths"]["/portal/marketing/codes"]["get"]["responses"]["200"]["content"]
             ["application/json"]["schema"]["$ref"],
         "#/components/schemas/PortalMarketingCodesResponse"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodesResponse"]["properties"]["items"]
+            ["items"]["$ref"],
+        "#/components/schemas/PortalMarketingCodeItem"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodeItem"]["properties"]["template"]["$ref"],
+        "#/components/schemas/CouponTemplateRecord"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodeItem"]["properties"]["campaign"]["$ref"],
+        "#/components/schemas/MarketingCampaignRecord"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodeItem"]["properties"]["applicability"]
+            ["$ref"],
+        "#/components/schemas/PortalCouponApplicabilitySummary"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodeItem"]["properties"]["effect"]["$ref"],
+        "#/components/schemas/PortalCouponEffectSummary"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingCodeItem"]["properties"]["ownership"]
+            ["$ref"],
+        "#/components/schemas/PortalCouponOwnershipSummary"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalMarketingRewardHistoryItem"]["properties"]
+            ["account_arrival"]["$ref"],
+        "#/components/schemas/PortalCouponAccountArrivalSummary"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCouponAccountArrivalSummary"]["properties"]
+            ["benefit_lots"]["items"]["$ref"],
+        "#/components/schemas/PortalCouponAccountArrivalLotItem"
+    );
+    assert_eq!(
+        json["paths"]["/portal/commerce/catalog"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/PortalCommerceCatalog"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceCatalog"]["properties"]["products"]["items"]
+            ["$ref"],
+        "#/components/schemas/PortalApiProduct"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceCatalog"]["properties"]["offers"]["items"]
+            ["$ref"],
+        "#/components/schemas/PortalProductOffer"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalProductOffer"]["properties"]
+            ["publication_revision_id"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalProductOffer"]["properties"]["publication_version"]
+            ["type"],
+        "integer"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalProductOffer"]["properties"]
+            ["publication_source_kind"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalProductOffer"]["properties"]
+            ["publication_effective_from_ms"]["type"][0],
+        "integer"
     );
     assert_eq!(
         json["paths"]["/portal/commerce/orders/{order_id}"]["get"]["parameters"][0]["name"],
@@ -161,13 +249,65 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "#/components/schemas/PortalCommerceOrder"
     );
     assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["product_kind"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["transaction_kind"]
+            ["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["product_id"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["offer_id"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["publication_id"]
+            ["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["publication_kind"]
+            ["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["publication_status"]
+            ["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]
+            ["publication_revision_id"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]["publication_version"]
+            ["type"],
+        "integer"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]
+            ["publication_source_kind"]["type"],
+        "string"
+    );
+    assert_eq!(
+        json["components"]["schemas"]["PortalCommerceOrder"]["properties"]
+            ["publication_effective_from_ms"]["type"][0],
+        "integer"
+    );
+    assert_eq!(
         json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"]["parameters"][0]
             ["name"],
         "order_id"
     );
     assert_eq!(
-        json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"]["responses"]["200"]
-            ["content"]["application/json"]["schema"]["items"]["$ref"],
+        json["paths"]["/portal/commerce/orders/{order_id}/payment-methods"]["get"]["responses"]
+            ["200"]["content"]["application/json"]["schema"]["items"]["$ref"],
         "#/components/schemas/PaymentMethodRecord"
     );
     assert_eq!(
@@ -176,8 +316,8 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
         "#/components/schemas/PortalCommerceOrderCenterResponse"
     );
     assert_eq!(
-        json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"]["parameters"]
-            [0]["name"],
+        json["paths"]["/portal/commerce/payment-attempts/{payment_attempt_id}"]["get"]
+            ["parameters"][0]["name"],
         "payment_attempt_id"
     );
     assert_eq!(

@@ -1,0 +1,118 @@
+[
+  {
+    "channel_id": "ernie",
+    "model_id": "ernie-4.5-turbo",
+    "proxy_provider_id": "provider-ernie-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.55,
+    "output_price": 1.65,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.55,
+        "output_price": 1.65,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "ernie",
+    "model_id": "ernie-embedding-v1",
+    "proxy_provider_id": "provider-ernie-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.08,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.08,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "minimax",
+    "model_id": "minimax-m1",
+    "proxy_provider_id": "provider-minimax-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.9,
+    "output_price": 2.4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.9,
+        "output_price": 2.4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "minimax",
+    "model_id": "minimax-embedding",
+    "proxy_provider_id": "provider-minimax-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.07,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.07,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  }
+]

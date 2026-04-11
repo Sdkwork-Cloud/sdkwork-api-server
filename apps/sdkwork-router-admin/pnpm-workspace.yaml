@@ -1,2 +1,3 @@
 packages:
   - "packages/*"
+  - "../../../sdkwork-ui/sdkwork-ui-pc-react"

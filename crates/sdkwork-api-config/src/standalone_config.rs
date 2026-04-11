@@ -19,6 +19,17 @@ impl Default for StandaloneConfig {
             native_dynamic_shutdown_drain_timeout_ms: 0,
             admin_jwt_signing_secret: "local-dev-admin-jwt-secret".to_owned(),
             portal_jwt_signing_secret: "local-dev-portal-jwt-secret".to_owned(),
+            bootstrap_data_dir: None,
+            bootstrap_profile: "prod".to_owned(),
+            official_openai_enabled: false,
+            official_openai_base_url: "https://api.openai.com/v1".to_owned(),
+            official_openai_api_key: String::new(),
+            official_anthropic_enabled: false,
+            official_anthropic_base_url: "https://api.anthropic.com".to_owned(),
+            official_anthropic_api_key: String::new(),
+            official_gemini_enabled: false,
+            official_gemini_base_url: "https://generativelanguage.googleapis.com".to_owned(),
+            official_gemini_api_key: String::new(),
             runtime_snapshot_interval_secs: 0,
             pricing_lifecycle_sync_interval_secs: 0,
             secret_backend: SecretBackendKind::DatabaseEncrypted,
@@ -98,6 +109,34 @@ impl StandaloneConfig {
                 self.portal_jwt_signing_secret.clone(),
             ),
             (
+                SDKWORK_BOOTSTRAP_PROFILE.to_owned(),
+                self.bootstrap_profile.clone(),
+            ),
+            (
+                SDKWORK_OFFICIAL_OPENAI_ENABLED.to_owned(),
+                self.official_openai_enabled.to_string(),
+            ),
+            (
+                SDKWORK_OFFICIAL_OPENAI_BASE_URL.to_owned(),
+                self.official_openai_base_url.clone(),
+            ),
+            (
+                SDKWORK_OFFICIAL_ANTHROPIC_ENABLED.to_owned(),
+                self.official_anthropic_enabled.to_string(),
+            ),
+            (
+                SDKWORK_OFFICIAL_ANTHROPIC_BASE_URL.to_owned(),
+                self.official_anthropic_base_url.clone(),
+            ),
+            (
+                SDKWORK_OFFICIAL_GEMINI_ENABLED.to_owned(),
+                self.official_gemini_enabled.to_string(),
+            ),
+            (
+                SDKWORK_OFFICIAL_GEMINI_BASE_URL.to_owned(),
+                self.official_gemini_base_url.clone(),
+            ),
+            (
                 SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS.to_owned(),
                 self.runtime_snapshot_interval_secs.to_string(),
             ),
@@ -157,10 +196,36 @@ impl StandaloneConfig {
             ));
         }
 
+        if let Some(bootstrap_data_dir) = &self.bootstrap_data_dir {
+            pairs.push((
+                SDKWORK_BOOTSTRAP_DATA_DIR.to_owned(),
+                bootstrap_data_dir.clone(),
+            ));
+        }
+
         if !self.credential_legacy_master_keys.is_empty() {
             pairs.push((
                 SDKWORK_CREDENTIAL_LEGACY_MASTER_KEYS.to_owned(),
                 join_env_list(&self.credential_legacy_master_keys),
+            ));
+        }
+
+        if !self.official_openai_api_key.is_empty() {
+            pairs.push((
+                SDKWORK_OFFICIAL_OPENAI_API_KEY.to_owned(),
+                self.official_openai_api_key.clone(),
+            ));
+        }
+        if !self.official_anthropic_api_key.is_empty() {
+            pairs.push((
+                SDKWORK_OFFICIAL_ANTHROPIC_API_KEY.to_owned(),
+                self.official_anthropic_api_key.clone(),
+            ));
+        }
+        if !self.official_gemini_api_key.is_empty() {
+            pairs.push((
+                SDKWORK_OFFICIAL_GEMINI_API_KEY.to_owned(),
+                self.official_gemini_api_key.clone(),
             ));
         }
 
@@ -286,6 +351,39 @@ impl StandaloneConfig {
         if self.portal_jwt_signing_secret != next.portal_jwt_signing_secret {
             fields.push("portal_jwt_signing_secret");
         }
+        if self.bootstrap_data_dir != next.bootstrap_data_dir {
+            fields.push("bootstrap_data_dir");
+        }
+        if self.bootstrap_profile != next.bootstrap_profile {
+            fields.push("bootstrap_profile");
+        }
+        if self.official_openai_enabled != next.official_openai_enabled {
+            fields.push("official_openai_enabled");
+        }
+        if self.official_openai_base_url != next.official_openai_base_url {
+            fields.push("official_openai_base_url");
+        }
+        if self.official_openai_api_key != next.official_openai_api_key {
+            fields.push("official_openai_api_key");
+        }
+        if self.official_anthropic_enabled != next.official_anthropic_enabled {
+            fields.push("official_anthropic_enabled");
+        }
+        if self.official_anthropic_base_url != next.official_anthropic_base_url {
+            fields.push("official_anthropic_base_url");
+        }
+        if self.official_anthropic_api_key != next.official_anthropic_api_key {
+            fields.push("official_anthropic_api_key");
+        }
+        if self.official_gemini_enabled != next.official_gemini_enabled {
+            fields.push("official_gemini_enabled");
+        }
+        if self.official_gemini_base_url != next.official_gemini_base_url {
+            fields.push("official_gemini_base_url");
+        }
+        if self.official_gemini_api_key != next.official_gemini_api_key {
+            fields.push("official_gemini_api_key");
+        }
         if self.pricing_lifecycle_sync_interval_secs != next.pricing_lifecycle_sync_interval_secs {
             fields.push("pricing_lifecycle_sync_interval_secs");
         }
@@ -369,6 +467,17 @@ impl StandaloneConfig {
             native_dynamic_shutdown_drain_timeout_ms: 0,
             admin_jwt_signing_secret: DEFAULT_ADMIN_JWT_SIGNING_SECRET.to_owned(),
             portal_jwt_signing_secret: DEFAULT_PORTAL_JWT_SIGNING_SECRET.to_owned(),
+            bootstrap_data_dir: None,
+            bootstrap_profile: "prod".to_owned(),
+            official_openai_enabled: false,
+            official_openai_base_url: "https://api.openai.com/v1".to_owned(),
+            official_openai_api_key: String::new(),
+            official_anthropic_enabled: false,
+            official_anthropic_base_url: "https://api.anthropic.com".to_owned(),
+            official_anthropic_api_key: String::new(),
+            official_gemini_enabled: false,
+            official_gemini_base_url: "https://generativelanguage.googleapis.com".to_owned(),
+            official_gemini_api_key: String::new(),
             runtime_snapshot_interval_secs: 0,
             pricing_lifecycle_sync_interval_secs: 0,
             secret_backend: SecretBackendKind::DatabaseEncrypted,
@@ -443,6 +552,41 @@ impl StandaloneConfig {
         }
         if let Some(value) = file.portal_jwt_signing_secret {
             self.portal_jwt_signing_secret = value;
+        }
+        if let Some(value) = file.bootstrap_data_dir {
+            self.bootstrap_data_dir = normalize_optional_string(
+                normalize_file_path_value(&value, base_dir),
+            );
+        }
+        if let Some(value) = file.bootstrap_profile {
+            self.bootstrap_profile = value;
+        }
+        if let Some(value) = file.official_openai_enabled {
+            self.official_openai_enabled = value;
+        }
+        if let Some(value) = file.official_openai_base_url {
+            self.official_openai_base_url = value;
+        }
+        if let Some(value) = file.official_openai_api_key {
+            self.official_openai_api_key = value;
+        }
+        if let Some(value) = file.official_anthropic_enabled {
+            self.official_anthropic_enabled = value;
+        }
+        if let Some(value) = file.official_anthropic_base_url {
+            self.official_anthropic_base_url = value;
+        }
+        if let Some(value) = file.official_anthropic_api_key {
+            self.official_anthropic_api_key = value;
+        }
+        if let Some(value) = file.official_gemini_enabled {
+            self.official_gemini_enabled = value;
+        }
+        if let Some(value) = file.official_gemini_base_url {
+            self.official_gemini_base_url = value;
+        }
+        if let Some(value) = file.official_gemini_api_key {
+            self.official_gemini_api_key = value;
         }
         if let Some(value) = file.runtime_snapshot_interval_secs {
             self.runtime_snapshot_interval_secs = value;
@@ -546,6 +690,45 @@ impl StandaloneConfig {
         }
         if let Some(value) = values.get(SDKWORK_PORTAL_JWT_SIGNING_SECRET) {
             self.portal_jwt_signing_secret = value.clone();
+        }
+        if let Some(value) = values.get(SDKWORK_BOOTSTRAP_DATA_DIR) {
+            self.bootstrap_data_dir = normalize_optional_string(value.clone());
+        }
+        if let Some(value) = values.get(SDKWORK_BOOTSTRAP_PROFILE) {
+            self.bootstrap_profile = value.clone();
+        }
+        self.official_openai_enabled = parse_bool_env(
+            values,
+            SDKWORK_OFFICIAL_OPENAI_ENABLED,
+            self.official_openai_enabled,
+        )?;
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_OPENAI_BASE_URL) {
+            self.official_openai_base_url = value.clone();
+        }
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_OPENAI_API_KEY) {
+            self.official_openai_api_key = value.clone();
+        }
+        self.official_anthropic_enabled = parse_bool_env(
+            values,
+            SDKWORK_OFFICIAL_ANTHROPIC_ENABLED,
+            self.official_anthropic_enabled,
+        )?;
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_ANTHROPIC_BASE_URL) {
+            self.official_anthropic_base_url = value.clone();
+        }
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_ANTHROPIC_API_KEY) {
+            self.official_anthropic_api_key = value.clone();
+        }
+        self.official_gemini_enabled = parse_bool_env(
+            values,
+            SDKWORK_OFFICIAL_GEMINI_ENABLED,
+            self.official_gemini_enabled,
+        )?;
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_GEMINI_BASE_URL) {
+            self.official_gemini_base_url = value.clone();
+        }
+        if let Some(value) = values.get(SDKWORK_OFFICIAL_GEMINI_API_KEY) {
+            self.official_gemini_api_key = value.clone();
         }
         self.runtime_snapshot_interval_secs = parse_u64_env(
             values,

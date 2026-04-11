@@ -1,0 +1,325 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-catalog-openai-direct-balanced",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Catalog OpenAI Direct Balanced",
+      "slug": "catalog-openai-direct-balanced",
+      "description": "Prefer the official OpenAI provider for GPT-4.1 family traffic, with curated marketplace fallback for install-time readiness.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-openrouter-main",
+        "provider-gemini-official"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000490000,
+      "updated_at_ms": 1710000490000
+    },
+    {
+      "profile_id": "profile-catalog-claude-direct-balanced",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Catalog Claude Direct Balanced",
+      "slug": "catalog-claude-direct-balanced",
+      "description": "Prefer the official Anthropic route for Claude traffic, with OpenRouter fallback kept ready for operational continuity.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-anthropic-official",
+        "provider-openrouter-main",
+        "provider-openai-official"
+      ],
+      "default_provider_id": "provider-anthropic-official",
+      "max_cost": 7,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491000
+    },
+    {
+      "profile_id": "profile-catalog-gemini-direct-balanced",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Catalog Gemini Direct Balanced",
+      "slug": "catalog-gemini-direct-balanced",
+      "description": "Prefer the official Gemini path for multimodal and high-context workloads, with OpenRouter ready as marketplace fallback.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-gemini-official",
+        "provider-openrouter-main",
+        "provider-openai-official"
+      ],
+      "default_provider_id": "provider-gemini-official",
+      "max_cost": 6.5,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000492000,
+      "updated_at_ms": 1710000492000
+    },
+    {
+      "profile_id": "profile-catalog-china-official-distribution",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Catalog China Official Distribution",
+      "slug": "catalog-china-official-distribution",
+      "description": "China-focused catalog posture that ranks official vendors first, then distribution providers for deployable fallback coverage.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-qwen-official",
+        "provider-doubao-official",
+        "provider-deepseek-official",
+        "provider-moonshot-official",
+        "provider-zhipu-official",
+        "provider-hunyuan-official",
+        "provider-siliconflow-main",
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-qwen-official",
+      "max_cost": 4,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000493000,
+      "updated_at_ms": 1710000493000
+    },
+    {
+      "profile_id": "profile-catalog-local-edge-qwen",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Catalog Local Edge Qwen",
+      "slug": "catalog-local-edge-qwen",
+      "description": "Local-edge profile that prefers Ollama for private Qwen traffic and falls back to low-cost distributed providers when needed.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-qwen-official",
+        "provider-deepseek-official"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 1.5,
+      "max_latency_ms": 18000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710000494000,
+      "updated_at_ms": 1710000494000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-catalog-openai-gpt41-responses",
+      "capability": "responses",
+      "model_pattern": "gpt-4.1*",
+      "enabled": true,
+      "priority": 120,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-catalog-claude37-responses",
+      "capability": "responses",
+      "model_pattern": "claude-3-7-*",
+      "enabled": true,
+      "priority": 119,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-anthropic-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-anthropic-official",
+      "max_cost": 7,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1300
+    },
+    {
+      "policy_id": "policy-catalog-gemini25-responses",
+      "capability": "responses",
+      "model_pattern": "gemini-2.5-*",
+      "enabled": true,
+      "priority": 118,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-gemini-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-gemini-official",
+      "max_cost": 6.5,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1300
+    },
+    {
+      "policy_id": "policy-catalog-deepseek-responses",
+      "capability": "responses",
+      "model_pattern": "deepseek-*",
+      "enabled": true,
+      "priority": 117,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official",
+        "provider-siliconflow-main",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 2.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1400
+    },
+    {
+      "policy_id": "policy-catalog-qwen-responses",
+      "capability": "responses",
+      "model_pattern": "qwen-*",
+      "enabled": true,
+      "priority": 116,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-qwen-official",
+        "provider-siliconflow-main",
+        "provider-ollama-local",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-qwen-official",
+      "max_cost": 3.2,
+      "max_latency_ms": 10000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-catalog-doubao-responses",
+      "capability": "responses",
+      "model_pattern": "doubao-*",
+      "enabled": true,
+      "priority": 115,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-doubao-official"
+      ],
+      "default_provider_id": "provider-doubao-official",
+      "max_cost": 2.8,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 180,
+      "upstream_retry_max_delay_ms": 1100
+    },
+    {
+      "policy_id": "policy-catalog-grok-responses",
+      "capability": "responses",
+      "model_pattern": "grok-*",
+      "enabled": true,
+      "priority": 114,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-xai-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-xai-official",
+      "max_cost": 14,
+      "max_latency_ms": 8500,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 180,
+      "upstream_retry_max_delay_ms": 1000
+    },
+    {
+      "policy_id": "policy-catalog-kimi-responses",
+      "capability": "responses",
+      "model_pattern": "kimi-*",
+      "enabled": true,
+      "priority": 113,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-moonshot-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-moonshot-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1300
+    },
+    {
+      "policy_id": "policy-catalog-local-qwen-responses",
+      "capability": "responses",
+      "model_pattern": "qwen2.5-14b-instruct",
+      "enabled": true,
+      "priority": 112,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 1.5,
+      "max_latency_ms": 18000,
+      "require_healthy": false,
+      "execution_failover_enabled": false,
+      "upstream_retry_max_attempts": 1,
+      "upstream_retry_base_delay_ms": 0,
+      "upstream_retry_max_delay_ms": 0
+    },
+    {
+      "policy_id": "policy-catalog-local-embeddings",
+      "capability": "embeddings",
+      "model_pattern": "nomic-embed-text-*",
+      "enabled": true,
+      "priority": 111,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 0.5,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "execution_failover_enabled": false,
+      "upstream_retry_max_attempts": 1,
+      "upstream_retry_base_delay_ms": 0,
+      "upstream_retry_max_delay_ms": 0
+    }
+  ],
+  "project_preferences": []
+}

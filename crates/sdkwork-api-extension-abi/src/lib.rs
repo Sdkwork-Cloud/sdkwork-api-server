@@ -71,6 +71,12 @@ pub enum ProviderInvocationResult {
     },
     Error {
         message: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retryable: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_after_ms: Option<u64>,
     },
 }
 
@@ -88,6 +94,25 @@ impl ProviderInvocationResult {
     pub fn error(message: impl Into<String>) -> Self {
         Self::Error {
             message: message.into(),
+            code: None,
+            retryable: None,
+            retry_after_ms: None,
+        }
+    }
+
+    pub fn retryable_error<C>(
+        message: impl Into<String>,
+        code: Option<C>,
+        retry_after_ms: Option<u64>,
+    ) -> Self
+    where
+        C: Into<String>,
+    {
+        Self::Error {
+            message: message.into(),
+            code: code.map(Into::into),
+            retryable: Some(true),
+            retry_after_ms,
         }
     }
 }
@@ -104,6 +129,12 @@ pub enum ProviderStreamInvocationResult {
     },
     Error {
         message: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retryable: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_after_ms: Option<u64>,
     },
 }
 
@@ -123,6 +154,25 @@ impl ProviderStreamInvocationResult {
     pub fn error(message: impl Into<String>) -> Self {
         Self::Error {
             message: message.into(),
+            code: None,
+            retryable: None,
+            retry_after_ms: None,
+        }
+    }
+
+    pub fn retryable_error<C>(
+        message: impl Into<String>,
+        code: Option<C>,
+        retry_after_ms: Option<u64>,
+    ) -> Self
+    where
+        C: Into<String>,
+    {
+        Self::Error {
+            message: message.into(),
+            code: code.map(Into::into),
+            retryable: Some(true),
+            retry_after_ms,
         }
     }
 }

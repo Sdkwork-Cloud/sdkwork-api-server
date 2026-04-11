@@ -1,5 +1,6 @@
 use super::*;
 
+#[serial(extension_env)]
 #[tokio::test]
 async fn native_dynamic_extension_can_relay_through_loaded_library() {
     let extension_root = temp_extension_root("native-dynamic");

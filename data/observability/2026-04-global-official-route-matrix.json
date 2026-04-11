@@ -1,0 +1,620 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-prod-deepseek-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-deepseek-live",
+      "capability": "responses",
+      "route_key": "deepseek-chat",
+      "matched_policy_id": "policy-deepseek-official-chat-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-deepseek-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 2.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000440000,
+      "updated_at_ms": 1710000440500
+    },
+    {
+      "snapshot_id": "snapshot-prod-qwen-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-qwen-live",
+      "capability": "responses",
+      "route_key": "qwen-max",
+      "matched_policy_id": "policy-qwen-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-qwen-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-qwen-official",
+      "max_cost": 3.2,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000441000,
+      "updated_at_ms": 1710000441500
+    },
+    {
+      "snapshot_id": "snapshot-prod-doubao-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-doubao-live",
+      "capability": "responses",
+      "route_key": "doubao-seed-1.6",
+      "matched_policy_id": "policy-doubao-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-doubao-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-doubao-official"
+      ],
+      "default_provider_id": "provider-doubao-official",
+      "max_cost": 2.8,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000442000,
+      "updated_at_ms": 1710000442500
+    },
+    {
+      "snapshot_id": "snapshot-prod-xai-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-xai-live",
+      "capability": "responses",
+      "route_key": "grok-4",
+      "matched_policy_id": "policy-xai-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-xai-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-xai-official",
+      "max_cost": 14,
+      "max_latency_ms": 8000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000443000,
+      "updated_at_ms": 1710000443500
+    },
+    {
+      "snapshot_id": "snapshot-prod-moonshot-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-moonshot-live",
+      "capability": "responses",
+      "route_key": "kimi-k2.5",
+      "matched_policy_id": "policy-moonshot-official-kimi-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-moonshot-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-moonshot-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000444000,
+      "updated_at_ms": 1710000444500
+    },
+    {
+      "snapshot_id": "snapshot-prod-zhipu-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-zhipu-live",
+      "capability": "responses",
+      "route_key": "glm-5",
+      "matched_policy_id": "policy-zhipu-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-zhipu-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-zhipu-official"
+      ],
+      "default_provider_id": "provider-zhipu-official",
+      "max_cost": 4,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000445000,
+      "updated_at_ms": 1710000445500
+    },
+    {
+      "snapshot_id": "snapshot-prod-hunyuan-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-hunyuan-live",
+      "capability": "responses",
+      "route_key": "hunyuan-t1-latest",
+      "matched_policy_id": "policy-hunyuan-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-hunyuan-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-hunyuan-official"
+      ],
+      "default_provider_id": "provider-hunyuan-official",
+      "max_cost": 5.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000446000,
+      "updated_at_ms": 1710000446500
+    },
+    {
+      "snapshot_id": "snapshot-prod-mistral-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-mistral-live",
+      "capability": "responses",
+      "route_key": "mistral-large-latest",
+      "matched_policy_id": "policy-mistral-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-mistral-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-mistral-official",
+      "max_cost": 6,
+      "max_latency_ms": 8500,
+      "require_healthy": true,
+      "preferred_region": "eu",
+      "created_at_ms": 1710000447000,
+      "updated_at_ms": 1710000447500
+    },
+    {
+      "snapshot_id": "snapshot-prod-cohere-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-cohere-live",
+      "capability": "responses",
+      "route_key": "command-a-03-2025",
+      "matched_policy_id": "policy-cohere-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-cohere-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-cohere-official"
+      ],
+      "default_provider_id": "provider-cohere-official",
+      "max_cost": 8,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000448000,
+      "updated_at_ms": 1710000448500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-prod-deepseek-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-deepseek-live",
+      "capability": "responses",
+      "route_key": "deepseek-chat",
+      "selected_provider_id": "provider-deepseek-official",
+      "matched_policy_id": "policy-deepseek-official-chat-responses",
+      "applied_routing_profile_id": "profile-global-deepseek-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-deepseek-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 611,
+      "selection_reason": "official DeepSeek profile pinned the request to the vendor-owned execution path.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000440100,
+      "assessments": [
+        {
+          "provider_id": "provider-deepseek-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0012,
+          "latency_ms": 480,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official DeepSeek route with direct provider-model ownership"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-qwen-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-qwen-live",
+      "capability": "responses",
+      "route_key": "qwen-max",
+      "selected_provider_id": "provider-qwen-official",
+      "matched_policy_id": "policy-qwen-official-responses",
+      "applied_routing_profile_id": "profile-global-qwen-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-qwen-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 612,
+      "selection_reason": "official Qwen profile pinned the request to DashScope-compatible official capacity.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000441100,
+      "assessments": [
+        {
+          "provider_id": "provider-qwen-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0036,
+          "latency_ms": 560,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official Qwen route preserves channel-to-provider ownership"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-doubao-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-doubao-live",
+      "capability": "responses",
+      "route_key": "doubao-seed-1.6",
+      "selected_provider_id": "provider-doubao-official",
+      "matched_policy_id": "policy-doubao-official-responses",
+      "applied_routing_profile_id": "profile-global-doubao-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-doubao-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 613,
+      "selection_reason": "official Doubao profile pinned the request to ByteDance-owned commercial capacity.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000442100,
+      "assessments": [
+        {
+          "provider_id": "provider-doubao-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0015,
+          "latency_ms": 520,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official Doubao route with direct Ark execution"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-xai-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-xai-live",
+      "capability": "responses",
+      "route_key": "grok-4",
+      "selected_provider_id": "provider-xai-official",
+      "matched_policy_id": "policy-xai-official-responses",
+      "applied_routing_profile_id": "profile-global-xai-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-xai-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 614,
+      "selection_reason": "official xAI profile pinned the request to Grok-native frontier capacity.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000443100,
+      "assessments": [
+        {
+          "provider_id": "provider-xai-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0162,
+          "latency_ms": 840,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official Grok route for frontier-only workloads"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-moonshot-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-moonshot-live",
+      "capability": "responses",
+      "route_key": "kimi-k2.5",
+      "selected_provider_id": "provider-moonshot-official",
+      "matched_policy_id": "policy-moonshot-official-kimi-responses",
+      "applied_routing_profile_id": "profile-global-moonshot-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-moonshot-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 615,
+      "selection_reason": "official Moonshot profile pinned the request to Kimi-owned long-context capacity.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000444100,
+      "assessments": [
+        {
+          "provider_id": "provider-moonshot-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0034,
+          "latency_ms": 630,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official Kimi route with vendor-owned context handling"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-zhipu-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-zhipu-live",
+      "capability": "responses",
+      "route_key": "glm-5",
+      "selected_provider_id": "provider-zhipu-official",
+      "matched_policy_id": "policy-zhipu-official-responses",
+      "applied_routing_profile_id": "profile-global-zhipu-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-zhipu-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 616,
+      "selection_reason": "official Zhipu profile pinned the request to BigModel-owned execution capacity.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000445100,
+      "assessments": [
+        {
+          "provider_id": "provider-zhipu-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0044,
+          "latency_ms": 600,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official GLM route aligned to enterprise China-region delivery"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-hunyuan-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-hunyuan-live",
+      "capability": "responses",
+      "route_key": "hunyuan-t1-latest",
+      "selected_provider_id": "provider-hunyuan-official",
+      "matched_policy_id": "policy-hunyuan-official-responses",
+      "applied_routing_profile_id": "profile-global-hunyuan-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-hunyuan-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 617,
+      "selection_reason": "official Hunyuan profile pinned the request to Tencent-owned enterprise capacity.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000446100,
+      "assessments": [
+        {
+          "provider_id": "provider-hunyuan-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0049,
+          "latency_ms": 580,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official Hunyuan route with Tencent-cloud residency posture"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-mistral-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-mistral-live",
+      "capability": "responses",
+      "route_key": "mistral-large-latest",
+      "selected_provider_id": "provider-mistral-official",
+      "matched_policy_id": "policy-mistral-official-responses",
+      "applied_routing_profile_id": "profile-global-mistral-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-mistral-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 618,
+      "selection_reason": "official Mistral profile pinned the request to EU-aligned vendor capacity.",
+      "fallback_reason": null,
+      "requested_region": "eu",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000447100,
+      "assessments": [
+        {
+          "provider_id": "provider-mistral-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0072,
+          "latency_ms": 640,
+          "region": "eu",
+          "region_match": true,
+          "reasons": [
+            "official Mistral route for EU-frontier production traffic"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-cohere-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-cohere-live",
+      "capability": "responses",
+      "route_key": "command-a-03-2025",
+      "selected_provider_id": "provider-cohere-official",
+      "matched_policy_id": "policy-cohere-official-responses",
+      "applied_routing_profile_id": "profile-global-cohere-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-cohere-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 619,
+      "selection_reason": "official Cohere profile pinned the request to enterprise command capacity.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000448100,
+      "assessments": [
+        {
+          "provider_id": "provider-cohere-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.013,
+          "latency_ms": 610,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official Cohere route aligned to enterprise command workloads"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": [
+    {
+      "provider_id": "provider-deepseek-official",
+      "extension_id": "sdkwork.provider.deepseek",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000449000,
+      "instance_id": "provider-deepseek-official",
+      "running": true,
+      "healthy": true,
+      "message": "official DeepSeek runtime healthy"
+    },
+    {
+      "provider_id": "provider-qwen-official",
+      "extension_id": "sdkwork.provider.qwen",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000449200,
+      "instance_id": "provider-qwen-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Qwen runtime healthy"
+    },
+    {
+      "provider_id": "provider-doubao-official",
+      "extension_id": "sdkwork.provider.doubao",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000449400,
+      "instance_id": "provider-doubao-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Doubao runtime healthy"
+    },
+    {
+      "provider_id": "provider-xai-official",
+      "extension_id": "sdkwork.provider.xai",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000449600,
+      "instance_id": "provider-xai-official",
+      "running": true,
+      "healthy": true,
+      "message": "official xAI runtime healthy"
+    },
+    {
+      "provider_id": "provider-moonshot-official",
+      "extension_id": "sdkwork.provider.moonshot",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000449800,
+      "instance_id": "provider-moonshot-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Moonshot runtime healthy"
+    },
+    {
+      "provider_id": "provider-zhipu-official",
+      "extension_id": "sdkwork.provider.zhipu",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000450000,
+      "instance_id": "provider-zhipu-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Zhipu runtime healthy"
+    },
+    {
+      "provider_id": "provider-hunyuan-official",
+      "extension_id": "sdkwork.provider.hunyuan",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000450200,
+      "instance_id": "provider-hunyuan-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Hunyuan runtime healthy"
+    },
+    {
+      "provider_id": "provider-mistral-official",
+      "extension_id": "sdkwork.provider.mistral",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000450400,
+      "instance_id": "provider-mistral-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Mistral runtime healthy"
+    },
+    {
+      "provider_id": "provider-cohere-official",
+      "extension_id": "sdkwork.provider.cohere",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000450600,
+      "instance_id": "provider-cohere-official",
+      "running": true,
+      "healthy": true,
+      "message": "official Cohere runtime healthy"
+    }
+  ]
+}

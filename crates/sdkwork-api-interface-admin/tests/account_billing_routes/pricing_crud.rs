@@ -171,6 +171,96 @@ async fn admin_billing_pricing_management_routes_update_canonical_plans_and_rate
 }
 
 #[tokio::test]
+async fn admin_billing_pricing_management_routes_normalize_commercial_plan_codes_on_create_and_update(
+) {
+    let pool = memory_pool().await;
+    let store = SqliteAdminStore::new(pool.clone());
+
+    let existing_plan = PricingPlanRecord::new(9101, 1001, 2002, "retail-pro", 1)
+        .with_display_name("Retail Pro")
+        .with_currency_code("USD")
+        .with_credit_unit_code("credit")
+        .with_status("active")
+        .with_created_at_ms(15)
+        .with_updated_at_ms(15);
+    store
+        .insert_pricing_plan_record(&existing_plan)
+        .await
+        .unwrap();
+
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let create_plan = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/billing/pricing-plans")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":1001,"organization_id":2002,"plan_code":" Subscription-Plan : growth ","plan_version":2,"display_name":"Growth","currency_code":"USD","credit_unit_code":"credit","status":"draft","effective_from_ms":1717171730000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_plan.status(), StatusCode::CREATED);
+    let created_plan_json = read_json(create_plan).await;
+    assert_eq!(created_plan_json["plan_code"], "subscription_plan:growth");
+
+    let update_plan = app
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/admin/billing/pricing-plans/9101")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":1001,"organization_id":2002,"plan_code":" Recharge-Pack : pack-100k ","plan_version":2,"display_name":"Pack 100k","currency_code":"USD","credit_unit_code":"credit","status":"draft","effective_from_ms":1718035730000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(update_plan.status(), StatusCode::OK);
+    let updated_plan_json = read_json(update_plan).await;
+    assert_eq!(updated_plan_json["plan_code"], "recharge_pack:pack-100k");
+}
+
+#[tokio::test]
+async fn admin_billing_pricing_management_routes_reject_commercial_plan_codes_without_target_id() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let token = login_token(app.clone()).await;
+
+    let create_plan = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/billing/pricing-plans")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"tenant_id":1001,"organization_id":2002,"plan_code":"custom_recharge:   ","plan_version":1,"display_name":"Custom Recharge","currency_code":"USD","credit_unit_code":"credit","status":"draft","effective_from_ms":1717171730000}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_plan.status(), StatusCode::BAD_REQUEST);
+    let error_json = read_json(create_plan).await;
+    assert_eq!(
+        error_json["error"]["message"],
+        "canonical commercial pricing plan code requires a non-empty target_id"
+    );
+}
+
+#[tokio::test]
 async fn admin_billing_pricing_management_routes_clone_canonical_plan_versions_with_rates() {
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool.clone());

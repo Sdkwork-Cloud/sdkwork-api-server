@@ -1,0 +1,90 @@
+{
+  "profile_id": "prod",
+  "description": "Commercial-ready production bootstrap profile with official provider mappings, routing defaults, pricing, payments, and marketing scaffolding.",
+  "release_version": "2026.04.base",
+  "updates": [
+    "updates/2026-04-global-catalog-expansion.json",
+    "updates/2026-04-global-extension-activation.json",
+    "updates/2026-04-global-official-route-matrix.json",
+    "updates/2026-04-global-provider-operations-readiness.json",
+    "updates/2026-04-global-asia-official-operations.json",
+    "updates/2026-04-global-openrouter-channel-coverage.json",
+    "updates/2026-04-global-catalog-pricing-admin-readiness.json",
+    "updates/2026-04-runtime-governance-foundation.json",
+    "updates/2026-04-account-kernel-commercial-foundation.json",
+    "updates/2026-04-global-asia-account-kernel-operations.json",
+    "updates/2026-04-global-official-route-account-kernel.json",
+    "updates/2026-04-global-provider-operations-account-kernel.json",
+    "updates/2026-04-global-openrouter-channel-account-kernel.json",
+    "updates/2026-04-global-pricing-governance-linkage.json",
+    "updates/2026-04-global-pricing-posture-commerce-walkthrough.json",
+    "updates/2026-04-global-pricing-posture-operations-linkage.json",
+    "updates/2026-04-global-enterprise-manual-contract-walkthrough.json"
+  ],
+  "channels": [
+    "channels/default.json"
+  ],
+  "providers": [
+    "providers/default.json"
+  ],
+  "provider_accounts": [
+    "provider-accounts/default.json"
+  ],
+  "official_provider_configs": [
+    "official-provider-configs/default.json"
+  ],
+  "models": [
+    "models/default.json"
+  ],
+  "channel_models": [
+    "channel-models/default.json"
+  ],
+  "model_prices": [
+    "model-prices/default.json"
+  ],
+  "tenants": [
+    "tenants/default.json"
+  ],
+  "projects": [
+    "projects/default.json"
+  ],
+  "identities": [
+    "identities/default.json"
+  ],
+  "extensions": [
+    "extensions/default.json"
+  ],
+  "routing": [
+    "routing/default.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/default.json"
+  ],
+  "observability": [
+    "observability/default.json"
+  ],
+  "billing": [
+    "billing/default.json"
+  ],
+  "quota_policies": [
+    "quota-policies/default.json"
+  ],
+  "pricing": [
+    "pricing/default.json"
+  ],
+  "payment_methods": [
+    "payment-methods/default.json"
+  ],
+  "marketing": [
+    "marketing/default.json"
+  ],
+  "commerce": [
+    "commerce/default.json"
+  ],
+  "jobs": [
+    "jobs/default.json"
+  ],
+  "provider_models": [
+    "provider-models/default.json"
+  ]
+}

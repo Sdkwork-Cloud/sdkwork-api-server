@@ -184,12 +184,8 @@ pub(crate) async fn reserve_marketing_coupon_handler(
     let atomic_result = state
         .store
         .reserve_coupon_redemption_atomic(&AtomicCouponReservationCommand {
-            template_to_persist: context
-                .compatibility_source
-                .then_some(context.template.clone()),
-            campaign_to_persist: context
-                .compatibility_source
-                .then_some(context.campaign.clone()),
+            template_to_persist: None,
+            campaign_to_persist: None,
             expected_budget: context.budget.clone(),
             next_budget: reserve_campaign_budget(
                 &context.budget,
@@ -494,9 +490,42 @@ pub(crate) async fn list_marketing_reward_history_handler(
 ) -> Result<Json<Vec<PortalMarketingRewardHistoryItem>>, StatusCode> {
     let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
     let subjects = PortalMarketingSubjectSet::new(&workspace, claims.claims());
-    load_marketing_reward_history_items(state.store.as_ref(), &subjects)
+    let account_arrival = load_portal_coupon_account_arrival_context(&state, &workspace).await?;
+    load_marketing_reward_history_items(state.store.as_ref(), &subjects, Some(&account_arrival))
         .await
         .map(Json)
+}
+
+async fn load_portal_coupon_account_arrival_context(
+    state: &PortalApiState,
+    workspace: &PortalWorkspaceSummary,
+) -> Result<PortalCouponAccountArrivalContext, StatusCode> {
+    let Some(commercial_billing) = state.commercial_billing.as_ref() else {
+        return Ok(PortalCouponAccountArrivalContext::default());
+    };
+
+    let account = commercial_billing
+        .resolve_payable_account_for_gateway_request_context(&portal_workspace_request_context(
+            workspace,
+        ))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let Some(account) = account else {
+        return Ok(PortalCouponAccountArrivalContext::default());
+    };
+
+    let lots = commercial_billing
+        .list_account_benefit_lots()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .into_iter()
+        .filter(|lot| lot.account_id == account.account_id)
+        .collect::<Vec<_>>();
+
+    Ok(PortalCouponAccountArrivalContext::from_account_lots(
+        account.account_id,
+        lots,
+    ))
 }
 
 pub(crate) async fn list_marketing_redemptions_handler(

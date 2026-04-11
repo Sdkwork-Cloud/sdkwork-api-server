@@ -1,0 +1,396 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-global-deepseek-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global DeepSeek Official",
+      "slug": "global-deepseek-official",
+      "description": "Official DeepSeek route profile for high-volume reasoning and chat traffic with provider-model aligned execution.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 2.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000420000,
+      "updated_at_ms": 1710000420000
+    },
+    {
+      "profile_id": "profile-global-qwen-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Qwen Official",
+      "slug": "global-qwen-official",
+      "description": "Official Qwen route profile for mainstream China and APAC production traffic with clean official-provider preference.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-qwen-official",
+      "max_cost": 3.2,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000421000,
+      "updated_at_ms": 1710000421000
+    },
+    {
+      "profile_id": "profile-global-doubao-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Doubao Official",
+      "slug": "global-doubao-official",
+      "description": "Official Doubao route profile for ByteDance-native commercial traffic and regulated China-region delivery.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-doubao-official"
+      ],
+      "default_provider_id": "provider-doubao-official",
+      "max_cost": 2.8,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000422000,
+      "updated_at_ms": 1710000422000
+    },
+    {
+      "profile_id": "profile-global-xai-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global xAI Official",
+      "slug": "global-xai-official",
+      "description": "Official xAI route profile for Grok-native frontier traffic with strict provider ownership.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-xai-official",
+      "max_cost": 14,
+      "max_latency_ms": 8000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000423000,
+      "updated_at_ms": 1710000423000
+    },
+    {
+      "profile_id": "profile-global-moonshot-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Moonshot Official",
+      "slug": "global-moonshot-official",
+      "description": "Official Moonshot route profile for Kimi-first long-context consumer and enterprise traffic.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-moonshot-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000424000,
+      "updated_at_ms": 1710000424000
+    },
+    {
+      "profile_id": "profile-global-zhipu-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Zhipu Official",
+      "slug": "global-zhipu-official",
+      "description": "Official Zhipu route profile for GLM-native enterprise workloads and regional compliance posture.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-zhipu-official"
+      ],
+      "default_provider_id": "provider-zhipu-official",
+      "max_cost": 4,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000425000,
+      "updated_at_ms": 1710000425000
+    },
+    {
+      "profile_id": "profile-global-hunyuan-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Hunyuan Official",
+      "slug": "global-hunyuan-official",
+      "description": "Official Hunyuan route profile for Tencent-cloud aligned enterprise deployments.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-hunyuan-official"
+      ],
+      "default_provider_id": "provider-hunyuan-official",
+      "max_cost": 5.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000426000,
+      "updated_at_ms": 1710000426000
+    },
+    {
+      "profile_id": "profile-global-mistral-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Mistral Official",
+      "slug": "global-mistral-official",
+      "description": "Official Mistral route profile for EU-centric frontier inference and enterprise residency needs.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-mistral-official",
+      "max_cost": 6,
+      "max_latency_ms": 8500,
+      "require_healthy": true,
+      "preferred_region": "eu",
+      "created_at_ms": 1710000427000,
+      "updated_at_ms": 1710000427000
+    },
+    {
+      "profile_id": "profile-global-cohere-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Cohere Official",
+      "slug": "global-cohere-official",
+      "description": "Official Cohere route profile for enterprise command models and search-adjacent workloads.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-cohere-official"
+      ],
+      "default_provider_id": "provider-cohere-official",
+      "max_cost": 8,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000428000,
+      "updated_at_ms": 1710000428000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-deepseek-official-chat-responses",
+      "capability": "responses",
+      "model_pattern": "deepseek-chat",
+      "enabled": true,
+      "priority": 89,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 2.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-deepseek-official-reasoner-responses",
+      "capability": "responses",
+      "model_pattern": "deepseek-reasoner",
+      "enabled": true,
+      "priority": 88,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 2.8,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1400
+    },
+    {
+      "policy_id": "policy-qwen-official-responses",
+      "capability": "responses",
+      "model_pattern": "qwen-*",
+      "enabled": true,
+      "priority": 87,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-qwen-official",
+      "max_cost": 3.2,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-doubao-official-responses",
+      "capability": "responses",
+      "model_pattern": "doubao-*",
+      "enabled": true,
+      "priority": 86,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-doubao-official"
+      ],
+      "default_provider_id": "provider-doubao-official",
+      "max_cost": 2.8,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 180,
+      "upstream_retry_max_delay_ms": 1100
+    },
+    {
+      "policy_id": "policy-xai-official-responses",
+      "capability": "responses",
+      "model_pattern": "grok-*",
+      "enabled": true,
+      "priority": 85,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-xai-official",
+      "max_cost": 14,
+      "max_latency_ms": 8000,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 180,
+      "upstream_retry_max_delay_ms": 1000
+    },
+    {
+      "policy_id": "policy-moonshot-official-kimi-responses",
+      "capability": "responses",
+      "model_pattern": "kimi-*",
+      "enabled": true,
+      "priority": 84,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-moonshot-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-moonshot-official-long-context-responses",
+      "capability": "responses",
+      "model_pattern": "moonshot-*",
+      "enabled": true,
+      "priority": 83,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-moonshot-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1300
+    },
+    {
+      "policy_id": "policy-zhipu-official-responses",
+      "capability": "responses",
+      "model_pattern": "glm-*",
+      "enabled": true,
+      "priority": 82,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-zhipu-official"
+      ],
+      "default_provider_id": "provider-zhipu-official",
+      "max_cost": 4,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-hunyuan-official-responses",
+      "capability": "responses",
+      "model_pattern": "hunyuan-*",
+      "enabled": true,
+      "priority": 81,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-hunyuan-official"
+      ],
+      "default_provider_id": "provider-hunyuan-official",
+      "max_cost": 5.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1400
+    },
+    {
+      "policy_id": "policy-mistral-official-responses",
+      "capability": "responses",
+      "model_pattern": "mistral-*",
+      "enabled": true,
+      "priority": 80,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-mistral-official",
+      "max_cost": 6,
+      "max_latency_ms": 8500,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 180,
+      "upstream_retry_max_delay_ms": 1000
+    },
+    {
+      "policy_id": "policy-cohere-official-responses",
+      "capability": "responses",
+      "model_pattern": "command-*",
+      "enabled": true,
+      "priority": 79,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-cohere-official"
+      ],
+      "default_provider_id": "provider-cohere-official",
+      "max_cost": 8,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    }
+  ],
+  "project_preferences": []
+}

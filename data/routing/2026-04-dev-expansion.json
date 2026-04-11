@@ -1,0 +1,45 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-growth-lab-asia-official",
+      "tenant_id": "tenant_growth_lab",
+      "project_id": "project_growth_lab",
+      "name": "Growth Lab Asia Official",
+      "slug": "growth-lab-asia-official",
+      "description": "Growth lab workspace profile inheriting Asia-official provider preferences for sandbox iteration.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-minimax-official",
+        "provider-ernie-official",
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-minimax-official",
+      "max_cost": 4.0,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710001400000,
+      "updated_at_ms": 1710001400000
+    }
+  ],
+  "policies": [],
+  "project_preferences": [
+    {
+      "project_id": "project_growth_lab",
+      "preset_id": "profile-growth-lab-asia-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-minimax-official",
+        "provider-ernie-official",
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-minimax-official",
+      "max_cost": 4.0,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "updated_at_ms": 1710001400000
+    }
+  ]
+}

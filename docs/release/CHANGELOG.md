@@ -1,5 +1,486 @@
 # SDKWork API Router CHANGELOG
 
+## v0.1.52 - Commercial S08 Release Sync External Blocker Formalization
+
+- Date: 2026-04-11
+- Type: patch
+- Highlights:
+  - refined the last `S08` blocker from a generic `release-sync-audit fail` label into a stop-condition-grade external blocker with exact repository evidence: the current `sdkwork-api-router` branch has no upstream configured, `sdkwork-core` is not a standalone git root and points at the wrong origin URL, and the governed sibling repositories remain dirty and remote-unverifiable
+  - backwrote `S08` step, review, release, and architecture records so the repo now states explicitly that commercialization capability is closed while release closure is blocked by cross-repository release hygiene, not by unresolved product/runtime work
+  - kept release truth fresh by reusing the governed latest artifacts posture: `release-window-snapshot = pass`, `release-slo-governance = pass`, `release-sync-audit = fail`, with explicit unlock conditions and next-loop entry
+
+## v0.1.51 - Commercial S08 Live Governance Pass Replay
+
+- Date: 2026-04-11
+- Type: patch
+- Highlights:
+  - fixed the Windows PowerShell compatibility hole in `live-commercial-governance-replay.ps1`, so the governed replay can now finish artifact generation on the current host instead of failing on `ConvertFrom-Json -Depth`
+  - replayed the source-backed admin, gateway, and portal stack against the repo-local `dev` bootstrap database, proved the canonical admin commercial-control-plane routes now return `200`, and materialized both isolated and latest governed telemetry export / snapshot / SLO artifacts from that live evidence
+  - advanced `S08` from `window pass / sync fail / SLO fail` to `window pass / sync fail / SLO pass`, leaving `release-sync-audit` as the only remaining `no-go` blocker
+
+## v0.1.50 - Commercial S08 Admin Service Commercial Billing Runtime Fix
+
+- Date: 2026-04-11
+- Type: patch
+- Highlights:
+  - fixed standalone `admin-api-service` runtime wiring so it now builds `commercial_billing` through `build_admin_store_and_commercial_billing_from_config(...)` and threads that kernel into both `AdminApiState` and runtime reload handles
+  - added service-level regression coverage proving `/admin/billing/account-holds`, `/admin/billing/request-settlements`, and `/admin/billing/pricing-lifecycle/synchronize` all record `status="200"` metrics and no longer emit `status="501"` from the current source runtime
+  - kept `S08` release truth honest: this loop closes the repo-local root cause, but the current shell policy still blocks source-backed background stack replay, so governed latest artifacts were not re-materialized and commercialization release remains `no-go` pending a fresh host-level replay
+
+## v0.1.49 - Commercial S08 Governance Fail Replay
+
+- Date: 2026-04-11
+- Type: patch
+- Highlights:
+  - fixed the governed release telemetry snapshot parser so truthful live admin Prometheus text with route-template labels such as `/admin/runtime-config/rollouts/{rollout_id}` can be materialized instead of crashing the snapshot derivation lane
+  - replayed `S08` with a truthful local stateful-provider failover probe, closing `gateway-fallback-success-rate` at `1/1` and `gateway-provider-timeout-budget` at `0`, then materialized `docs/release/release-telemetry-export-latest.json`, `release-telemetry-snapshot-latest.json`, and `slo-governance-latest.json`
+  - converted the release gate from `window pass / sync fail / SLO blocked` into `window pass / sync fail / SLO fail`, with the remaining governed failures now explicit: `admin-api-availability`, `account-hold-creation-success-rate`, `request-settlement-finalize-success-rate`, and `pricing-lifecycle-synchronize-success-rate`
+
+## v0.1.48 - Commercial S08 Local Derived Target Probe
+
+- Date: 2026-04-11
+- Type: patch
+- Highlights:
+  - proved through a live local derived-target probe that six previously-missing non-availability SLO targets are already truthfully closeable, including route simulation latency, API-key issuance, runtime rollout, gateway non-streaming and streaming success, and billing-event writes
+  - replayed the governed telemetry chain with those truthful supplemental targets and advanced the first exact snapshot failure from `gateway-non-streaming-success-rate` to `gateway-fallback-success-rate`, tightening the remaining blocker to fallback / timeout evidence instead of a broad supplemental-target gap
+  - documented the smaller residual blocker set explicitly: provider-level failover and timeout samples are still absent, commercial billing kernel routes still return `501`, portal billing account truth is still unprovisioned, and `release-sync-audit` remains independently failing
+
+## v0.1.47 - Commercial S08 Managed Telemetry Availability Proof
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - proved that the current host already carries live managed telemetry on `127.0.0.1:9980 / 9981 / 9982`, with authenticated `/metrics` available for gateway, admin, and portal even though the older raw `8080 / 8081 / 8082` defaults remain absent
+  - materialized a truthful release telemetry export from those live managed metrics into an isolated evidence pack, then reproduced the next exact failure point at snapshot derivation: `release telemetry snapshot is missing target gateway-non-streaming-success-rate`
+  - tightened `S08` and `166` again so the commercialization gate now distinguishes "availability telemetry exists locally" from "the governed SLO baseline still lacks truthful supplemental target coverage", while keeping the honest posture unchanged: `window pass`, `sync fail`, `SLO blocked`
+
+## v0.1.46 - Commercial S08 Telemetry Input External Blocker Refinement
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - converted the remaining `release-slo-governance` blocker from a generic “missing telemetry” statement into a reproducible external-input diagnosis: no telemetry env injection, no governed telemetry latest artifacts, and no reachable localhost `/metrics` sources on the documented ports
+  - confirmed the repo already owns the telemetry export, snapshot, and SLO materialization chain, so the remaining gap is a truthful hosted control-plane handoff plus `supplemental.targets`, not a local implementation omission
+  - tightened `S08` records again so the commercialization gate now distinguishes product closure from release-evidence supply more sharply: `window pass`, `sync fail`, `SLO blocked by external telemetry handoff`
+
+## v0.1.45 - Commercial S08 Release Window Freshness Replay
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - investigated and fixed a new governed release-window evidence drift where default latest-artifact replay still carried `workingTreeEntryCount = 506` after later `S08` doc/release backwrite changed the live workspace truth
+  - refreshed `docs/release/release-window-snapshot-latest.json` from current shell git truth and documented the operational rule that later `S08` backwrite must re-materialize that artifact before the next governance replay
+  - reaffirmed the honest commercialization gate posture as `release-window pass`, `release-sync fail`, `release-slo blocked`, so the remaining blocker stays release governance rather than product convergence
+
+## v0.1.44 - Commercial S08 Release Window Pass and Sync Audit Refinement
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - materialized governed `release-window-snapshot-latest.json` from current shell git truth, converting that release-governance lane from host-exec blocked to passing
+  - materialized governed `release-sync-audit-latest.json` from current repository and sibling-repository shell truth, converting that lane from opaque `command-exec-blocked` into a concrete release `fail` with dirty-tree, branch-sync, remote-root, and remote-url evidence
+  - tightened `S08` documentation so the commercialization gate now reflects the more accurate structure: `window pass`, `sync fail`, `SLO blocked`, instead of the older all-blocked posture
+
+## v0.1.43 - Commercial S08 Integrated Acceptance and Release Gate
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - aggregated fresh admin, portal, and public gateway verification evidence into the `S08` commercialization acceptance matrix, showing the coupon-first `product / account / marketing` line is internally converged on current runtime and UI surfaces
+  - backwrote `docs/step/110`, `docs/架构/166`, `docs/架构/133`, and `docs/架构/03` with the same final gate posture so the repository no longer describes `S08` as only a plan instead of an evidence-backed decision point
+  - recorded the honest `S08` release result as `no-go`, with the remaining blockers narrowed to governed release telemetry input and release window / sync truth on a host that can prove remote Git state
+
+## v0.1.42 - Commercial S07 Historical Legacy Coupon Doc Closure
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - cleaned `docs/step`, `docs/review`, and `docs/superpowers` so legacy coupon wording now reads as historical baseline or superseded design, not live product truth
+  - removed exact legacy coupon crate, route, helper, and UI residue from planning and review docs, making `marketing` the only active coupon vocabulary across architecture and execution records
+  - kept historical intent and audit value while tightening release-grade documentation posture for the commercial coupon-first marketing product line
+
+## v0.1.41 - Commercial S07 Legacy Coupon Full Exit
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - removed the last active-surface legacy coupon residue from admin coupon tests, stale i18n catalogs, and the admin API reference, so `/admin/coupons` is no longer described or implied anywhere in the live control-plane product surface
+  - updated active architecture docs to treat `marketing` as the only coupon truth and removed `sdkwork-api-domain-coupon` / `sdkwork-api-app-coupon` from the live module-boundary inventory
+  - verified that active runtime and product surfaces no longer ship legacy coupon crate, projection, or route truth; remaining mentions are removal tests or historical records only
+
+## v0.1.40 - Commercial S07 Main-Path Legacy Coupon Exit and S06 API Reference Closure
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - removed legacy coupon fallback from gateway, portal, and commerce main coupon flows, making canonical marketing the only coupon fact source on those runtime surfaces
+  - removed admin primary-view `Legacy coupon compatibility` copy and dropped main-path legacy coupon crate dependencies from commerce and portal
+  - closed the public consumer documentation gap by publishing `market / marketing / commercial` gateway route families plus `after_lot_id`, `next_after_lot_id`, and `scope_order_id` in the main API reference
+
+## v0.1.39 - Commercial S06 Public Commercial Benefit-Lot Pagination
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - upgraded public `GET /commercial/account/benefit-lots` from store-wide filtering to account-scoped storage reads, closing the remaining `S06` scale gap on commercial benefit-lot visibility
+  - added cursor pagination with `after_lot_id`, `limit`, and additive `page` metadata, so commercial account lot history can be traversed safely without weakening coupon/account-arrival semantics
+  - added `idx_ai_account_benefit_lot_account_lot` on sqlite and postgres and synchronized gateway `/openapi.json` to the same pagination contract
+
+## v0.1.38 - Commercial S06 Public Market/Coupon/Commercial API Convergence
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added authenticated public gateway routes for `market / marketing / commercial`, covering API products, quotes, coupon validate-reserve-confirm-rollback, and commercial account plus benefit-lot visibility
+  - kept public coupon semantics explicit with `template / campaign / applicability / effect`, making outward coupon effect visible as `checkout_discount | account_entitlement`
+  - exposed `scope_order_id` on public commercial benefit-lot payloads, so order-to-account-arrival evidence is outwardly inspectable instead of portal-only
+  - closed runtime versus `/openapi.json` drift by publishing the same 9-route public surface under gateway OpenAPI tags `market`, `marketing`, and `commercial`
+
+## v0.1.37 - Commercial S03 Portal Coupon Account Arrival Correlation
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added additive portal `reward-history.account_arrival` so grant-style coupon redemptions now expose linked commercial-account arrival evidence instead of stopping at redemption status
+  - correlated portal reward-history to real runtime lot evidence through `CouponRedemptionRecord.order_id` and current-account `AccountBenefitLotRecord.scope_json.order_id`, constrained to `source_type = order`
+  - synchronized manual portal OpenAPI, shared portal TS types, and portal credits reward-history UI with explicit arrival semantics `Arrived to account`, `No linked account lot evidence yet`, and `No account arrival for checkout discount`
+  - kept the slice additive and coupon-first while narrowing the next `S03` outward gap from portal arrival evidence to wider public API convergence
+
+## v0.1.36 - Commercial S03 Portal Coupon Semantic Convergence
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - upgraded portal `my-coupons / reward-history` into coupon-semantic read models carrying `template / campaign / applicability / effect / ownership` instead of only operational status fragments
+  - made outward coupon effect explicit as `checkout_discount | account_entitlement`, keeping coupon-first semantics clear inside portal wallet and reward-history flows
+  - surfaced target applicability and current-subject ownership truth through additive semantic fields and synchronized portal OpenAPI, shared TS types, and credits UI copy
+  - restored sqlite compile continuity with a missing `PricingPlanOwnershipScope` import so the new portal commercialization slice can be rebuilt and verified cleanly
+
+## v0.1.35 - Commercial S03 Admin Marketing Campaign Revision Governance
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - upgraded canonical `marketing campaign` with additive `approval_state / revision / root_marketing_campaign_id / parent_marketing_campaign_id`, so campaign revisions now carry explicit approval and lineage evidence instead of only rollout status
+  - added semantic admin revision-governance APIs `clone / compare / submit-for-approval / approve / reject` for campaigns, keeping coupon-first campaign semantics explicit inside `market`
+  - made campaign rollout approval-aware for governed revisions and extended lifecycle audit with `source_marketing_campaign_id`, approval-state transitions, and revision deltas
+  - synchronized OpenAPI, admin shared TS types, and the admin API client, and backwrote architecture doc `166` so campaign-side `revision / approval / compare / clone` is no longer the next `S03` governance gap
+
+## v0.1.34 - Commercial S03 Admin Marketing Coupon Template Revision Governance
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - upgraded canonical `coupon template` with additive `approval_state / revision / root_coupon_template_id / parent_coupon_template_id`, so template revisions now carry explicit approval and lineage evidence instead of only rollout status
+  - added semantic admin revision-governance APIs `clone / compare / submit-for-approval / approve / reject`, keeping coupon semantics explicit inside the coupon-first `market` model
+  - made template rollout approval-aware for governed revisions and extended lifecycle audit with `source_coupon_template_id`, approval-state transitions, and revision deltas
+  - synchronized OpenAPI, admin shared TS types, and the admin API client, and backwrote architecture doc `166` so template-side `revision / approval / compare / clone` is no longer the next `S03` gap
+
+## v0.1.33 - Commercial S03 Admin Marketing Budget/Code Lifecycle
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - promoted canonical budget control to semantic `activate / close` APIs and canonical coupon code control to semantic `disable / restore` APIs, keeping legacy `/status` routes only as compatibility
+  - persisted and exposed budget/code lifecycle audit for both applied and rejected decisions, carrying `operator_id / request_id / reason / decision_reasons / requested_at_ms`
+  - enforced coupon-first governance guardrails where budget activation requires headroom and non-closed campaign context, while expired code cannot be restored and runtime-owned `reserved / redeemed` code states stop behaving like normal admin toggles
+  - synchronized OpenAPI, admin shared types, and the admin API client with `CampaignBudget*` and `CouponCode*` lifecycle schemas and methods, and updated architecture doc `166` so `budget / code` is no longer the next `S03` gap
+
+## v0.1.32 - Commercial S03 Admin Marketing Lifecycle Audit
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - persisted template/campaign lifecycle audit for applied and rejected decisions on canonical marketing truth, carrying `operator_id / request_id / reason / decision_reasons / requested_at_ms`
+  - added dedicated admin audit list APIs plus sqlite/postgres audit tables and indexes, so lifecycle evidence is now queryable rather than response-only
+  - synchronized OpenAPI, admin shared types, and the admin API client with `CouponTemplateLifecycleAuditRecord` and `MarketingCampaignLifecycleAuditRecord`
+  - backwrote architecture doc `166` so repo truth now treats template/campaign lifecycle audit as closed and re-ranks `budget / code` plus `revision / approval / compare / clone` as the next `S03` gaps
+
+## v0.1.31 - Commercial S03 Admin Marketing Coupon Template Lifecycle
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added semantic admin template lifecycle mutations on canonical coupon template ids, so operators can now `publish / schedule / retire` coupon definitions instead of overloading a generic `status` toggle
+  - introduced `CouponTemplateMutationResult { detail, audit }` plus additive `CouponTemplateStatus::Scheduled` and `activation_at_ms`, making definition-side activation timing explicit inside the coupon-first `market` model
+  - synchronized admin/portal shared types and the admin API client to the new template lifecycle contract, preventing frontend-facing coupon semantics from falling behind backend truth
+  - backwrote architecture doc `166` to reflect that marketing no longer only exposes `create + status toggle`; template/campaign lifecycle is now semantic while budget/code remain the next governance gap
+
+## v0.1.30 - Commercial S03 Admin Marketing Campaign Lifecycle
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added semantic admin campaign lifecycle mutations on canonical marketing campaign ids, so operators can now `publish / schedule / retire` coupon campaigns instead of mutating a generic `status` field with hidden timing rules
+  - introduced `MarketingCampaignMutationResult { detail, audit }`, returning campaign truth, linked coupon template context, lifecycle actionability, and operator reason in one response so coupon semantics stay explicit inside `market`
+  - enforced coupon-first lifecycle guardrails where inactive templates block `publish / schedule`, future `start_at_ms` blocks `publish`, and `retire` converges campaigns to `ended`
+  - kept legacy `/status` compatibility while moving the admin contract toward semantic lifecycle actions, and verified the full `sdkwork-api-interface-admin` package stays green
+
+## v0.1.29 - Commercial S01 Admin Publication Mutation Audit
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added semantic admin publication lifecycle mutations on canonical publication ids, so operators can now `publish / schedule / retire` from the publication surface instead of leaking governed pricing-plan ids into workflow tooling
+  - introduced `CommercialCatalogPublicationMutationResult { detail, audit }` and persisted `CatalogPublicationLifecycleAuditRecord`, making publication lifecycle decisions durable with operator id, request id, operator reason, before-after status, and rejected decision reasons
+  - hardened governed `planned` publication semantics so repeat `schedule` is blocked as `publication is already scheduled` while outward publication status stays `draft`, matching canonical catalog behavior
+  - repaired a stale sqlite admin integration test uncovered by full-package verification, aligning admin `model-price` setup with the current `provider-model` prerequisite and restoring green `sdkwork-api-interface-admin` package validation
+
+## v0.1.28 - Commercial S01 Admin Publication Actionability
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - extended admin publication detail with additive `actionability.publish / schedule / retire`, so operators can evaluate publication lifecycle readiness from one canonical read model instead of inferring pricing lifecycle rules manually
+  - derived publication actionability from canonical publication status, governed pricing-plan presence, governed pricing-rate presence, and effective time while returning explicit block reasons for non-actionable states
+  - hardened publication regressions around real future `effective_from_ms` semantics, preventing stale pseudo-future test data from masking lifecycle behavior drift
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 admin-publication-control convergence traceable by loop and version
+
+## v0.1.27 - Commercial S01 Admin Publication Detail
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added additive `GET /admin/commerce/catalog-publications/{publication_id}`, so admin can now load one canonical publication with its full governed pricing context instead of joining pricing evidence manually
+  - introduced `CommercialCatalogPublicationDetail { projection, governed_pricing_plan, governed_pricing_rates }`, keeping publication semantics explicit while exposing the exact pricing-plan evidence backing the current revision
+  - resolved governed publication detail by canonical commercial `plan_code + publication_version`, avoiding admin-side inference from unstable ids or client-side joins
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 admin-publication-detail convergence traceable by loop and version
+
+## v0.1.26 - Commercial S01 Admin Publication Projection
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added additive `GET /admin/commerce/catalog-publications`, so admin now has a first-class read model for canonical `ApiProduct -> ProductOffer -> CatalogPublication` truth instead of inferring publication state from pricing-plan records
+  - introduced `CommercialCatalogPublicationProjection { product, offer, publication }`, reusing canonical domain schemas rather than creating a duplicate admin-only publication contract
+  - opened shared catalog projection reuse through `current_canonical_commercial_catalog_for_store(...)` and synchronized pricing lifecycle before admin projection, so operator visibility now follows the same governed publication truth as runtime commerce
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 admin-publication convergence traceable by loop and version
+
+## v0.1.25 - Commercial S01 Publication-Revision Governance
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - upgraded canonical `CatalogPublication` with additive `publication_revision_id / publication_version / publication_source_kind / publication_effective_from_ms`, so publication governance is now explicit revision evidence instead of only `publication_status`
+  - added deterministic publication revision identity `publication_revision:<publication_kind>:offer:<product_kind>:<target_id>:v<version>` and derived it from governed pricing-plan truth or catalog-seed fallback without storage-schema churn
+  - threaded publication revision evidence through portal catalog offers, commerce quotes, order snapshots, order read views, and portal OpenAPI while preserving existing `pricing_plan_*` compatibility
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 publication-governance convergence traceable by loop and version
+
+## v0.1.24 - Commercial S01 Plan-Code Governance
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - introduced shared commercial pricing-code normalization in `sdkwork-api-app-catalog`, so product-bound pricing codes now converge to canonical `<product_kind>:<target_id>` instead of relying on operator-perfect string entry
+  - upgraded canonical catalog governance matching to use the shared normalization helper, allowing historical commercial code variants to align with runtime catalog truth without a storage migration
+  - upgraded admin pricing-plan create/update to persist normalized commercial codes while preserving generic non-commercial `plan_code` compatibility, and added explicit rejection for malformed commercial codes with empty `target_id`
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 plan-code governance convergence traceable by loop and version
+
+## v0.1.23 - Commercial S01 Pricing Governance Overlay
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - introduced canonical commercial `plan_code` alignment `<product_kind>:<target_id>`, so pricing governance can now safely project onto outward commercial catalog semantics without replacing the existing compatibility `pricing_plan_id`
+  - upgraded canonical catalog building and portal commerce quote generation to overlay governed `pricing_plan_version / publication_status` from aligned pricing-plan lifecycle records, while keeping the old fallback `version=1 / published` path for non-aligned or legacy cases
+  - added an `AdminStore -> AccountKernelStore` bridge for sqlite/postgres-backed commerce reads, allowing portal catalog and quote flows to consume pricing governance without widening router state types or forking a second store abstraction
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 pricing-governance convergence traceable by loop and version
+
+## v0.1.22 - Commercial S01 Outward Order Owner Chain
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - extended outward portal order reads with additive canonical `product_id / offer_id / publication_id / publication_kind / publication_status`, so catalog-owner semantics now reach order detail and order-center instead of stopping inside quote/snapshot evidence
+  - promoted reusable app-layer `PortalCommerceCatalogBinding` and reused it from the portal interface, avoiding a second snapshot-parsing truth path
+  - aligned `PortalCommerceOrder` OpenAPI and portal shared TS contracts with runtime order payloads, including the previously missing `pricing_plan_id / pricing_plan_version` plus new owner-chain fields
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 outward-order convergence traceable by loop and version
+
+## v0.1.21 - Commercial S01 Catalog Publication Owner Chain
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - extended portal catalog offers and portal quotes with additive canonical `product_id / offer_id / publication_id / publication_kind / publication_status`, so portal-facing commerce payloads now carry explicit `ApiProduct -> ProductOffer -> CatalogPublication` owner chain instead of relying on local inference
+  - upgraded quote binding resolution from pricing-only to full catalog-owner binding and added explicit `catalog_binding` evidence into order snapshots, tightening quote-time and order-time auditability without storage-schema churn
+  - made settlement-side quote reconstruction prefer stored owner-chain evidence while retaining a compatibility fallback for older snapshots
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 publication-owner convergence traceable by loop and version
+
+## v0.1.20 - Commercial S01 Quote Pricing Evidence
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - extended `PortalCommerceQuote` with additive `pricing_plan_id / pricing_plan_version / pricing_rate_id / pricing_metric_code`, so quote payload now exposes the same canonical pricing identity already carried by catalog offer truth
+  - changed portal order creation to persist pricing-plan identity from quote truth and added explicit `pricing_binding` evidence into `pricing_snapshot_json`, tightening quote-time auditability without storage-schema churn
+  - verified recharge-pack and custom-recharge quote parity through Rust regressions, re-checked portal OpenAPI inventory exposure, and updated portal shared TS quote contracts
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 quote-evidence convergence traceable by loop and version
+
+## v0.1.19 - Commercial S01 Offer Pricing Binding
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - extended canonical `ProductOffer` semantics with additive `pricing_plan_id / pricing_plan_version / pricing_rate_id / pricing_metric_code`, so offer truth now carries explicit pricing binding instead of only a display label
+  - added deterministic pricing binding generation in `sdkwork-api-app-catalog` and exposed those bindings through portal catalog `offers` plus portal shared TS types
+  - fixed portal order creation so `pricing_plan_id` now resolves from canonical offer pricing truth, eliminating the previous misuse of subscription `target_id` as a pricing-plan identity
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 pricing-convergence progress traceable by loop and version
+
+## v0.1.18 - Commercial S01 Domain/App Canonical Commercial Catalog
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - introduced shared `ApiProduct / ProductOffer / CatalogPublication / CommercialCatalog` semantics in `sdkwork-api-domain-catalog`, giving S01 an explicit domain owner for canonical commercial catalog truth
+  - added `sdkwork-api-app-catalog` canonical seed builders and rewired `sdkwork-api-app-commerce` so portal catalog `products / offers` now derive from the shared domain/app model instead of local compatibility assembly
+  - repaired the sqlite compile blockers exposed by fresh-loop verification and removed the leftover provider-account decoder warning debt, so the new canonical catalog slice can be rebuilt and proven without warm-state artifacts
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 progress traceable by loop and version
+
+## v0.1.17 - Commercial S01 Catalog Product Offer Layer
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added additive `products` and `offers` to portal commerce catalog as a canonical product/offer truth layer, while preserving legacy `plans`, `packs`, `recharge_options`, `custom_recharge_policy`, and `coupons`
+  - introduced `PortalApiProduct` and `PortalProductOffer` across Rust DTOs, portal OpenAPI, and shared portal TypeScript contracts so coupon-first commercialization can evolve toward explicit `ApiProduct / ProductOffer / Quote / Transaction` semantics without immediate storage churn
+  - published `/portal/commerce/catalog` in the manual portal OpenAPI and verified the new catalog surface, quote flow compatibility, and TS contract exposure through Rust tests plus direct Node assertions
+  - updated commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`, keeping S01 progress traceable by loop and version
+
+## v0.1.16 - Commercial S01 Coupon Semantics Split
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - added additive `product_kind` and `quote_kind` to portal commerce quote output, keeping legacy `target_kind` wire compatibility while separating API product purchase semantics from coupon redemption semantics
+  - added additive `product_kind` and `transaction_kind` to portal commerce order responses through an interface-layer view model, avoiding storage-schema churn while making coupon-first marketing and commerce boundaries explicit
+  - split portal TypeScript contract semantics into `PortalCommerceTargetKind`, `PortalMarketingTargetKind`, `ApiProductKind`, `PortalQuoteKind`, and `CommercialTransactionKind`, while retaining `PortalCommerceQuoteKind` as a compatibility alias
+  - updated portal OpenAPI order schema and added commercialization loop evidence under `docs/step`, `docs/review`, and `docs/release`
+
+## v0.1.15 - Commercial Step Loop Prompt Final Tightening
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - compressed `docs/prompts/反复执行Step指令.md` again into a shorter final execution contract for the commercialization step loop
+  - merged repeated prose into denser rules while preserving the hard flow: truth sync, batch selection, batch implementation, per-step closure, release writeback, and next-loop continuation
+  - kept the serial backbone, allowed parallel windows, single-writer shared-file controls, mandatory `go / conditional-go / no-go`, and forced `docs/release` updates for every substantive iteration
+
+## v0.1.14 - Commercial Step Loop Prompt Short Core
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - compressed `docs/prompts/反复执行Step指令.md` again into a shorter commercial step execution contract
+  - removed explanatory redundancy while preserving the hard closure loop: truth sync, batch selection, batch implementation, per-step closure, release writeback, and next-loop continuation
+  - kept the serial backbone, allowed parallel windows, single-writer shared-file controls, mandatory `go / conditional-go / no-go`, and required `docs/release` updates for every substantive iteration
+
+## v0.1.13 - Commercial Step Loop Prompt Tightening
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - compressed `docs/prompts/反复执行Step指令.md` into a shorter commercialization loop prompt while preserving the hard closure logic
+  - kept the accelerated batch-first flow: finish the current unlocked implementation batch first, then enter per-step testing, review, architecture writeback, and release closure
+  - retained explicit serial backbone, allowed parallel windows, single-writer shared-contract rules, and mandatory `go / conditional-go / no-go` step exits
+  - preserved professional change-log governance under `docs/release`, including dated/versioned loop notes and evidence-oriented release writeback
+
+## v0.1.12 - Commercial Step Loop Prompt Refresh
+
+- Date: 2026-04-10
+- Type: patch
+- Highlights:
+  - rewrote `docs/prompts/反复执行Step指令.md` into a commercialization-specific repeatable execution contract aligned to `docs/step/100-110` and `docs/架构/166/133/03`
+  - formalized the accelerated wave loop: finish the current unlocked batch of code implementation first, then enter per-step testing, review, architecture writeback, and release closure
+  - made the serial backbone and allowed parallel windows explicit for `S00-S08`, while pinning shared-contract files to single-writer control
+  - required professional change-log governance under `docs/release`, including dated and versioned loop notes, verification evidence, rollback context, and remaining-risk disclosure
+
+## Unreleased - Provider Protocol / Plugin Runtime Split
+
+- Date: 2026-04-09
+- Type: minor
+- Highlights:
+  - added explicit `protocol_kind` to provider metadata so external protocol standard and plugin runtime identity are no longer conflated inside `adapter_kind`
+  - threaded `protocol_kind` through `/admin/providers`, SQLite, PostgreSQL, and stateless gateway upstream configuration while preserving legacy payload compatibility
+  - added native Anthropic and Gemini passthrough at the HTTP gateway edge for both stateless and stateful flows
+  - added no-log planned provider preview plus shared planned execution entrypoints so stateful Anthropic/Gemini passthrough and translated fallback now keep the same one-request/one-decision-log/one-provider-plan audit shape
+  - canonicalized extension runtime protocol capability to `openai`, `anthropic`, `gemini`, and `custom`, while preserving legacy manifest compatibility for `openrouter` and `ollama`
+  - added explicit builtin manifest protocol capability metadata and safe fallback from unresolved `extension_id` to protocol-default runtime only for unbound providers
+  - closed the safety gap where blocked explicit plugins could silently degrade to builtin defaults
+  - added first-class raw native-dynamic plugin execution for Anthropic and Gemini compat routes, so heterogeneous plugins can return provider-native JSON/SSE without collapsing back into OpenAI translation
+  - extended planned execution context with resolved runtime metadata, kept explicit broken bindings fail-closed in stateful compat flows, and now still persist one routing decision log when those failures occur
+  - upgraded stateful raw-plugin execution to reuse gateway execution-context controls, upstream outcome metrics, and provider health snapshot persistence instead of bypassing governance
+  - taught raw JSON planned execution to honor matched routing retry policy conservatively, with verified timeout->retry->success recovery for native-dynamic compat plugins while keeping opaque plugin failures non-retryable
+  - extended the native-dynamic ABI error envelope with optional retry metadata, so plugins can explicitly declare transient failures and `retry_after_ms` without forcing gateway-side message heuristics
+  - extended the same explicit transient-error contract to raw SSE startup, so native-dynamic compat streams may retry only before the first content type or chunk is emitted and still remain no-retry after stream output starts
+  - corrected raw-plugin fallthrough accounting so non-`native_dynamic` or raw-not-applicable paths return `None` without emitting phantom upstream success metrics or healthy provider snapshots
+  - expanded Anthropic/Gemini compat regressions to lock native-dynamic raw stream and count-tokens branches, using isolated broken-binding extension ids so fail-closed behavior cannot be masked by host cache reuse
+  - added targeted raw planned-execution governance regressions in `sdkwork-api-app-gateway`, including raw SSE startup retry scheduling, opaque-plugin no-retry coverage, and accounting-neutral raw fallthrough, and re-verified `sdkwork-api-extension-abi`, `sdkwork-api-extension-host`, `sdkwork-api-app-gateway`, `anthropic_messages_route`, `gemini_generate_content_route`, and `cargo check` for the touched runtime chain
+  - moved connector runtime startup supervision out of the async compat-planning path and into `spawn_blocking`, preventing current-thread runtime starvation from breaking connector-backed Anthropic/Gemini translated fallback
+  - taught connector startup to adopt delayed external health when no local filesystem entrypoint exists, so externally managed connector endpoints can come online within the configured startup budget instead of immediately collapsing into spawn errors
+  - removed duplicate connector supervision inside planned execution context construction, so one planned connector request now probes external `/health` once instead of resolving the same execution target twice
+  - codified runtime capability boundaries in `ExtensionRuntime`, so raw provider execution and structured retry hints are now explicitly native-dynamic-only instead of being guarded by scattered equality checks
+  - added connector raw JSON/SSE accounting-neutral regressions, proving connector runtimes stay off the raw plugin surface while still remaining available on the supervised HTTP path
+  - taught planned execution context construction to fail over when the selected connector cannot produce an execution target before relay execution starts, and now rewrite planned decision / usage context to the executable backup provider with `gateway_execution_failover`
+  - widened planned execution preflight failover to also cover selected-provider missing tenant credential, and added an Anthropic compat regression that proves the primary upstream is skipped before execution while usage and routing audit both point at the backup provider
+  - extended the same missing-tenant-credential preflight failover contract to direct store-relay OpenAI `chat/responses` JSON and SSE, so stateful OpenAI routes now skip the non-credentialed primary upstream before execution and keep usage/routing audit aligned with the backup provider that actually ran
+  - fixed a commercial correctness gap where direct store-relay OpenAI `chat/responses` routes could select a standard Anthropic/Gemini provider without an explicit conversion plugin and then silently fabricate local fallback success instead of failing over to the first compatible backup provider
+  - added route-selection fallback auditing for policy-declared unavailable candidates, so missing/unavailable primaries now record `policy_candidate_unavailable` while real planning/execution replacement remains `gateway_execution_failover`
+  - added additive `/admin/providers.execution` observability driven by gateway provider-resolution truth, so operators can now see implicit-default passthrough, adapter-surface executability, raw-plugin capability, and explicit-binding `fail_closed` risk in one catalog response
+  - refined `/admin/providers.execution` with `route_readiness` for `openai`, `anthropic`, and `gemini`, so operators can distinguish matching-standard passthrough from raw-plugin conversion and from true fail-closed families instead of overreading global `fail_closed`
+  - corrected default-plugin protocol derivation for `ollama` and `ollama-compatible`, so Ollama remains default-plugin onboardable without being mislabeled as `openai` standard-protocol passthrough; `openrouter` stays `openai`
+  - added additive `default_plugin_family` on `POST /admin/providers`, with first-class builtin onboarding for `openrouter` and `ollama`
+  - pinned default-plugin onboarding to the canonical builtin `adapter_kind`, derived `protocol_kind`, and derived `extension_id`, and now reject conflicting low-level fields with `400 Bad Request`
+  - added additive `/admin/providers.integration` with `mode={standard_passthrough|default_plugin|custom_plugin}` plus `default_plugin_family` when applicable, so onboarding semantics are explicit alongside runtime execution truth
+  - added additive `integration` to `POST /admin/providers`, so create-time control-plane callers now receive normalized onboarding truth immediately without needing a follow-up list read
+  - moved default-plugin identity normalization into `sdkwork-api-app-catalog`, so provider onboarding policy is reusable application logic instead of an admin-controller-only rule
+  - moved reusable `ProviderIntegrationView` derivation into `sdkwork-api-app-catalog`, so admin and portal now share one onboarding-truth contract instead of classifying provider mode independently
+  - updated admin routing/model fixtures to create OpenRouter through `default_plugin_family=openrouter`, removing the old `adapter_kind=openai` shortcut from management-side examples
+  - converged non-admin routing and relay regressions on the same OpenRouter identity contract, so simulate-route helpers and routing relay coverage now pin `adapter_kind=openrouter`, `protocol_kind=openai`, and `extension_id=sdkwork.provider.openrouter` instead of silently using the official OpenAI runtime identity
+  - removed the remaining stateless protocol-truth fork by rewiring `StatelessGatewayUpstream` to reuse shared domain-catalog protocol derive/normalize helpers, keeping stateless config aligned with provider metadata for `openrouter/openai` and `ollama/custom`
+  - converged portal and HTTP relay samples on the same default-plugin onboarding contract, so Portal fixtures now mount canonical OpenRouter identity and HTTP relay regressions now create OpenRouter/Ollama through `default_plugin_family`
+  - extended portal routing `provider_options` with additive `protocol_kind` plus `integration`, so frontend/provider-choice surfaces can distinguish industrial-standard passthrough, builtin default-plugin onboarding, and custom-plugin normalization directly
+  - extended portal routing `provider_options` with additive tenant-scoped `credential_readiness`, so frontend/provider-choice surfaces can now distinguish static onboarding shape from current-tenant credential configuration without mixing secret presence into `integration`
+  - extended `GET /admin/providers?tenant_id=...` with additive tenant-scoped `credential_readiness`, while keeping the default unscoped admin provider catalog tenant-agnostic
+  - moved shared provider credential-readiness derivation into `sdkwork-api-app-credential`, so admin and portal now consume one app-layer secret-presence contract instead of duplicating readiness strings per transport
+  - published `GET /admin/providers` and `POST /admin/providers` in admin OpenAPI with the real provider/integration/execution/credential-readiness schemas, and documented `tenant_id` as an explicit opt-in tenant overlay instead of undocumented behavior
+  - added dedicated `GET /admin/tenants/{tenant_id}/providers/readiness`, so tenant-scoped provider readiness now has a focused operator endpoint that returns provider identity, static `integration`, and tenant `credential_readiness` without dragging global `execution` into the tenant overlay surface
+  - added first-class stateless default-plugin ingress via `StatelessGatewayUpstream::from_default_plugin_family(...)` and `StatelessGatewayConfig::try_with_default_plugin_upstream(...)`, so non-admin direct onboarding of OpenRouter/Ollama now follows the same config-only builtin plugin-family contract as admin
+  - added `create_provider_with_default_plugin_family_and_bindings(...)` to `sdkwork-api-app-catalog`, so non-admin seeders now reuse canonical default-plugin identity plus secondary bindings instead of hand-building OpenRouter fixtures
+  - normalized HTTP compat regressions that explicitly probe `/health`, so native-protocol and connector suites now verify protocol/plugin behavior instead of failing on incomplete mock upstream health fixtures
+
+## Unreleased - Release Sync Audit SSH Remote Equivalence
+
+- Date: 2026-04-09
+- Type: patch
+- Highlights:
+  - normalized GitHub remote comparison in `scripts/release/verify-release-sync.mjs` so valid SSH clones no longer fail the release-sync gate only because the expected repository URL is stored in HTTPS form
+  - added a red-first regression in `scripts/release/tests/release-sync-audit.test.mjs` and re-verified adjacent release-governance coverage through `materialize-release-sync-audit.test.mjs` and `release-governance-runner.test.mjs`
+  - kept governance truth honest: `node scripts/release/run-release-governance-checks.mjs --format json` still returns `ok=false`, `blocked=true`, `passingIds=7`, `blockedIds=3`, `failingIds=[]` because this host still lacks live telemetry input and still blocks Node child-Git execution
+
+## Unreleased - Windows Startup Smoke Follow-up
+
+- Date: 2026-04-09
+- Type: patch
+- Highlights:
+  - restored `crates/sdkwork-api-storage-postgres/tests/integration_postgres/routing_usage.rs` quota-policy coverage as a real integration test by adding the missing `#[tokio::test]`
+  - re-verified `cargo test --workspace --no-run -j 1` after the test-entry repair
+  - re-verified Windows startup-related repository contracts through `start-dev-windows-backend-warmup`, `start-workspace`, `process-supervision`, `windows-rust-toolchain-guard`, and `router-runtime-tooling` Node smoke suites
+  - executed a fresh managed preview launch/stop smoke through `node scripts/dev/start-workspace.mjs` with temporary runtime state and green gateway/admin/portal/web readiness
+  - kept release truth honest: direct `PowerShell -> bin/start-dev.ps1` execution remains blocked by this shell session's policy boundary, so this iteration proves the managed runtime path but not the direct PowerShell wrapper layer
+
+
+## Unreleased - Workspace Test Module Visibility Stabilization
+
+- Date: 2026-04-09
+- Type: patch
+- Highlights:
+  - fixed sibling-module test support visibility in `sdkwork-api-app-runtime/tests/standalone_runtime_supervision/support.rs`, restoring shared runtime supervision fixtures across split child modules
+  - fixed sibling-module test support visibility in `sdkwork-api-app-gateway/tests/extension_dispatch/support.rs`, restoring shared extension dispatch fixtures, guards, and native-dynamic helpers across split child modules
+  - verified `cargo test -p sdkwork-api-app-runtime --test standalone_runtime_supervision -j 1` at `16 / 16`
+  - verified `cargo test -p sdkwork-api-app-gateway --test extension_dispatch -j 1` at `14 / 14`
+  - restored a green `cargo test --workspace --no-run -j 1` gate without changing provider passthrough or plugin-adapter runtime behavior
+  - kept release truth honest: one dead-code warning remains in `sdkwork-api-storage-postgres`, and startup smoke was not re-run in this iteration
+
 ## Unreleased - Step Loop Prompt Governance Refresh
 
 - Date: 2026-04-09

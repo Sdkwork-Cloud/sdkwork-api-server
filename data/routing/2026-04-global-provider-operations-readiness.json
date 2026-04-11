@@ -1,0 +1,124 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-global-openrouter-main",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global OpenRouter Main",
+      "slug": "global-openrouter-main",
+      "description": "Marketplace-first profile for broad commercial model coverage through OpenRouter.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000460000,
+      "updated_at_ms": 1710000460000
+    },
+    {
+      "profile_id": "profile-global-siliconflow-main",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global SiliconFlow Main",
+      "slug": "global-siliconflow-main",
+      "description": "Proxy-first profile for China-friendly open-weight and low-cost production traffic.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-siliconflow-main",
+      "max_cost": 2.2,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000461000,
+      "updated_at_ms": 1710000461000
+    },
+    {
+      "profile_id": "profile-global-ollama-local",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Ollama Local",
+      "slug": "global-ollama-local",
+      "description": "Edge-local profile for private deployments and fallback-free local execution.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 1.2,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710000462000,
+      "updated_at_ms": 1710000462000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-openrouter-main-responses",
+      "capability": "responses",
+      "model_pattern": "gpt-4.1*",
+      "enabled": true,
+      "priority": 78,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    },
+    {
+      "policy_id": "policy-siliconflow-main-responses",
+      "capability": "responses",
+      "model_pattern": "deepseek-v3",
+      "enabled": true,
+      "priority": 77,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-siliconflow-main",
+      "max_cost": 2.2,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 220,
+      "upstream_retry_max_delay_ms": 1400
+    },
+    {
+      "policy_id": "policy-ollama-local-responses",
+      "capability": "responses",
+      "model_pattern": "qwen2.5-14b-instruct",
+      "enabled": true,
+      "priority": 76,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 1.2,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "execution_failover_enabled": false,
+      "upstream_retry_max_attempts": 1,
+      "upstream_retry_base_delay_ms": 0,
+      "upstream_retry_max_delay_ms": 0
+    }
+  ],
+  "project_preferences": []
+}

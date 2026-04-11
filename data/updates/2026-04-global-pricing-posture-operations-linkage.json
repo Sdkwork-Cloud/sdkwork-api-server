@@ -1,0 +1,19 @@
+{
+  "update_id": "2026-04-global-pricing-posture-operations-linkage",
+  "release_version": "2026.04.21",
+  "description": "Extend official-direct and local-edge pricing posture walkthroughs into billing telemetry, async job samples, and account reconciliation state so installs have richer end-to-end operational data.",
+  "depends_on": [
+    "2026-04-global-pricing-posture-commerce-walkthrough",
+    "2026-04-account-kernel-commercial-foundation",
+    "2026-04-global-provider-operations-readiness"
+  ],
+  "billing": [
+    "billing/2026-04-global-pricing-posture-operations-linkage.json"
+  ],
+  "jobs": [
+    "jobs/2026-04-global-pricing-posture-operations-linkage.json"
+  ],
+  "account_reconciliation": [
+    "account-reconciliation/2026-04-global-pricing-posture-operations-linkage.json"
+  ]
+}

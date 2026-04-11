@@ -1,8 +1,7 @@
 use sdkwork_api_app_marketing::{
-    confirm_coupon_redemption, project_legacy_coupon_campaign, reserve_coupon_redemption,
-    rollback_coupon_redemption, validate_coupon_stack,
+    confirm_coupon_redemption, reserve_coupon_redemption, rollback_coupon_redemption,
+    validate_coupon_stack,
 };
-use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_marketing::{
     CampaignBudgetRecord, CampaignBudgetStatus, CouponCodeRecord, CouponCodeStatus,
     CouponRedemptionStatus, CouponReservationStatus, CouponRollbackStatus, CouponRollbackType,
@@ -194,28 +193,4 @@ fn rollback_coupon_redemption_rejects_restored_budget_above_redeemed_subsidy() {
         error.to_string(),
         "restored budget exceeds redeemed coupon subsidy"
     );
-}
-
-#[test]
-fn legacy_coupon_campaign_projects_into_marketing_kernel_records() {
-    let legacy_coupon = CouponCampaign::new(
-        "coupon_launch",
-        "LAUNCH20",
-        "20% launch discount",
-        "new_signup",
-        200,
-        true,
-        "Launch compatibility campaign",
-        "2026-06-30",
-    )
-    .with_created_at_ms(1_700);
-
-    let (template, campaign, budget, code) = project_legacy_coupon_campaign(&legacy_coupon);
-
-    assert_eq!(template.coupon_template_id, "legacy_tpl_coupon_launch");
-    assert_eq!(campaign.coupon_template_id, template.coupon_template_id);
-    assert_eq!(budget.total_budget_minor, u64::MAX);
-    assert_eq!(budget.marketing_campaign_id, campaign.marketing_campaign_id);
-    assert_eq!(code.code_value, "LAUNCH20");
-    assert_eq!(code.coupon_template_id, template.coupon_template_id);
 }

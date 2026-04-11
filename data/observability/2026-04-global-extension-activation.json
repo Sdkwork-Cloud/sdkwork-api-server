@@ -1,0 +1,26 @@
+{
+  "compiled_routing_snapshots": [],
+  "routing_decision_logs": [],
+  "provider_health_snapshots": [
+    {
+      "provider_id": "provider-ernie-official",
+      "extension_id": "sdkwork.provider.ernie",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000412400,
+      "instance_id": "provider-ernie-official",
+      "running": true,
+      "healthy": true,
+      "message": "builtin official ERNIE instance healthy"
+    },
+    {
+      "provider_id": "provider-minimax-official",
+      "extension_id": "sdkwork.provider.minimax",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000412600,
+      "instance_id": "provider-minimax-official",
+      "running": true,
+      "healthy": true,
+      "message": "builtin official MiniMax instance healthy"
+    }
+  ]
+}

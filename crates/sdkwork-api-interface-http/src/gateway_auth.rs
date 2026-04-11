@@ -354,6 +354,7 @@ async fn apply_gateway_rate_limit(
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StatelessGatewayUpstream {
     runtime_key: String,
+    protocol_kind: String,
     base_url: String,
     api_key: String,
 }
@@ -364,8 +365,25 @@ impl StatelessGatewayUpstream {
         base_url: impl Into<String>,
         api_key: impl Into<String>,
     ) -> Self {
+        let runtime_key = runtime_key.into();
         Self {
-            runtime_key: runtime_key.into(),
+            protocol_kind: derive_stateless_protocol_kind(&runtime_key).to_owned(),
+            runtime_key,
+            base_url: base_url.into(),
+            api_key: api_key.into(),
+        }
+    }
+
+    pub fn new_with_protocol_kind(
+        runtime_key: impl Into<String>,
+        protocol_kind: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
+        let runtime_key = runtime_key.into();
+        Self {
+            protocol_kind: normalize_stateless_protocol_kind(protocol_kind, &runtime_key),
+            runtime_key,
             base_url: base_url.into(),
             api_key: api_key.into(),
         }
@@ -376,7 +394,32 @@ impl StatelessGatewayUpstream {
         base_url: impl Into<String>,
         api_key: impl Into<String>,
     ) -> Self {
-        Self::new(adapter_kind, base_url, api_key)
+        let adapter_kind = adapter_kind.into();
+        Self::new_with_protocol_kind(
+            adapter_kind.clone(),
+            derive_stateless_protocol_kind(&adapter_kind),
+            base_url,
+            api_key,
+        )
+    }
+
+    pub fn from_default_plugin_family(
+        default_plugin_family: impl AsRef<str>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> anyhow::Result<Self> {
+        let default_plugin_family =
+            sdkwork_api_domain_catalog::normalize_provider_default_plugin_family(
+                default_plugin_family,
+            )
+            .ok_or_else(|| anyhow::anyhow!("unsupported default_plugin_family"))?;
+
+        Ok(Self::new_with_protocol_kind(
+            default_plugin_family,
+            sdkwork_api_domain_catalog::derive_provider_protocol_kind(default_plugin_family),
+            base_url,
+            api_key,
+        ))
     }
 
     pub fn runtime_key(&self) -> &str {
@@ -387,9 +430,24 @@ impl StatelessGatewayUpstream {
         &self.base_url
     }
 
+    pub fn protocol_kind(&self) -> &str {
+        &self.protocol_kind
+    }
+
     pub fn api_key(&self) -> &str {
         &self.api_key
     }
+}
+
+fn derive_stateless_protocol_kind(runtime_key: &str) -> &'static str {
+    sdkwork_api_domain_catalog::derive_provider_protocol_kind(runtime_key)
+}
+
+fn normalize_stateless_protocol_kind(
+    protocol_kind: impl Into<String>,
+    runtime_key: &str,
+) -> String {
+    sdkwork_api_domain_catalog::normalize_provider_protocol_kind(protocol_kind, runtime_key)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -427,6 +485,19 @@ impl StatelessGatewayConfig {
     pub fn with_upstream(mut self, upstream: StatelessGatewayUpstream) -> Self {
         self.upstream = Some(upstream);
         self
+    }
+
+    pub fn try_with_default_plugin_upstream(
+        self,
+        default_plugin_family: impl AsRef<str>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> anyhow::Result<Self> {
+        Ok(self.with_upstream(StatelessGatewayUpstream::from_default_plugin_family(
+            default_plugin_family,
+            base_url,
+            api_key,
+        )?))
     }
 
     pub fn tenant_id(&self) -> &str {
@@ -493,4 +564,3 @@ async fn apply_request_routing_region(request: Request<Body>, next: Next) -> Res
         .map(ToOwned::to_owned);
     with_request_routing_region(requested_region, next.run(request)).await
 }
-

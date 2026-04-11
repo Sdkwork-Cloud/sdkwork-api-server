@@ -47,7 +47,7 @@ const apiSurfaces: ApiSurfaceDefinition[] = [
     specEndpoint: '/openapi.json',
     interactiveDocs: '/docs',
     referenceFocus:
-      'OpenAI-compatible execution surface for models, responses, embeddings, audio, images, and multimodal workloads.',
+      'OpenAI-compatible execution surface for models, responses, embeddings, audio, images, multimodal workloads, and market, coupon, and commercial account workflows.',
     commonWorkflow:
       'List models or issue OpenAI-compatible inference traffic with one gateway API key.',
   },
@@ -128,6 +128,12 @@ function mapTagToLabel(surfaceId: string, rawTag: string) {
         return 'Runs';
       case 'realtime':
         return 'Realtime';
+      case 'market':
+        return 'Market';
+      case 'marketing':
+        return 'Marketing';
+      case 'commercial':
+        return 'Commercial';
       case 'compatibility':
         return 'Compatibility';
       case 'system':

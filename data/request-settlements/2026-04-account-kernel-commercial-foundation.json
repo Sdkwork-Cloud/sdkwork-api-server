@@ -1,0 +1,22 @@
+[
+  {
+    "request_settlement_id": 8301001,
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "request_id": 610001,
+    "account_id": 7001001,
+    "user_id": 3001,
+    "hold_id": 8101001,
+    "status": "partially_released",
+    "estimated_credit_hold": 7000.0,
+    "released_credit_amount": 500.0,
+    "captured_credit_amount": 6500.0,
+    "provider_cost_amount": 0.0119,
+    "retail_charge_amount": 0.024,
+    "shortfall_amount": 0.0,
+    "refunded_amount": 0.0,
+    "settled_at_ms": 1710000300500,
+    "created_at_ms": 1710000300000,
+    "updated_at_ms": 1710000300500
+  }
+]

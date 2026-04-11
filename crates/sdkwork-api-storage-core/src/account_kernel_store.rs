@@ -53,6 +53,18 @@ pub trait AccountKernelStore: AdminStore {
         ))
     }
 
+    async fn list_account_benefit_lots_for_account(
+        &self,
+        _account_id: u64,
+        _after_lot_id: Option<u64>,
+        _limit: usize,
+    ) -> Result<Vec<AccountBenefitLotRecord>> {
+        Err(unsupported_account_kernel_method(
+            self.dialect(),
+            "list_account_benefit_lots_for_account",
+        ))
+    }
+
     async fn insert_account_hold(&self, _record: &AccountHoldRecord) -> Result<AccountHoldRecord> {
         Err(unsupported_account_kernel_method(
             self.dialect(),

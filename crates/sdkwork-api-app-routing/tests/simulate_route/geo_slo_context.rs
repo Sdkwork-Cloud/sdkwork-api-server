@@ -1,4 +1,6 @@
 use super::*;
+use sdkwork_api_app_catalog::create_provider_with_default_plugin_family_and_bindings;
+use sdkwork_api_domain_catalog::ProviderChannelBinding;
 
 #[tokio::test]
 async fn route_simulation_geo_affinity_prefers_matching_region() {
@@ -753,13 +755,21 @@ async fn select_route_with_store_context_applies_project_routing_preferences_ove
         .await
         .unwrap();
     store
-        .insert_provider(&ProxyProvider::new(
-            "provider-openrouter",
-            "openai",
-            "openai",
-            "https://openrouter.example/v1",
-            "OpenRouter",
-        ))
+        .insert_channel(&Channel::new("openrouter", "OpenRouter"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &create_provider_with_default_plugin_family_and_bindings(
+                "provider-openrouter",
+                "openrouter",
+                "openrouter",
+                "https://openrouter.example/v1",
+                "OpenRouter",
+                &[ProviderChannelBinding::new("provider-openrouter", "openai")],
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
     store
@@ -841,13 +851,21 @@ async fn route_selection_applies_group_routing_profile_over_project_preferences(
         .await
         .unwrap();
     store
-        .insert_provider(&ProxyProvider::new(
-            "provider-openrouter",
-            "openai",
-            "openai",
-            "https://openrouter.example/v1",
-            "OpenRouter",
-        ))
+        .insert_channel(&Channel::new("openrouter", "OpenRouter"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &create_provider_with_default_plugin_family_and_bindings(
+                "provider-openrouter",
+                "openrouter",
+                "openrouter",
+                "https://openrouter.example/v1",
+                "OpenRouter",
+                &[ProviderChannelBinding::new("provider-openrouter", "openai")],
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
     store

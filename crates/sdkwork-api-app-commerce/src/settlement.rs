@@ -442,10 +442,22 @@ pub(crate) async fn load_order_settlement_quote(
     _store: &dyn AdminStore,
     order: &CommerceOrderRecord,
 ) -> CommerceResult<PortalCommerceQuote> {
+    let catalog_binding = PortalCommerceCatalogBinding::from_order(order);
     Ok(PortalCommerceQuote {
         target_kind: order.target_kind.clone(),
+        product_kind: portal_commerce_product_kind(&order.target_kind).map(str::to_owned),
+        quote_kind: portal_commerce_quote_kind(&order.target_kind).to_owned(),
         target_id: order.target_id.clone(),
         target_name: order.target_name.clone(),
+        product_id: catalog_binding.product_id,
+        offer_id: catalog_binding.offer_id,
+        publication_id: catalog_binding.publication_id,
+        publication_kind: catalog_binding.publication_kind,
+        publication_status: catalog_binding.publication_status,
+        publication_revision_id: catalog_binding.publication_revision_id,
+        publication_version: catalog_binding.publication_version,
+        publication_source_kind: catalog_binding.publication_source_kind,
+        publication_effective_from_ms: catalog_binding.publication_effective_from_ms,
         list_price_cents: order.list_price_cents,
         payable_price_cents: order.payable_price_cents,
         list_price_label: order.list_price_label.clone(),
@@ -458,6 +470,10 @@ pub(crate) async fn load_order_settlement_quote(
             None
         },
         projected_remaining_units: None,
+        pricing_plan_id: catalog_binding.pricing_plan_id,
+        pricing_plan_version: catalog_binding.pricing_plan_version,
+        pricing_rate_id: catalog_binding.pricing_rate_id,
+        pricing_metric_code: catalog_binding.pricing_metric_code,
         applied_coupon: order
             .applied_coupon_code
             .as_ref()

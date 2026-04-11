@@ -76,6 +76,10 @@ const productServerSiteAssetRoots = {
   portal: path.join(rootDir, 'apps', 'sdkwork-router-portal', 'dist'),
 };
 
+const productServerBootstrapDataRoots = {
+  data: path.join(rootDir, 'data'),
+};
+
 export function normalizePlatformId(platform = process.platform) {
   if (platform === 'win32' || platform === 'windows') {
     return 'windows';
@@ -178,6 +182,10 @@ export function listNativeServiceBinaryNames() {
 
 export function listNativeDesktopAppIds() {
   return [...NATIVE_RELEASE_DESKTOP_APP_IDS];
+}
+
+export function listNativeProductServerBootstrapDataRoots() {
+  return { ...productServerBootstrapDataRoots };
 }
 
 export function buildNativeProductServerArchiveBaseName({ platformId, archId } = {}) {
@@ -475,11 +483,12 @@ function writeProductServerBundleReadme({ archiveRoot, platformId, archId, targe
       '- bin/: standalone services plus router-product-service',
       '- sites/admin/dist/: admin web assets',
       '- sites/portal/dist/: portal web assets',
+      '- data/: bootstrap data packs for first-start initialization',
       '',
       'Example startup:',
       platformId === 'windows'
-        ? '  set SDKWORK_ADMIN_SITE_DIR=sites\\admin\\dist && set SDKWORK_PORTAL_SITE_DIR=sites\\portal\\dist && bin\\router-product-service.exe'
-        : '  SDKWORK_ADMIN_SITE_DIR=sites/admin/dist SDKWORK_PORTAL_SITE_DIR=sites/portal/dist ./bin/router-product-service',
+        ? '  set SDKWORK_BOOTSTRAP_DATA_DIR=data && set SDKWORK_ADMIN_SITE_DIR=sites\\admin\\dist && set SDKWORK_PORTAL_SITE_DIR=sites\\portal\\dist && bin\\router-product-service.exe'
+        : '  SDKWORK_BOOTSTRAP_DATA_DIR=data SDKWORK_ADMIN_SITE_DIR=sites/admin/dist SDKWORK_PORTAL_SITE_DIR=sites/portal/dist ./bin/router-product-service',
       '',
       'Override SDKWORK_CONFIG_DIR, SDKWORK_CONFIG_FILE, SDKWORK_DATABASE_URL, and role/upstream flags as needed.',
       '',
@@ -493,6 +502,13 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
     if (!existsSync(sourceDir)) {
       throw new Error(
         `Missing product server site assets for ${label}: ${sourceDir}\nsite asset root: ${describeDirectoryState(sourceDir)}`,
+      );
+    }
+  }
+  for (const [label, sourceDir] of Object.entries(productServerBootstrapDataRoots)) {
+    if (!existsSync(sourceDir)) {
+      throw new Error(
+        `Missing product server bootstrap data for ${label}: ${sourceDir}\nbootstrap data root: ${describeDirectoryState(sourceDir)}`,
       );
     }
   }
@@ -520,6 +536,12 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
       cpSync(sourceDir, targetDir, { recursive: true });
     }
 
+    for (const [label, sourceDir] of Object.entries(productServerBootstrapDataRoots)) {
+      const targetDir = path.join(archiveRoot, label);
+      ensureDirectory(path.dirname(targetDir));
+      cpSync(sourceDir, targetDir, { recursive: true });
+    }
+
     writeProductServerBundleReadme({
       archiveRoot,
       platformId,
@@ -537,6 +559,7 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
           target: targetTriple,
           services: listNativeServiceBinaryNames(),
           sites: Object.keys(productServerSiteAssetRoots),
+          bootstrapDataRoots: Object.keys(productServerBootstrapDataRoots),
         },
         null,
         2,

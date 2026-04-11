@@ -143,6 +143,29 @@ test('release telemetry snapshot materializer derives a governed snapshot from a
   assert.equal(written.targets['routing-simulation-p95-latency'].value, 420);
 });
 
+test('release telemetry snapshot materializer accepts Prometheus label values containing route template braces', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'materialize-release-telemetry-snapshot.mjs'),
+    ).href,
+  );
+
+  const exportPayload = createTelemetryExportPayload();
+  exportPayload.prometheus.admin = [
+    '# HELP sdkwork_http_requests_total Total HTTP requests observed',
+    '# TYPE sdkwork_http_requests_total counter',
+    'sdkwork_http_requests_total{service="admin",method="GET",route="/admin/runtime-config/rollouts/{rollout_id}",status="200"} 3',
+    'sdkwork_http_requests_total{service="admin",method="GET",route="/admin/health",status="200"} 4994',
+    'sdkwork_http_requests_total{service="admin",method="GET",route="/admin/runtime-config/rollouts/{rollout_id}",status="503"} 3',
+  ].join('\n');
+
+  const derived = module.deriveReleaseTelemetrySnapshotFromExport({
+    exportBundle: exportPayload,
+  });
+
+  assert.equal(derived.targets['admin-api-availability'].ratio, 0.9994);
+});
+
 test('release telemetry snapshot materializer also accepts direct JSON input', async () => {
   const module = await import(
     pathToFileURL(

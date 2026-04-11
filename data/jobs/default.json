@@ -1,0 +1,130 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-global-growth-playbook",
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "user_id": 3001,
+      "account_id": 7001001,
+      "request_id": 5001,
+      "provider_id": "provider-openai-official",
+      "model_code": "gpt-4.1",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "playbook_generate",
+      "status": "succeeded",
+      "external_job_id": "openai-job-global-growth-playbook",
+      "idempotency_key": "job:global-growth:playbook",
+      "callback_url": "https://portal.sdkwork.ai/api/jobs/callbacks/global-growth",
+      "input_summary": "Generate a launch playbook for the global growth commercial workspace seeded during bootstrap.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710000210000,
+      "updated_at_ms": 1710000210600,
+      "started_at_ms": 1710000210100,
+      "completed_at_ms": 1710000210600
+    },
+    {
+      "job_id": "job-global-embeddings-catalog",
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "user_id": 3001,
+      "account_id": 7001001,
+      "request_id": 5002,
+      "provider_id": "provider-openai-official",
+      "model_code": "text-embedding-3-small",
+      "capability_code": "embeddings",
+      "modality": "text",
+      "operation_kind": "semantic_index",
+      "status": "succeeded",
+      "external_job_id": "openai-job-global-embeddings-catalog",
+      "idempotency_key": "job:global:embeddings-catalog",
+      "callback_url": "https://portal.sdkwork.ai/api/jobs/callbacks/embeddings",
+      "input_summary": "Build an initial semantic catalog index for the commercial model showcase.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710000211000,
+      "updated_at_ms": 1710000211700,
+      "started_at_ms": 1710000211120,
+      "completed_at_ms": 1710000211700
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": 9801,
+      "job_id": "job-global-growth-playbook",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "openai",
+      "endpoint": "https://api.openai.com/v1/responses",
+      "external_job_id": "openai-job-global-growth-playbook",
+      "claimed_at_ms": 1710000210120,
+      "finished_at_ms": 1710000210580,
+      "error_message": null,
+      "created_at_ms": 1710000210000,
+      "updated_at_ms": 1710000210580
+    },
+    {
+      "attempt_id": 9804,
+      "job_id": "job-global-embeddings-catalog",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "openai",
+      "endpoint": "https://api.openai.com/v1/embeddings",
+      "external_job_id": "openai-job-global-embeddings-catalog",
+      "claimed_at_ms": 1710000211150,
+      "finished_at_ms": 1710000211660,
+      "error_message": null,
+      "created_at_ms": 1710000211000,
+      "updated_at_ms": 1710000211660
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset-global-growth-playbook-md",
+      "job_id": "job-global-growth-playbook",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1001/jobs/job-global-growth-playbook/playbook.md",
+      "download_url": "https://cdn.sdkwork.ai/jobs/job-global-growth-playbook/playbook.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 4096,
+      "checksum_sha256": "58ca3dd81a8bb6fd85245ac4c0b1ec31ea2647d6f2d87a47c3b8f5bb098cda7b",
+      "created_at_ms": 1710000210590
+    },
+    {
+      "asset_id": "asset-global-embeddings-catalog-json",
+      "job_id": "job-global-embeddings-catalog",
+      "asset_kind": "json",
+      "storage_key": "tenant-1001/jobs/job-global-embeddings-catalog/index-manifest.json",
+      "download_url": "https://cdn.sdkwork.ai/jobs/job-global-embeddings-catalog/index-manifest.json",
+      "mime_type": "application/json",
+      "size_bytes": 2816,
+      "checksum_sha256": "8b7df44e10fda9afafc0f75e2e2f6e4eb6b9e4b1b34670cb6dc62091fcd39535",
+      "created_at_ms": 1710000211680
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_id": 10801,
+      "job_id": "job-global-growth-playbook",
+      "event_type": "job.completed",
+      "dedupe_key": "openai:openai-job-global-growth-playbook:completed",
+      "payload_json": "{\"job_id\":\"job-global-growth-playbook\",\"status\":\"succeeded\",\"provider\":\"openai\"}",
+      "status": "processed",
+      "received_at_ms": 1710000210610,
+      "processed_at_ms": 1710000210640
+    },
+    {
+      "callback_id": 10802,
+      "job_id": "job-global-embeddings-catalog",
+      "event_type": "job.completed",
+      "dedupe_key": "openai:openai-job-global-embeddings-catalog:completed",
+      "payload_json": "{\"job_id\":\"job-global-embeddings-catalog\",\"status\":\"succeeded\",\"provider\":\"openai\"}",
+      "status": "processed",
+      "received_at_ms": 1710000211710,
+      "processed_at_ms": 1710000211750
+    }
+  ]
+}

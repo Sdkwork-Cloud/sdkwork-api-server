@@ -1,0 +1,97 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-global-asia-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Asia Official",
+      "slug": "global-asia-official",
+      "description": "Official Asia-provider ranking for regional growth, compliance, and lower-latency commercial delivery.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ernie-official",
+        "provider-minimax-official",
+        "provider-qwen-official",
+        "provider-doubao-official",
+        "provider-zhipu-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ernie-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710000400000,
+      "updated_at_ms": 1710000400000
+    },
+    {
+      "profile_id": "profile-global-ernie-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global ERNIE Official",
+      "slug": "global-ernie-official",
+      "description": "Prefer Baidu ERNIE official capacity for China-first enterprise delivery.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ernie-official",
+        "provider-qwen-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ernie-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710000400000,
+      "updated_at_ms": 1710000400000
+    },
+    {
+      "profile_id": "profile-global-minimax-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global MiniMax Official",
+      "slug": "global-minimax-official",
+      "description": "Prefer MiniMax official routing for APAC reasoning workloads.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-minimax-official",
+        "provider-ernie-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-minimax-official",
+      "max_cost": 5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710000400000,
+      "updated_at_ms": 1710000400000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-asia-official-responses",
+      "capability": "responses",
+      "model_pattern": "ernie-*",
+      "enabled": true,
+      "priority": 85,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ernie-official",
+        "provider-minimax-official",
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-ernie-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1200
+    }
+  ],
+  "project_preferences": []
+}

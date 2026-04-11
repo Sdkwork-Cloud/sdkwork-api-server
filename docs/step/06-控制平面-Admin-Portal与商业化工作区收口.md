@@ -106,7 +106,7 @@
 - `crates/sdkwork-api-app-usage`
 - `crates/sdkwork-api-app-catalog`
 - `crates/sdkwork-api-app-commerce`
-- `crates/sdkwork-api-app-coupon`
+- 已移除的 legacy coupon app（现由 `marketing` 承接）
 - `crates/sdkwork-api-app-marketing`
 
 ### 5.2 接口层收敛

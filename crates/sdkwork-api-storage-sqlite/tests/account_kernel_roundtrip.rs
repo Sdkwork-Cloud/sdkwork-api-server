@@ -2,7 +2,7 @@ use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType,
     AccountHoldAllocationRecord, AccountHoldRecord, AccountLedgerAllocationRecord,
     AccountLedgerEntryRecord, AccountLedgerEntryType, AccountRecord, AccountType,
-    PricingPlanRecord, PricingRateRecord, RequestSettlementRecord,
+    PricingPlanOwnershipScope, PricingPlanRecord, PricingRateRecord, RequestSettlementRecord,
 };
 use sdkwork_api_domain_usage::{RequestMeterFactRecord, RequestMeterMetricRecord};
 use sdkwork_api_storage_core::AccountKernelStore;
@@ -78,6 +78,7 @@ async fn sqlite_store_round_trips_canonical_account_kernel_records() {
     let plan = PricingPlanRecord::new(9101, 1001, 2002, "default-retail", 3)
         .with_display_name("Default Retail v3")
         .with_status("active")
+        .with_ownership_scope(PricingPlanOwnershipScope::PlatformShared)
         .with_effective_from_ms(38)
         .with_effective_to_ms(Some(138))
         .with_created_at_ms(38)
@@ -164,5 +165,83 @@ async fn sqlite_store_round_trips_canonical_account_kernel_records() {
     assert_eq!(
         store.list_request_settlement_records().await.unwrap().len(),
         1
+    );
+}
+
+#[tokio::test]
+async fn sqlite_store_lists_account_benefit_lots_with_account_cursor_pagination() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let account = AccountRecord::new(7001, 1001, 2002, 9001, AccountType::Primary)
+        .with_currency_code("USD")
+        .with_credit_unit_code("credit")
+        .with_created_at_ms(10)
+        .with_updated_at_ms(20);
+    let other_account = AccountRecord::new(7002, 1001, 2002, 9002, AccountType::Primary)
+        .with_currency_code("USD")
+        .with_credit_unit_code("credit")
+        .with_created_at_ms(10)
+        .with_updated_at_ms(20);
+    store.insert_account_record(&account).await.unwrap();
+    store.insert_account_record(&other_account).await.unwrap();
+
+    for lot_id in [8001_u64, 8002, 8003] {
+        store
+            .insert_account_benefit_lot(
+                &AccountBenefitLotRecord::new(
+                    lot_id,
+                    account.tenant_id,
+                    account.organization_id,
+                    account.account_id,
+                    account.user_id,
+                    AccountBenefitType::CashCredit,
+                )
+                .with_source_type(AccountBenefitSourceType::Recharge)
+                .with_original_quantity(100.0)
+                .with_remaining_quantity(100.0)
+                .with_issued_at_ms(lot_id)
+                .with_created_at_ms(lot_id)
+                .with_updated_at_ms(lot_id),
+            )
+            .await
+            .unwrap();
+    }
+    store
+        .insert_account_benefit_lot(
+            &AccountBenefitLotRecord::new(
+                8100,
+                other_account.tenant_id,
+                other_account.organization_id,
+                other_account.account_id,
+                other_account.user_id,
+                AccountBenefitType::CashCredit,
+            )
+            .with_source_type(AccountBenefitSourceType::Recharge)
+            .with_original_quantity(50.0)
+            .with_remaining_quantity(50.0)
+            .with_issued_at_ms(8100)
+            .with_created_at_ms(8100)
+            .with_updated_at_ms(8100),
+        )
+        .await
+        .unwrap();
+
+    let first_page = store
+        .list_account_benefit_lots_for_account(account.account_id, None, 2)
+        .await
+        .unwrap();
+    assert_eq!(
+        first_page.iter().map(|lot| lot.lot_id).collect::<Vec<_>>(),
+        vec![8001, 8002]
+    );
+
+    let second_page = store
+        .list_account_benefit_lots_for_account(account.account_id, Some(8002), 2)
+        .await
+        .unwrap();
+    assert_eq!(
+        second_page.iter().map(|lot| lot.lot_id).collect::<Vec<_>>(),
+        vec![8003]
     );
 }

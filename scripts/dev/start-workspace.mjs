@@ -99,7 +99,7 @@ function main() {
   console.log(`  SDKWORK_ADMIN_BIND=${settings.adminBind}`);
   console.log(`  SDKWORK_PORTAL_BIND=${settings.portalBind}`);
   console.log(`  SDKWORK_WEB_BIND=${settings.webBind}`);
-  console.log(`  frontend_mode=${settings.preview ? 'preview' : settings.tauri ? 'tauri' : 'browser'}`);
+  console.log(`  frontend_mode=${settings.preview ? 'preview' : settings.proxyDev ? 'proxy-dev' : settings.tauri ? 'tauri' : 'browser'}`);
   for (const line of workspaceAccessLines(settings)) {
     console.log(line);
   }
@@ -107,6 +107,10 @@ function main() {
   if (settings.dryRun) {
     console.log(`[start-workspace] ${plan.backend.name}: ${formatCommand(plan.nodeExecutable, plan.backend.args)}`);
     if (settings.preview) {
+      console.log(`[start-workspace] ${plan.web.name}: ${formatCommand(plan.nodeExecutable, plan.web.args)}`);
+    } else if (settings.proxyDev) {
+      console.log(`[start-workspace] ${plan.admin.name}: ${formatCommand(plan.nodeExecutable, plan.admin.args)}`);
+      console.log(`[start-workspace] ${plan.portal.name}: ${formatCommand(plan.nodeExecutable, plan.portal.args)}`);
       console.log(`[start-workspace] ${plan.web.name}: ${formatCommand(plan.nodeExecutable, plan.web.args)}`);
     } else if (settings.tauri) {
       console.log(`[start-workspace] ${plan.admin.name}: ${formatCommand(plan.nodeExecutable, plan.admin.args)}`);
@@ -142,6 +146,8 @@ function main() {
 
   const steps = settings.preview
     ? [plan.backend, plan.web]
+    : settings.proxyDev
+      ? [plan.backend, plan.admin, plan.portal, plan.web]
     : settings.tauri
       ? [plan.backend, plan.admin, plan.web]
       : [plan.backend, plan.admin, plan.portal];

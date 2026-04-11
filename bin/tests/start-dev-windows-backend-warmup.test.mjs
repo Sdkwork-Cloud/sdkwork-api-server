@@ -28,6 +28,9 @@ test('start-dev.ps1 wires in a Windows backend warm-up build with managed cargo 
   assert.match(commonScript, /function Enable-RouterManagedCargoEnv/);
   assert.match(commonScript, /function Invoke-RouterWindowsBackendWarmupBuild/);
   assert.match(commonScript, /function Get-RouterWindowsBackendWarmupCommandDisplay/);
+  assert.match(commonScript, /function Test-RouterPnpmNodeModulesHealthy/);
+  assert.match(commonScript, /function Test-RouterPortalFrontendDependencyLinksUsable/);
+  assert.match(commonScript, /function Repair-RouterPortalFrontendNodeModules/);
   assert.match(commonScript, /function Write-RouterUtf8File/);
   assert.match(commonScript, /SDKWORK_ROUTER_DEV_HOME/);
   assert.match(commonScript, /\.sdkwork-target-vs2022/);
@@ -37,6 +40,10 @@ test('start-dev.ps1 wires in a Windows backend warm-up build with managed cargo 
   assert.match(commonScript, /'gateway-service'/);
   assert.match(commonScript, /'portal-api-service'/);
   assert.match(startDevScript, /Enable-RouterManagedCargoEnv -RepoRoot \$repoRoot/);
+  assert.match(startDevScript, /\$packagedBootstrapDataDirectory = Join-Path \$scriptDir 'data'/);
+  assert.match(startDevScript, /Test-RouterPnpmNodeModulesHealthy -NodeModulesPath \$portalNodeModules/);
+  assert.match(startDevScript, /Repair-RouterPortalFrontendNodeModules -RepoRoot \$repoRoot/);
+  assert.match(startDevScript, /portal frontend dependency links repaired from local workspace packages/);
   assert.match(startDevScript, /Invoke-RouterWindowsBackendWarmupBuild -RepoRoot \$repoRoot/);
   assert.match(startDevScript, /Write-RouterUtf8File -FilePath \$planFile -Content \$planOutput/);
 });
@@ -85,6 +92,54 @@ test('start-dev.ps1 dry-run honors SDKWORK_ROUTER_DEV_HOME and refreshes the gen
     assert.doesNotMatch(planContents, /stale-plan/);
     assert.match(planContents, /\[start-workspace\] unified launch settings/);
     assert.match(planContents, /frontend_mode=preview/);
+  } finally {
+    rmSync(devHome, { recursive: true, force: true });
+  }
+});
+
+test('start-dev.ps1 accepts GNU-style --proxy-dev and emits a proxy hot-reload plan', {
+  skip: !canSpawnPowerShellFromNode(),
+}, () => {
+  const devHome = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-router-proxy-dev-home-'));
+  const runDir = path.join(devHome, 'run');
+  const planFile = path.join(runDir, 'start-workspace.plan.txt');
+
+  mkdirSync(runDir, { recursive: true });
+
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(binRoot, 'start-dev.ps1'),
+        '--proxy-dev',
+        '--dry-run',
+      ],
+      {
+        cwd: binRoot,
+        env: {
+          ...process.env,
+          SDKWORK_ROUTER_DEV_HOME: devHome,
+        },
+        encoding: 'utf8',
+      },
+    );
+
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+    assert.equal(result.status, 0, output);
+    assert.ok(existsSync(planFile), 'expected proxy-dev dry-run plan file to be written');
+
+    const planContents = readFileSync(planFile, 'utf8');
+    assert.match(output, /frontend_mode=proxy-dev/);
+    assert.match(output, /Frontend delivery: proxy hot reload/);
+    assert.match(planContents, /frontend_mode=proxy-dev/);
+    assert.match(planContents, /web-proxy-dev:/);
+    assert.match(planContents, /--admin-site-target 127\.0\.0\.1:5173/);
+    assert.match(planContents, /--portal-site-target 127\.0\.0\.1:5174/);
+    assert.match(planContents, /--proxy-dev --dry-run/);
   } finally {
     rmSync(devHome, { recursive: true, force: true });
   }

@@ -15,7 +15,8 @@ import type {
   ChannelModelRecord,
   CredentialRecord,
   ModelPriceRecord,
-  ProxyProviderRecord,
+  ProviderCatalogRecord,
+  ProviderModelRecord,
 } from 'sdkwork-router-admin-types';
 
 import {
@@ -42,7 +43,13 @@ type CatalogDetailDrawerProps = {
   onOpenChange: (open: boolean) => void;
   onPublishVariant: () => void;
   onRotateCredential: () => void;
-  onStartPricing: (record: ChannelModelRecord) => void;
+  onStartPricing: (
+    record: ChannelModelRecord,
+    options?: {
+      proxyProviderId?: string;
+      priceSourceKind?: string;
+    },
+  ) => void;
   open: boolean;
   providerNameById: Map<string, string>;
   selectedChannel: ChannelRecord | null;
@@ -50,7 +57,9 @@ type CatalogDetailDrawerProps = {
   selectedChannelProviderCount: number;
   selectedCredential: CredentialRecord | null;
   selectedModelPrices: ModelPriceRecord[];
-  selectedProvider: ProxyProviderRecord | null;
+  selectedProviderModels: ProviderModelRecord[];
+  selectedProviderModelPrices: ModelPriceRecord[];
+  selectedProvider: ProviderCatalogRecord | null;
   selectedPublication: ChannelModelRecord | null;
   selectedVariant: VariantRecord | null;
 };
@@ -78,6 +87,8 @@ export function CatalogDetailDrawer({
   selectedChannelProviderCount,
   selectedCredential,
   selectedModelPrices,
+  selectedProviderModels,
+  selectedProviderModelPrices,
   selectedProvider,
   selectedPublication,
   selectedVariant,
@@ -100,6 +111,8 @@ export function CatalogDetailDrawer({
       selectedChannelProviderCount={selectedChannelProviderCount}
       selectedCredential={selectedCredential}
       selectedModelPrices={selectedModelPrices}
+      selectedProviderModels={selectedProviderModels}
+      selectedProviderModelPrices={selectedProviderModelPrices}
       selectedProvider={selectedProvider}
       selectedPublication={selectedPublication}
       selectedVariant={selectedVariant}

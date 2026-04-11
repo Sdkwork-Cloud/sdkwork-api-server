@@ -33,12 +33,23 @@ export const PROD_DEFAULTS = {
   portalBind: '127.0.0.1:9982',
 };
 
+function normalizeRuntimePlatform(platform = process.platform) {
+  if (platform === 'windows') {
+    return 'win32';
+  }
+  if (platform === 'macos') {
+    return 'darwin';
+  }
+
+  return platform;
+}
+
 export function toPortablePath(value) {
   return String(value).replaceAll('\\', '/');
 }
 
 export function withExecutable(binaryName, platform = process.platform) {
-  return platform === 'win32' ? `${binaryName}.exe` : binaryName;
+  return normalizeRuntimePlatform(platform) === 'win32' ? `${binaryName}.exe` : binaryName;
 }
 
 export function defaultReleaseOutputDir(repoRoot) {
@@ -71,12 +82,13 @@ function resolveReleaseCargoJobs({
   platform = process.platform,
   env = process.env,
 } = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
   const requestedJobs = String(env.CARGO_BUILD_JOBS ?? '').trim();
   if (requestedJobs.length > 0) {
     return requestedJobs;
   }
 
-  return platform === 'win32' ? '1' : '';
+  return runtimePlatform === 'win32' ? '1' : '';
 }
 
 export function createReleaseBuildPlan({
@@ -90,20 +102,21 @@ export function createReleaseBuildPlan({
   releaseOutputDir = defaultReleaseOutputDir(repoRoot),
   exists = existsSync,
 } = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
   const buildEnv = withSupportedWindowsCmakeGenerator(
     withManagedWorkspaceTargetDir({
       workspaceRoot: repoRoot,
       env,
-      platform,
+      platform: runtimePlatform,
     }),
-    platform,
+    runtimePlatform,
   );
   const releaseCargoJobs = resolveReleaseCargoJobs({
-    platform,
+    platform: runtimePlatform,
     env: buildEnv,
   });
   const target = resolveDesktopReleaseTarget({
-    platform,
+    platform: runtimePlatform,
     arch,
     env: buildEnv,
   });
@@ -133,7 +146,7 @@ export function createReleaseBuildPlan({
       cwd: repoRoot,
       env: buildEnv,
       shell: rustRunner.shell,
-      windowsHide: platform === 'win32',
+      windowsHide: runtimePlatform === 'win32',
     },
   ];
 
@@ -176,8 +189,8 @@ export function createReleaseBuildPlan({
         args: ['--dir', toPortablePath(path.relative(repoRoot, app.dir)), 'install'],
         cwd: repoRoot,
         env: buildEnv,
-        shell: platform === 'win32',
-        windowsHide: platform === 'win32',
+        shell: runtimePlatform === 'win32',
+        windowsHide: runtimePlatform === 'win32',
       });
     }
 
@@ -187,8 +200,8 @@ export function createReleaseBuildPlan({
       args: ['--dir', toPortablePath(path.relative(repoRoot, app.dir)), 'build'],
       cwd: repoRoot,
       env: buildEnv,
-      shell: platform === 'win32',
-      windowsHide: platform === 'win32',
+      shell: runtimePlatform === 'win32',
+      windowsHide: runtimePlatform === 'win32',
     });
   }
 
@@ -207,7 +220,7 @@ export function createReleaseBuildPlan({
       cwd: repoRoot,
       env: buildEnv,
       shell: false,
-      windowsHide: platform === 'win32',
+      windowsHide: runtimePlatform === 'win32',
     },
     {
       label: 'portal desktop release build',
@@ -222,7 +235,7 @@ export function createReleaseBuildPlan({
       cwd: repoRoot,
       env: buildEnv,
       shell: false,
-      windowsHide: platform === 'win32',
+      windowsHide: runtimePlatform === 'win32',
     },
     {
       label: 'native release package',
@@ -242,7 +255,7 @@ export function createReleaseBuildPlan({
       cwd: repoRoot,
       env: buildEnv,
       shell: false,
-      windowsHide: platform === 'win32',
+      windowsHide: runtimePlatform === 'win32',
     },
   );
 
@@ -257,9 +270,10 @@ export function renderRuntimeEnvTemplate({
   platform = process.platform,
   defaults = PROD_DEFAULTS,
 } = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
   const portableRoot = toPortablePath(installRoot);
   const binaryPath = toPortablePath(
-    path.join(installRoot, 'bin', withExecutable('router-product-service', platform)),
+    path.join(installRoot, 'bin', withExecutable('router-product-service', runtimePlatform)),
   );
   const configDir = `${portableRoot}/config`;
   const dataDir = `${portableRoot}/var/data`;
@@ -740,8 +754,9 @@ export function createInstallPlan({
   arch = process.arch,
   env = process.env,
 } = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
   const target = resolveDesktopReleaseTarget({
-    platform,
+    platform: runtimePlatform,
     arch,
     env,
   });
@@ -749,7 +764,7 @@ export function createInstallPlan({
     resolveWorkspaceTargetDir({
       workspaceRoot: repoRoot,
       env,
-      platform,
+      platform: runtimePlatform,
     }),
     target.targetTriple,
     'release',
@@ -759,6 +774,7 @@ export function createInstallPlan({
     path.join(installRoot, 'bin'),
     path.join(installRoot, 'bin', 'lib'),
     path.join(installRoot, 'config'),
+    path.join(installRoot, 'data'),
     path.join(installRoot, 'service', 'systemd'),
     path.join(installRoot, 'service', 'launchd'),
     path.join(installRoot, 'service', 'windows-task'),
@@ -774,8 +790,8 @@ export function createInstallPlan({
   for (const binaryName of RELEASE_BINARY_NAMES) {
     files.push({
       type: 'file',
-      sourcePath: path.join(releaseRoot, withExecutable(binaryName, platform)),
-      targetPath: path.join(installRoot, 'bin', withExecutable(binaryName, platform)),
+      sourcePath: path.join(releaseRoot, withExecutable(binaryName, runtimePlatform)),
+      targetPath: path.join(installRoot, 'bin', withExecutable(binaryName, runtimePlatform)),
     });
   }
 
@@ -805,6 +821,11 @@ export function createInstallPlan({
   files.push(
     {
       type: 'directory',
+      sourcePath: path.join(repoRoot, 'data'),
+      targetPath: path.join(installRoot, 'data'),
+    },
+    {
+      type: 'directory',
       sourcePath: path.join(repoRoot, 'apps', 'sdkwork-router-admin', 'dist'),
       targetPath: path.join(installRoot, 'sites', 'admin', 'dist'),
     },
@@ -818,7 +839,7 @@ export function createInstallPlan({
       targetPath: path.join(installRoot, 'config', 'router.env'),
       contents: renderRuntimeEnvTemplate({
         installRoot,
-        platform,
+        platform: runtimePlatform,
       }),
       skipIfExists: true,
     },
@@ -827,7 +848,7 @@ export function createInstallPlan({
       targetPath: path.join(installRoot, 'config', 'router.env.example'),
       contents: renderRuntimeEnvTemplate({
         installRoot,
-        platform,
+        platform: runtimePlatform,
       }),
     },
     {
@@ -892,6 +913,8 @@ export function createInstallPlan({
         runtime: 'sdkwork-api-router',
         target,
         installedBinaries: RELEASE_BINARY_NAMES,
+        bootstrapDataRoot: 'data',
+        mutableDataRoot: path.join('var', 'data'),
         installedAt: new Date().toISOString(),
       }, null, 2)}\n`,
     },

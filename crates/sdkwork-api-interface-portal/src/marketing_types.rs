@@ -12,6 +12,69 @@ pub(crate) struct PortalMarketingCodesQuery {
     pub(crate) status: Option<CouponCodeStatus>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PortalCouponEffectKind {
+    CheckoutDiscount,
+    AccountEntitlement,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PortalCouponApplicabilitySummary {
+    pub(crate) target_kinds: Vec<String>,
+    pub(crate) all_target_kinds_eligible: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PortalCouponEffectSummary {
+    pub(crate) effect_kind: PortalCouponEffectKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) discount_percent: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) discount_amount_minor: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) grant_units: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PortalCouponOwnershipSummary {
+    pub(crate) owned_by_current_subject: bool,
+    pub(crate) claimed_to_current_subject: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) claimed_subject_scope: Option<MarketingSubjectScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) claimed_subject_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PortalCouponAccountArrivalLotItem {
+    pub(crate) lot_id: u64,
+    pub(crate) benefit_type: sdkwork_api_domain_billing::AccountBenefitType,
+    pub(crate) source_type: sdkwork_api_domain_billing::AccountBenefitSourceType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) source_id: Option<u64>,
+    pub(crate) status: sdkwork_api_domain_billing::AccountBenefitLotStatus,
+    pub(crate) original_quantity: f64,
+    pub(crate) remaining_quantity: f64,
+    pub(crate) issued_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) expires_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) scope_order_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PortalCouponAccountArrivalSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) order_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) account_id: Option<u64>,
+    pub(crate) benefit_lot_count: usize,
+    pub(crate) credited_quantity: f64,
+    #[serde(default)]
+    pub(crate) benefit_lots: Vec<PortalCouponAccountArrivalLotItem>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct PortalCouponValidationRequest {
     pub(crate) coupon_code: String,
@@ -124,6 +187,11 @@ pub(crate) struct PortalMarketingRedemptionsResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct PortalMarketingCodeItem {
     pub(crate) code: CouponCodeRecord,
+    pub(crate) template: CouponTemplateRecord,
+    pub(crate) campaign: MarketingCampaignRecord,
+    pub(crate) applicability: PortalCouponApplicabilitySummary,
+    pub(crate) effect: PortalCouponEffectSummary,
+    pub(crate) ownership: PortalCouponOwnershipSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) latest_reservation: Option<CouponReservationRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -140,6 +208,12 @@ pub(crate) struct PortalMarketingCodesResponse {
 pub(crate) struct PortalMarketingRewardHistoryItem {
     pub(crate) redemption: CouponRedemptionRecord,
     pub(crate) code: CouponCodeRecord,
+    pub(crate) template: CouponTemplateRecord,
+    pub(crate) campaign: MarketingCampaignRecord,
+    pub(crate) applicability: PortalCouponApplicabilitySummary,
+    pub(crate) effect: PortalCouponEffectSummary,
+    pub(crate) ownership: PortalCouponOwnershipSummary,
+    pub(crate) account_arrival: PortalCouponAccountArrivalSummary,
     #[serde(default)]
     pub(crate) rollbacks: Vec<CouponRollbackRecord>,
 }

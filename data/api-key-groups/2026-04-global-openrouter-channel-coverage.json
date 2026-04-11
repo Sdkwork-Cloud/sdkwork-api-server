@@ -1,0 +1,50 @@
+[
+  {
+    "group_id": "group-proxy-openrouter-xai-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "OpenRouter xAI Live",
+    "slug": "proxy-openrouter-xai-live",
+    "description": "Live traffic group pinned to the OpenRouter Grok profile.",
+    "color": "#312e81",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-openrouter-xai",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000488000,
+    "updated_at_ms": 1710000488000
+  },
+  {
+    "group_id": "group-proxy-openrouter-moonshot-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "OpenRouter Moonshot Live",
+    "slug": "proxy-openrouter-moonshot-live",
+    "description": "Live traffic group pinned to the OpenRouter Kimi profile.",
+    "color": "#0f766e",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-openrouter-moonshot",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000489000,
+    "updated_at_ms": 1710000489000
+  },
+  {
+    "group_id": "group-proxy-openrouter-mistral-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "OpenRouter Mistral Live",
+    "slug": "proxy-openrouter-mistral-live",
+    "description": "Live traffic group pinned to the OpenRouter Mistral profile.",
+    "color": "#475569",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-openrouter-mistral",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000490000,
+    "updated_at_ms": 1710000490000
+  }
+]

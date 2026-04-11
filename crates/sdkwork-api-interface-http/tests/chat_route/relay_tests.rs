@@ -372,7 +372,7 @@ async fn stateful_chat_route_relays_to_openrouter_provider() {
                 .header("authorization", format!("Bearer {admin_token}"))
 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    "{{\"id\":\"provider-openrouter-main\",\"channel_id\":\"openrouter\",\"adapter_kind\":\"openrouter\",\"base_url\":\"http://{address}\",\"display_name\":\"OpenRouter Main\"}}"
+                    "{{\"id\":\"provider-openrouter-main\",\"channel_id\":\"openrouter\",\"default_plugin_family\":\"openrouter\",\"base_url\":\"http://{address}\",\"display_name\":\"OpenRouter Main\"}}"
                 )))
                 .unwrap(),
         )
@@ -380,6 +380,10 @@ async fn stateful_chat_route_relays_to_openrouter_provider() {
         .unwrap();
 
     assert_eq!(provider.status(), StatusCode::CREATED);
+    let provider_json = read_json(provider).await;
+    assert_eq!(provider_json["adapter_kind"], "openrouter");
+    assert_eq!(provider_json["protocol_kind"], "openai");
+    assert_eq!(provider_json["extension_id"], "sdkwork.provider.openrouter");
 
     let credential = admin_app
         .clone()
@@ -483,7 +487,7 @@ async fn stateful_chat_route_relays_to_ollama_provider() {
                 .header("authorization", format!("Bearer {admin_token}"))
 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    "{{\"id\":\"provider-ollama-local\",\"channel_id\":\"ollama\",\"adapter_kind\":\"ollama\",\"base_url\":\"http://{address}\",\"display_name\":\"Ollama Local\"}}"
+                    "{{\"id\":\"provider-ollama-local\",\"channel_id\":\"ollama\",\"default_plugin_family\":\"ollama\",\"base_url\":\"http://{address}\",\"display_name\":\"Ollama Local\"}}"
                 )))
                 .unwrap(),
         )
@@ -491,6 +495,10 @@ async fn stateful_chat_route_relays_to_ollama_provider() {
         .unwrap();
 
     assert_eq!(provider.status(), StatusCode::CREATED);
+    let provider_json = read_json(provider).await;
+    assert_eq!(provider_json["adapter_kind"], "ollama");
+    assert_eq!(provider_json["protocol_kind"], "custom");
+    assert_eq!(provider_json["extension_id"], "sdkwork.provider.ollama");
 
     let credential = admin_app
         .clone()
@@ -554,3 +562,346 @@ async fn stateful_chat_route_relays_to_ollama_provider() {
 
 #[tokio::test]
 async fn stateful_chat_route_uses_requested_region_for_geo_affinity() {
+    let tenant_id = "tenant-chat-geo-affinity";
+    let project_id = "project-chat-geo-affinity";
+    let eu_state = UpstreamCaptureState::default();
+    let us_state = UpstreamCaptureState::default();
+
+    let eu_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let eu_address = eu_listener.local_addr().unwrap();
+    let eu_upstream = Router::new()
+        .route("/v1/chat/completions", post(upstream_chat_handler))
+        .with_state(eu_state.clone());
+    tokio::spawn(async move {
+        axum::serve(eu_listener, eu_upstream).await.unwrap();
+    });
+
+    let us_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let us_address = us_listener.local_addr().unwrap();
+    let us_upstream = Router::new()
+        .route("/v1/chat/completions", post(upstream_chat_handler))
+        .with_state(us_state.clone());
+    tokio::spawn(async move {
+        axum::serve(us_listener, us_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let create_channel = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/channels")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"id\":\"openai\",\"name\":\"OpenAI\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_channel.status(), StatusCode::CREATED);
+
+    let create_eu_provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-chat-geo-eu\",\"channel_id\":\"openai\",\"extension_id\":\"sdkwork.provider.openai.official\",\"adapter_kind\":\"openai\",\"base_url\":\"http://{eu_address}\",\"display_name\":\"Chat Geo EU\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_eu_provider.status(), StatusCode::CREATED);
+
+    let create_us_provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-chat-geo-us\",\"channel_id\":\"openai\",\"extension_id\":\"sdkwork.provider.openai.official\",\"adapter_kind\":\"openai\",\"base_url\":\"http://{us_address}\",\"display_name\":\"Chat Geo US\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_us_provider.status(), StatusCode::CREATED);
+
+    let create_eu_credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"provider-chat-geo-eu\",\"key_reference\":\"cred-chat-geo-eu\",\"secret_value\":\"sk-chat-geo-eu\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_eu_credential.status(), StatusCode::CREATED);
+
+    let create_us_credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"provider-chat-geo-us\",\"key_reference\":\"cred-chat-geo-us\",\"secret_value\":\"sk-chat-geo-us\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_us_credential.status(), StatusCode::CREATED);
+
+    let create_eu_model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-chat-geo-eu\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_eu_model.status(), StatusCode::CREATED);
+
+    let create_us_model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-chat-geo-us\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_us_model.status(), StatusCode::CREATED);
+
+    let create_eu_installation = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/installations")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "installation_id": "chat-geo-eu-installation",
+                        "extension_id": "sdkwork.provider.openai.official",
+                        "runtime": "builtin",
+                        "enabled": true,
+                        "entrypoint": null,
+                        "config": {}
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_eu_installation.status(), StatusCode::CREATED);
+
+    let create_us_installation = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/installations")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "installation_id": "chat-geo-us-installation",
+                        "extension_id": "sdkwork.provider.openai.official",
+                        "runtime": "builtin",
+                        "enabled": true,
+                        "entrypoint": null,
+                        "config": {}
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_us_installation.status(), StatusCode::CREATED);
+
+    let create_eu_instance = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/instances")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "instance_id": "provider-chat-geo-eu",
+                        "installation_id": "chat-geo-eu-installation",
+                        "extension_id": "sdkwork.provider.openai.official",
+                        "enabled": true,
+                        "base_url": format!("http://{eu_address}"),
+                        "credential_ref": "cred-chat-geo-eu",
+                        "config": {
+                            "routing": {
+                                "region": "eu-west"
+                            }
+                        }
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_eu_instance.status(), StatusCode::CREATED);
+
+    let create_us_instance = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/extensions/instances")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "instance_id": "provider-chat-geo-us",
+                        "installation_id": "chat-geo-us-installation",
+                        "extension_id": "sdkwork.provider.openai.official",
+                        "enabled": true,
+                        "base_url": format!("http://{us_address}"),
+                        "credential_ref": "cred-chat-geo-us",
+                        "config": {
+                            "routing": {
+                                "region": "us-east"
+                            }
+                        }
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_us_instance.status(), StatusCode::CREATED);
+
+    let create_policy = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/routing/policies")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "policy_id": "route-chat-geo-affinity",
+                        "capability": "chat_completion",
+                        "model_pattern": "gpt-4.1",
+                        "enabled": true,
+                        "priority": 300,
+                        "strategy": "geo_affinity",
+                        "ordered_provider_ids": [
+                            "provider-chat-geo-eu",
+                            "provider-chat-geo-us"
+                        ]
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_policy.status(), StatusCode::CREATED);
+
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("x-sdkwork-region", "us-east")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"messages\":[{\"role\":\"user\",\"content\":\"use us-east please\"}]}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["id"], "chatcmpl_upstream");
+    assert_eq!(eu_state.authorization.lock().unwrap().as_deref(), None);
+    assert_eq!(
+        us_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-chat-geo-us")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(usage_json[0]["provider"], "provider-chat-geo-us");
+
+    let logs = admin_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(logs_json[0]["requested_region"], "us-east");
+    assert_eq!(logs_json[0]["selected_provider_id"], "provider-chat-geo-us");
+}

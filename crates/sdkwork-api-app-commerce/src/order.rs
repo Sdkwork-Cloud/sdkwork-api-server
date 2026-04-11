@@ -3,11 +3,18 @@ use super::*;
 pub async fn load_portal_commerce_catalog(
     store: &dyn AdminStore,
 ) -> CommerceResult<PortalCommerceCatalog> {
+    let plans = subscription_plan_catalog();
+    let packs = recharge_pack_catalog();
+    let recharge_options = recharge_option_catalog();
+    let custom_recharge_policy = Some(build_custom_recharge_policy());
+    let canonical_catalog = current_canonical_commercial_catalog_for_store(store).await?;
     Ok(PortalCommerceCatalog {
-        plans: subscription_plan_catalog(),
-        packs: recharge_pack_catalog(),
-        recharge_options: recharge_option_catalog(),
-        custom_recharge_policy: Some(build_custom_recharge_policy()),
+        products: portal_api_products_from_canonical_catalog(&canonical_catalog),
+        offers: portal_product_offers_from_canonical_catalog(&canonical_catalog),
+        plans,
+        packs,
+        recharge_options,
+        custom_recharge_policy,
         coupons: load_coupon_catalog(store).await?,
     })
 }
@@ -39,6 +46,9 @@ pub(crate) async fn preview_portal_commerce_quote_internal(
         ));
     }
 
+    let catalog_binding =
+        current_quote_target_catalog_binding_for_store(store, target_kind, target_id).await?;
+
     match target_kind {
         "subscription_plan" => {
             let plan = subscription_plan_seeds()
@@ -60,6 +70,7 @@ pub(crate) async fn preview_portal_commerce_quote_internal(
                 plan.included_units,
                 "workspace_seed",
                 request.current_remaining_units,
+                catalog_binding,
                 applied_coupon.as_ref().map(|item| item.definition.clone()),
             );
             Ok((quote, applied_coupon))
@@ -84,6 +95,7 @@ pub(crate) async fn preview_portal_commerce_quote_internal(
                 pack.points,
                 "workspace_seed",
                 request.current_remaining_units,
+                catalog_binding,
                 applied_coupon.as_ref().map(|item| item.definition.clone()),
             );
             Ok((quote, applied_coupon))
@@ -101,6 +113,7 @@ pub(crate) async fn preview_portal_commerce_quote_internal(
             let quote = build_custom_recharge_quote(
                 custom_amount_cents,
                 request.current_remaining_units,
+                catalog_binding,
                 applied_coupon.as_ref().map(|item| item.definition.clone()),
             )?;
             Ok((quote, applied_coupon))
@@ -113,8 +126,11 @@ pub(crate) async fn preview_portal_commerce_quote_internal(
                     coupon.definition.coupon.code
                 )));
             }
-            let quote =
-                build_redemption_quote(coupon.definition.clone(), request.current_remaining_units);
+            let quote = build_redemption_quote(
+                coupon.definition.clone(),
+                request.current_remaining_units,
+                catalog_binding,
+            );
             Ok((quote, Some(coupon)))
         }
         _ => Err(CommerceError::InvalidInput(format!(
@@ -172,9 +188,8 @@ pub async fn submit_portal_commerce_order(
         quote.source.clone(),
         created_at_ms,
     )
-    .with_pricing_plan_id_option(
-        (quote.target_kind == "subscription_plan").then_some(quote.target_id.clone()),
-    )
+    .with_pricing_plan_id_option(quote.pricing_plan_id.clone())
+    .with_pricing_plan_version_option(quote.pricing_plan_version)
     .with_pricing_snapshot_json(build_order_pricing_snapshot_json(
         request,
         &quote,
@@ -803,10 +818,28 @@ fn build_order_pricing_snapshot_json(
     reserved_coupon: Option<&ReservedMarketingCouponState>,
     issued_at_ms: u64,
 ) -> CommerceResult<String> {
+    let catalog_binding = PortalCommerceCatalogBinding::from_quote(quote);
     serde_json::to_string(&serde_json::json!({
         "issued_at_ms": issued_at_ms,
         "request": request,
         "quote": quote,
+        "catalog_binding": {
+            "product_id": catalog_binding.product_id,
+            "offer_id": catalog_binding.offer_id,
+            "publication_id": catalog_binding.publication_id,
+            "publication_kind": catalog_binding.publication_kind,
+            "publication_status": catalog_binding.publication_status,
+            "publication_revision_id": catalog_binding.publication_revision_id,
+            "publication_version": catalog_binding.publication_version,
+            "publication_source_kind": catalog_binding.publication_source_kind,
+            "publication_effective_from_ms": catalog_binding.publication_effective_from_ms,
+        },
+        "pricing_binding": {
+            "pricing_plan_id": catalog_binding.pricing_plan_id,
+            "pricing_plan_version": catalog_binding.pricing_plan_version,
+            "pricing_rate_id": catalog_binding.pricing_rate_id,
+            "pricing_metric_code": catalog_binding.pricing_metric_code,
+        },
         "resolved_coupon": resolved_coupon.as_ref().map(|resolved_coupon| serde_json::json!({
             "coupon": resolved_coupon.definition.coupon,
             "discount_percent": resolved_coupon.definition.benefit.discount_percent,

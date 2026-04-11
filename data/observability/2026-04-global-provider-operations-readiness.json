@@ -1,0 +1,452 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-prod-openai-official-live",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-openai-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openai-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-openrouter-main",
+        "provider-gemini-official"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000472000,
+      "updated_at_ms": 1710000472500
+    },
+    {
+      "snapshot_id": "snapshot-prod-openai-official-direct-2026",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-openai-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1-mini",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openai-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-openrouter-main",
+        "provider-gemini-official"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 2.5,
+      "max_latency_ms": 9000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000494700,
+      "updated_at_ms": 1710000494750
+    },
+    {
+      "snapshot_id": "snapshot-prod-claude-official-live",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-claude-live",
+      "capability": "responses",
+      "route_key": "claude-3-7-sonnet",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-claude-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-anthropic-official",
+        "provider-openrouter-main",
+        "provider-openai-official"
+      ],
+      "default_provider_id": "provider-anthropic-official",
+      "max_cost": 7,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000473000,
+      "updated_at_ms": 1710000473500
+    },
+    {
+      "snapshot_id": "snapshot-prod-gemini-official-live",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-gemini-live",
+      "capability": "responses",
+      "route_key": "gemini-2.5-pro",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-gemini-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-gemini-official",
+        "provider-openrouter-main",
+        "provider-openai-official"
+      ],
+      "default_provider_id": "provider-gemini-official",
+      "max_cost": 6,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000474000,
+      "updated_at_ms": 1710000474500
+    },
+    {
+      "snapshot_id": "snapshot-prod-openrouter-main",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1-mini",
+      "matched_policy_id": "policy-openrouter-main-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openrouter-main",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000475000,
+      "updated_at_ms": 1710000475500
+    },
+    {
+      "snapshot_id": "snapshot-prod-siliconflow-main",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-siliconflow-live",
+      "capability": "responses",
+      "route_key": "deepseek-v3",
+      "matched_policy_id": "policy-siliconflow-main-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-siliconflow-main",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-siliconflow-main",
+      "max_cost": 2.2,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "cn",
+      "created_at_ms": 1710000476000,
+      "updated_at_ms": 1710000476500
+    },
+    {
+      "snapshot_id": "snapshot-prod-ollama-local",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-local-ollama-edge",
+      "capability": "responses",
+      "route_key": "qwen2.5-14b-instruct",
+      "matched_policy_id": "policy-ollama-local-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-ollama-local",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 1.2,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710000477000,
+      "updated_at_ms": 1710000477500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-prod-openai-official-live",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-openai-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1",
+      "selected_provider_id": "provider-openai-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-global-openai-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-openai-official-live",
+      "strategy": "deterministic_priority",
+      "selection_seed": 701,
+      "selection_reason": "dedicated official OpenAI live group selected the primary vendor route.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000472100,
+      "assessments": [
+        {
+          "provider_id": "provider-openai-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0108,
+          "latency_ms": 520,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official OpenAI route"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-openai-official-direct-2026",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-openai-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1-mini",
+      "selected_provider_id": "provider-openai-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-global-openai-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-openai-official-direct-2026",
+      "strategy": "deterministic_priority",
+      "selection_seed": 707,
+      "selection_reason": "official OpenAI live group selected the lower-cost direct mini route.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000494750,
+      "assessments": [
+        {
+          "provider_id": "provider-openai-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0024,
+          "latency_ms": 510,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official OpenAI direct mini route"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-claude-official-live",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-claude-live",
+      "capability": "responses",
+      "route_key": "claude-3-7-sonnet",
+      "selected_provider_id": "provider-anthropic-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-global-claude-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-claude-official-live",
+      "strategy": "deterministic_priority",
+      "selection_seed": 702,
+      "selection_reason": "dedicated Claude live group selected Anthropic-owned capacity.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000473100,
+      "assessments": [
+        {
+          "provider_id": "provider-anthropic-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.018,
+          "latency_ms": 740,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official Anthropic route"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-gemini-official-live",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-gemini-live",
+      "capability": "responses",
+      "route_key": "gemini-2.5-pro",
+      "selected_provider_id": "provider-gemini-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-global-gemini-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-gemini-official-live",
+      "strategy": "deterministic_priority",
+      "selection_seed": 703,
+      "selection_reason": "dedicated Gemini live group selected Google-owned long-context capacity.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000474100,
+      "assessments": [
+        {
+          "provider_id": "provider-gemini-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0155,
+          "latency_ms": 710,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official Gemini route"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-openrouter-main",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-live",
+      "capability": "responses",
+      "route_key": "gpt-4.1-mini",
+      "selected_provider_id": "provider-openrouter-main",
+      "matched_policy_id": "policy-openrouter-main-responses",
+      "applied_routing_profile_id": "profile-global-openrouter-main",
+      "compiled_routing_snapshot_id": "snapshot-prod-openrouter-main",
+      "strategy": "deterministic_priority",
+      "selection_seed": 704,
+      "selection_reason": "dedicated OpenRouter group selected the marketplace proxy route.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000475100,
+      "assessments": [
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0038,
+          "latency_ms": 650,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "broad frontier marketplace coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-siliconflow-main",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-siliconflow-live",
+      "capability": "responses",
+      "route_key": "deepseek-v3",
+      "selected_provider_id": "provider-siliconflow-main",
+      "matched_policy_id": "policy-siliconflow-main-responses",
+      "applied_routing_profile_id": "profile-global-siliconflow-main",
+      "compiled_routing_snapshot_id": "snapshot-prod-siliconflow-main",
+      "strategy": "deterministic_priority",
+      "selection_seed": 705,
+      "selection_reason": "dedicated SiliconFlow group selected the proxy low-cost route.",
+      "fallback_reason": null,
+      "requested_region": "cn",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000476100,
+      "assessments": [
+        {
+          "provider_id": "provider-siliconflow-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0011,
+          "latency_ms": 690,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "cost-efficient proxy route for open-weight traffic"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-ollama-local",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-local-ollama-edge",
+      "capability": "responses",
+      "route_key": "qwen2.5-14b-instruct",
+      "selected_provider_id": "provider-ollama-local",
+      "matched_policy_id": "policy-ollama-local-responses",
+      "applied_routing_profile_id": "profile-global-ollama-local",
+      "compiled_routing_snapshot_id": "snapshot-prod-ollama-local",
+      "strategy": "deterministic_priority",
+      "selection_seed": 706,
+      "selection_reason": "edge-local group selected the private Ollama route with no remote fallback.",
+      "fallback_reason": null,
+      "requested_region": "local",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000477100,
+      "assessments": [
+        {
+          "provider_id": "provider-ollama-local",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0003,
+          "latency_ms": 1150,
+          "region": "local",
+          "region_match": true,
+          "reasons": [
+            "local private inference with zero external dependency"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": [
+    {
+      "provider_id": "provider-openrouter-main",
+      "extension_id": "sdkwork.provider.openrouter",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000478000,
+      "instance_id": "provider-openrouter-main",
+      "running": true,
+      "healthy": true,
+      "message": "OpenRouter marketplace relay healthy for provider-mix bootstrap traffic"
+    },
+    {
+      "provider_id": "provider-siliconflow-main",
+      "extension_id": "sdkwork.provider.siliconflow",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000478200,
+      "instance_id": "provider-siliconflow-main",
+      "running": true,
+      "healthy": true,
+      "message": "SiliconFlow proxy healthy for low-cost bootstrap traffic"
+    },
+    {
+      "provider_id": "provider-ollama-local",
+      "extension_id": "sdkwork.provider.ollama",
+      "runtime": "builtin",
+      "observed_at_ms": 1710000478400,
+      "instance_id": "provider-ollama-local",
+      "running": true,
+      "healthy": true,
+      "message": "Ollama local edge runtime healthy for private bootstrap workloads"
+    }
+  ]
+}

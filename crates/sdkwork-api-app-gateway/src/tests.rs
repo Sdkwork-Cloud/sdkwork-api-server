@@ -9,8 +9,9 @@ use super::gateway_runtime_execution::{
     record_gateway_upstream_outcome, record_gateway_upstream_retry_with_detail,
 };
 use super::{
-    ROUTING_DECISION_CACHE_NAMESPACE, RoutingDecision, configure_route_decision_cache_store,
-    current_request_api_key_group_id, with_request_api_key_group_id, with_request_routing_region,
+    configure_route_decision_cache_store, current_request_api_key_group_id,
+    with_request_api_key_group_id, with_request_routing_region, RoutingDecision,
+    ROUTING_DECISION_CACHE_NAMESPACE,
 };
 use sdkwork_api_cache_core::CacheStore;
 use sdkwork_api_cache_memory::MemoryCacheStore;
@@ -223,13 +224,11 @@ async fn route_decision_cache_uses_configured_cache_store_and_consumes_entries_o
         )
         .await;
 
-        assert!(
-            cache_store
-                .get(ROUTING_DECISION_CACHE_NAMESPACE, &cache_key)
-                .await
-                .unwrap()
-                .is_some()
-        );
+        assert!(cache_store
+            .get(ROUTING_DECISION_CACHE_NAMESPACE, &cache_key)
+            .await
+            .unwrap()
+            .is_some());
 
         let cached = take_cached_routing_decision(
             "tenant-1",

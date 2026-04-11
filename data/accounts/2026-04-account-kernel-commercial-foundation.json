@@ -1,0 +1,16 @@
+[
+  {
+    "account_id": 7001001,
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "user_id": 3001,
+    "account_type": "primary",
+    "currency_code": "USD",
+    "credit_unit_code": "credit",
+    "status": "active",
+    "allow_overdraft": false,
+    "overdraft_limit": 0.0,
+    "created_at_ms": 1710000200000,
+    "updated_at_ms": 1710000200100
+  }
+]

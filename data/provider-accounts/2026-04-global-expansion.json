@@ -1,0 +1,38 @@
+[
+  {
+    "provider_account_id": "acct-provider-ernie-official-primary",
+    "provider_id": "provider-ernie-official",
+    "display_name": "ERNIE Official Primary",
+    "account_kind": "official_api",
+    "owner_scope": "platform",
+    "execution_instance_id": "provider-ernie-official",
+    "region": "cn",
+    "priority": 945,
+    "weight": 100,
+    "enabled": true,
+    "routing_tags": ["official", "primary", "cn", "enterprise"],
+    "health_score_hint": 0.985,
+    "latency_ms_hint": 185,
+    "cost_hint": 0.62,
+    "success_rate_hint": 0.985,
+    "notes": "Default ERNIE official execution account for Baidu Qianfan bootstrap routes."
+  },
+  {
+    "provider_account_id": "acct-provider-minimax-official-primary",
+    "provider_id": "provider-minimax-official",
+    "display_name": "MiniMax Official Primary",
+    "account_kind": "official_api",
+    "owner_scope": "platform",
+    "execution_instance_id": "provider-minimax-official",
+    "region": "cn",
+    "priority": 905,
+    "weight": 100,
+    "enabled": true,
+    "routing_tags": ["official", "primary", "cn", "reasoning"],
+    "health_score_hint": 0.984,
+    "latency_ms_hint": 195,
+    "cost_hint": 0.78,
+    "success_rate_hint": 0.984,
+    "notes": "Default MiniMax official execution account for reasoning-oriented bootstrap routes."
+  }
+]

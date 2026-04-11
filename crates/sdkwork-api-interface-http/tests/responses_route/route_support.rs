@@ -1,32 +1,32 @@
 use super::*;
 
-async fn read_json(response: axum::response::Response) -> Value {
+pub(super) async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
-async fn read_text(response: axum::response::Response) -> String {
+pub(super) async fn read_text(response: axum::response::Response) -> String {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     String::from_utf8(bytes.to_vec()).unwrap()
 }
 
-async fn memory_pool() -> SqlitePool {
+pub(super) async fn memory_pool() -> SqlitePool {
     sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
         .unwrap()
 }
 
 #[derive(Clone, Default)]
-struct UpstreamCaptureState {
-    authorization: Arc<Mutex<Option<String>>>,
-    request_count: Arc<AtomicUsize>,
+pub(super) struct UpstreamCaptureState {
+    pub(super) authorization: Arc<Mutex<Option<String>>>,
+    pub(super) request_count: Arc<AtomicUsize>,
 }
 
-async fn setup_stateful_responses_route_with_single_provider(
+pub(super) async fn setup_stateful_responses_route_with_single_provider(
     tenant_id: &str,
     project_id: &str,
     provider_id: &str,
@@ -136,7 +136,7 @@ async fn setup_stateful_responses_route_with_single_provider(
     (gateway_app, admin_app, admin_token, api_key)
 }
 
-async fn create_openai_channel(admin_app: &Router, admin_token: &str) {
+pub(super) async fn create_openai_channel(admin_app: &Router, admin_token: &str) {
     let create_channel = admin_app
         .clone()
         .oneshot(
@@ -153,7 +153,7 @@ async fn create_openai_channel(admin_app: &Router, admin_token: &str) {
     assert_eq!(create_channel.status(), StatusCode::CREATED);
 }
 
-async fn create_stateful_openai_provider_for_responses(
+pub(super) async fn create_stateful_openai_provider_for_responses(
     admin_app: &Router,
     admin_token: &str,
     tenant_id: &str,
@@ -215,7 +215,7 @@ async fn create_stateful_openai_provider_for_responses(
     assert_eq!(model.status(), StatusCode::CREATED);
 }
 
-async fn create_responses_routing_policy(
+pub(super) async fn create_responses_routing_policy(
     admin_app: &Router,
     admin_token: &str,
     policy_id: &str,
@@ -231,7 +231,7 @@ async fn create_responses_routing_policy(
     .await;
 }
 
-async fn create_responses_routing_policy_with_overrides(
+pub(super) async fn create_responses_routing_policy_with_overrides(
     admin_app: &Router,
     admin_token: &str,
     policy_id: &str,
@@ -273,13 +273,13 @@ async fn create_responses_routing_policy_with_overrides(
     assert_eq!(policy.status(), StatusCode::CREATED);
 }
 
-struct EnvVarGuard {
+pub(super) struct EnvVarGuard {
     key: &'static str,
     previous: Option<String>,
 }
 
 impl EnvVarGuard {
-    fn set(key: &'static str, value: &str) -> Self {
+    pub(super) fn set(key: &'static str, value: &str) -> Self {
         let previous = std::env::var(key).ok();
         std::env::set_var(key, value);
         Self { key, previous }

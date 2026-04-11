@@ -1,7 +1,9 @@
-﻿use super::*;
+use super::*;
+use sdkwork_api_app_catalog::{
+    create_provider_with_config, create_provider_with_default_plugin_family_and_bindings,
+};
 
-pub(super) const PROVIDER_HEALTH_TTL_ENV: &str =
-    "SDKWORK_ROUTING_PROVIDER_HEALTH_FRESHNESS_TTL_MS";
+pub(super) const PROVIDER_HEALTH_TTL_ENV: &str = "SDKWORK_ROUTING_PROVIDER_HEALTH_FRESHNESS_TTL_MS";
 pub(super) const PROVIDER_HEALTH_RECOVERY_PROBE_PERCENT_ENV: &str =
     "SDKWORK_ROUTING_PROVIDER_HEALTH_RECOVERY_PROBE_PERCENT";
 pub(super) const PROVIDER_HEALTH_RECOVERY_PROBE_LOCK_TTL_ENV: &str =
@@ -15,6 +17,10 @@ pub(super) async fn create_store_with_openai_channel() -> SqliteAdminStore {
         .await
         .unwrap();
     store
+        .insert_channel(&Channel::new("openrouter", "OpenRouter"))
+        .await
+        .unwrap();
+    store
 }
 
 pub(super) async fn insert_openai_provider(
@@ -25,8 +31,36 @@ pub(super) async fn insert_openai_provider(
 ) {
     store
         .insert_provider(
-            &ProxyProvider::new(provider_id, "openai", "openai", base_url, display_name)
-                .with_extension_id("sdkwork.provider.openai.official"),
+            &create_provider_with_config(
+                provider_id,
+                "openai",
+                "openai",
+                base_url,
+                display_name,
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+}
+
+pub(super) async fn insert_openrouter_provider(
+    store: &SqliteAdminStore,
+    provider_id: &str,
+    base_url: &str,
+    display_name: &str,
+) {
+    store
+        .insert_provider(
+            &create_provider_with_default_plugin_family_and_bindings(
+                provider_id,
+                "openrouter",
+                "openrouter",
+                base_url,
+                display_name,
+                &[ProviderChannelBinding::new(provider_id, "openai")],
+            )
+            .unwrap(),
         )
         .await
         .unwrap();

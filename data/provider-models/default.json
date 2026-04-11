@@ -1,0 +1,787 @@
+[
+  {
+    "proxy_provider_id": "provider-openai-official",
+    "channel_id": "openai",
+    "model_id": "gpt-4.1",
+    "provider_model_id": "gpt-4.1",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openai-official",
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "provider_model_id": "gpt-4.1-mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openai-official",
+    "channel_id": "openai",
+    "model_id": "gpt-4o-mini",
+    "provider_model_id": "gpt-4o-mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openai-official",
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-small",
+    "provider_model_id": "text-embedding-3-small",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openai-official",
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-large",
+    "provider_model_id": "text-embedding-3-large",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-anthropic-official",
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "provider_model_id": "claude-3-7-sonnet",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 200000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-anthropic-official",
+    "channel_id": "anthropic",
+    "model_id": "claude-3-5-haiku",
+    "provider_model_id": "claude-3-5-haiku",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 200000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-gemini-official",
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "provider_model_id": "gemini-2.5-pro",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1048576,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-gemini-official",
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-flash",
+    "provider_model_id": "gemini-2.5-flash",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1048576,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-gemini-official",
+    "channel_id": "gemini",
+    "model_id": "text-embedding-004",
+    "provider_model_id": "text-embedding-004",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 2048,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-deepseek-official",
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "provider_model_id": "deepseek-chat",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-deepseek-official",
+    "channel_id": "deepseek",
+    "model_id": "deepseek-reasoner",
+    "provider_model_id": "deepseek-reasoner",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-qwen-official",
+    "channel_id": "qwen",
+    "model_id": "qwen-max",
+    "provider_model_id": "qwen-max",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-qwen-official",
+    "channel_id": "qwen",
+    "model_id": "qwen-plus",
+    "provider_model_id": "qwen-plus",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-qwen-official",
+    "channel_id": "qwen",
+    "model_id": "text-embedding-v3",
+    "provider_model_id": "text-embedding-v3",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-doubao-official",
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6",
+    "provider_model_id": "doubao-seed-1.6",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-doubao-official",
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6-thinking",
+    "provider_model_id": "doubao-seed-1.6-thinking",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-xai-official",
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "provider_model_id": "grok-4",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-xai-official",
+    "channel_id": "xai",
+    "model_id": "grok-3-mini",
+    "provider_model_id": "grok-3-mini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-moonshot-official",
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "provider_model_id": "kimi-k2.5",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-moonshot-official",
+    "channel_id": "moonshot",
+    "model_id": "moonshot-v1-128k",
+    "provider_model_id": "moonshot-v1-128k",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-zhipu-official",
+    "channel_id": "zhipu",
+    "model_id": "glm-5",
+    "provider_model_id": "glm-5",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-zhipu-official",
+    "channel_id": "zhipu",
+    "model_id": "glm-4.7",
+    "provider_model_id": "glm-4.7",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-zhipu-official",
+    "channel_id": "zhipu",
+    "model_id": "embedding-3",
+    "provider_model_id": "embedding-3",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-hunyuan-official",
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-turbos-latest",
+    "provider_model_id": "hunyuan-turbos-latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-hunyuan-official",
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-t1-latest",
+    "provider_model_id": "hunyuan-t1-latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-hunyuan-official",
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-embedding",
+    "provider_model_id": "hunyuan-embedding",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-mistral-official",
+    "channel_id": "mistral",
+    "model_id": "mistral-large-latest",
+    "provider_model_id": "mistral-large-latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-mistral-official",
+    "channel_id": "mistral",
+    "model_id": "mistral-small-latest",
+    "provider_model_id": "mistral-small-latest",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-mistral-official",
+    "channel_id": "mistral",
+    "model_id": "mistral-embed",
+    "provider_model_id": "mistral-embed",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-cohere-official",
+    "channel_id": "cohere",
+    "model_id": "command-a-03-2025",
+    "provider_model_id": "command-a-03-2025",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-cohere-official",
+    "channel_id": "cohere",
+    "model_id": "command-r7b-12-2024",
+    "provider_model_id": "command-r7b-12-2024",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-cohere-official",
+    "channel_id": "cohere",
+    "model_id": "embed-v4.0",
+    "provider_model_id": "embed-v4.0",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "openai",
+    "model_id": "gpt-4.1",
+    "provider_model_id": "openai/gpt-4.1",
+    "provider_model_family": "openai",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "provider_model_id": "openai/gpt-4.1-mini",
+    "provider_model_family": "openai",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "provider_model_id": "anthropic/claude-3.7-sonnet",
+    "provider_model_family": "anthropic",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 200000,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "provider_model_id": "google/gemini-2.5-pro",
+    "provider_model_family": "gemini",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1048576,
+    "supports_prompt_caching": true,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "provider_model_id": "deepseek/deepseek-chat",
+    "provider_model_family": "deepseek",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "qwen",
+    "model_id": "qwen-max",
+    "provider_model_id": "qwen/qwen-max",
+    "provider_model_family": "qwen",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "meta",
+    "model_id": "llama-3.2-3b-instruct",
+    "provider_model_id": "meta-llama/llama-3.2-3b-instruct",
+    "provider_model_family": "meta-llama",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-siliconflow-main",
+    "channel_id": "deepseek",
+    "model_id": "deepseek-v3",
+    "provider_model_id": "deepseek-ai/DeepSeek-V3",
+    "provider_model_family": "deepseek",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-siliconflow-main",
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-72b-instruct",
+    "provider_model_id": "Qwen/Qwen2.5-72B-Instruct",
+    "provider_model_family": "qwen2.5",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 131072,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-siliconflow-main",
+    "channel_id": "baai",
+    "model_id": "bge-m3",
+    "provider_model_id": "BAAI/bge-m3",
+    "provider_model_family": "bge",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-ollama-local",
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-14b-instruct",
+    "provider_model_id": "qwen2.5:14b",
+    "provider_model_family": "local-chat",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 32768,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-ollama-local",
+    "channel_id": "meta",
+    "model_id": "llama-3.2-3b-instruct",
+    "provider_model_id": "llama3.2:latest",
+    "provider_model_family": "local-chat",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-ollama-local",
+    "channel_id": "nomic",
+    "model_id": "nomic-embed-text-v1.5",
+    "provider_model_id": "nomic-embed-text:latest",
+    "provider_model_family": "local-embedding",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  }
+]

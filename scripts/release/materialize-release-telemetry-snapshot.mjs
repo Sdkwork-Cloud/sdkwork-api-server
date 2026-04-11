@@ -24,7 +24,7 @@ const DEFAULT_EXPORT_INPUT_PATH = path.join(
   'release',
   'release-telemetry-export-latest.json',
 );
-const PROMETHEUS_SAMPLE_PATTERN = /^([A-Za-z_:][A-Za-z0-9_:]*)(?:\{([^}]*)\})?\s+([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)$/;
+const PROMETHEUS_VALUE_PATTERN = /^([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)$/;
 const HTTP_REQUEST_TOTAL_METRIC = 'sdkwork_http_requests_total';
 const DIRECT_PROMETHEUS_TARGET_SPECS = Object.freeze([
   Object.freeze({ targetId: 'gateway-availability', prometheusKey: 'gateway' }),
@@ -89,6 +89,73 @@ function parsePrometheusLabels(text) {
   return labels;
 }
 
+function splitPrometheusSampleLine(line, context) {
+  const text = String(line ?? '').trim();
+  if (text.length === 0) {
+    throw new Error(`invalid ${context} Prometheus sample line: ${line}`);
+  }
+
+  let index = 0;
+  while (
+    index < text.length
+    && /[A-Za-z0-9_:]/u.test(text[index])
+  ) {
+    index += 1;
+  }
+
+  if (index === 0 || !/^[A-Za-z_:][A-Za-z0-9_:]*$/u.test(text.slice(0, index))) {
+    throw new Error(`invalid ${context} Prometheus sample line: ${line}`);
+  }
+
+  const name = text.slice(0, index);
+  let labelsText = '';
+  let valueStart = index;
+
+  if (text[index] === '{') {
+    let inQuotes = false;
+    let escaped = false;
+    let closingIndex = -1;
+
+    for (let cursor = index + 1; cursor < text.length; cursor += 1) {
+      const char = text[cursor];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (!inQuotes && char === '}') {
+        closingIndex = cursor;
+        break;
+      }
+    }
+
+    if (closingIndex < 0) {
+      throw new Error(`invalid ${context} Prometheus sample line: ${line}`);
+    }
+
+    labelsText = text.slice(index + 1, closingIndex);
+    valueStart = closingIndex + 1;
+  }
+
+  const valueText = text.slice(valueStart).trim();
+  if (!PROMETHEUS_VALUE_PATTERN.test(valueText)) {
+    throw new Error(`invalid ${context} Prometheus sample line: ${line}`);
+  }
+
+  return {
+    name,
+    labelsText,
+    valueText,
+  };
+}
+
 function parsePrometheusSamples(text, context) {
   const samples = [];
   const lines = String(text ?? '').split(/\r?\n/u);
@@ -99,19 +166,15 @@ function parsePrometheusSamples(text, context) {
       continue;
     }
 
-    const match = PROMETHEUS_SAMPLE_PATTERN.exec(trimmedLine);
-    if (!match) {
-      throw new Error(`invalid ${context} Prometheus sample line: ${trimmedLine}`);
-    }
-
-    const value = Number(match[3]);
+    const sample = splitPrometheusSampleLine(trimmedLine, context);
+    const value = Number(sample.valueText);
     if (!isFiniteNumber(value)) {
       throw new Error(`invalid ${context} Prometheus sample value: ${trimmedLine}`);
     }
 
     samples.push({
-      name: match[1],
-      labels: parsePrometheusLabels(match[2] ?? ''),
+      name: sample.name,
+      labels: parsePrometheusLabels(sample.labelsText),
       value,
     });
   }

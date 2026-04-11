@@ -13,13 +13,12 @@ serde.workspace = true
 serde_json.workspace = true
 serde_urlencoded = "0.7"
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
+sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-marketing = { path = "../sdkwork-api-app-marketing" }
-sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
-sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sha2_010 = { package = "sha2", version = "0.10" }

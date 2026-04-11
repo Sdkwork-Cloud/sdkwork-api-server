@@ -163,6 +163,53 @@ impl AccountKernelStore for PostgresAdminStore {
             .collect()
     }
 
+    async fn list_account_benefit_lots_for_account(
+        &self,
+        account_id: u64,
+        after_lot_id: Option<u64>,
+        limit: usize,
+    ) -> Result<Vec<AccountBenefitLotRecord>> {
+        let rows = match after_lot_id {
+            Some(after_lot_id) => {
+                sqlx::query(
+                    "SELECT lot_id, tenant_id, organization_id, account_id, user_id, benefit_type,
+                            source_type, source_id, scope_json, original_quantity, remaining_quantity,
+                            held_quantity, priority, acquired_unit_cost, issued_at_ms, expires_at_ms,
+                            status, created_at_ms, updated_at_ms
+                     FROM ai_account_benefit_lot
+                     WHERE account_id = $1
+                       AND lot_id > $2
+                     ORDER BY lot_id
+                     LIMIT $3",
+                )
+                .bind(i64::try_from(account_id)?)
+                .bind(i64::try_from(after_lot_id)?)
+                .bind(i64::try_from(limit)?)
+                .fetch_all(&self.pool)
+                .await?
+            }
+            None => {
+                sqlx::query(
+                    "SELECT lot_id, tenant_id, organization_id, account_id, user_id, benefit_type,
+                            source_type, source_id, scope_json, original_quantity, remaining_quantity,
+                            held_quantity, priority, acquired_unit_cost, issued_at_ms, expires_at_ms,
+                            status, created_at_ms, updated_at_ms
+                     FROM ai_account_benefit_lot
+                     WHERE account_id = $1
+                     ORDER BY lot_id
+                     LIMIT $2",
+                )
+                .bind(i64::try_from(account_id)?)
+                .bind(i64::try_from(limit)?)
+                .fetch_all(&self.pool)
+                .await?
+            }
+        };
+        rows.into_iter()
+            .map(decode_account_benefit_lot_row)
+            .collect()
+    }
+
     async fn insert_account_hold(&self, record: &AccountHoldRecord) -> Result<AccountHoldRecord> {
         sqlx::query(
             "INSERT INTO ai_account_hold (
@@ -570,9 +617,9 @@ impl AccountKernelStore for PostgresAdminStore {
         sqlx::query(
             "INSERT INTO ai_pricing_plan (
                 pricing_plan_id, tenant_id, organization_id, plan_code, plan_version,
-                display_name, currency_code, credit_unit_code, status, effective_from_ms,
-                effective_to_ms, created_at_ms, updated_at_ms
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                display_name, currency_code, credit_unit_code, status, ownership_scope,
+                effective_from_ms, effective_to_ms, created_at_ms, updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
              ON CONFLICT (pricing_plan_id) DO UPDATE SET
                 tenant_id = excluded.tenant_id,
                 organization_id = excluded.organization_id,
@@ -582,6 +629,7 @@ impl AccountKernelStore for PostgresAdminStore {
                 currency_code = excluded.currency_code,
                 credit_unit_code = excluded.credit_unit_code,
                 status = excluded.status,
+                ownership_scope = excluded.ownership_scope,
                 effective_from_ms = excluded.effective_from_ms,
                 effective_to_ms = excluded.effective_to_ms,
                 created_at_ms = excluded.created_at_ms,
@@ -596,6 +644,7 @@ impl AccountKernelStore for PostgresAdminStore {
         .bind(&record.currency_code)
         .bind(&record.credit_unit_code)
         .bind(&record.status)
+        .bind(pricing_plan_ownership_scope_as_str(record.ownership_scope))
         .bind(i64::try_from(record.effective_from_ms)?)
         .bind(record.effective_to_ms.map(i64::try_from).transpose()?)
         .bind(i64::try_from(record.created_at_ms)?)
@@ -608,8 +657,8 @@ impl AccountKernelStore for PostgresAdminStore {
     async fn list_pricing_plan_records(&self) -> Result<Vec<PricingPlanRecord>> {
         let rows = sqlx::query(
             "SELECT pricing_plan_id, tenant_id, organization_id, plan_code, plan_version,
-                    display_name, currency_code, credit_unit_code, status, effective_from_ms,
-                    effective_to_ms, created_at_ms, updated_at_ms
+                    display_name, currency_code, credit_unit_code, status, ownership_scope,
+                    effective_from_ms, effective_to_ms, created_at_ms, updated_at_ms
              FROM ai_pricing_plan
              ORDER BY updated_at_ms DESC, pricing_plan_id",
         )

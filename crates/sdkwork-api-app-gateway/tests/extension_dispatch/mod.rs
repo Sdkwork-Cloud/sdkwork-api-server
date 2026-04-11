@@ -8,9 +8,9 @@ use sdkwork_api_app_credential::{
 };
 use sdkwork_api_app_gateway::{
     builtin_extension_host, execute_json_provider_request_with_runtime,
-    relay_chat_completion_from_store, reload_configured_extension_host,
-    reload_extension_host_with_scope, start_configured_extension_hot_reload_supervision,
-    ConfiguredExtensionHostReloadScope,
+    planned_execution_provider_context_for_route_without_log, relay_chat_completion_from_store,
+    reload_configured_extension_host, reload_extension_host_with_scope,
+    start_configured_extension_hot_reload_supervision, ConfiguredExtensionHostReloadScope,
 };
 use sdkwork_api_contract_openai::chat_completions::{
     ChatMessageInput, CreateChatCompletionRequest,
@@ -33,6 +33,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};

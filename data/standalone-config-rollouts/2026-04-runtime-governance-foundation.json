@@ -1,0 +1,67 @@
+{
+  "rollouts": [
+    {
+      "rollout_id": "rollout-global-gateway-config-reload",
+      "requested_service_kind": "gateway",
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711007000000,
+      "deadline_at_ms": 1711007600000
+    },
+    {
+      "rollout_id": "rollout-global-portal-config-reload",
+      "requested_service_kind": "portal",
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711008000000,
+      "deadline_at_ms": 1711008600000
+    },
+    {
+      "rollout_id": "rollout-global-shared-config-hydration",
+      "requested_service_kind": null,
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711009000000,
+      "deadline_at_ms": 1711009600000
+    }
+  ],
+  "participants": [
+    {
+      "rollout_id": "rollout-global-gateway-config-reload",
+      "node_id": "node-global-gateway-sg-01",
+      "service_kind": "gateway",
+      "status": "pending",
+      "message": "Gateway nodes will pick up the refreshed upstream credential bundle on next config poll.",
+      "updated_at_ms": 1711007010000
+    },
+    {
+      "rollout_id": "rollout-global-portal-config-reload",
+      "node_id": "node-global-portal-eu-01",
+      "service_kind": "portal",
+      "status": "succeeded",
+      "message": "Portal runtime already applied the shared UI and branding configuration payload.",
+      "updated_at_ms": 1711008040000
+    },
+    {
+      "rollout_id": "rollout-global-shared-config-hydration",
+      "node_id": "node-global-gateway-sg-01",
+      "service_kind": "gateway",
+      "status": "succeeded",
+      "message": "Gateway node hydrated the shared runtime configuration cache.",
+      "updated_at_ms": 1711009050000
+    },
+    {
+      "rollout_id": "rollout-global-shared-config-hydration",
+      "node_id": "node-global-admin-us-01",
+      "service_kind": "admin",
+      "status": "succeeded",
+      "message": "Admin node hydrated the shared runtime configuration cache.",
+      "updated_at_ms": 1711009055000
+    },
+    {
+      "rollout_id": "rollout-global-shared-config-hydration",
+      "node_id": "node-global-portal-eu-01",
+      "service_kind": "portal",
+      "status": "pending",
+      "message": "Portal node is waiting for the next synchronized config hydration pass.",
+      "updated_at_ms": 1711009040000
+    }
+  ]
+}

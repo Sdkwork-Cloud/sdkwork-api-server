@@ -592,36 +592,34 @@ pub fn create_music(
     _project_id: &str,
     request: &CreateMusicRequest,
 ) -> Result<MusicTracksResponse> {
-    Ok(MusicTracksResponse::new(vec![
-        MusicObject::new("music_1")
-            .with_status("completed")
-            .with_model(&request.model)
-            .with_title(
-                request
-                    .title
-                    .clone()
-                    .unwrap_or_else(|| "SDKWork Track".to_owned()),
-            )
-            .with_audio_url("https://example.com/music.mp3")
-            .with_lyrics(
-                request
-                    .lyrics
-                    .clone()
-                    .unwrap_or_else(|| "We rise with the skyline".to_owned()),
-            )
-            .with_duration_seconds(request.duration_seconds.unwrap_or(123.0)),
-    ]))
+    Ok(MusicTracksResponse::new(vec![MusicObject::new("music_1")
+        .with_status("completed")
+        .with_model(&request.model)
+        .with_title(
+            request
+                .title
+                .clone()
+                .unwrap_or_else(|| "SDKWork Track".to_owned()),
+        )
+        .with_audio_url("https://example.com/music.mp3")
+        .with_lyrics(
+            request
+                .lyrics
+                .clone()
+                .unwrap_or_else(|| "We rise with the skyline".to_owned()),
+        )
+        .with_duration_seconds(
+            request.duration_seconds.unwrap_or(123.0),
+        )]))
 }
 
 pub fn list_music(_tenant_id: &str, _project_id: &str) -> Result<MusicTracksResponse> {
-    Ok(MusicTracksResponse::new(vec![
-        MusicObject::new("music_1")
-            .with_status("completed")
-            .with_model("suno-v4")
-            .with_title("SDKWork Track")
-            .with_audio_url("https://example.com/music.mp3")
-            .with_duration_seconds(123.0),
-    ]))
+    Ok(MusicTracksResponse::new(vec![MusicObject::new("music_1")
+        .with_status("completed")
+        .with_model("suno-v4")
+        .with_title("SDKWork Track")
+        .with_audio_url("https://example.com/music.mp3")
+        .with_duration_seconds(123.0)]))
 }
 
 fn ensure_local_music_exists(music_id: &str) -> Result<()> {

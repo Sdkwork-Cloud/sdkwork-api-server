@@ -19,14 +19,16 @@ import {
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import {
   buildEmbeddedAdminSingleSelectRowProps,
+  describeProviderIntegration,
   embeddedAdminDataTableClassName,
   embeddedAdminDataTableSlotProps,
+  summarizeProviderPricingCoverage,
   useAdminI18n,
 } from 'sdkwork-router-admin-core';
 import type {
   AdminPageProps,
   CredentialRecord,
-  ProxyProviderRecord,
+  ProviderCatalogRecord,
 } from 'sdkwork-router-admin-types';
 
 import {
@@ -42,12 +44,12 @@ type CatalogRegistrySectionProps = {
   defaultChannelId: string;
   filteredChannels: ChannelRecord[];
   filteredCredentials: CredentialRecord[];
-  filteredProviders: ProxyProviderRecord[];
+  filteredProviders: ProviderCatalogRecord[];
   filteredVariants: VariantRecord[];
   onDeleteItem: (deleteTarget: NonNullable<PendingDelete>) => void;
   onEditChannel: (channel: ChannelRecord) => void;
   onEditCredential: (record: CredentialRecord) => void;
-  onEditProvider: (provider: ProxyProviderRecord) => void;
+  onEditProvider: (provider: ProviderCatalogRecord) => void;
   onOpenCredentialDialog: (providerId?: string) => void;
   onOpenNewChannelModel: (channelId: string, variant?: VariantRecord) => void;
   onOpenNewProvider: (channelId?: string) => void;
@@ -134,7 +136,7 @@ export function CatalogRegistrySection({
     },
   ];
 
-  const providerColumns: DataTableColumn<ProxyProviderRecord>[] = [
+  const providerColumns: DataTableColumn<ProviderCatalogRecord>[] = [
     {
       id: 'provider',
       header: t('Provider'),
@@ -143,7 +145,9 @@ export function CatalogRegistrySection({
           <div className="font-medium text-[var(--sdk-color-text-primary)]">
             {row.display_name}
           </div>
-          <div className="text-sm text-[var(--sdk-color-text-secondary)]">{row.id}</div>
+          <div className="text-sm text-[var(--sdk-color-text-secondary)]">
+            {row.id} / {describeProviderIntegration(row)}
+          </div>
         </div>
       ),
     },
@@ -155,8 +159,8 @@ export function CatalogRegistrySection({
     {
       id: 'adapter',
       header: t('Adapter'),
-      cell: (row) => row.adapter_kind,
-      width: 160,
+      cell: (row) => describeProviderIntegration(row),
+      width: 220,
     },
     {
       id: 'bindings',
@@ -164,6 +168,44 @@ export function CatalogRegistrySection({
       header: t('Bound channels'),
       cell: (row) => formatNumber(providerChannelIds(row).length),
       width: 140,
+    },
+    {
+      id: 'models',
+      align: 'right',
+      header: t('Supported models'),
+      cell: (row) =>
+        formatNumber(
+          snapshot.providerModels.filter(
+            (record) => record.proxy_provider_id === row.id && record.is_active,
+          ).length,
+      ),
+      width: 150,
+    },
+    {
+      id: 'pricing',
+      header: t('Pricing coverage'),
+      cell: (row) => {
+        const summary = summarizeProviderPricingCoverage(
+          row.id,
+          snapshot.providerModels,
+          snapshot.modelPrices,
+        );
+        if (summary.active_model_count === 0) {
+          return t('0 / 0 priced');
+        }
+        if (summary.missing_price_count > 0) {
+          return t('{priced} / {active} priced · {missing} missing', {
+            priced: summary.priced_model_count,
+            active: summary.active_model_count,
+            missing: summary.missing_price_count,
+          });
+        }
+        return t('{priced} / {active} priced', {
+          priced: summary.priced_model_count,
+          active: summary.active_model_count,
+        });
+      },
+      width: 220,
     },
   ];
 
@@ -337,14 +379,14 @@ export function CatalogRegistrySection({
           columns={providerColumns}
           emptyDescription={t('Try a broader query or add a new provider.')}
           emptyTitle={t('No providers match the search')}
-          getRowId={(row: ProxyProviderRecord) => row.id}
+          getRowId={(row: ProviderCatalogRecord) => row.id}
           getRowProps={buildEmbeddedAdminSingleSelectRowProps(
             selectedProviderId,
-            (row: ProxyProviderRecord) => row.id,
+            (row: ProviderCatalogRecord) => row.id,
           )}
-          onRowClick={(row: ProxyProviderRecord) => onSelectProvider(row.id)}
+          onRowClick={(row: ProviderCatalogRecord) => onSelectProvider(row.id)}
           slotProps={embeddedAdminDataTableSlotProps}
-          rowActions={(row: ProxyProviderRecord) => (
+          rowActions={(row: ProviderCatalogRecord) => (
             <div className="flex items-center justify-end gap-2">
               <Button
                 onClick={(event) => {

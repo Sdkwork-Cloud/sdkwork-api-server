@@ -97,6 +97,36 @@ function installPortalApiTestEnvironment(responseMap = {}) {
   };
 }
 
+test('portal commercial types split target, product, quote, and transaction semantics', () => {
+  const types = readFileSync(
+    path.join(appRoot, 'packages', 'sdkwork-router-portal-types', 'src', 'index.ts'),
+    'utf8',
+  );
+
+  assert.match(types, /export interface PortalApiProduct/);
+  assert.match(types, /export interface PortalProductOffer/);
+  assert.match(types, /export type PortalCommerceTargetKind =/);
+  assert.match(types, /export type ApiProductKind = Exclude<PortalCommerceTargetKind, 'coupon_redemption'>;/);
+  assert.match(types, /export type PortalQuoteKind =/);
+  assert.match(types, /export type CommercialTransactionKind =/);
+  assert.match(
+    types,
+    /export interface PortalCommerceCatalog[\s\S]*products: PortalApiProduct\[];[\s\S]*offers: PortalProductOffer\[];/,
+  );
+  assert.match(
+    types,
+    /export interface PortalProductOffer[\s\S]*product_kind: ApiProductKind;[\s\S]*quote_target_kind: ApiProductKind;[\s\S]*quote_kind: PortalQuoteKind;/,
+  );
+  assert.match(
+    types,
+    /export interface PortalCommerceQuote[\s\S]*target_kind: PortalCommerceTargetKind;[\s\S]*product_kind\?: ApiProductKind \| null;[\s\S]*quote_kind: PortalQuoteKind;/,
+  );
+  assert.match(
+    types,
+    /export interface PortalCommerceOrder[\s\S]*target_kind: PortalCommerceTargetKind;[\s\S]*product_kind\?: ApiProductKind \| null;[\s\S]*transaction_kind: CommercialTransactionKind;/,
+  );
+});
+
 test('portal commercial api client exposes canonical commercial billing methods', async () => {
   const portalApi = loadPortalApi();
   const env = installPortalApiTestEnvironment();

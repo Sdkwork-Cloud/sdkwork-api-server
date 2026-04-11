@@ -1,0 +1,38 @@
+{
+  "update_id": "2026-04-global-provider-operations-readiness",
+  "release_version": "2026.04.13",
+  "description": "Add provider-facing route groups, proxy and local operational profiles, commercial pricing plans, payment methods, marketing campaigns, commerce records, and async job samples for install-time operational readiness.",
+  "depends_on": [
+    "2026-04-global-official-route-matrix"
+  ],
+  "routing": [
+    "routing/2026-04-global-provider-operations-readiness.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/2026-04-global-provider-operations-readiness.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-provider-operations-readiness.json"
+  ],
+  "billing": [
+    "billing/2026-04-global-provider-operations-readiness.json"
+  ],
+  "quota_policies": [
+    "quota-policies/2026-04-global-provider-operations-readiness.json"
+  ],
+  "pricing": [
+    "pricing/2026-04-global-provider-operations-readiness.json"
+  ],
+  "payment_methods": [
+    "payment-methods/2026-04-global-provider-operations-readiness.json"
+  ],
+  "marketing": [
+    "marketing/2026-04-global-provider-operations-readiness.json"
+  ],
+  "commerce": [
+    "commerce/2026-04-global-provider-operations-readiness.json"
+  ],
+  "jobs": [
+    "jobs/2026-04-global-provider-operations-readiness.json"
+  ]
+}

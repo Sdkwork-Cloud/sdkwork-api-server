@@ -65,6 +65,10 @@ define_admin_store_facet!(CatalogStore {
     async fn list_providers(&self) -> Vec<ProxyProvider>;
     async fn find_provider(&self, provider_id: &str) -> Option<ProxyProvider>;
     async fn delete_provider(&self, provider_id: &str) -> bool;
+    async fn upsert_provider_account(&self, record: &ProviderAccountRecord) -> ProviderAccountRecord;
+    async fn list_provider_accounts(&self) -> Vec<ProviderAccountRecord>;
+    async fn find_provider_account(&self, provider_account_id: &str) -> Option<ProviderAccountRecord>;
+    async fn delete_provider_account(&self, provider_account_id: &str) -> bool;
     async fn insert_model(&self, model: &ModelCatalogEntry) -> ModelCatalogEntry;
     async fn list_models(&self) -> Vec<ModelCatalogEntry>;
     async fn find_model(&self, external_name: &str) -> Option<ModelCatalogEntry>;
@@ -120,10 +124,6 @@ define_admin_store_facet!(BillingStore {
     async fn list_ledger_entries(&self) -> Vec<LedgerEntry>;
     async fn insert_quota_policy(&self, policy: &QuotaPolicy) -> QuotaPolicy;
     async fn list_quota_policies(&self) -> Vec<QuotaPolicy>;
-    async fn insert_coupon(&self, coupon: &CouponCampaign) -> CouponCampaign;
-    async fn list_coupons(&self) -> Vec<CouponCampaign>;
-    async fn find_coupon(&self, coupon_id: &str) -> Option<CouponCampaign>;
-    async fn delete_coupon(&self, coupon_id: &str) -> bool;
     async fn insert_commerce_order(&self, order: &CommerceOrderRecord) -> CommerceOrderRecord;
     async fn list_commerce_orders(&self) -> Vec<CommerceOrderRecord>;
     async fn upsert_commerce_payment_event(&self, event: &CommercePaymentEventRecord) -> CommercePaymentEventRecord;

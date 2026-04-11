@@ -1,0 +1,122 @@
+[
+  {
+    "provider_id": "provider-openai-official",
+    "key_reference": "openai-default",
+    "base_url": "https://api.openai.com/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-anthropic-official",
+    "key_reference": "anthropic-default",
+    "base_url": "https://api.anthropic.com",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-gemini-official",
+    "key_reference": "gemini-default",
+    "base_url": "https://generativelanguage.googleapis.com",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-deepseek-official",
+    "key_reference": "deepseek-default",
+    "base_url": "https://api.deepseek.com",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-qwen-official",
+    "key_reference": "qwen-default",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-doubao-official",
+    "key_reference": "doubao-default",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-xai-official",
+    "key_reference": "xai-default",
+    "base_url": "https://api.x.ai/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-moonshot-official",
+    "key_reference": "moonshot-default",
+    "base_url": "https://api.moonshot.cn/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-zhipu-official",
+    "key_reference": "zhipu-default",
+    "base_url": "https://open.bigmodel.cn/api/paas/v4",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-hunyuan-official",
+    "key_reference": "hunyuan-default",
+    "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-mistral-official",
+    "key_reference": "mistral-default",
+    "base_url": "https://api.mistral.ai/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-cohere-official",
+    "key_reference": "cohere-default",
+    "base_url": "https://api.cohere.ai/compatibility/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-openrouter-main",
+    "key_reference": "openrouter-default",
+    "base_url": "https://openrouter.ai/api/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-siliconflow-main",
+    "key_reference": "siliconflow-default",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "provider_id": "provider-ollama-local",
+    "key_reference": "ollama-local-default",
+    "base_url": "http://127.0.0.1:11434",
+    "enabled": false,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  }
+]

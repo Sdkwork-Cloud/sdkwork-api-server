@@ -1,10 +1,8 @@
-use sdkwork_api_domain_coupon::CouponCampaign;
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CampaignBudgetStatus, CouponBenefitSpec, CouponCodeRecord,
-    CouponCodeStatus, CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
-    CouponReservationRecord, CouponReservationStatus, CouponRollbackRecord, CouponRollbackStatus,
-    CouponRollbackType, CouponTemplateRecord, CouponTemplateStatus, MarketingBenefitKind,
-    MarketingCampaignRecord, MarketingCampaignStatus,
+    CampaignBudgetRecord, CouponCodeRecord, CouponCodeStatus, CouponRedemptionRecord,
+    CouponRedemptionStatus, CouponReservationRecord, CouponReservationStatus,
+    CouponRollbackRecord, CouponRollbackStatus, CouponRollbackType, CouponTemplateRecord,
+    CouponTemplateStatus, MarketingCampaignRecord,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,107 +201,4 @@ pub fn rollback_coupon_redemption(
     .with_updated_at_ms(now_ms);
 
     Ok((rolled_back_redemption, rollback))
-}
-
-pub fn project_legacy_coupon_campaign(
-    coupon: &CouponCampaign,
-) -> (
-    CouponTemplateRecord,
-    MarketingCampaignRecord,
-    CampaignBudgetRecord,
-    CouponCodeRecord,
-) {
-    let benefit = match parse_percent_discount(&coupon.discount_label) {
-        Some(discount_percent) => CouponBenefitSpec::new(MarketingBenefitKind::PercentageOff)
-            .with_discount_percent(Some(discount_percent)),
-        None => CouponBenefitSpec::new(MarketingBenefitKind::GrantUnits),
-    };
-
-    let template = CouponTemplateRecord::new(
-        format!("legacy_tpl_{}", coupon.id),
-        coupon.code.to_ascii_lowercase(),
-        benefit.benefit_kind,
-    )
-    .with_display_name(coupon.note.clone())
-    .with_status(if coupon.active {
-        CouponTemplateStatus::Active
-    } else {
-        CouponTemplateStatus::Archived
-    })
-    .with_distribution_kind(CouponDistributionKind::SharedCode)
-    .with_benefit(benefit)
-    .with_created_at_ms(coupon.created_at_ms)
-    .with_updated_at_ms(coupon.created_at_ms);
-
-    let campaign = MarketingCampaignRecord::new(
-        format!("legacy_camp_{}", coupon.id),
-        template.coupon_template_id.clone(),
-    )
-    .with_display_name(coupon.note.clone())
-    .with_status(if coupon.active {
-        MarketingCampaignStatus::Active
-    } else {
-        MarketingCampaignStatus::Archived
-    })
-    .with_created_at_ms(coupon.created_at_ms)
-    .with_updated_at_ms(coupon.created_at_ms);
-
-    let budget_status = if coupon.active {
-        if coupon.remaining > 0 {
-            CampaignBudgetStatus::Active
-        } else {
-            CampaignBudgetStatus::Exhausted
-        }
-    } else {
-        CampaignBudgetStatus::Closed
-    };
-    // Legacy coupons tracked remaining availability rather than a monetary subsidy budget.
-    // Compatibility projection keeps them redeemable by mapping active legacy inventory to an
-    // effectively unbounded marketing budget until a full migration lands.
-    let projected_budget_minor = if coupon.active && coupon.remaining > 0 {
-        u64::MAX
-    } else {
-        0
-    };
-    let budget = CampaignBudgetRecord::new(
-        format!("legacy_budget_{}", coupon.id),
-        campaign.marketing_campaign_id.clone(),
-    )
-    .with_status(budget_status)
-    .with_total_budget_minor(projected_budget_minor)
-    .with_created_at_ms(coupon.created_at_ms)
-    .with_updated_at_ms(coupon.created_at_ms);
-
-    let code_status = if coupon.active {
-        if coupon.remaining > 0 {
-            CouponCodeStatus::Available
-        } else {
-            CouponCodeStatus::Expired
-        }
-    } else {
-        CouponCodeStatus::Disabled
-    };
-    let code = CouponCodeRecord::new(
-        format!("legacy_code_{}", coupon.id),
-        template.coupon_template_id.clone(),
-        coupon.code.clone(),
-    )
-    .with_status(code_status)
-    .with_created_at_ms(coupon.created_at_ms)
-    .with_updated_at_ms(coupon.created_at_ms);
-
-    (template, campaign, budget, code)
-}
-
-fn parse_percent_discount(label: &str) -> Option<u8> {
-    let percent_index = label.find('%')?;
-    let digits = label[..percent_index]
-        .chars()
-        .rev()
-        .take_while(|character| character.is_ascii_digit())
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect::<String>();
-    digits.parse::<u8>().ok()
 }

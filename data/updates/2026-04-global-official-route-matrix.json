@@ -1,0 +1,20 @@
+{
+  "update_id": "2026-04-global-official-route-matrix",
+  "release_version": "2026.04.12",
+  "description": "Add official per-channel route profiles, live API key groups, and operational samples while keeping provider selection aligned to declared provider-model coverage.",
+  "depends_on": [
+    "2026-04-global-catalog-expansion"
+  ],
+  "routing": [
+    "routing/2026-04-global-official-route-matrix.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/2026-04-global-official-route-matrix.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-official-route-matrix.json"
+  ],
+  "billing": [
+    "billing/2026-04-global-official-route-matrix.json"
+  ]
+}

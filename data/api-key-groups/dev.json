@@ -1,0 +1,50 @@
+[
+  {
+    "group_id": "group-local-demo-live",
+    "tenant_id": "tenant_local_demo",
+    "project_id": "project_local_demo",
+    "environment": "live",
+    "name": "Local Demo Live",
+    "slug": "local-demo-live",
+    "description": "Live-like development traffic group for interactive testing.",
+    "color": "#0f766e",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-dev-balanced",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710001000000,
+    "updated_at_ms": 1710001000000
+  },
+  {
+    "group_id": "group-local-demo-sandbox",
+    "tenant_id": "tenant_local_demo",
+    "project_id": "project_local_demo",
+    "environment": "sandbox",
+    "name": "Local Demo Sandbox",
+    "slug": "local-demo-sandbox",
+    "description": "Low-risk sandbox group that prefers local and low-cost routes.",
+    "color": "#1d4ed8",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-dev-local-first",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710001000000,
+    "updated_at_ms": 1710001000000
+  },
+  {
+    "group_id": "group-partner-demo-staging",
+    "tenant_id": "tenant_partner_demo",
+    "project_id": "project_partner_demo",
+    "environment": "staging",
+    "name": "Partner Demo Staging",
+    "slug": "partner-demo-staging",
+    "description": "Partner acceptance traffic group with broad model coverage.",
+    "color": "#7c3aed",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-partner-sandbox",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710001000000,
+    "updated_at_ms": 1710001000000
+  }
+]

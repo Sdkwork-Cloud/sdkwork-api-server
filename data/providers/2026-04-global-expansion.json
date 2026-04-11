@@ -1,0 +1,34 @@
+[
+  {
+    "id": "provider-ernie-official",
+    "channel_id": "ernie",
+    "extension_id": "sdkwork.provider.ernie",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://qianfan.baidubce.com/v2",
+    "display_name": "ERNIE Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-ernie-official",
+        "channel_id": "ernie",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-minimax-official",
+    "channel_id": "minimax",
+    "extension_id": "sdkwork.provider.minimax",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://api.minimax.chat/v1",
+    "display_name": "MiniMax Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-minimax-official",
+        "channel_id": "minimax",
+        "is_primary": true
+      }
+    ]
+  }
+]

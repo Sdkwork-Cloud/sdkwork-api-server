@@ -5,6 +5,11 @@ impl AdminStore for SqliteAdminStore {
     fn dialect(&self) -> StorageDialect {
         StorageDialect::Sqlite
     }
+
+    fn account_kernel_store(&self) -> Option<&dyn AccountKernelStore> {
+        Some(self)
+    }
+
     async fn insert_channel(&self, channel: &Channel) -> Result<Channel> {
         SqliteAdminStore::insert_channel(self, channel).await
     }
@@ -28,6 +33,27 @@ impl AdminStore for SqliteAdminStore {
     }
     async fn delete_provider(&self, provider_id: &str) -> Result<bool> {
         SqliteAdminStore::delete_provider(self, provider_id).await
+    }
+    async fn upsert_provider_account(
+        &self,
+        record: &ProviderAccountRecord,
+    ) -> Result<ProviderAccountRecord> {
+        SqliteAdminStore::upsert_provider_account(self, record).await
+    }
+    async fn list_provider_accounts(&self) -> Result<Vec<ProviderAccountRecord>> {
+        SqliteAdminStore::list_provider_accounts(self).await
+    }
+    async fn find_provider_account(
+        &self,
+        provider_account_id: &str,
+    ) -> Result<Option<ProviderAccountRecord>> {
+        Ok(SqliteAdminStore::list_provider_accounts(self)
+            .await?
+            .into_iter()
+            .find(|record| record.provider_account_id == provider_account_id))
+    }
+    async fn delete_provider_account(&self, provider_account_id: &str) -> Result<bool> {
+        SqliteAdminStore::delete_provider_account(self, provider_account_id).await
     }
     async fn insert_credential(
         &self,
@@ -89,6 +115,21 @@ impl AdminStore for SqliteAdminStore {
     ) -> Result<bool> {
         SqliteAdminStore::delete_credential(self, tenant_id, provider_id, key_reference).await
     }
+    async fn upsert_official_provider_config(
+        &self,
+        config: &OfficialProviderConfig,
+    ) -> Result<OfficialProviderConfig> {
+        SqliteAdminStore::upsert_official_provider_config(self, config).await
+    }
+    async fn list_official_provider_configs(&self) -> Result<Vec<OfficialProviderConfig>> {
+        SqliteAdminStore::list_official_provider_configs(self).await
+    }
+    async fn find_official_provider_config(
+        &self,
+        provider_id: &str,
+    ) -> Result<Option<OfficialProviderConfig>> {
+        SqliteAdminStore::find_official_provider_config(self, provider_id).await
+    }
     async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {
         SqliteAdminStore::insert_model(self, model).await
     }
@@ -124,6 +165,24 @@ impl AdminStore for SqliteAdminStore {
     }
     async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool> {
         SqliteAdminStore::delete_channel_model(self, channel_id, model_id).await
+    }
+    async fn upsert_provider_model(
+        &self,
+        record: &ProviderModelRecord,
+    ) -> Result<ProviderModelRecord> {
+        SqliteAdminStore::upsert_provider_model(self, record).await
+    }
+    async fn list_provider_models(&self) -> Result<Vec<ProviderModelRecord>> {
+        SqliteAdminStore::list_provider_models(self).await
+    }
+    async fn delete_provider_model(
+        &self,
+        proxy_provider_id: &str,
+        channel_id: &str,
+        model_id: &str,
+    ) -> Result<bool> {
+        SqliteAdminStore::delete_provider_model(self, proxy_provider_id, channel_id, model_id)
+            .await
     }
     async fn insert_model_price(&self, record: &ModelPriceRecord) -> Result<ModelPriceRecord> {
         SqliteAdminStore::insert_model_price(self, record).await
@@ -307,21 +366,6 @@ impl AdminStore for SqliteAdminStore {
     async fn delete_project(&self, project_id: &str) -> Result<bool> {
         SqliteAdminStore::delete_project(self, project_id).await
     }
-    async fn insert_coupon(&self, coupon: &CouponCampaign) -> Result<CouponCampaign> {
-        SqliteAdminStore::insert_coupon(self, coupon).await
-    }
-    async fn list_coupons(&self) -> Result<Vec<CouponCampaign>> {
-        SqliteAdminStore::list_coupons(self).await
-    }
-    async fn list_active_coupons(&self) -> Result<Vec<CouponCampaign>> {
-        SqliteAdminStore::list_active_coupons(self).await
-    }
-    async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>> {
-        SqliteAdminStore::find_coupon(self, coupon_id).await
-    }
-    async fn delete_coupon(&self, coupon_id: &str) -> Result<bool> {
-        SqliteAdminStore::delete_coupon(self, coupon_id).await
-    }
     async fn insert_coupon_template_record(
         &self,
         record: &CouponTemplateRecord,
@@ -344,6 +388,27 @@ impl AdminStore for SqliteAdminStore {
         <Self as MarketingStore>::find_coupon_template_record_by_template_key(self, template_key)
             .await
     }
+    async fn insert_coupon_template_lifecycle_audit_record(
+        &self,
+        record: &CouponTemplateLifecycleAuditRecord,
+    ) -> Result<CouponTemplateLifecycleAuditRecord> {
+        <Self as MarketingStore>::insert_coupon_template_lifecycle_audit_record(self, record).await
+    }
+    async fn list_coupon_template_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_coupon_template_lifecycle_audit_records(self).await
+    }
+    async fn list_coupon_template_lifecycle_audit_records_for_template(
+        &self,
+        coupon_template_id: &str,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_coupon_template_lifecycle_audit_records_for_template(
+            self,
+            coupon_template_id,
+        )
+        .await
+    }
     async fn insert_marketing_campaign_record(
         &self,
         record: &MarketingCampaignRecord,
@@ -363,6 +428,28 @@ impl AdminStore for SqliteAdminStore {
         )
         .await
     }
+    async fn insert_marketing_campaign_lifecycle_audit_record(
+        &self,
+        record: &MarketingCampaignLifecycleAuditRecord,
+    ) -> Result<MarketingCampaignLifecycleAuditRecord> {
+        <Self as MarketingStore>::insert_marketing_campaign_lifecycle_audit_record(self, record)
+            .await
+    }
+    async fn list_marketing_campaign_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_marketing_campaign_lifecycle_audit_records(self).await
+    }
+    async fn list_marketing_campaign_lifecycle_audit_records_for_campaign(
+        &self,
+        marketing_campaign_id: &str,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_marketing_campaign_lifecycle_audit_records_for_campaign(
+            self,
+            marketing_campaign_id,
+        )
+        .await
+    }
     async fn insert_campaign_budget_record(
         &self,
         record: &CampaignBudgetRecord,
@@ -379,6 +466,27 @@ impl AdminStore for SqliteAdminStore {
         <Self as MarketingStore>::list_campaign_budget_records_for_campaign(
             self,
             marketing_campaign_id,
+        )
+        .await
+    }
+    async fn insert_campaign_budget_lifecycle_audit_record(
+        &self,
+        record: &CampaignBudgetLifecycleAuditRecord,
+    ) -> Result<CampaignBudgetLifecycleAuditRecord> {
+        <Self as MarketingStore>::insert_campaign_budget_lifecycle_audit_record(self, record).await
+    }
+    async fn list_campaign_budget_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_campaign_budget_lifecycle_audit_records(self).await
+    }
+    async fn list_campaign_budget_lifecycle_audit_records_for_budget(
+        &self,
+        campaign_budget_id: &str,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_campaign_budget_lifecycle_audit_records_for_budget(
+            self,
+            campaign_budget_id,
         )
         .await
     }
@@ -408,6 +516,27 @@ impl AdminStore for SqliteAdminStore {
         now_ms: u64,
     ) -> Result<Vec<CouponCodeRecord>> {
         <Self as MarketingStore>::list_redeemable_coupon_code_records_at(self, now_ms).await
+    }
+    async fn insert_coupon_code_lifecycle_audit_record(
+        &self,
+        record: &CouponCodeLifecycleAuditRecord,
+    ) -> Result<CouponCodeLifecycleAuditRecord> {
+        <Self as MarketingStore>::insert_coupon_code_lifecycle_audit_record(self, record).await
+    }
+    async fn list_coupon_code_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_coupon_code_lifecycle_audit_records(self).await
+    }
+    async fn list_coupon_code_lifecycle_audit_records_for_code(
+        &self,
+        coupon_code_id: &str,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        <Self as MarketingStore>::list_coupon_code_lifecycle_audit_records_for_code(
+            self,
+            coupon_code_id,
+        )
+        .await
     }
     async fn insert_coupon_reservation_record(
         &self,
@@ -492,6 +621,17 @@ impl AdminStore for SqliteAdminStore {
         command: &AtomicCouponRollbackCompensationCommand,
     ) -> Result<AtomicCouponRollbackCompensationResult> {
         sdkwork_api_storage_core::execute_atomic_coupon_rollback_compensation(self, command).await
+    }
+    async fn insert_catalog_publication_lifecycle_audit_record(
+        &self,
+        record: &CatalogPublicationLifecycleAuditRecord,
+    ) -> Result<CatalogPublicationLifecycleAuditRecord> {
+        SqliteAdminStore::insert_catalog_publication_lifecycle_audit_record(self, record).await
+    }
+    async fn list_catalog_publication_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CatalogPublicationLifecycleAuditRecord>> {
+        SqliteAdminStore::list_catalog_publication_lifecycle_audit_records(self).await
     }
     async fn insert_commerce_order(
         &self,

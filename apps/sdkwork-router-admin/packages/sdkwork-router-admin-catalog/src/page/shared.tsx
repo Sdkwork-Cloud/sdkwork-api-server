@@ -14,28 +14,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sdkwork/ui-pc-react';
-import { translateAdminText } from 'sdkwork-router-admin-core';
+import {
+  emptyProviderDraft as createEmptyProviderDraft,
+  providerDraftFromRecord as createProviderDraftFromRecord,
+  translateAdminText,
+  type ProviderDraft,
+} from 'sdkwork-router-admin-core';
 import type {
   AdminPageProps,
   ChannelModelRecord,
   CredentialRecord,
   ModelPriceRecord,
+  ModelPriceTier,
+  ProviderCatalogRecord,
+  ProviderModelRecord,
   ProxyProviderRecord,
 } from 'sdkwork-router-admin-types';
 
 export type CatalogLane = 'channels' | 'providers' | 'credentials' | 'variants';
+export type { ProviderDraft } from 'sdkwork-router-admin-core';
 export type ChannelRecord = AdminPageProps['snapshot']['channels'][number];
 export type VariantRecord = AdminPageProps['snapshot']['models'][number];
 export type ChannelDraft = { id: string; name: string };
-export type ProviderDraft = {
-  id: string;
-  primary_channel_id: string;
-  display_name: string;
-  adapter_kind: string;
-  base_url: string;
-  extension_id: string;
-  bound_channel_ids: string[];
-};
 export type CredentialDraft = {
   tenant_id: string;
   provider_id: string;
@@ -62,6 +62,9 @@ export type ModelPriceDraft = {
   cache_read_price: string;
   cache_write_price: string;
   request_price: string;
+  price_source_kind: string;
+  billing_notes: string;
+  pricing_tiers_json: string;
   is_active: boolean;
 };
 export type PendingDelete =
@@ -93,6 +96,13 @@ export const PRICE_UNIT_OPTIONS = [
   { value: 'per_second_audio', label: 'Audio second' },
   { value: 'per_minute_video', label: 'Video minute' },
   { value: 'per_track', label: 'Music track' },
+] as const;
+
+export const MODEL_PRICE_SOURCE_OPTIONS = [
+  { value: 'official', label: 'Official pricing' },
+  { value: 'proxy', label: 'Proxy provider pricing' },
+  { value: 'local', label: 'Local runtime reference' },
+  { value: 'reference', label: 'Reference pricing' },
 ] as const;
 
 export function DialogField({
@@ -198,6 +208,12 @@ export function priceUnitLabel(value: string) {
   );
 }
 
+export function modelPriceSourceLabel(value: string) {
+  return translateAdminText(
+    MODEL_PRICE_SOURCE_OPTIONS.find((option) => option.value === value)?.label ?? value,
+  );
+}
+
 export function splitCapabilities(value: string) {
   return value
     .split(',')
@@ -215,6 +231,28 @@ export function parseOptionalNumber(value: string) {
 export function parseRequiredNumber(value: string) {
   const parsed = Number(value.trim() || '0');
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function formatPricingTiersJson(pricingTiers: ModelPriceTier[]) {
+  if (pricingTiers.length === 0) {
+    return '';
+  }
+
+  return JSON.stringify(pricingTiers, null, 2);
+}
+
+export function parsePricingTiersJson(value: string): ModelPriceTier[] {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const parsed = JSON.parse(trimmed);
+  if (!Array.isArray(parsed)) {
+    throw new Error(translateAdminText('Pricing tiers JSON must be an array.'));
+  }
+
+  return parsed as ModelPriceTier[];
 }
 
 export function providerChannelIds(provider: ProxyProviderRecord) {
@@ -238,27 +276,14 @@ export function credentialStorageLabel(credential: CredentialRecord) {
 }
 
 export function emptyProviderDraft(channelId = ''): ProviderDraft {
-  return {
-    id: '',
-    primary_channel_id: channelId,
-    display_name: '',
-    adapter_kind: 'openai',
-    base_url: '',
-    extension_id: '',
-    bound_channel_ids: channelId ? [channelId] : [],
-  };
+  return createEmptyProviderDraft(channelId);
 }
 
-export function providerDraftFromRecord(record: ProxyProviderRecord): ProviderDraft {
-  return {
-    id: record.id,
-    primary_channel_id: record.channel_id,
-    display_name: record.display_name,
-    adapter_kind: record.adapter_kind,
-    base_url: record.base_url,
-    extension_id: record.extension_id ?? '',
-    bound_channel_ids: providerChannelIds(record),
-  };
+export function providerDraftFromRecord(
+  record: ProviderCatalogRecord,
+  providerModels: ProviderModelRecord[] = [],
+): ProviderDraft {
+  return createProviderDraftFromRecord(record, providerModels);
 }
 
 export function emptyCredentialDraft(tenantId = '', providerId = ''): CredentialDraft {
@@ -309,11 +334,16 @@ export function channelModelDraftFromRecord(
   };
 }
 
-export function emptyModelPriceDraft(channelId = '', modelId = ''): ModelPriceDraft {
+export function emptyModelPriceDraft(
+  channelId = '',
+  modelId = '',
+  proxyProviderId = '',
+  priceSourceKind = 'reference',
+): ModelPriceDraft {
   return {
     channel_id: channelId,
     model_id: modelId,
-    proxy_provider_id: '',
+    proxy_provider_id: proxyProviderId,
     currency_code: 'USD',
     price_unit: 'per_1m_tokens',
     input_price: '0',
@@ -321,6 +351,9 @@ export function emptyModelPriceDraft(channelId = '', modelId = ''): ModelPriceDr
     cache_read_price: '0',
     cache_write_price: '0',
     request_price: '0',
+    price_source_kind: priceSourceKind,
+    billing_notes: '',
+    pricing_tiers_json: '',
     is_active: true,
   };
 }
@@ -337,6 +370,9 @@ export function modelPriceDraftFromRecord(record: ModelPriceRecord): ModelPriceD
     cache_read_price: String(record.cache_read_price),
     cache_write_price: String(record.cache_write_price),
     request_price: String(record.request_price),
+    price_source_kind: record.price_source_kind,
+    billing_notes: record.billing_notes ?? '',
+    pricing_tiers_json: formatPricingTiersJson(record.pricing_tiers),
     is_active: record.is_active,
   };
 }

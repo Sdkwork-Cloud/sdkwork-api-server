@@ -1,0 +1,34 @@
+[
+  {
+    "group_id": "group-default-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "Default Live",
+    "slug": "default-live",
+    "description": "默认线上流量分组，绑定 balanced 路由画像。",
+    "color": "#0f766e",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-balanced",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  },
+  {
+    "group_id": "group-default-staging",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "staging",
+    "name": "Default Staging",
+    "slug": "default-staging",
+    "description": "默认预发流量分组，优先低成本路由。",
+    "color": "#1d4ed8",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-low-cost",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000000000,
+    "updated_at_ms": 1710000000000
+  }
+]

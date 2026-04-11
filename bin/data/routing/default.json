@@ -1,0 +1,196 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-global-balanced",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Balanced",
+      "slug": "global-balanced",
+      "description": "默认商业流量画像，优先可用性与总体成本平衡。",
+      "active": true,
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-openai-official",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-gemini-official",
+        "provider-anthropic-official",
+        "provider-siliconflow-main",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 5.0,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "profile_id": "profile-global-low-cost",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Low Cost",
+      "slug": "global-low-cost",
+      "description": "低成本优先，适合批处理、评测和默认沙箱调用。",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-siliconflow-main",
+        "provider-openrouter-main",
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-deepseek-official",
+      "max_cost": 1.5,
+      "max_latency_ms": 18000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "profile_id": "profile-global-low-latency",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Low Latency",
+      "slug": "global-low-latency",
+      "description": "低延迟优先，适合在线交互与 API 实时场景。",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-gemini-official",
+        "provider-xai-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 6.0,
+      "max_latency_ms": 6000,
+      "require_healthy": true,
+      "preferred_region": "global",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "profile_id": "profile-global-local-first",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "name": "Global Local First",
+      "slug": "global-local-first",
+      "description": "优先本地 Ollama，其次回退到低成本云侧通道。",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 2.0,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-default-responses",
+      "capability": "responses",
+      "model_pattern": "*",
+      "enabled": true,
+      "priority": 100,
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-openai-official",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-gemini-official",
+        "provider-anthropic-official",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 5.0,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 3,
+      "upstream_retry_base_delay_ms": 250,
+      "upstream_retry_max_delay_ms": 2000
+    },
+    {
+      "policy_id": "policy-default-chat-completions",
+      "capability": "chat_completions",
+      "model_pattern": "*",
+      "enabled": true,
+      "priority": 90,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-openrouter-main",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-gemini-official",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 5.0,
+      "max_latency_ms": 10000,
+      "require_healthy": true,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 200,
+      "upstream_retry_max_delay_ms": 1500
+    },
+    {
+      "policy_id": "policy-default-embeddings",
+      "capability": "embeddings",
+      "model_pattern": "*",
+      "enabled": true,
+      "priority": 80,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openai-official",
+        "provider-qwen-official",
+        "provider-gemini-official",
+        "provider-siliconflow-main",
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-openai-official",
+      "max_cost": 1.0,
+      "max_latency_ms": 8000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 150,
+      "upstream_retry_max_delay_ms": 1000
+    }
+  ],
+  "project_preferences": [
+    {
+      "project_id": "project_global_default",
+      "preset_id": "profile-global-balanced",
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-openai-official",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-gemini-official",
+        "provider-anthropic-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 5.0,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "updated_at_ms": 1710000000000
+    }
+  ]
+}

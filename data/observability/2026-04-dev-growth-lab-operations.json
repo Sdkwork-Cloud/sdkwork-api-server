@@ -1,0 +1,26 @@
+{
+  "compiled_routing_snapshots": [],
+  "routing_decision_logs": [],
+  "provider_health_snapshots": [
+    {
+      "provider_id": "provider-minimax-official",
+      "extension_id": "sdkwork.provider.minimax",
+      "runtime": "builtin",
+      "observed_at_ms": 1710001504500,
+      "instance_id": "provider-minimax-official",
+      "running": true,
+      "healthy": true,
+      "message": "growth lab APAC sandbox warm cache ready"
+    },
+    {
+      "provider_id": "provider-ernie-official",
+      "extension_id": "sdkwork.provider.ernie",
+      "runtime": "builtin",
+      "observed_at_ms": 1710001504700,
+      "instance_id": "provider-ernie-official",
+      "running": true,
+      "healthy": true,
+      "message": "growth lab regional fallback ready"
+    }
+  ]
+}

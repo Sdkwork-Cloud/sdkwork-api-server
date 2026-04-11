@@ -29,8 +29,8 @@ use sdkwork_api_extension_abi::{
     free_raw_c_string, from_raw_c_str, into_raw_c_string,
 };
 use sdkwork_api_extension_core::{
-    ExtensionInstallation, ExtensionInstance, ExtensionManifest, ExtensionRuntime,
-    ExtensionSignatureAlgorithm,
+    CompatibilityLevel, ExtensionInstallation, ExtensionInstance, ExtensionManifest,
+    ExtensionRuntime, ExtensionSignatureAlgorithm,
 };
 use sdkwork_api_provider_core::{
     ProviderAdapter, ProviderExecutionAdapter, ProviderOutput, ProviderRequest,
@@ -65,7 +65,8 @@ use host_types::{
 };
 use connector_runtime::{native_dynamic_runtime_registry, resolve_entrypoint};
 use native_dynamic_runtime::{
-    ensure_native_dynamic_manifest_matches, load_or_reuse_native_dynamic_runtime, merge_config,
+    ensure_native_dynamic_manifest_matches, execute_native_dynamic_invocation,
+    execute_native_dynamic_stream_invocation, load_or_reuse_native_dynamic_runtime, merge_config,
 };
 use provider_invocation::{
     provider_invocation_from_request, provider_invocation_from_request_with_options,

@@ -1,0 +1,145 @@
+# Unreleased - Provider Protocol / Plugin Runtime Split
+
+- Date: 2026-04-09
+- Type: minor
+- Scope: provider catalog, admin API, portal API, SQLite, PostgreSQL, app gateway, HTTP gateway
+- Highlights:
+  - added explicit `protocol_kind` to provider metadata so external protocol standard is no longer conflated with `adapter_kind`
+  - threaded `protocol_kind` through `/admin/providers`, SQLite, PostgreSQL, and stateless gateway upstream configuration with backward-compatible defaults
+  - added native Anthropic and Gemini passthrough at the HTTP gateway edge for both stateless and stateful flows
+  - added no-log planned provider preview plus shared planned execution entrypoints so stateful Anthropic/Gemini passthrough and translated fallback now select once, log once, and execute from one provider plan
+  - canonicalized plugin runtime protocol capability to `openai`, `anthropic`, `gemini`, `custom` while preserving legacy manifest compatibility for `openrouter` and `ollama`
+  - added explicit builtin manifest protocol capability metadata plus safe fallback from unresolved `extension_id` to protocol-default runtime only for unbound providers
+  - closed a plugin safety gap where blocked or missing explicit extension bindings could silently degrade to builtin defaults
+  - added first-class raw native-dynamic plugin execution for Anthropic and Gemini compat routes, so heterogeneous plugins can return provider-native JSON/SSE instead of being forced through OpenAI translation
+  - extended planned execution context with resolved runtime metadata, kept explicit broken bindings fail-closed in stateful compat flows, and now still persist one routing decision log for those failures
+  - upgraded stateful raw-plugin execution to reuse gateway execution-context controls, upstream outcome metrics, and provider health snapshot persistence instead of bypassing governance
+  - taught raw JSON planned execution to honor matched routing retry policy conservatively, with verified timeout->retry->success recovery for native-dynamic compat plugins while keeping opaque plugin failures non-retryable
+  - extended the native-dynamic ABI error envelope with optional retry metadata, so plugins can explicitly mark transient failures instead of forcing the gateway to infer retryability from free-form text
+  - taught the gateway to consume plugin-declared transient error hints for raw JSON retry classification and `retry_after_ms` delay selection, while keeping opaque plugin failures non-retryable
+  - extended the same explicit transient-error contract to raw SSE startup, so native-dynamic compat streams may retry only before the first content type or chunk is emitted and still remain no-retry after stream output starts
+  - corrected raw-plugin fallthrough accounting so non-`native_dynamic` or raw-not-applicable paths return `None` without emitting phantom upstream success metrics or healthy provider snapshots
+  - expanded compat regression coverage to lock Anthropic/Gemini raw stream and count-tokens plugin paths, plus explicit broken-binding fail-closed behavior
+  - added targeted app-gateway governance regressions for raw JSON/SSE planned execution, covering success health snapshots, timeout/deadline execution-context accounting, raw JSON retry scheduling, raw SSE startup retry scheduling, opaque plugin no-retry behavior, and accounting-neutral raw fallthrough
+  - extended the signed native mock fixture contract with Anthropic/Gemini raw operations plus sequenced transient/opaque error simulation, and re-verified full app-gateway / extension-host / compat-route coverage
+  - moved connector runtime startup supervision out of the async compat-planning path and into `spawn_blocking`, preventing current-thread runtime starvation from breaking connector-backed Anthropic/Gemini translated fallback
+  - taught connector startup to adopt delayed external health when no local filesystem entrypoint exists, so externally managed connector endpoints can come online within the configured startup budget instead of immediately collapsing into spawn errors
+  - removed duplicate connector supervision inside planned execution context construction, so one planned connector request now probes external `/health` once instead of resolving the same execution target twice
+  - codified runtime capability boundaries in `ExtensionRuntime`, so raw provider execution and structured retry hints are now explicitly native-dynamic-only instead of being guarded by scattered equality checks
+  - added connector raw JSON/SSE accounting-neutral regressions, proving connector runtimes stay off the raw plugin surface while still remaining available on the supervised HTTP path
+  - taught planned execution context construction to fail over when the selected connector cannot produce an execution target before relay execution starts, and now rewrite planned decision / usage context to the executable backup provider with `gateway_execution_failover`
+  - widened planned execution preflight failover to also cover selected-provider missing tenant credential, and added an Anthropic compat regression that proves the primary upstream is skipped before execution while usage and routing audit both point at the backup provider
+  - extended the same missing-tenant-credential preflight failover contract to direct store-relay OpenAI `chat/responses` JSON and SSE, so stateful OpenAI routes now skip the non-credentialed primary upstream before execution and keep usage/routing audit aligned with the backup provider that actually ran
+  - fixed a commercial correctness gap where direct store-relay OpenAI `chat/responses` routes could select a standard Anthropic/Gemini provider without an explicit conversion plugin and then silently fall through to local mock/local fallback instead of failing over to a compatible backup provider
+  - direct store-relay OpenAI execution now treats "selected provider has no executable OpenAI adapter surface" as execution failure, so JSON and SSE on both `chat` and `responses` correctly fail over to the first compatible backup provider and keep routing/usage audit truthful
+  - added route-selection fallback auditing for policy-declared unavailable candidates, so missing/unavailable primaries now record `policy_candidate_unavailable` instead of disappearing behind a blank fallback reason, while real planning/execution replacement still records `gateway_execution_failover`
+  - added additive `/admin/providers.execution` observability driven by gateway provider-resolution truth, so operators can now see `binding_kind`, `runtime`, `runtime_key`, `passthrough_protocol`, adapter/raw-plugin capability, and `fail_closed` risk without starting runtimes
+  - refined `/admin/providers.execution` with per-route-family readiness, so operators can now distinguish `provider_adapter`, `standard_passthrough`, `raw_plugin`, `fail_closed`, and `unavailable` for `openai`, `anthropic`, and `gemini` independently
+  - corrected default-plugin protocol derivation for Ollama, so `ollama` / `ollama-compatible` remain config-only onboardable through the default plugin but no longer advertise `protocol_kind=openai`; `openrouter` remains `openai`
+  - added additive `default_plugin_family` on `POST /admin/providers`, so builtin same-structure onboarding no longer depends on low-level `adapter_kind` only
+  - current first-class builtin default-plugin families are `openrouter` and `ollama`; the admin path now pins their canonical `adapter_kind`, derived `protocol_kind`, and derived `extension_id`
+  - conflicting low-level fields on the default-plugin path now fail fast with `400 Bad Request` instead of silently drifting into a custom-plugin contract
+  - added additive `/admin/providers.integration` with `mode={standard_passthrough|default_plugin|custom_plugin}` plus `default_plugin_family` when applicable, so onboarding semantics and runtime semantics are now both visible without conflation
+  - moved default-plugin identity normalization into `sdkwork-api-app-catalog`, so provider onboarding policy is reusable application logic instead of an admin-controller-only rule
+  - added additive `integration` to `POST /admin/providers`, so create-time control-plane callers now receive normalized onboarding truth immediately without needing a follow-up list read
+  - moved reusable `ProviderIntegrationView` derivation into `sdkwork-api-app-catalog`, so onboarding-mode classification is shared application logic instead of admin-controller-only behavior
+  - updated admin routing/model fixtures to create OpenRouter through `default_plugin_family=openrouter`, removing the old `adapter_kind=openai` shortcut from management-side examples
+  - converged non-admin routing and relay regressions on the same OpenRouter identity contract, so simulate-route helpers and routing relay coverage now pin `adapter_kind=openrouter`, `protocol_kind=openai`, and `extension_id=sdkwork.provider.openrouter` instead of silently using the official OpenAI runtime identity
+  - removed the remaining stateless protocol-truth fork by rewiring `StatelessGatewayUpstream` to reuse shared domain-catalog protocol derive/normalize helpers, so stateless HTTP config now follows the same `openrouter/openai` and `ollama/custom` rules as provider metadata and storage normalization
+  - converged portal and HTTP relay samples on the same default-plugin onboarding contract, so Portal fixtures now mount canonical OpenRouter identity and HTTP relay regressions now create OpenRouter/Ollama through `default_plugin_family` instead of low-level adapter-only payloads
+  - extended portal routing `provider_options` with additive `protocol_kind` plus `integration`, so frontend/provider-choice surfaces can distinguish industrial-standard passthrough, builtin default-plugin onboarding, and custom-plugin normalization directly
+  - extended portal routing `provider_options` with additive tenant-scoped `credential_readiness`, so frontend/provider-choice surfaces can now distinguish static onboarding shape from current-tenant credential configuration without mixing secret presence into `integration`
+  - extended `GET /admin/providers?tenant_id=...` with additive tenant-scoped `credential_readiness`, while keeping the default unscoped admin provider catalog tenant-agnostic
+  - moved shared provider credential-readiness derivation into `sdkwork-api-app-credential`, so admin and portal now consume one app-layer secret-presence contract instead of duplicating readiness strings per transport
+  - published `GET /admin/providers` and `POST /admin/providers` in admin OpenAPI with real provider/integration/execution/credential-readiness schemas, and documented `tenant_id` as an explicit opt-in scope for tenant overlays
+  - added dedicated `GET /admin/tenants/{tenant_id}/providers/readiness`, so tenant-scoped provider readiness now has a focused admin boundary that returns provider identity, static `integration`, and tenant `credential_readiness` without widening global runtime `execution`
+  - added first-class stateless default-plugin ingress via `StatelessGatewayUpstream::from_default_plugin_family(...)` and `StatelessGatewayConfig::try_with_default_plugin_upstream(...)`, so non-admin direct onboarding of OpenRouter/Ollama now follows the same config-only builtin plugin-family contract as admin
+  - added `create_provider_with_default_plugin_family_and_bindings(...)` to `sdkwork-api-app-catalog`, so non-admin seeders now reuse canonical default-plugin identity plus secondary bindings instead of hand-building OpenRouter fixtures
+  - normalized HTTP compat regressions that explicitly probe `/health`, so native-protocol and connector suites now verify protocol/plugin behavior instead of failing on incomplete mock upstream health fixtures
+- stabilized extension runtime integration tests by serializing global host-cache and environment-sensitive dispatch scenarios
+- Verification:
+  - `cargo test -p sdkwork-api-interface-http --test anthropic_messages_route stateful_anthropic_messages_route_fails_over_before_execution_when_primary_lacks_tenant_credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test chat_route stateful_chat_route_fails_over_before_execution_when_primary_lacks_tenant_credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test chat_route stateful_chat_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test responses_route stateful_responses_route_fails_over_before_execution_when_primary_lacks_tenant_credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test responses_route stateful_responses_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http stateful_chat_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http stateful_chat_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http stateful_responses_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http stateful_responses_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-extension-abi --test abi_contract -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance none_is_accounting_neutral -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance raw_json_planned_execution_retries_timeout_and_succeeds_when_policy_allows -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance raw_json_planned_execution_retries_retryable_plugin_error_and_succeeds -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance raw_json_planned_execution_does_not_retry_opaque_plugin_error -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance raw_stream_planned_execution_ -- --nocapture`
+  - `cargo test -p sdkwork-api-extension-host`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway`
+  - `cargo test -p sdkwork-api-interface-http --test anthropic_messages_route native_dynamic_raw_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test gemini_generate_content_route native_dynamic_raw_plugin -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test anthropic_messages_route stateful_anthropic_messages_stream_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime_and_records_usage -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test gemini_generate_content_route stateful_gemini_stream_generate_content_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime_and_records_usage -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test anthropic_messages_route`
+  - `cargo test -p sdkwork-api-interface-http --test gemini_generate_content_route`
+  - `cargo test -p sdkwork-api-interface-http --test chat_route -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test responses_route -- --nocapture`
+  - `cargo test -p sdkwork-api-app-routing --test simulate_route -- --nocapture`
+  - `cargo test -p sdkwork-api-extension-host --test connector_runtime -- --nocapture`
+  - `cargo test -p sdkwork-api-extension-core --test manifest_contract runtime_capability_helpers_keep_connector_off_raw_plugin_surface -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test planned_execution -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test extension_dispatch planned_execution_context_fails_over_when_selected_connector_cannot_start -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test extension_dispatch planned_execution_context_probes_external_connector_health_once -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test raw_execution_governance connector_runtime -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test extension_dispatch -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin list_providers_exposes_implicit_standard_passthrough_execution_view -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin list_providers_exposes_native_dynamic_raw_plugin_execution_view -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin list_providers_exposes_fail_closed_execution_view_for_broken_explicit_binding -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes providers_models_coupons -- --nocapture`
+  - `cargo test -p sdkwork-api-domain-catalog provider_normalizes_default_plugin_families_for_builtin_nonstandard_families -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes create_provider_accepts_default_plugin_family_for_openrouter -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes create_provider_accepts_default_plugin_family_for_ollama -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes create_provider_rejects_conflicting_default_plugin_family_and_adapter_kind -- --nocapture`
+  - `cargo test -p sdkwork-api-app-catalog --test create_provider -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes providers_models_coupons -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes routing -- --nocapture`
+  - `cargo test -p sdkwork-api-app-routing --test simulate_route route_simulation_uses_catalog_model_candidates -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test routing_policy_dispatch relay_chat_completion_honors_routing_policy_provider_order -- --nocapture`
+  - `cargo test -p sdkwork-api-app-routing --test simulate_route -- --nocapture`
+  - `cargo test -p sdkwork-api-app-gateway --test routing_policy_dispatch -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-http --test stateless_upstream_protocol -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-portal --test portal_routing portal_routing_preferences_preview_and_logs_are_project_scoped -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-portal --test portal_routing -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes list_providers_exposes_tenant_scoped_credential_readiness_only_when_requested -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes providers_models_coupons -- --nocapture`
+  - `cargo test -p sdkwork-api-app-credential -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test openapi_route openapi_routes_expose_admin_api_inventory_with_schema_components -- --nocapture`
+  - `cargo test -p sdkwork-api-interface-admin --test sqlite_admin_routes list_tenant_provider_readiness_exposes_focused_tenant_overlay_inventory -- --nocapture`
+  - `cargo check -p sdkwork-api-interface-portal`
+  - `cargo check -p sdkwork-api-app-credential -p sdkwork-api-interface-admin -p sdkwork-api-interface-portal`
+  - `cargo check -p sdkwork-api-app-catalog -p sdkwork-api-interface-admin -p sdkwork-api-interface-portal`
+  - `cargo check -p sdkwork-api-domain-catalog -p sdkwork-api-app-catalog -p sdkwork-api-app-gateway -p sdkwork-api-app-credential -p sdkwork-api-interface-admin`
+  - `cargo check -p sdkwork-api-interface-admin -p sdkwork-api-app-credential -p sdkwork-api-app-catalog -p sdkwork-api-domain-catalog`
+  - `cargo check -p sdkwork-api-app-catalog -p sdkwork-api-app-routing -p sdkwork-api-app-gateway -p sdkwork-api-interface-portal`
+  - `cargo check -p sdkwork-api-app-routing -p sdkwork-api-app-gateway`
+  - `cargo check -p sdkwork-api-app-gateway -p sdkwork-api-interface-admin`
+  - `cargo check -p sdkwork-api-extension-abi -p sdkwork-api-extension-host -p sdkwork-api-ext-provider-native-mock -p sdkwork-api-app-gateway -p sdkwork-api-interface-http`
+  - `cargo check -p sdkwork-api-extension-host -p sdkwork-api-app-gateway -p sdkwork-api-interface-http`
+  - `cargo check -p sdkwork-api-app-gateway -p sdkwork-api-interface-http`
+  - `cargo check -p sdkwork-api-ext-provider-native-mock -p sdkwork-api-app-gateway -p sdkwork-api-interface-http`
+  - `cargo check -p sdkwork-api-interface-http -p sdkwork-api-interface-portal`
+- Known gaps:
+  - raw plugin execution is native-dynamic only; connector runtimes remain HTTP-supervised by design
+  - stream execution governance now retries only pre-first-byte startup and still does not govern full downstream body drain lifetime
+  - planned preflight failover now covers runtime-target resolution failures plus selected-provider missing tenant credential; policy-declared missing/unavailable candidates are handled earlier at route selection as `policy_candidate_unavailable`
+  - `/admin/providers.execution` explains execution boundaries and fail-closed binding risk, but it intentionally does not embed tenant-credential readiness or live runtime-health verdicts
+  - `/admin/providers.execution.route_readiness` is still static execution truth, not a live credential or live-health verdict
+  - portal routing `provider_options.protocol_kind` and `provider_options.integration` are static onboarding metadata, while `provider_options.credential_readiness` is tenant-scoped secret-presence metadata only; none of them is a live runtime-health verdict
+  - `/admin/providers?tenant_id=...` overlays tenant-scoped `credential_readiness`, but the default unscoped `/admin/providers` contract remains global catalog truth
+  - same-structure default-plugin onboarding and matching industrial-standard passthrough remain related but distinct: Ollama now stays explicitly on the non-standard/default-plugin side of that boundary
+  - first-class `default_plugin_family` onboarding currently covers builtin families with distinct runtime identity: `openrouter` and `ollama`
+  - future non-admin provider-ingest surfaces beyond admin/stateless still need an explicit decision on whether to expose `default_plugin_family` directly or stay behind the shared normalized app-catalog contract
+  - OpenAI-route execution now forbids silent local fallback after selecting an incompatible standard provider without an explicit conversion plugin; future cross-standard support must stay explicit and plugin-owned
+  - connector runtimes do not yet expose an equivalent transient-error contract
+  - raw JSON retries only for explicitly classified failures; opaque plugin failures still do not retry
+  - future heterogeneous provider families still need explicit plugin operation contracts when they cannot already fit OpenAI / Anthropic / Gemini standards

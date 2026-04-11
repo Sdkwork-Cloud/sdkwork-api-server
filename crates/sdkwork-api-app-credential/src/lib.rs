@@ -1,19 +1,37 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use sdkwork_api_domain_credential::UpstreamCredential;
+use serde::Serialize;
+use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_secret_core::{
     decrypt, encrypt, master_key_id, CredentialSecretRef, SecretBackendKind, SecretEnvelope,
 };
 use sdkwork_api_secret_keyring::{KeyringBackend, KeyringSecretStore, OsKeyringBackend};
 use sdkwork_api_secret_local::LocalEncryptedFileSecretStore;
 use sdkwork_api_storage_core::AdminStore;
+use utoipa::ToSchema;
 
 pub fn service_name() -> &'static str {
     "credential-service"
+}
+
+pub const OFFICIAL_PROVIDER_PLATFORM_TENANT_ID: &str = "__sdkwork_platform_official__";
+pub const OFFICIAL_PROVIDER_KEY_REFERENCE: &str = "official";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderCredentialReadinessState {
+    Configured,
+    Missing,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ProviderCredentialReadinessView {
+    pub ready: bool,
+    pub state: ProviderCredentialReadinessState,
 }
 
 #[derive(Debug, Clone)]
@@ -393,6 +411,23 @@ pub async fn list_credentials(store: &dyn AdminStore) -> Result<Vec<UpstreamCred
     store.list_credentials().await
 }
 
+pub async fn list_official_provider_configs(
+    store: &dyn AdminStore,
+) -> Result<Vec<OfficialProviderConfig>> {
+    store.list_official_provider_configs().await
+}
+
+pub fn provider_credential_readiness_view(ready: bool) -> ProviderCredentialReadinessView {
+    ProviderCredentialReadinessView {
+        ready,
+        state: if ready {
+            ProviderCredentialReadinessState::Configured
+        } else {
+            ProviderCredentialReadinessState::Missing
+        },
+    }
+}
+
 #[async_trait]
 pub trait CredentialInventoryStore: Send + Sync {
     async fn list_credentials_for_tenant(&self, tenant_id: &str)
@@ -422,6 +457,20 @@ where
     ) -> Result<Vec<UpstreamCredential>> {
         AdminStore::list_credentials_for_provider(self, provider_id).await
     }
+}
+
+pub async fn list_configured_provider_ids_for_tenant<T>(
+    store: &T,
+    tenant_id: &str,
+) -> Result<HashSet<String>>
+where
+    T: CredentialInventoryStore + ?Sized,
+{
+    Ok(list_tenant_credentials(store, tenant_id)
+        .await?
+        .into_iter()
+        .map(|credential| credential.provider_id)
+        .collect())
 }
 
 pub async fn delete_credential_with_manager<T>(
@@ -565,6 +614,118 @@ pub async fn resolve_provider_secret_with_manager(
     Ok(Some(secret))
 }
 
+pub async fn persist_official_provider_config_with_secret_and_manager(
+    store: &dyn AdminStore,
+    manager: &CredentialSecretManager,
+    provider_id: &str,
+    base_url: &str,
+    enabled: bool,
+    secret_value: &str,
+) -> Result<OfficialProviderConfig> {
+    let config = OfficialProviderConfig::new(
+        provider_id,
+        OFFICIAL_PROVIDER_KEY_REFERENCE,
+        base_url,
+        enabled,
+    );
+    let config = store.upsert_official_provider_config(&config).await?;
+
+    if !secret_value.trim().is_empty() {
+        persist_credential_with_secret_and_manager(
+            store,
+            manager,
+            OFFICIAL_PROVIDER_PLATFORM_TENANT_ID,
+            provider_id,
+            &config.key_reference,
+            secret_value,
+        )
+        .await?;
+    }
+
+    Ok(config)
+}
+
+pub async fn resolve_official_provider_secret_with_manager(
+    store: &dyn AdminStore,
+    manager: &CredentialSecretManager,
+    provider_id: &str,
+) -> Result<Option<String>> {
+    let Some(config) = store.find_official_provider_config(provider_id).await? else {
+        return Ok(None);
+    };
+
+    if config.key_reference.trim().is_empty() {
+        return Ok(None);
+    }
+
+    let Some(credential) = store
+        .find_credential(
+            OFFICIAL_PROVIDER_PLATFORM_TENANT_ID,
+            provider_id,
+            &config.key_reference,
+        )
+        .await?
+    else {
+        return Ok(None);
+    };
+
+    let secret = manager.resolve_secret(store, &credential).await?;
+    Ok(Some(secret))
+}
+
+pub async fn official_provider_secret_configured(
+    store: &dyn AdminStore,
+    provider_id: &str,
+) -> Result<bool> {
+    let Some(config) = store.find_official_provider_config(provider_id).await? else {
+        return Ok(false);
+    };
+
+    if config.key_reference.trim().is_empty() {
+        return Ok(false);
+    }
+
+    Ok(store
+        .find_credential(
+            OFFICIAL_PROVIDER_PLATFORM_TENANT_ID,
+            provider_id,
+            &config.key_reference,
+        )
+        .await?
+        .is_some())
+}
+
+async fn resolve_enabled_official_provider_secret_with_manager(
+    store: &dyn AdminStore,
+    manager: &CredentialSecretManager,
+    provider_id: &str,
+) -> Result<Option<String>> {
+    let Some(config) = store.find_official_provider_config(provider_id).await? else {
+        return Ok(None);
+    };
+
+    if !config.enabled {
+        return Ok(None);
+    }
+
+    resolve_official_provider_secret_with_manager(store, manager, provider_id).await
+}
+
+pub async fn resolve_provider_secret_with_fallback_and_manager(
+    store: &dyn AdminStore,
+    manager: &CredentialSecretManager,
+    tenant_id: &str,
+    provider_id: &str,
+) -> Result<Option<String>> {
+    if let Some(secret) =
+        resolve_provider_secret_with_manager(store, manager, tenant_id, provider_id).await?
+    {
+        return Ok(Some(secret));
+    }
+
+    resolve_enabled_official_provider_secret_with_manager(store, manager, provider_id).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,6 +766,41 @@ mod tests {
             store.last_provider_id.lock().unwrap().as_deref(),
             Some("provider-a")
         );
+    }
+
+    #[tokio::test]
+    async fn list_configured_provider_ids_for_tenant_reads_only_tenant_scope() {
+        let store = RecordingCredentialInventoryStore::new(vec![
+            UpstreamCredential::new("tenant-1", "provider-a", "key-a"),
+            UpstreamCredential::new("tenant-1", "provider-b", "key-b"),
+            UpstreamCredential::new("tenant-2", "provider-a", "key-c"),
+        ]);
+
+        let provider_ids = list_configured_provider_ids_for_tenant(&store, "tenant-1")
+            .await
+            .unwrap();
+
+        assert_eq!(provider_ids.len(), 2);
+        assert!(provider_ids.contains("provider-a"));
+        assert!(provider_ids.contains("provider-b"));
+        assert_eq!(
+            store.last_tenant_id.lock().unwrap().as_deref(),
+            Some("tenant-1")
+        );
+    }
+
+    #[test]
+    fn provider_credential_readiness_view_distinguishes_configured_and_missing() {
+        let configured = provider_credential_readiness_view(true);
+        assert!(configured.ready);
+        assert_eq!(
+            configured.state,
+            ProviderCredentialReadinessState::Configured
+        );
+
+        let missing = provider_credential_readiness_view(false);
+        assert!(!missing.ready);
+        assert_eq!(missing.state, ProviderCredentialReadinessState::Missing);
     }
 
     struct RecordingCredentialInventoryStore {

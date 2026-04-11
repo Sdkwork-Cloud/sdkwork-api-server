@@ -1,0 +1,29 @@
+{
+  "update_id": "2026-04-account-kernel-commercial-foundation",
+  "release_version": "2026.04.15",
+  "description": "Seed global commercial account, balance, metering, settlement, and reconciliation records so fresh production installs start with ready-to-inspect account kernel data.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness"
+  ],
+  "accounts": [
+    "accounts/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "account_benefit_lots": [
+    "account-benefit-lots/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "account_holds": [
+    "account-holds/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "account_ledger": [
+    "account-ledger/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "request_settlements": [
+    "request-settlements/2026-04-account-kernel-commercial-foundation.json"
+  ],
+  "account_reconciliation": [
+    "account-reconciliation/2026-04-account-kernel-commercial-foundation.json"
+  ]
+}

@@ -1,7 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import {
-  Button,
   Card,
   CardContent,
   Input,
@@ -9,7 +8,7 @@ import {
   StatusBadge,
   type DataTableColumn,
 } from '@sdkwork/ui-pc-react';
-import { Plus, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useAdminI18n } from 'sdkwork-router-admin-core';
 import type {
   AdminPageProps,
@@ -24,14 +23,10 @@ import type {
   MarketingCampaignStatus,
 } from 'sdkwork-router-admin-types';
 
-import { CouponDialog } from './page/CouponDialog';
 import { CouponsDetailDrawer } from './page/CouponsDetailDrawer';
-import { CouponsDetailPanel } from './page/CouponsDetailPanel';
 import { CouponsRegistrySection } from './page/CouponsRegistrySection';
 import {
-  ConfirmActionDialog,
   SelectField,
-  createEmptyCouponDraft,
   daysUntilExpiry,
   expiryDetail,
   isCouponAtRisk,
@@ -41,9 +36,6 @@ import {
 } from './page/shared';
 
 type CouponsPageProps = AdminPageProps & {
-  onSaveCoupon: (coupon: CouponRecord) => Promise<void> | void;
-  onToggleCoupon: (coupon: CouponRecord) => Promise<void> | void;
-  onDeleteCoupon: (couponId: string) => Promise<void> | void;
   onUpdateMarketingCouponTemplateStatus: (
     couponTemplateId: string,
     status: CouponTemplateStatus,
@@ -71,22 +63,16 @@ type CouponGovernance = {
 
 export function CouponsPage({
   snapshot,
-  onSaveCoupon,
-  onToggleCoupon,
-  onDeleteCoupon,
   onUpdateMarketingCouponTemplateStatus,
   onUpdateMarketingCampaignStatus,
   onUpdateMarketingCampaignBudgetStatus,
   onUpdateMarketingCouponCodeStatus,
 }: CouponsPageProps) {
   const { formatNumber, t } = useAdminI18n();
-  const [draft, setDraft] = useState<CouponRecord>(createEmptyCouponDraft());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CouponStatusFilter>('all');
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
-  const [isCouponDialogOpen, setIsCouponDialogOpen] = useState(false);
-  const [pendingDeleteCoupon, setPendingDeleteCoupon] = useState<CouponRecord | null>(null);
   const deferredQuery = useDeferredValue(search.trim().toLowerCase());
 
   const activeCoupons = snapshot.coupons.filter((coupon) => coupon.active);
@@ -255,25 +241,6 @@ export function CouponsPage({
     [formatNumber, t],
   );
 
-  function resetCouponDialog() {
-    setIsCouponDialogOpen(false);
-    setDraft(createEmptyCouponDraft());
-  }
-
-  function handleCouponDialogOpenChange(open: boolean) {
-    if (!open) {
-      resetCouponDialog();
-      return;
-    }
-
-    setIsCouponDialogOpen(true);
-  }
-
-  function openCouponDialog(coupon?: CouponRecord) {
-    setDraft(coupon ? { ...coupon } : createEmptyCouponDraft());
-    setIsCouponDialogOpen(true);
-  }
-
   function openDetailDrawer(coupon: CouponRecord) {
     setSelectedCouponId(coupon.id);
     setIsDetailDrawerOpen(true);
@@ -284,31 +251,6 @@ export function CouponsPage({
     if (!open) {
       setSelectedCouponId(null);
     }
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSaveCoupon({
-      ...draft,
-      id: draft.id || `coupon_${Date.now().toString(16)}`,
-      code: draft.code.trim().toUpperCase(),
-      note: draft.note.trim(),
-      audience: draft.audience.trim(),
-      discount_label: draft.discount_label.trim(),
-      expires_on: draft.expires_on.trim(),
-    });
-    resetCouponDialog();
-  }
-
-  async function handleDeleteCoupon() {
-    if (!pendingDeleteCoupon) {
-      return;
-    }
-
-    await onDeleteCoupon(pendingDeleteCoupon.id);
-    setPendingDeleteCoupon(null);
-    setSelectedCouponId(null);
-    setIsDetailDrawerOpen(false);
   }
 
   return (
@@ -362,10 +304,9 @@ export function CouponsPage({
                   {' | '}
                   {t('{count} at risk', { count: formatNumber(atRiskCoupons.length) })}
                 </div>
-                <Button onClick={() => openCouponDialog()} type="button" variant="primary">
-                  <Plus className="w-4 h-4" />
-                  {t('New coupon')}
-                </Button>
+                <div className="rounded-full border border-[var(--sdk-color-border-subtle)] bg-[var(--sdk-color-surface-muted)] px-3 py-1 text-xs uppercase tracking-[0.18em] text-[var(--sdk-color-text-secondary)]">
+                  {t('Canonical marketing derived')}
+                </div>
               </div>
             </form>
 
@@ -436,10 +377,7 @@ export function CouponsPage({
             expiringSoonCoupons={expiringSoonCoupons}
             filteredCoupons={filteredCoupons}
             nextExpiringCoupon={nextExpiringCoupon}
-            onDeleteCoupon={setPendingDeleteCoupon}
-            onEditCoupon={openCouponDialog}
             onSelectCoupon={openDetailDrawer}
-            onToggleCoupon={onToggleCoupon}
             remainingQuota={remainingQuota}
             selectedCouponId={selectedCouponId}
           />
@@ -448,26 +386,7 @@ export function CouponsPage({
 
       <CouponsDetailDrawer
         governance={selectedCouponGovernance}
-        onDelete={() => {
-          if (!selectedCoupon) {
-            return;
-          }
-          setPendingDeleteCoupon(selectedCoupon);
-        }}
-        onEdit={() => {
-          if (!selectedCoupon) {
-            return;
-          }
-          setIsDetailDrawerOpen(false);
-          openCouponDialog(selectedCoupon);
-        }}
         onOpenChange={handleDetailDrawerOpenChange}
-        onToggleStatus={() => {
-          if (!selectedCoupon) {
-            return;
-          }
-          void onToggleCoupon(selectedCoupon);
-        }}
         onUpdateMarketingCampaignBudgetStatus={(campaignBudgetId, status) =>
           void onUpdateMarketingCampaignBudgetStatus(campaignBudgetId, status)
         }
@@ -482,34 +401,6 @@ export function CouponsPage({
         }
         open={isDetailDrawerOpen}
         selectedCoupon={selectedCoupon}
-      />
-
-      <CouponDialog
-        draft={draft}
-        onOpenChange={handleCouponDialogOpenChange}
-        onSubmit={(event) => void handleSubmit(event)}
-        open={isCouponDialogOpen}
-        setDraft={setDraft}
-      />
-
-      <ConfirmActionDialog
-        confirmLabel={t('Delete coupon')}
-        description={
-          pendingDeleteCoupon
-            ? t(
-                'Remove {code} from the campaign roster. This permanently deletes the offer from the admin control plane.',
-                { code: pendingDeleteCoupon.code },
-              )
-            : ''
-        }
-        onConfirm={() => void handleDeleteCoupon()}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingDeleteCoupon(null);
-          }
-        }}
-        open={Boolean(pendingDeleteCoupon)}
-        title={t('Delete coupon campaign')}
       />
     </>
   );

@@ -1,0 +1,127 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-prod-ernie-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-ernie-live",
+      "capability": "responses",
+      "route_key": "ernie-4.5-turbo",
+      "matched_policy_id": "policy-asia-official-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-ernie-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ernie-official",
+        "provider-qwen-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ernie-official",
+      "max_cost": 4.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710000499000,
+      "updated_at_ms": 1710000499500
+    },
+    {
+      "snapshot_id": "snapshot-prod-minimax-official",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-minimax-live",
+      "capability": "responses",
+      "route_key": "minimax-m1",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-minimax-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-minimax-official",
+        "provider-ernie-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-minimax-official",
+      "max_cost": 5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710000500000,
+      "updated_at_ms": 1710000500500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-prod-ernie-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-ernie-live",
+      "capability": "responses",
+      "route_key": "ernie-4.5-turbo",
+      "selected_provider_id": "provider-ernie-official",
+      "matched_policy_id": "policy-asia-official-responses",
+      "applied_routing_profile_id": "profile-global-ernie-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-ernie-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 710,
+      "selection_reason": "Dedicated ERNIE official group selected the Baidu-owned primary route.",
+      "fallback_reason": null,
+      "requested_region": "apac",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000499100,
+      "assessments": [
+        {
+          "provider_id": "provider-ernie-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0018,
+          "latency_ms": 460,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "official ERNIE route"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-minimax-official",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-official-minimax-live",
+      "capability": "responses",
+      "route_key": "minimax-m1",
+      "selected_provider_id": "provider-minimax-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-global-minimax-official",
+      "compiled_routing_snapshot_id": "snapshot-prod-minimax-official",
+      "strategy": "deterministic_priority",
+      "selection_seed": 711,
+      "selection_reason": "Dedicated MiniMax official group selected the MiniMax-owned primary route.",
+      "fallback_reason": null,
+      "requested_region": "apac",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000500100,
+      "assessments": [
+        {
+          "provider_id": "provider-minimax-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0038,
+          "latency_ms": 520,
+          "region": "sg",
+          "region_match": true,
+          "reasons": [
+            "official MiniMax route"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": []
+}

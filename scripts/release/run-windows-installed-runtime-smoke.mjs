@@ -100,6 +100,10 @@ function truncateText(value, maxLength = 1600) {
   return `${text.slice(0, Math.max(0, maxLength - 12))}...[truncated]`;
 }
 
+function quoteForPowerShellSingleQuotedString(value) {
+  return String(value).replaceAll("'", "''");
+}
+
 function toPortableRelativePath(repoRoot, targetPath) {
   return (path.relative(repoRoot, targetPath) || '.').replaceAll('\\', '/');
 }
@@ -129,6 +133,20 @@ function buildFailureContext(plan) {
   return contexts.length > 0 ? `\n${contexts.join('\n\n')}` : '';
 }
 
+function assertPackagedBootstrapData(runtimeHome) {
+  const requiredFiles = [
+    path.join(runtimeHome, 'data', 'channels', 'default.json'),
+    path.join(runtimeHome, 'data', 'providers', 'default.json'),
+    path.join(runtimeHome, 'data', 'routing', 'default.json'),
+  ];
+
+  for (const filePath of requiredFiles) {
+    if (!existsSync(filePath)) {
+      throw new Error(`installed runtime is missing packaged bootstrap data: ${filePath}`);
+    }
+  }
+}
+
 function buildCommandFailure(label, result, plan) {
   const fragments = [];
 
@@ -150,12 +168,13 @@ function buildCommandFailure(label, result, plan) {
   );
 }
 
-function runScriptCommand(command, args, { cwd, env, label, plan } = {}) {
+function runScriptCommand(command, args, { cwd, env, label, plan, stdio = 'pipe' } = {}) {
   const result = spawnSync(command, args, {
     cwd,
     env,
     encoding: 'utf8',
     shell: false,
+    stdio,
   });
 
   if (result.error || result.status !== 0) {
@@ -203,13 +222,36 @@ async function allocateLoopbackPorts() {
 }
 
 async function assertHealthyResponse(url) {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(5000),
-  });
-  const body = String(await response.text()).trim();
+  const urlLiteral = quoteForPowerShellSingleQuotedString(url);
+  const result = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      [
+        '$ErrorActionPreference = \'Stop\'',
+        `try { $response = Invoke-WebRequest -UseBasicParsing -Uri '${urlLiteral}' -TimeoutSec 5; Write-Output ('status=' + $response.StatusCode); Write-Output ('body=' + ([string]$response.Content).Trim()) } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join('; '),
+    ],
+    {
+      encoding: 'utf8',
+    },
+  );
 
-  if (!response.ok) {
-    throw new Error(`${url} returned HTTP ${response.status}: ${truncateText(body, 400)}`);
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `${url} health probe failed: ${truncateText(`${result.stdout}${result.stderr}${result.error?.message ?? ''}`, 400)}`,
+    );
+  }
+
+  const output = String(result.stdout ?? '');
+  const status = Number(output.match(/^status=(\d+)$/m)?.[1] ?? 0);
+  const body = String(output.match(/^body=(.*)$/m)?.[1] ?? '').trim();
+
+  if (status < 200 || status >= 300) {
+    throw new Error(`${url} returned HTTP ${status}: ${truncateText(body, 400)}`);
   }
 
   if (body.length > 0 && body.toLowerCase() !== 'ok') {
@@ -391,6 +433,7 @@ export function createWindowsInstalledRuntimeSmokePlan({
         '-WaitSeconds',
         String(DEFAULT_WAIT_SECONDS),
       ],
+      stdio: 'ignore',
     },
     stopCommand: {
       command: 'powershell.exe',
@@ -492,6 +535,7 @@ export async function runWindowsInstalledRuntimeSmoke({
     applyInstallPlan(plan.installPlan, {
       force: true,
     });
+    assertPackagedBootstrapData(plan.runtimeHome);
     writeFileSync(plan.routerEnvPath, plan.routerEnvContents, 'utf8');
 
     runScriptCommand(plan.startCommand.command, plan.startCommand.args, {
@@ -499,6 +543,7 @@ export async function runWindowsInstalledRuntimeSmoke({
       env,
       label: 'installed runtime start.ps1',
       plan,
+      stdio: plan.startCommand.stdio,
     });
 
     await waitForHealthUrls(plan.healthUrls);

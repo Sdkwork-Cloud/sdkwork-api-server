@@ -1,0 +1,608 @@
+[
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.4,
+    "output_price": 1.6,
+    "cache_read_price": 0.1,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official OpenAI pricing. Use this row as the canonical cost anchor when comparing proxy marketplaces or configuring markup.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.4,
+        "output_price": 1.6,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "proxy_provider_id": "provider-anthropic-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 15,
+    "cache_read_price": 0.3,
+    "cache_write_price": 3.75,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Anthropic pricing. Top-level cache write reflects the common 5-minute prompt-cache tier; tier metadata also includes the 1-hour variant for operator comparison.",
+    "pricing_tiers": [
+      {
+        "tier_id": "cache-5m",
+        "display_name": "Prompt cache write 5m",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 3.75,
+        "request_price": 0,
+        "cache_ttl": "5m"
+      },
+      {
+        "tier_id": "cache-1h",
+        "display_name": "Prompt cache write 1h",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 6,
+        "request_price": 0,
+        "cache_ttl": "1h"
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-flash",
+    "proxy_provider_id": "provider-gemini-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.3,
+    "output_price": 2.5,
+    "cache_read_price": 0.03,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Gemini pricing. Top-level prices reflect the common text, image, and video tier; tier metadata preserves audio input and explicit cache storage for operator comparison.",
+    "pricing_tiers": [
+      {
+        "tier_id": "text-image-video",
+        "display_name": "Text, image, and video input",
+        "condition_kind": "modality",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.3,
+        "output_price": 2.5,
+        "cache_read_price": 0.03,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "modality": "text_image_video"
+      },
+      {
+        "tier_id": "audio",
+        "display_name": "Audio input",
+        "condition_kind": "modality",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1,
+        "output_price": 2.5,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "modality": "audio"
+      },
+      {
+        "tier_id": "cache-storage",
+        "display_name": "Explicit cache storage",
+        "condition_kind": "cache_storage",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens_per_hour",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 1,
+        "request_price": 0,
+        "cache_ttl": "1h",
+        "notes": "Gemini explicit cache storage price per hour."
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "proxy_provider_id": "provider-deepseek-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.27,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official DeepSeek pricing. Compare this line against proxy-distribution rows when optimizing for regional latency or blended margin.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.27,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-plus",
+    "proxy_provider_id": "provider-qwen-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Qwen pricing. This is the canonical APAC and China-official reference row for proxy spread comparison.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6",
+    "proxy_provider_id": "provider-doubao-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Doubao pricing. Use it as the official benchmark before enabling proxy distribution or regional commercial markup.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "proxy_provider_id": "provider-xai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 12,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official xAI pricing. Compare this official Grok cost line against marketplace distribution before adopting proxy-first fallback.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 12,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "proxy_provider_id": "provider-moonshot-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.6,
+    "output_price": 2.4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Moonshot pricing. Use it to evaluate long-context Kimi traffic against proxy convenience and channel-distribution spread.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.6,
+        "output_price": 2.4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "glm-5",
+    "proxy_provider_id": "provider-zhipu-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 2.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Zhipu pricing. This row is the official GLM benchmark for proxy and enterprise resale pricing decisions.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 2.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-turbos-latest",
+    "proxy_provider_id": "provider-hunyuan-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.5,
+    "output_price": 1.5,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Direct-vendor baseline for official Hunyuan pricing. Keep this row as the Tencent-cloud aligned source of truth before applying proxy or contract markup.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.5,
+        "output_price": 1.5,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.4,
+    "output_price": 1.6,
+    "cache_read_price": 0.1,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for OpenRouter. Compare this proxy row against the official OpenAI baseline before choosing proxy-first routing or markup posture.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.4,
+        "output_price": 1.6,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 15,
+    "cache_read_price": 0.3,
+    "cache_write_price": 3.75,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for OpenRouter. Compare this Claude proxy row against the official Anthropic baseline before using proxy-first failover.",
+    "pricing_tiers": [
+      {
+        "tier_id": "cache-5m",
+        "display_name": "Prompt cache write 5m",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 3.75,
+        "request_price": 0,
+        "cache_ttl": "5m"
+      },
+      {
+        "tier_id": "cache-1h",
+        "display_name": "Prompt cache write 1h",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 6,
+        "request_price": 0,
+        "cache_ttl": "1h"
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 1.25,
+    "output_price": 10,
+    "cache_read_price": 0.125,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for OpenRouter. Compare this Gemini proxy row against the official Google baseline before adopting proxy-first route policy.",
+    "pricing_tiers": [
+      {
+        "tier_id": "le-200k",
+        "display_name": "Prompts up to 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1.25,
+        "output_price": 10,
+        "cache_read_price": 0.125,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "max_input_tokens": 200000
+      },
+      {
+        "tier_id": "gt-200k",
+        "display_name": "Prompts above 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2.5,
+        "output_price": 15,
+        "cache_read_price": 0.25,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "min_input_tokens": 200001
+      },
+      {
+        "tier_id": "cache-storage",
+        "display_name": "Explicit cache storage",
+        "condition_kind": "cache_storage",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens_per_hour",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 4.5,
+        "request_price": 0,
+        "cache_ttl": "1h",
+        "notes": "Gemini explicit cache storage price per hour."
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.27,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for OpenRouter. Use this proxy row to compare convenience and aggregation spread versus the official DeepSeek baseline.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.27,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-v3",
+    "proxy_provider_id": "provider-siliconflow-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.25,
+    "output_price": 0.95,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for SiliconFlow. Compare this China-friendly proxy row against official DeepSeek cost before selecting regional distribution routes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.25,
+        "output_price": 0.95,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-72b-instruct",
+    "proxy_provider_id": "provider-siliconflow-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.2,
+    "output_price": 0.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Marketplace and distribution reference for SiliconFlow. Use it to compare distributed Qwen serving against official Qwen pricing and local edge execution.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.2,
+        "output_price": 0.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-14b-instruct",
+    "proxy_provider_id": "provider-ollama-local",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "local",
+    "billing_notes": "Local execution placeholder for Ollama. Keep zero for demos and lab installs, or replace it with infra showback or transfer pricing before settlement-sensitive production use.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "nomic",
+    "model_id": "nomic-embed-text-v1.5",
+    "proxy_provider_id": "provider-ollama-local",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "local",
+    "billing_notes": "Local execution placeholder for Ollama embeddings. Replace this zero-cost seed with internal showback or hardware cost allocation when the deployment enters production chargeback flows.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  }
+]

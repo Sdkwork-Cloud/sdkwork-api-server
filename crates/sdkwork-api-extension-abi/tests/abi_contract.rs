@@ -34,3 +34,19 @@ fn serializes_provider_stream_result_envelopes() {
     assert_eq!(encoded_result["kind"], "streamed");
     assert_eq!(encoded_result["content_type"], "text/event-stream");
 }
+
+#[test]
+fn serializes_provider_error_retry_hints() {
+    let result = ProviderInvocationResult::retryable_error(
+        "provider temporarily overloaded",
+        Some("provider_overloaded"),
+        Some(125),
+    );
+    let encoded_result = serde_json::to_value(&result).expect("error result json");
+
+    assert_eq!(encoded_result["kind"], "error");
+    assert_eq!(encoded_result["message"], "provider temporarily overloaded");
+    assert_eq!(encoded_result["code"], "provider_overloaded");
+    assert_eq!(encoded_result["retryable"], true);
+    assert_eq!(encoded_result["retry_after_ms"], 125);
+}

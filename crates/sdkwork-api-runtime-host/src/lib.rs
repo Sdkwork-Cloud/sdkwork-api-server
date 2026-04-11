@@ -96,6 +96,8 @@ pub struct RuntimeHostConfig {
     pub admin_upstream: String,
     pub portal_upstream: String,
     pub gateway_upstream: String,
+    pub admin_site_proxy_upstream: Option<String>,
+    pub portal_site_proxy_upstream: Option<String>,
 }
 
 impl RuntimeHostConfig {
@@ -114,6 +116,8 @@ impl RuntimeHostConfig {
             admin_upstream: admin_upstream.into(),
             portal_upstream: portal_upstream.into(),
             gateway_upstream: gateway_upstream.into(),
+            admin_site_proxy_upstream: None,
+            portal_site_proxy_upstream: None,
         }
     }
 
@@ -218,6 +222,39 @@ pub fn classify_request(request_path: &str) -> RuntimeRoute {
     }
 
     RuntimeRoute::NotFound
+}
+
+fn site_proxy_upstream_name(site: RuntimeSite) -> &'static str {
+    match site {
+        RuntimeSite::Admin => "admin-site",
+        RuntimeSite::Portal => "portal-site",
+    }
+}
+
+fn site_proxy_upstream_target<'a>(
+    config: &'a RuntimeHostConfig,
+    site: RuntimeSite,
+) -> Option<&'a str> {
+    match site {
+        RuntimeSite::Admin => config.admin_site_proxy_upstream.as_deref(),
+        RuntimeSite::Portal => config.portal_site_proxy_upstream.as_deref(),
+    }
+}
+
+pub fn resolve_runtime_route(config: &RuntimeHostConfig, request_path: &str) -> RuntimeRoute {
+    match classify_request(request_path) {
+        RuntimeRoute::Static { site, request_path } => {
+            if site_proxy_upstream_target(config, site).is_some() {
+                RuntimeRoute::Proxy {
+                    upstream: site_proxy_upstream_name(site).to_owned(),
+                    request_path,
+                }
+            } else {
+                RuntimeRoute::Static { site, request_path }
+            }
+        }
+        route => route,
+    }
 }
 
 pub fn resolve_static_asset(
@@ -395,7 +432,7 @@ async fn runtime_host_handler(
 ) -> AxumResponse {
     let request_path = request.uri().path().to_owned();
 
-    match classify_request(&request_path) {
+    match resolve_runtime_route(&state.config, &request_path) {
         RuntimeRoute::Redirect(location) => redirect_response(&location),
         RuntimeRoute::Static { site, request_path } => {
             let site_root = match site {
@@ -608,7 +645,15 @@ fn apply_browser_cors_http_headers(headers: &mut HeaderMap) {
 fn upstream_target<'a>(config: &'a RuntimeHostConfig, upstream: &str) -> &'a str {
     match upstream {
         "admin" => config.admin_upstream.as_str(),
+        "admin-site" => config
+            .admin_site_proxy_upstream
+            .as_deref()
+            .unwrap_or(config.admin_upstream.as_str()),
         "portal" => config.portal_upstream.as_str(),
+        "portal-site" => config
+            .portal_site_proxy_upstream
+            .as_deref()
+            .unwrap_or(config.portal_upstream.as_str()),
         "gateway" => config.gateway_upstream.as_str(),
         _ => config.portal_upstream.as_str(),
     }
@@ -668,7 +713,7 @@ impl ProxyHttp for RuntimeHostProxy {
         ctx: &mut Self::CTX,
     ) -> PingoraResult<bool> {
         let request_path = session.req_header().uri.path().to_owned();
-        let route = classify_request(&request_path);
+        let route = resolve_runtime_route(&self.config, &request_path);
         ctx.route = route.clone();
 
         if matches!(route, RuntimeRoute::Proxy { .. })
@@ -884,7 +929,8 @@ fn wait_for_listener(bind_addr: &str) -> Result<()> {
 mod tests {
     use super::{
         apply_browser_cors_headers, build_redirect_response_header, listener_probe_addr,
-        selected_runtime_backend, RuntimeHostBackend, BROWSER_CORS_ALLOW_HEADERS,
+        resolve_runtime_route, selected_runtime_backend, RuntimeHostBackend, RuntimeHostConfig,
+        RuntimeRoute, RuntimeSite, BROWSER_CORS_ALLOW_HEADERS,
         BROWSER_CORS_ALLOW_METHODS, BROWSER_CORS_ALLOW_ORIGIN, BROWSER_CORS_EXPOSE_HEADERS,
         BROWSER_CORS_MAX_AGE,
     };
@@ -949,5 +995,47 @@ mod tests {
         } else {
             assert_eq!(selected_runtime_backend(), RuntimeHostBackend::Pingora);
         }
+    }
+
+    #[test]
+    fn resolve_runtime_route_keeps_static_site_requests_when_no_site_proxy_is_configured() {
+        let config = RuntimeHostConfig::local_defaults("127.0.0.1:9983");
+
+        assert_eq!(
+            resolve_runtime_route(&config, "/admin/users"),
+            RuntimeRoute::Static {
+                site: RuntimeSite::Admin,
+                request_path: "/admin/users".to_owned(),
+            }
+        );
+        assert_eq!(
+            resolve_runtime_route(&config, "/portal/home"),
+            RuntimeRoute::Static {
+                site: RuntimeSite::Portal,
+                request_path: "/portal/home".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_runtime_route_can_proxy_admin_and_portal_pages_to_dev_servers() {
+        let mut config = RuntimeHostConfig::local_defaults("127.0.0.1:9983");
+        config.admin_site_proxy_upstream = Some("127.0.0.1:5173".to_owned());
+        config.portal_site_proxy_upstream = Some("127.0.0.1:5174".to_owned());
+
+        assert_eq!(
+            resolve_runtime_route(&config, "/admin/users"),
+            RuntimeRoute::Proxy {
+                upstream: "admin-site".to_owned(),
+                request_path: "/admin/users".to_owned(),
+            }
+        );
+        assert_eq!(
+            resolve_runtime_route(&config, "/portal/home"),
+            RuntimeRoute::Proxy {
+                upstream: "portal-site".to_owned(),
+                request_path: "/portal/home".to_owned(),
+            }
+        );
     }
 }

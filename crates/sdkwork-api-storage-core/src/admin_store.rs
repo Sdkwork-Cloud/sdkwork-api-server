@@ -4,6 +4,10 @@ use super::*;
 pub trait AdminStore: Send + Sync {
     fn dialect(&self) -> StorageDialect;
 
+    fn account_kernel_store(&self) -> Option<&dyn AccountKernelStore> {
+        None
+    }
+
     async fn insert_channel(&self, channel: &Channel) -> Result<Channel>;
     async fn list_channels(&self) -> Result<Vec<Channel>>;
     async fn delete_channel(&self, channel_id: &str) -> Result<bool>;
@@ -11,12 +15,20 @@ pub trait AdminStore: Send + Sync {
     async fn insert_provider(&self, provider: &ProxyProvider) -> Result<ProxyProvider>;
     async fn list_providers(&self) -> Result<Vec<ProxyProvider>>;
     async fn list_providers_for_model(&self, model: &str) -> Result<Vec<ProxyProvider>> {
-        let model_provider_ids = self
-            .list_models_for_external_name(model)
+        let mut model_provider_ids = self
+            .list_provider_models_for_model(model)
             .await?
             .into_iter()
-            .map(|entry| entry.provider_id)
+            .map(|entry| entry.proxy_provider_id)
             .collect::<std::collections::HashSet<_>>();
+        if model_provider_ids.is_empty() {
+            model_provider_ids = self
+                .list_models_for_external_name(model)
+                .await?
+                .into_iter()
+                .map(|entry| entry.provider_id)
+                .collect::<std::collections::HashSet<_>>();
+        }
         Ok(self
             .list_providers()
             .await?
@@ -28,6 +40,33 @@ pub trait AdminStore: Send + Sync {
     }
     async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>>;
     async fn delete_provider(&self, provider_id: &str) -> Result<bool>;
+    async fn upsert_provider_account(
+        &self,
+        record: &ProviderAccountRecord,
+    ) -> Result<ProviderAccountRecord>;
+    async fn list_provider_accounts(&self) -> Result<Vec<ProviderAccountRecord>>;
+    async fn list_provider_accounts_for_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<Vec<ProviderAccountRecord>> {
+        Ok(self
+            .list_provider_accounts()
+            .await?
+            .into_iter()
+            .filter(|record| record.provider_id == provider_id)
+            .collect())
+    }
+    async fn find_provider_account(
+        &self,
+        provider_account_id: &str,
+    ) -> Result<Option<ProviderAccountRecord>> {
+        Ok(self
+            .list_provider_accounts()
+            .await?
+            .into_iter()
+            .find(|record| record.provider_account_id == provider_account_id))
+    }
+    async fn delete_provider_account(&self, provider_account_id: &str) -> Result<bool>;
 
     async fn insert_credential(
         &self,
@@ -84,6 +123,15 @@ pub trait AdminStore: Send + Sync {
         provider_id: &str,
         key_reference: &str,
     ) -> Result<bool>;
+    async fn upsert_official_provider_config(
+        &self,
+        config: &OfficialProviderConfig,
+    ) -> Result<OfficialProviderConfig>;
+    async fn list_official_provider_configs(&self) -> Result<Vec<OfficialProviderConfig>>;
+    async fn find_official_provider_config(
+        &self,
+        provider_id: &str,
+    ) -> Result<Option<OfficialProviderConfig>>;
 
     async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry>;
     async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>>;
@@ -108,6 +156,51 @@ pub trait AdminStore: Send + Sync {
         -> Result<ChannelModelRecord>;
     async fn list_channel_models(&self) -> Result<Vec<ChannelModelRecord>>;
     async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool>;
+    async fn upsert_provider_model(
+        &self,
+        record: &ProviderModelRecord,
+    ) -> Result<ProviderModelRecord>;
+    async fn list_provider_models(&self) -> Result<Vec<ProviderModelRecord>>;
+    async fn list_provider_models_for_model(
+        &self,
+        model_id: &str,
+    ) -> Result<Vec<ProviderModelRecord>> {
+        Ok(self
+            .list_provider_models()
+            .await?
+            .into_iter()
+            .filter(|record| record.model_id == model_id)
+            .collect())
+    }
+    async fn list_provider_models_for_provider(
+        &self,
+        proxy_provider_id: &str,
+    ) -> Result<Vec<ProviderModelRecord>> {
+        Ok(self
+            .list_provider_models()
+            .await?
+            .into_iter()
+            .filter(|record| record.proxy_provider_id == proxy_provider_id)
+            .collect())
+    }
+    async fn list_provider_models_for_channel_model(
+        &self,
+        channel_id: &str,
+        model_id: &str,
+    ) -> Result<Vec<ProviderModelRecord>> {
+        Ok(self
+            .list_provider_models()
+            .await?
+            .into_iter()
+            .filter(|record| record.channel_id == channel_id && record.model_id == model_id)
+            .collect())
+    }
+    async fn delete_provider_model(
+        &self,
+        proxy_provider_id: &str,
+        channel_id: &str,
+        model_id: &str,
+    ) -> Result<bool>;
     async fn insert_model_price(&self, record: &ModelPriceRecord) -> Result<ModelPriceRecord>;
     async fn list_model_prices(&self) -> Result<Vec<ModelPriceRecord>>;
     async fn delete_model_price(
@@ -259,19 +352,6 @@ pub trait AdminStore: Send + Sync {
     async fn find_project(&self, project_id: &str) -> Result<Option<Project>>;
     async fn delete_project(&self, project_id: &str) -> Result<bool>;
 
-    async fn insert_coupon(&self, coupon: &CouponCampaign) -> Result<CouponCampaign>;
-    async fn list_coupons(&self) -> Result<Vec<CouponCampaign>>;
-    async fn list_active_coupons(&self) -> Result<Vec<CouponCampaign>> {
-        Ok(self
-            .list_coupons()
-            .await?
-            .into_iter()
-            .filter(CouponCampaign::is_compatibility_live)
-            .collect())
-    }
-    async fn find_coupon(&self, coupon_id: &str) -> Result<Option<CouponCampaign>>;
-    async fn delete_coupon(&self, coupon_id: &str) -> Result<bool>;
-
     async fn insert_coupon_template_record(
         &self,
         _record: &CouponTemplateRecord,
@@ -305,6 +385,33 @@ pub trait AdminStore: Send + Sync {
             .into_iter()
             .find(|record| record.template_key == template_key))
     }
+    async fn insert_coupon_template_lifecycle_audit_record(
+        &self,
+        _record: &CouponTemplateLifecycleAuditRecord,
+    ) -> Result<CouponTemplateLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_coupon_template_lifecycle_audit_record",
+        ))
+    }
+    async fn list_coupon_template_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_coupon_template_lifecycle_audit_records",
+        ))
+    }
+    async fn list_coupon_template_lifecycle_audit_records_for_template(
+        &self,
+        coupon_template_id: &str,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        Ok(AdminStore::list_coupon_template_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.coupon_template_id == coupon_template_id)
+            .collect())
+    }
     async fn insert_marketing_campaign_record(
         &self,
         _record: &MarketingCampaignRecord,
@@ -330,6 +437,33 @@ pub trait AdminStore: Send + Sync {
             .filter(|record| record.coupon_template_id == coupon_template_id)
             .collect())
     }
+    async fn insert_marketing_campaign_lifecycle_audit_record(
+        &self,
+        _record: &MarketingCampaignLifecycleAuditRecord,
+    ) -> Result<MarketingCampaignLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_marketing_campaign_lifecycle_audit_record",
+        ))
+    }
+    async fn list_marketing_campaign_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_marketing_campaign_lifecycle_audit_records",
+        ))
+    }
+    async fn list_marketing_campaign_lifecycle_audit_records_for_campaign(
+        &self,
+        marketing_campaign_id: &str,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        Ok(AdminStore::list_marketing_campaign_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.marketing_campaign_id == marketing_campaign_id)
+            .collect())
+    }
     async fn insert_campaign_budget_record(
         &self,
         _record: &CampaignBudgetRecord,
@@ -353,6 +487,33 @@ pub trait AdminStore: Send + Sync {
             .await?
             .into_iter()
             .filter(|record| record.marketing_campaign_id == marketing_campaign_id)
+            .collect())
+    }
+    async fn insert_campaign_budget_lifecycle_audit_record(
+        &self,
+        _record: &CampaignBudgetLifecycleAuditRecord,
+    ) -> Result<CampaignBudgetLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_campaign_budget_lifecycle_audit_record",
+        ))
+    }
+    async fn list_campaign_budget_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_campaign_budget_lifecycle_audit_records",
+        ))
+    }
+    async fn list_campaign_budget_lifecycle_audit_records_for_budget(
+        &self,
+        campaign_budget_id: &str,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        Ok(AdminStore::list_campaign_budget_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.campaign_budget_id == campaign_budget_id)
             .collect())
     }
     async fn insert_coupon_code_record(
@@ -396,6 +557,33 @@ pub trait AdminStore: Send + Sync {
             .await?
             .into_iter()
             .filter(|record| record.is_redeemable_at(now_ms))
+            .collect())
+    }
+    async fn insert_coupon_code_lifecycle_audit_record(
+        &self,
+        _record: &CouponCodeLifecycleAuditRecord,
+    ) -> Result<CouponCodeLifecycleAuditRecord> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "insert_coupon_code_lifecycle_audit_record",
+        ))
+    }
+    async fn list_coupon_code_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        Err(unsupported_marketing_kernel_method(
+            self.dialect(),
+            "list_coupon_code_lifecycle_audit_records",
+        ))
+    }
+    async fn list_coupon_code_lifecycle_audit_records_for_code(
+        &self,
+        coupon_code_id: &str,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        Ok(AdminStore::list_coupon_code_lifecycle_audit_records(self)
+            .await?
+            .into_iter()
+            .filter(|record| record.coupon_code_id == coupon_code_id)
             .collect())
     }
     async fn insert_coupon_reservation_record(
@@ -529,6 +717,24 @@ pub trait AdminStore: Send + Sync {
         Err(unsupported_marketing_kernel_method(
             self.dialect(),
             "compensate_coupon_rollback_atomic",
+        ))
+    }
+
+    async fn insert_catalog_publication_lifecycle_audit_record(
+        &self,
+        _record: &CatalogPublicationLifecycleAuditRecord,
+    ) -> Result<CatalogPublicationLifecycleAuditRecord> {
+        Err(unsupported_commerce_method(
+            self.dialect(),
+            "insert_catalog_publication_lifecycle_audit_record",
+        ))
+    }
+    async fn list_catalog_publication_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CatalogPublicationLifecycleAuditRecord>> {
+        Err(unsupported_commerce_method(
+            self.dialect(),
+            "list_catalog_publication_lifecycle_audit_records",
         ))
     }
 

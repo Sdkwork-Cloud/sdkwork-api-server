@@ -856,7 +856,36 @@ export interface PortalCommerceCoupon {
   bonus_units: number;
 }
 
+export interface PortalApiProduct {
+  product_id: string;
+  product_kind: ApiProductKind;
+  target_id: string;
+  display_name: string;
+  source: PortalDataSource;
+}
+
+export interface PortalProductOffer {
+  offer_id: string;
+  product_id: string;
+  product_kind: ApiProductKind;
+  display_name: string;
+  quote_kind: PortalQuoteKind;
+  quote_target_kind: ApiProductKind;
+  quote_target_id: string;
+  publication_id?: string | null;
+  publication_kind?: string | null;
+  publication_status?: string | null;
+  pricing_plan_id?: string | null;
+  pricing_plan_version?: number | null;
+  pricing_rate_id?: string | null;
+  pricing_metric_code?: string | null;
+  price_label?: string | null;
+  source: PortalDataSource;
+}
+
 export interface PortalCommerceCatalog {
+  products: PortalApiProduct[];
+  offers: PortalProductOffer[];
   plans: SubscriptionPlan[];
   packs: RechargePack[];
   recharge_options: PortalRechargeOption[];
@@ -867,7 +896,7 @@ export interface PortalCommerceCatalog {
 export type MarketingBenefitKind = 'percentage_off' | 'fixed_amount_off' | 'grant_units';
 export type MarketingStackingPolicy = 'exclusive' | 'stackable' | 'best_of_group';
 export type MarketingSubjectScope = 'user' | 'project' | 'workspace' | 'account';
-export type CouponTemplateStatus = 'draft' | 'active' | 'archived';
+export type CouponTemplateStatus = 'draft' | 'scheduled' | 'active' | 'archived';
 export type CouponDistributionKind = 'shared_code' | 'unique_code' | 'auto_claim';
 export type MarketingCampaignStatus =
   | 'draft'
@@ -915,6 +944,7 @@ export interface CouponTemplateRecord {
   distribution_kind: CouponDistributionKind;
   benefit: CouponBenefitSpec;
   restriction: CouponRestrictionSpec;
+  activation_at_ms?: number | null;
   created_at_ms: number;
   updated_at_ms: number;
 }
@@ -992,7 +1022,7 @@ export interface CouponRollbackRecord {
 export interface PortalCouponValidationRequest {
   coupon_code: string;
   subject_scope: MarketingSubjectScope;
-  target_kind: PortalCommerceQuoteKind;
+  target_kind: PortalMarketingTargetKind;
   order_amount_minor: number;
   reserve_amount_minor: number;
 }
@@ -1014,7 +1044,7 @@ export interface PortalCouponValidationResponse {
 export interface PortalCouponReservationRequest {
   coupon_code: string;
   subject_scope: MarketingSubjectScope;
-  target_kind: PortalCommerceQuoteKind;
+  target_kind: PortalMarketingTargetKind;
   reserve_amount_minor: number;
   ttl_ms: number;
   idempotency_key?: string | null;
@@ -1058,6 +1088,48 @@ export interface PortalCouponRedemptionRollbackResponse {
   code: CouponCodeRecord;
 }
 
+export type PortalCouponEffectKind = 'checkout_discount' | 'account_entitlement';
+
+export interface PortalCouponApplicabilitySummary {
+  target_kinds: string[];
+  all_target_kinds_eligible: boolean;
+}
+
+export interface PortalCouponEffectSummary {
+  effect_kind: PortalCouponEffectKind;
+  discount_percent?: number | null;
+  discount_amount_minor?: number | null;
+  grant_units?: number | null;
+}
+
+export interface PortalCouponOwnershipSummary {
+  owned_by_current_subject: boolean;
+  claimed_to_current_subject: boolean;
+  claimed_subject_scope?: MarketingSubjectScope | null;
+  claimed_subject_id?: string | null;
+}
+
+export interface PortalCouponAccountArrivalLotItem {
+  lot_id: number;
+  benefit_type: CommercialAccountBenefitType;
+  source_type: CommercialAccountBenefitSourceType;
+  source_id?: number | null;
+  status: CommercialAccountBenefitLotStatus;
+  original_quantity: number;
+  remaining_quantity: number;
+  issued_at_ms: number;
+  expires_at_ms?: number | null;
+  scope_order_id?: string | null;
+}
+
+export interface PortalCouponAccountArrivalSummary {
+  order_id?: string | null;
+  account_id?: number | null;
+  benefit_lot_count: number;
+  credited_quantity: number;
+  benefit_lots: PortalCouponAccountArrivalLotItem[];
+}
+
 export interface PortalMarketingRedemptionSummary {
   total_count: number;
   redeemed_count: number;
@@ -1077,6 +1149,11 @@ export interface PortalMarketingCodeSummary {
 
 export interface PortalMarketingCodeItem {
   code: CouponCodeRecord;
+  template: CouponTemplateRecord;
+  campaign: MarketingCampaignRecord;
+  applicability: PortalCouponApplicabilitySummary;
+  effect: PortalCouponEffectSummary;
+  ownership: PortalCouponOwnershipSummary;
   latest_reservation?: CouponReservationRecord | null;
   latest_redemption?: CouponRedemptionRecord | null;
 }
@@ -1094,17 +1171,33 @@ export interface PortalMarketingRedemptionsResponse {
 export interface PortalMarketingRewardHistoryItem {
   redemption: CouponRedemptionRecord;
   code: CouponCodeRecord;
+  template: CouponTemplateRecord;
+  campaign: MarketingCampaignRecord;
+  applicability: PortalCouponApplicabilitySummary;
+  effect: PortalCouponEffectSummary;
+  ownership: PortalCouponOwnershipSummary;
+  account_arrival: PortalCouponAccountArrivalSummary;
   rollbacks: CouponRollbackRecord[];
 }
 
-export type PortalCommerceQuoteKind =
+export type PortalCommerceTargetKind =
   | 'subscription_plan'
   | 'recharge_pack'
   | 'custom_recharge'
   | 'coupon_redemption';
 
+export type PortalMarketingTargetKind = PortalCommerceTargetKind;
+
+export type ApiProductKind = Exclude<PortalCommerceTargetKind, 'coupon_redemption'>;
+
+export type PortalQuoteKind = 'product_purchase' | 'coupon_redemption';
+
+export type CommercialTransactionKind = 'product_purchase' | 'coupon_redemption';
+
+export type PortalCommerceQuoteKind = PortalCommerceTargetKind;
+
 export interface PortalCommerceQuoteRequest {
-  target_kind: PortalCommerceQuoteKind;
+  target_kind: PortalCommerceTargetKind;
   target_id: string;
   coupon_code?: string | null;
   current_remaining_units?: number | null;
@@ -1120,9 +1213,16 @@ export interface PortalAppliedCoupon {
 }
 
 export interface PortalCommerceQuote {
-  target_kind: PortalCommerceQuoteKind;
+  target_kind: PortalCommerceTargetKind;
+  product_kind?: ApiProductKind | null;
+  quote_kind: PortalQuoteKind;
   target_id: string;
   target_name: string;
+  product_id?: string | null;
+  offer_id?: string | null;
+  publication_id?: string | null;
+  publication_kind?: string | null;
+  publication_status?: string | null;
   list_price_cents: number;
   payable_price_cents: number;
   list_price_label: string;
@@ -1131,6 +1231,10 @@ export interface PortalCommerceQuote {
   bonus_units: number;
   amount_cents?: number | null;
   projected_remaining_units?: number | null;
+  pricing_plan_id?: string | null;
+  pricing_plan_version?: number | null;
+  pricing_rate_id?: string | null;
+  pricing_metric_code?: string | null;
   applied_coupon?: PortalAppliedCoupon | null;
   pricing_rule_label?: string | null;
   effective_ratio_label?: string | null;
@@ -1304,9 +1408,20 @@ export interface PortalCommerceOrder {
   order_id: string;
   project_id: string;
   user_id: string;
-  target_kind: PortalCommerceQuoteKind;
+  target_kind: PortalCommerceTargetKind;
+  product_kind?: ApiProductKind | null;
+  transaction_kind: CommercialTransactionKind;
+  product_id?: string | null;
+  offer_id?: string | null;
+  publication_id?: string | null;
+  publication_kind?: string | null;
+  publication_status?: string | null;
   target_id: string;
   target_name: string;
+  pricing_plan_id?: string | null;
+  pricing_plan_version?: number | null;
+  pricing_rate_id?: string | null;
+  pricing_metric_code?: string | null;
   list_price_cents: number;
   payable_price_cents: number;
   list_price_label: string;

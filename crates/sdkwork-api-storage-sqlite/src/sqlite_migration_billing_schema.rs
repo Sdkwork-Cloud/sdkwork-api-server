@@ -57,6 +57,12 @@ pub(crate) async fn apply_sqlite_billing_schema(pool: &SqlitePool) -> Result<()>
     .execute(pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_account_benefit_lot_account_lot
+         ON ai_account_benefit_lot (account_id, lot_id)",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_account_hold (
             hold_id INTEGER PRIMARY KEY NOT NULL,
             tenant_id INTEGER NOT NULL,
@@ -287,6 +293,7 @@ pub(crate) async fn apply_sqlite_billing_schema(pool: &SqlitePool) -> Result<()>
             currency_code TEXT NOT NULL DEFAULT 'USD',
             credit_unit_code TEXT NOT NULL DEFAULT 'credit',
             status TEXT NOT NULL DEFAULT 'draft',
+            ownership_scope TEXT NOT NULL DEFAULT 'workspace',
             effective_from_ms INTEGER NOT NULL DEFAULT 0,
             effective_to_ms INTEGER,
             created_at_ms INTEGER NOT NULL DEFAULT 0,
@@ -300,6 +307,13 @@ pub(crate) async fn apply_sqlite_billing_schema(pool: &SqlitePool) -> Result<()>
          ON ai_pricing_plan (tenant_id, organization_id, plan_code, plan_version)",
     )
     .execute(pool)
+    .await?;
+    ensure_sqlite_column(
+        pool,
+        "ai_pricing_plan",
+        "ownership_scope",
+        "ownership_scope TEXT NOT NULL DEFAULT 'workspace'",
+    )
     .await?;
     ensure_sqlite_column(
         pool,

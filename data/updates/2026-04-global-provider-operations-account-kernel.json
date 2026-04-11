@@ -1,0 +1,24 @@
+{
+  "update_id": "2026-04-global-provider-operations-account-kernel",
+  "release_version": "2026.04.18",
+  "description": "Add account-kernel evidence for provider-operations readiness so official live, proxy, and local provider groups are inspectable through holds, metering, settlements, and ledger history.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness",
+    "2026-04-account-kernel-commercial-foundation"
+  ],
+  "account_benefit_lots": [
+    "account-benefit-lots/2026-04-global-provider-operations-account-kernel.json"
+  ],
+  "account_holds": [
+    "account-holds/2026-04-global-provider-operations-account-kernel.json"
+  ],
+  "account_ledger": [
+    "account-ledger/2026-04-global-provider-operations-account-kernel.json"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-global-provider-operations-account-kernel.json"
+  ],
+  "request_settlements": [
+    "request-settlements/2026-04-global-provider-operations-account-kernel.json"
+  ]
+}

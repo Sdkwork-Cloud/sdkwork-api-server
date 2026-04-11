@@ -66,6 +66,13 @@ pub(crate) async fn apply_sqlite_catalog_gateway_compatibility(pool: &SqlitePool
     ensure_sqlite_column(
         pool,
         "ai_proxy_provider",
+        "protocol_kind",
+        "protocol_kind TEXT NOT NULL DEFAULT ''",
+    )
+    .await?;
+    ensure_sqlite_column(
+        pool,
+        "ai_proxy_provider",
         "base_url",
         "base_url TEXT NOT NULL DEFAULT 'http://localhost'",
     )
@@ -250,6 +257,21 @@ pub(crate) async fn apply_sqlite_catalog_gateway_compatibility(pool: &SqlitePool
         "ai_model_price",
         "request_price",
         "request_price REAL NOT NULL DEFAULT 0",
+    )
+    .await?;
+    ensure_sqlite_column(
+        pool,
+        "ai_model_price",
+        "price_source_kind",
+        "price_source_kind TEXT NOT NULL DEFAULT 'reference'",
+    )
+    .await?;
+    ensure_sqlite_column(pool, "ai_model_price", "billing_notes", "billing_notes TEXT").await?;
+    ensure_sqlite_column(
+        pool,
+        "ai_model_price",
+        "pricing_tiers_json",
+        "pricing_tiers_json TEXT NOT NULL DEFAULT '[]'",
     )
     .await?;
     ensure_sqlite_column(

@@ -1,11 +1,6 @@
 import {
-  Button,
   Card,
   DataTable,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -14,7 +9,6 @@ import {
   PaginationPrevious,
   type DataTableColumn,
 } from '@sdkwork/ui-pc-react';
-import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   buildEmbeddedAdminSingleSelectRowProps,
@@ -33,10 +27,7 @@ type CouponsRegistrySectionProps = {
   expiringSoonCoupons: CouponRecord[];
   filteredCoupons: CouponRecord[];
   nextExpiringCoupon: { coupon: CouponRecord; days: number | null } | null;
-  onDeleteCoupon: (coupon: CouponRecord) => void;
-  onEditCoupon: (coupon?: CouponRecord) => void;
   onSelectCoupon: (coupon: CouponRecord) => void;
-  onToggleCoupon: (coupon: CouponRecord) => Promise<void> | void;
   remainingQuota: number;
   selectedCouponId: string | null;
 };
@@ -50,10 +41,7 @@ export function CouponsRegistrySection({
   expiringSoonCoupons,
   filteredCoupons,
   nextExpiringCoupon,
-  onDeleteCoupon,
-  onEditCoupon,
   onSelectCoupon,
-  onToggleCoupon,
   remainingQuota,
   selectedCouponId,
 }: CouponsRegistrySectionProps) {
@@ -90,48 +78,6 @@ export function CouponsRegistrySection({
         )}
         onRowClick={onSelectCoupon}
         slotProps={embeddedAdminDataTableSlotProps}
-        rowActions={(coupon: CouponRecord) => (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              onClick={(event) => {
-                event.stopPropagation();
-                onEditCoupon(coupon);
-              }}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              {t('Edit')}
-            </Button>
-            <Button
-              onClick={(event) => {
-                event.stopPropagation();
-                void onToggleCoupon(coupon);
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {coupon.active ? t('Archive') : t('Restore')}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" type="button" variant="ghost">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-[var(--sdk-color-state-danger)]"
-                  onClick={() => onDeleteCoupon(coupon)}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-2" />
-                  {t('Delete')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
         rows={paginatedCoupons}
         stickyHeader
       />

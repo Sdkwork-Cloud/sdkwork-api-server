@@ -1,0 +1,80 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-dev-growth-lab",
+      "tenant_id": "tenant_growth_lab",
+      "project_id": "project_growth_lab",
+      "api_key_group_id": "group-growth-lab-sandbox",
+      "capability": "responses",
+      "route_key": "minimax-m1",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_growth_lab",
+      "applied_routing_profile_id": "profile-growth-lab-asia-official",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-minimax-official",
+        "provider-ernie-official",
+        "provider-siliconflow-main"
+      ],
+      "default_provider_id": "provider-minimax-official",
+      "max_cost": 4.0,
+      "max_latency_ms": 8500,
+      "require_healthy": false,
+      "preferred_region": "apac",
+      "created_at_ms": 1710001410000,
+      "updated_at_ms": 1710001410500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-dev-growth-lab",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_growth_lab",
+      "project_id": "project_growth_lab",
+      "api_key_group_id": "group-growth-lab-sandbox",
+      "capability": "responses",
+      "route_key": "minimax-m1",
+      "selected_provider_id": "provider-minimax-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-growth-lab-asia-official",
+      "compiled_routing_snapshot_id": "snapshot-dev-growth-lab",
+      "strategy": "deterministic_priority",
+      "selection_seed": 404,
+      "selection_reason": "growth lab sandbox prefers the lower-latency Asia reasoning route",
+      "fallback_reason": null,
+      "requested_region": "apac",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710001411000,
+      "assessments": [
+        {
+          "provider_id": "provider-minimax-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.91,
+          "latency_ms": 410,
+          "region": "sg",
+          "region_match": true,
+          "reasons": [
+            "preferred sandbox reasoning provider"
+          ]
+        },
+        {
+          "provider_id": "provider-ernie-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.62,
+          "latency_ms": 470,
+          "region": "cn",
+          "region_match": true,
+          "reasons": [
+            "regional fallback for Chinese-language prompts"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": []
+}

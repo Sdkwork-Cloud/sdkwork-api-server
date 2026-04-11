@@ -1,5 +1,7 @@
 # 企业级优惠券与促销系统详细设计
 
+> 状态：历史设计草案，已被 `docs/架构/166-*` 与 2026-04-10 的 legacy coupon 全量退场结果取代；以下内容仅保留为问题分析与演进背景。
+
 **状态：** 基于 `sdkwork-api-router` 当前仓库实现与 2026-04-05 官方行业资料校对后的增强设计稿
 
 **目标：** 将当前 `单表 coupon campaign + 剩余额度递减` 的轻量实现，升级为可商用、可审计、可回滚、可扩展、可对账、可运营的企业级优惠券与促销系统，并与现有订单、支付、账户、计费、退款、门户和后台体系形成完整闭环。
@@ -113,8 +115,8 @@
 
 当前实现的核心位置：
 
-- 当前优惠券领域对象：`crates/sdkwork-api-domain-coupon/src/lib.rs`
-- 当前优惠券应用逻辑：`crates/sdkwork-api-app-coupon/src/lib.rs`
+- 当时的 legacy coupon 领域对象：已移除的历史 coupon domain crate
+- 当时的 legacy coupon 应用逻辑：已移除的历史 coupon app crate
 - 当前订单与门户优惠逻辑：`crates/sdkwork-api-app-commerce/src/lib.rs`
 - 当前后台优惠券接口：`crates/sdkwork-api-interface-admin/src/lib.rs`
 - 当前门户订单与对账联动：`crates/sdkwork-api-interface-portal/src/lib.rs`
@@ -825,15 +827,15 @@ grant 型优惠包括：
 
 ### 兼容旧接口策略
 
-当前旧接口：
+当时的旧兼容接口：
 
-- `GET /admin/coupons`
-- `POST /admin/coupons`
-- `DELETE /admin/coupons/{coupon_id}`
+- legacy admin coupon list route
+- legacy admin coupon create route
+- legacy admin coupon delete route
 
 兼容策略：
 
-- `POST /admin/coupons` 继续存在，但内部改为生成：
+- legacy admin coupon create route 继续存在，但内部改为生成：
   - 一个 `CouponTemplateRecord`
   - 一个 `MarketingCampaignRecord`
   - 一个 `CouponCodeBatchRecord`

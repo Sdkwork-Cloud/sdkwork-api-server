@@ -1,0 +1,68 @@
+[
+  {
+    "proxy_provider_id": "provider-ernie-official",
+    "channel_id": "ernie",
+    "model_id": "ernie-4.5-turbo",
+    "provider_model_id": "ernie-4.5-turbo",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-ernie-official",
+    "channel_id": "ernie",
+    "model_id": "ernie-embedding-v1",
+    "provider_model_id": "ernie-embedding-v1",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-minimax-official",
+    "channel_id": "minimax",
+    "model_id": "minimax-m1",
+    "provider_model_id": "minimax-m1",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": false,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-minimax-official",
+    "channel_id": "minimax",
+    "model_id": "minimax-embedding",
+    "provider_model_id": "minimax-embedding",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": false,
+    "is_default_route": false,
+    "is_active": true
+  }
+]

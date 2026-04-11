@@ -50,10 +50,8 @@ where
     .map_err(|error| CommerceError::Conflict(error.to_string()))?;
     store
         .reserve_coupon_redemption_atomic(&AtomicCouponReservationCommand {
-            template_to_persist: (context.source != "marketing")
-                .then_some(context.template.clone()),
-            campaign_to_persist: (context.source != "marketing")
-                .then_some(context.campaign.clone()),
+            template_to_persist: None,
+            campaign_to_persist: None,
             expected_budget: context.budget.clone(),
             next_budget: reserve_campaign_budget(
                 &context.budget,
@@ -392,14 +390,10 @@ where
         });
     }
 
-    load_compatibility_marketing_coupon_context(store, &normalized_code)
-        .await?
-        .ok_or_else(|| {
-            CommerceError::Conflict(format!(
-                "coupon {} no longer resolves to a marketing context",
-                code_value
-            ))
-        })
+    Err(CommerceError::Conflict(format!(
+        "coupon {} no longer resolves to a marketing context",
+        code_value
+    )))
 }
 
 fn coupon_code_is_exclusive(template: &CouponTemplateRecord) -> bool {

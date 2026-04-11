@@ -1,0 +1,150 @@
+{
+  "coupons": [
+    {
+      "id": "coupon-launch-credit-100",
+      "code": "LAUNCH100",
+      "discount_label": "$100 launch credit",
+      "audience": "all_new_workspaces",
+      "remaining": 5000,
+      "active": true,
+      "note": "新租户首单信用金。",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710000000000
+    },
+    {
+      "id": "coupon-partner-20",
+      "code": "PARTNER20",
+      "discount_label": "20% partner program discount",
+      "audience": "channel_partners",
+      "remaining": 1000,
+      "active": true,
+      "note": "渠道合作伙伴默认折扣。",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710000000000
+    }
+  ],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-launch-credit-100",
+      "template_key": "launch-credit-100",
+      "display_name": "Launch Credit 100",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 10000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 10000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 10000,
+        "first_order_only": true,
+        "new_customer_only": true,
+        "exclusive_group": "launch",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 1,
+        "eligible_target_kinds": ["subscription_plan", "recharge_pack"]
+      },
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "coupon_template_id": "template-partner-20",
+      "template_key": "partner-20",
+      "display_name": "Partner 20 Percent",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "percentage_off",
+        "discount_percent": 20,
+        "discount_amount_minor": null,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 50000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 0,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "partner",
+        "stacking_policy": "best_of_group",
+        "max_redemptions_per_subject": 5,
+        "eligible_target_kinds": ["subscription_plan", "recharge_pack", "enterprise_contract"]
+      },
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-launch-q2",
+      "coupon_template_id": "template-launch-credit-100",
+      "display_name": "Launch Campaign Q2",
+      "status": "active",
+      "start_at_ms": 1710000000000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "marketing_campaign_id": "campaign-partner-enablement",
+      "coupon_template_id": "template-partner-20",
+      "display_name": "Partner Enablement",
+      "status": "active",
+      "start_at_ms": 1710000000000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-launch-q2",
+      "marketing_campaign_id": "campaign-launch-q2",
+      "status": "active",
+      "total_budget_minor": 5000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "campaign_budget_id": "budget-partner-enablement",
+      "marketing_campaign_id": "campaign-partner-enablement",
+      "status": "active",
+      "total_budget_minor": 8000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-launch-credit-100",
+      "coupon_template_id": "template-launch-credit-100",
+      "code_value": "LAUNCH100",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    },
+    {
+      "coupon_code_id": "coupon-code-partner-20-global",
+      "coupon_template_id": "template-partner-20",
+      "code_value": "PARTNER20",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000000000,
+      "updated_at_ms": 1710000000000
+    }
+  ]
+}

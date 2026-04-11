@@ -13,7 +13,7 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-const sharedUiPackagePath = 'file:../../../../../sdkwork-ui/sdkwork-ui-pc-react';
+const sharedUiPackagePath = 'workspace:*';
 
 test('traffic and operations use paginated admin-table patterns instead of legacy admin workbenches', () => {
   const coverage = [

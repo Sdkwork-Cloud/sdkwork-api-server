@@ -24,6 +24,7 @@ export function parseWorkspaceArgs(argv) {
     webBind: '0.0.0.0:9983',
     install: false,
     preview: false,
+    proxyDev: false,
     tauri: false,
     dryRun: false,
     help: false,
@@ -62,6 +63,9 @@ export function parseWorkspaceArgs(argv) {
         break;
       case '--preview':
         settings.preview = true;
+        break;
+      case '--proxy-dev':
+        settings.proxyDev = true;
         break;
       case '--tauri':
         settings.tauri = true;
@@ -122,6 +126,16 @@ export function buildWorkspaceCommandPlan(settings) {
     webArgs.push('--preview');
   }
 
+  if (settings.proxyDev) {
+    webArgs.push(
+      '--admin-site-target',
+      '127.0.0.1:5173',
+      '--portal-site-target',
+      '127.0.0.1:5174',
+      '--proxy-dev',
+    );
+  }
+
   if (settings.tauri) {
     adminArgs.push('--tauri');
     webArgs.push('--tauri');
@@ -151,7 +165,13 @@ export function buildWorkspaceCommandPlan(settings) {
       args: portalArgs,
     },
     web: {
-      name: settings.preview ? 'web-preview' : settings.tauri ? 'web-tauri' : 'web-static',
+      name: settings.preview
+        ? 'web-preview'
+        : settings.proxyDev
+          ? 'web-proxy-dev'
+          : settings.tauri
+            ? 'web-tauri'
+            : 'web-static',
       scriptPath: 'scripts/dev/start-web.mjs',
       args: webArgs,
     },
@@ -159,13 +179,16 @@ export function buildWorkspaceCommandPlan(settings) {
 }
 
 export function workspaceAccessLines(settings) {
-  const unifiedAccessEnabled = settings.preview || settings.tauri;
+  const unifiedAccessEnabled = settings.preview || settings.proxyDev || settings.tauri;
   const lines = [
-    `[start-workspace] Mode: ${settings.preview ? 'preview' : settings.tauri ? 'tauri' : 'browser'}`,
+    `[start-workspace] Mode: ${settings.preview ? 'preview' : settings.proxyDev ? 'proxy-dev' : settings.tauri ? 'tauri' : 'browser'}`,
   ];
 
   if (unifiedAccessEnabled) {
     lines.push('[start-workspace] Unified Access');
+    if (settings.proxyDev) {
+      lines.push('[start-workspace]   Frontend delivery: proxy hot reload');
+    }
     lines.push(`[start-workspace]   Admin App: ${resolveLoopbackUrl(settings.webBind, '/admin/')}`);
     lines.push(`[start-workspace]   Portal App: ${resolveLoopbackUrl(settings.webBind, '/portal/')}`);
     lines.push(`[start-workspace]   Gateway API Health: ${resolveLoopbackUrl(settings.webBind, '/api/v1/health')}`);
@@ -200,6 +223,7 @@ Options:
   --web-bind <bind>      SDKWORK_WEB_BIND override for the Pingora public host
   --install              Run pnpm install before starting the frontend apps
   --preview              Build admin and portal, then serve them through the Pingora web host
+  --proxy-dev            Start admin and portal Vite dev servers, then proxy them through the Pingora web host
   --tauri                Start the admin Tauri shell and the Pingora web host for external access
   --dry-run              Print the backend, admin, portal, and web-host commands without running them
   -h, --help             Show this help

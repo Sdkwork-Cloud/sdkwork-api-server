@@ -594,5 +594,3 @@ async fn stateful_chat_route_records_upstream_token_usage() {
     assert_eq!(usage_json[0]["output_tokens"], 80);
     assert_eq!(usage_json[0]["total_tokens"], 200);
 }
-
-#[tokio::test]

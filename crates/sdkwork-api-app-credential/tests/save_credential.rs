@@ -1,6 +1,8 @@
 use sdkwork_api_app_credential::{
+    persist_official_provider_config_with_secret_and_manager,
     persist_credential_with_secret, persist_credential_with_secret_and_manager,
-    resolve_credential_secret, resolve_provider_secret_with_manager, save_credential,
+    resolve_credential_secret, resolve_provider_secret_with_fallback_and_manager,
+    resolve_provider_secret_with_manager, save_credential,
     CredentialSecretManager,
 };
 use sdkwork_api_secret_core::{master_key_id, SecretBackendKind};
@@ -215,4 +217,101 @@ async fn resolves_historical_credentials_after_secret_manager_reconfiguration() 
     assert_eq!(secret.as_deref(), Some("sk-upstream-openai"));
     let _ = std::fs::remove_file(initial_path);
     let _ = std::fs::remove_file(rotated_path);
+}
+
+#[tokio::test]
+async fn official_provider_secret_is_used_as_fallback_when_tenant_secret_is_missing() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    persist_official_provider_config_with_secret_and_manager(
+        &store,
+        &manager,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        true,
+        "sk-platform-openai",
+    )
+    .await
+    .unwrap();
+
+    let secret = resolve_provider_secret_with_fallback_and_manager(
+        &store,
+        &manager,
+        "tenant-1",
+        "provider-openai-official",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(secret.as_deref(), Some("sk-platform-openai"));
+}
+
+#[tokio::test]
+async fn tenant_secret_wins_over_official_provider_fallback_secret() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    persist_official_provider_config_with_secret_and_manager(
+        &store,
+        &manager,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        true,
+        "sk-platform-openai",
+    )
+    .await
+    .unwrap();
+    persist_credential_with_secret_and_manager(
+        &store,
+        &manager,
+        "tenant-1",
+        "provider-openai-official",
+        "cred-openai",
+        "sk-tenant-openai",
+    )
+    .await
+    .unwrap();
+
+    let secret = resolve_provider_secret_with_fallback_and_manager(
+        &store,
+        &manager,
+        "tenant-1",
+        "provider-openai-official",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(secret.as_deref(), Some("sk-tenant-openai"));
+}
+
+#[tokio::test]
+async fn disabled_official_provider_secret_does_not_count_as_fallback() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    persist_official_provider_config_with_secret_and_manager(
+        &store,
+        &manager,
+        "provider-openai-official",
+        "https://api.openai.com/v1",
+        false,
+        "sk-platform-openai",
+    )
+    .await
+    .unwrap();
+
+    let secret = resolve_provider_secret_with_fallback_and_manager(
+        &store,
+        &manager,
+        "tenant-1",
+        "provider-openai-official",
+    )
+    .await
+    .unwrap();
+
+    assert!(secret.is_none());
 }

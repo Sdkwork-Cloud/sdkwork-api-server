@@ -1,0 +1,14 @@
+{
+  "update_id": "2026-04-global-extension-activation",
+  "release_version": "2026.04.11",
+  "description": "Activate official extension installations and instance-level health coverage for the expanded Asia provider catalog.",
+  "depends_on": [
+    "2026-04-global-catalog-expansion"
+  ],
+  "extensions": [
+    "extensions/2026-04-global-extension-activation.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-extension-activation.json"
+  ]
+}

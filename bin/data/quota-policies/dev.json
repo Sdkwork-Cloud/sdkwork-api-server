@@ -1,0 +1,66 @@
+{
+  "quota_policies": [
+    {
+      "policy_id": "quota-local-demo-live",
+      "project_id": "project_local_demo",
+      "max_units": 15000000,
+      "enabled": true
+    },
+    {
+      "policy_id": "quota-local-demo-sandbox",
+      "project_id": "project_local_demo",
+      "max_units": 5000000,
+      "enabled": true
+    },
+    {
+      "policy_id": "quota-partner-demo-staging",
+      "project_id": "project_partner_demo",
+      "max_units": 8000000,
+      "enabled": true
+    }
+  ],
+  "rate_limit_policies": [
+    {
+      "policy_id": "rate-limit-local-demo-responses",
+      "project_id": "project_local_demo",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": null,
+      "requests_per_window": 180,
+      "window_seconds": 60,
+      "burst_requests": 300,
+      "enabled": true,
+      "notes": "Local demo responses rate limit",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "policy_id": "rate-limit-local-demo-embeddings",
+      "project_id": "project_local_demo",
+      "api_key_hash": null,
+      "route_key": "embeddings",
+      "model_name": null,
+      "requests_per_window": 240,
+      "window_seconds": 60,
+      "burst_requests": 360,
+      "enabled": true,
+      "notes": "Local demo embeddings rate limit",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "policy_id": "rate-limit-partner-demo-responses",
+      "project_id": "project_partner_demo",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": null,
+      "requests_per_window": 120,
+      "window_seconds": 60,
+      "burst_requests": 180,
+      "enabled": true,
+      "notes": "Partner sandbox responses rate limit",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ]
+}

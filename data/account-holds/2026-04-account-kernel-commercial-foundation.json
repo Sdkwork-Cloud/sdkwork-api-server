@@ -1,0 +1,33 @@
+{
+  "holds": [
+    {
+      "hold_id": 8101001,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610001,
+      "status": "partially_released",
+      "estimated_quantity": 7000.0,
+      "captured_quantity": 6500.0,
+      "released_quantity": 500.0,
+      "expires_at_ms": 1710000900000,
+      "created_at_ms": 1710000300000,
+      "updated_at_ms": 1710000300500
+    }
+  ],
+  "allocations": [
+    {
+      "hold_allocation_id": 8401001,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "hold_id": 8101001,
+      "lot_id": 8001001,
+      "allocated_quantity": 7000.0,
+      "captured_quantity": 6500.0,
+      "released_quantity": 500.0,
+      "created_at_ms": 1710000300000,
+      "updated_at_ms": 1710000300500
+    }
+  ]
+}

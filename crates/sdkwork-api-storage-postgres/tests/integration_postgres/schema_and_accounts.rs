@@ -116,6 +116,7 @@ async fn postgres_store_creates_canonical_account_kernel_tables_when_url_is_prov
     for index_name in [
         "idx_ai_account_user_type",
         "idx_ai_account_benefit_lot_account_status_expiry",
+        "idx_ai_account_benefit_lot_account_lot",
         "idx_ai_account_hold_request",
         "idx_ai_account_hold_allocation_hold_lot",
         "idx_ai_account_ledger_allocation_ledger_lot",

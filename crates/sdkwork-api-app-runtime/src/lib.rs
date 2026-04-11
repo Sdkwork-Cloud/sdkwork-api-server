@@ -41,6 +41,7 @@ use tokio::time::MissedTickBehavior;
 mod rollout_execution;
 mod rollout_models;
 mod runtime_builders;
+mod bootstrap_data;
 mod runtime_core;
 mod runtime_reload;
 mod standalone_listener;
@@ -84,6 +85,7 @@ pub use runtime_builders::{
     build_admin_store_and_commercial_billing_from_config, build_admin_store_from_config,
     build_cache_runtime_from_config,
 };
+pub use sdkwork_api_app_billing::CommercialBillingReadKernel;
 pub use runtime_core::{
     StandaloneRuntimeSupervision, StandaloneServiceKind, StandaloneServiceReloadHandles,
 };

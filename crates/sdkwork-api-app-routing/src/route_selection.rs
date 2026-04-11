@@ -1,5 +1,9 @@
 use super::*;
 
+const POLICY_CANDIDATE_UNAVAILABLE_FALLBACK_REASON: &str = "policy_candidate_unavailable";
+const NO_CATALOG_OR_POLICY_CANDIDATES_FALLBACK_REASON: &str =
+    "no catalog-backed or policy-backed candidates were available";
+
 pub async fn simulate_route_with_store(
     store: &dyn AdminStore,
     capability: &str,
@@ -166,6 +170,14 @@ async fn simulate_route_with_store_inner(
         .into_iter()
         .map(|provider| (provider.id.clone(), provider))
         .collect::<HashMap<_, _>>();
+    let policy_candidate_unavailable = effective_policy.as_ref().and_then(|policy| {
+        let available_provider_ids = if model_candidate_ids.is_empty() {
+            provider_map.keys().cloned().collect::<HashSet<_>>()
+        } else {
+            model_candidate_ids.iter().cloned().collect::<HashSet<_>>()
+        };
+        policy_candidate_unavailable_fallback_reason(policy, &available_provider_ids)
+    });
 
     let candidate_ids = if model_candidate_ids.is_empty() {
         if let Some(policy) = effective_policy.as_ref() {
@@ -196,9 +208,10 @@ async fn simulate_route_with_store_inner(
                 return Ok(simulate_route(capability, model)?
                     .with_applied_routing_profile_id_option(applied_routing_profile_id.clone())
                     .with_compiled_routing_snapshot_id(compiled_snapshot_id)
-                    .with_fallback_reason(
-                        "no catalog-backed or policy-backed candidates were available",
-                    )
+                    .with_fallback_reason_option(merged_fallback_reason(
+                        Some(NO_CATALOG_OR_POLICY_CANDIDATES_FALLBACK_REASON),
+                        policy_candidate_unavailable,
+                    ))
                     .with_requested_region_option(requested_region.clone()));
             }
 
@@ -223,9 +236,7 @@ async fn simulate_route_with_store_inner(
             return Ok(simulate_route(capability, model)?
                 .with_applied_routing_profile_id_option(applied_routing_profile_id.clone())
                 .with_compiled_routing_snapshot_id(compiled_snapshot_id)
-                .with_fallback_reason(
-                    "no catalog-backed or policy-backed candidates were available",
-                )
+                .with_fallback_reason(NO_CATALOG_OR_POLICY_CANDIDATES_FALLBACK_REASON)
                 .with_requested_region_option(requested_region.clone()));
         }
     } else {
@@ -315,6 +326,10 @@ async fn simulate_route_with_store_inner(
         .iter()
         .map(|assessment| assessment.provider_id.clone())
         .collect::<Vec<_>>();
+    let fallback_reason = merged_fallback_reason(
+        fallback_reason.as_deref(),
+        policy_candidate_unavailable,
+    );
 
     let mut decision = RoutingDecision::new(selected, ranked_candidate_ids)
         .with_applied_routing_profile_id_option(applied_routing_profile_id)
@@ -496,6 +511,31 @@ fn sanitize_snapshot_segment(value: &str) -> String {
         }
     }
     sanitized.trim_matches('-').to_owned()
+}
+
+fn policy_candidate_unavailable_fallback_reason<'a>(
+    policy: &RoutingPolicy,
+    available_provider_ids: &'a HashSet<String>,
+) -> Option<&'static str> {
+    policy
+        .declared_provider_ids()
+        .into_iter()
+        .any(|provider_id| !available_provider_ids.contains(&provider_id))
+        .then_some(POLICY_CANDIDATE_UNAVAILABLE_FALLBACK_REASON)
+}
+
+fn merged_fallback_reason(existing: Option<&str>, additional: Option<&str>) -> Option<String> {
+    match (existing, additional) {
+        (Some(existing), Some(additional))
+            if existing.split(';').any(|value| value == additional) =>
+        {
+            Some(existing.to_owned())
+        }
+        (Some(existing), Some(additional)) => Some(format!("{existing};{additional}")),
+        (Some(existing), None) => Some(existing.to_owned()),
+        (None, Some(additional)) => Some(additional.to_owned()),
+        (None, None) => None,
+    }
 }
 
 fn apply_project_routing_preferences(

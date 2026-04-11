@@ -290,8 +290,8 @@
 **Files:**
 - Create: `docs/superpowers/specs/2026-04-04-coupon-and-growth-marketing-system-design.md`
 - Create: `docs/superpowers/plans/2026-04-04-coupon-and-growth-marketing-program.md`
-- Modify: `crates/sdkwork-api-domain-coupon/src/lib.rs`
-- Modify: `crates/sdkwork-api-app-coupon/src/lib.rs`
+- Modify: historical legacy coupon domain compatibility layer
+- Modify: historical legacy coupon app compatibility layer
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/index.tsx`
 - Modify: `apps/sdkwork-router-portal/packages/sdkwork-router-portal-credits/src/pages/index.tsx`
 

@@ -1,0 +1,26 @@
+{
+  "update_id": "2026-04-dev-experience-expansion",
+  "release_version": "2026.04.10-dev",
+  "description": "Add a growth-lab workspace, routing preferences, quota policy, and realistic observability samples for developer deployments.",
+  "depends_on": [
+    "2026-04-global-catalog-expansion"
+  ],
+  "tenants": [
+    "tenants/2026-04-dev-expansion.json"
+  ],
+  "projects": [
+    "projects/2026-04-dev-expansion.json"
+  ],
+  "routing": [
+    "routing/2026-04-dev-expansion.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/2026-04-dev-expansion.json"
+  ],
+  "observability": [
+    "observability/2026-04-dev-expansion.json"
+  ],
+  "quota_policies": [
+    "quota-policies/2026-04-dev-expansion.json"
+  ]
+}

@@ -1,7 +1,7 @@
 pub(crate) mod stripe;
 
 use crate::error::{CommerceError, CommerceResult};
-use sdkwork_api_app_credential::{CredentialSecretManager, resolve_credential_secret_with_manager};
+use sdkwork_api_app_credential::{resolve_credential_secret_with_manager, CredentialSecretManager};
 use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, PaymentMethodCredentialBindingRecord, PaymentMethodRecord,
 };

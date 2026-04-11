@@ -1,0 +1,223 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-prod-openrouter-xai",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-xai-live",
+      "capability": "responses",
+      "route_key": "grok-4",
+      "matched_policy_id": "policy-openrouter-xai-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openrouter-xai",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-xai-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 16,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491500
+    },
+    {
+      "snapshot_id": "snapshot-prod-openrouter-moonshot",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-moonshot-live",
+      "capability": "responses",
+      "route_key": "kimi-k2.5",
+      "matched_policy_id": "policy-openrouter-moonshot-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openrouter-moonshot",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-moonshot-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 9500,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000492000,
+      "updated_at_ms": 1710000492500
+    },
+    {
+      "snapshot_id": "snapshot-prod-openrouter-mistral",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-mistral-live",
+      "capability": "responses",
+      "route_key": "mistral-large-latest",
+      "matched_policy_id": "policy-openrouter-mistral-responses",
+      "project_routing_preferences_project_id": "project_global_default",
+      "applied_routing_profile_id": "profile-global-openrouter-mistral",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-mistral-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 6.5,
+      "max_latency_ms": 9000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710000493000,
+      "updated_at_ms": 1710000493500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-prod-openrouter-xai",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-xai-live",
+      "capability": "responses",
+      "route_key": "grok-4",
+      "selected_provider_id": "provider-openrouter-main",
+      "matched_policy_id": "policy-openrouter-xai-responses",
+      "applied_routing_profile_id": "profile-global-openrouter-xai",
+      "compiled_routing_snapshot_id": "snapshot-prod-openrouter-xai",
+      "strategy": "deterministic_priority",
+      "selection_seed": 707,
+      "selection_reason": "Dedicated proxy xAI group selected OpenRouter first with official Grok fallback available.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000491100,
+      "assessments": [
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.0162,
+          "latency_ms": 820,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "proxy-first Grok marketplace route"
+          ]
+        },
+        {
+          "provider_id": "provider-xai-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.0162,
+          "latency_ms": 860,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "official Grok fallback"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-openrouter-moonshot",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-moonshot-live",
+      "capability": "responses",
+      "route_key": "kimi-k2.5",
+      "selected_provider_id": "provider-openrouter-main",
+      "matched_policy_id": "policy-openrouter-moonshot-responses",
+      "applied_routing_profile_id": "profile-global-openrouter-moonshot",
+      "compiled_routing_snapshot_id": "snapshot-prod-openrouter-moonshot",
+      "strategy": "deterministic_priority",
+      "selection_seed": 708,
+      "selection_reason": "Dedicated proxy Moonshot group selected OpenRouter first with Moonshot official fallback available.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000492100,
+      "assessments": [
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.003,
+          "latency_ms": 760,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "proxy-first Kimi marketplace route"
+          ]
+        },
+        {
+          "provider_id": "provider-moonshot-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.003,
+          "latency_ms": 810,
+          "region": "cn",
+          "region_match": false,
+          "reasons": [
+            "official Kimi fallback"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-prod-openrouter-mistral",
+      "decision_source": "admin_simulation",
+      "tenant_id": "tenant_global_default",
+      "project_id": "project_global_default",
+      "api_key_group_id": "group-proxy-openrouter-mistral-live",
+      "capability": "responses",
+      "route_key": "mistral-large-latest",
+      "selected_provider_id": "provider-openrouter-main",
+      "matched_policy_id": "policy-openrouter-mistral-responses",
+      "applied_routing_profile_id": "profile-global-openrouter-mistral",
+      "compiled_routing_snapshot_id": "snapshot-prod-openrouter-mistral",
+      "strategy": "deterministic_priority",
+      "selection_seed": 709,
+      "selection_reason": "Dedicated proxy Mistral group selected OpenRouter first with official Mistral fallback available.",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710000493100,
+      "assessments": [
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0.007,
+          "latency_ms": 690,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "proxy-first Mistral marketplace route"
+          ]
+        },
+        {
+          "provider_id": "provider-mistral-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.007,
+          "latency_ms": 740,
+          "region": "eu",
+          "region_match": false,
+          "reasons": [
+            "official Mistral fallback"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": []
+}

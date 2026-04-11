@@ -9,7 +9,7 @@ async fn routing_simulation_uses_catalog_models() {
     create_provider_fixture(
         app.clone(),
         &token,
-        r#"{"id":"provider-openrouter","channel_id":"openrouter","adapter_kind":"openai","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
+        r#"{"id":"provider-openrouter","channel_id":"openrouter","default_plugin_family":"openrouter","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
     )
     .await;
     create_provider_fixture(
@@ -226,7 +226,7 @@ async fn create_and_list_routing_profiles_and_apply_them_in_simulation() {
     create_provider_fixture(
         app.clone(),
         &token,
-        r#"{"id":"provider-openrouter","channel_id":"openrouter","adapter_kind":"openai","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
+        r#"{"id":"provider-openrouter","channel_id":"openrouter","default_plugin_family":"openrouter","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
     )
     .await;
     create_provider_fixture(
@@ -412,7 +412,7 @@ async fn routing_simulation_reports_policy_selected_provider() {
     create_provider_fixture(
         app.clone(),
         &token,
-        r#"{"id":"provider-openrouter","channel_id":"openrouter","adapter_kind":"openai","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
+        r#"{"id":"provider-openrouter","channel_id":"openrouter","default_plugin_family":"openrouter","base_url":"https://openrouter.ai/api/v1","display_name":"OpenRouter","channel_bindings":[{"channel_id":"openrouter","is_primary":true}]}"#,
     )
     .await;
     create_provider_fixture(

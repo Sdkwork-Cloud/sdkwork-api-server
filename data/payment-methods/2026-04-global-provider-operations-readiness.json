@@ -1,0 +1,50 @@
+{
+  "payment_methods": [
+    {
+      "payment_method_id": "payment-stripe-link",
+      "display_name": "Stripe Link Express",
+      "description": "Fast global checkout path for card-on-file commercial upgrades and provider-mix plans.",
+      "provider": "stripe",
+      "channel": "link_express",
+      "mode": "live",
+      "enabled": true,
+      "sort_order": 15,
+      "capability_codes": ["checkout", "recommended", "wallet"],
+      "supported_currency_codes": ["USD", "EUR", "GBP", "SGD"],
+      "supported_country_codes": ["US", "GB", "DE", "SG"],
+      "supported_order_kinds": ["subscription_plan", "recharge_pack", "custom_recharge"],
+      "callback_strategy": "webhook_signed",
+      "webhook_path": "/api/portal/commerce/webhooks/stripe",
+      "webhook_tolerance_seconds": 300,
+      "replay_window_seconds": 300,
+      "max_retry_count": 8,
+      "config_json": "{\"provider\":\"stripe\",\"checkout_mode\":\"link\"}",
+      "created_at_ms": 1710000488000,
+      "updated_at_ms": 1710000488000
+    },
+    {
+      "payment_method_id": "payment-alipay-mobile",
+      "display_name": "Alipay Mobile H5",
+      "description": "Mobile-first China checkout path for direct regional provider plans and top-ups.",
+      "provider": "alipay",
+      "channel": "mobile_h5",
+      "mode": "live",
+      "enabled": true,
+      "sort_order": 25,
+      "capability_codes": ["checkout", "recommended", "mobile"],
+      "supported_currency_codes": ["CNY"],
+      "supported_country_codes": ["CN"],
+      "supported_order_kinds": ["subscription_plan", "recharge_pack", "custom_recharge"],
+      "callback_strategy": "redirect_polling",
+      "webhook_path": "/api/portal/commerce/webhooks/alipay",
+      "webhook_tolerance_seconds": 300,
+      "replay_window_seconds": 300,
+      "max_retry_count": 6,
+      "config_json": "{\"provider\":\"alipay\",\"channel\":\"mobile_h5\"}",
+      "created_at_ms": 1710000489000,
+      "updated_at_ms": 1710000489000
+    }
+  ],
+  "credential_bindings": [],
+  "project_memberships": []
+}

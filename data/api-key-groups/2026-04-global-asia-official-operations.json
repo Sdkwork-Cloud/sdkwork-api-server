@@ -1,0 +1,34 @@
+[
+  {
+    "group_id": "group-official-ernie-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "ERNIE Official Live",
+    "slug": "official-ernie-live",
+    "description": "Live traffic group pinned to the official ERNIE route profile.",
+    "color": "#1d4ed8",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-ernie-official",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000497000,
+    "updated_at_ms": 1710000497000
+  },
+  {
+    "group_id": "group-official-minimax-live",
+    "tenant_id": "tenant_global_default",
+    "project_id": "project_global_default",
+    "environment": "live",
+    "name": "MiniMax Official Live",
+    "slug": "official-minimax-live",
+    "description": "Live traffic group pinned to the official MiniMax route profile.",
+    "color": "#7c3aed",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-global-minimax-official",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710000498000,
+    "updated_at_ms": 1710000498000
+  }
+]

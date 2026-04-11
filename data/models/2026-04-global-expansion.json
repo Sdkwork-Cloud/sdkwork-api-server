@@ -1,0 +1,40 @@
+[
+  {
+    "external_name": "ernie-4.5-turbo",
+    "provider_id": "provider-ernie-official",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000
+  },
+  {
+    "external_name": "ernie-embedding-v1",
+    "provider_id": "provider-ernie-official",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192
+  },
+  {
+    "external_name": "minimax-m1",
+    "provider_id": "provider-minimax-official",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000
+  },
+  {
+    "external_name": "minimax-embedding",
+    "provider_id": "provider-minimax-official",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192
+  }
+]

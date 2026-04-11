@@ -1,0 +1,31 @@
+{
+  "update_id": "2026-04-dev-account-kernel-expansion",
+  "release_version": "2026.04.15-dev",
+  "description": "Extend developer bootstrap with local demo, partner sandbox, and growth lab account kernel data so dev environments start with realistic balances, meter facts, holds, and reconciliations.",
+  "depends_on": [
+    "2026-04-account-kernel-commercial-foundation",
+    "2026-04-dev-experience-expansion",
+    "2026-04-dev-growth-lab-operations"
+  ],
+  "accounts": [
+    "accounts/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "account_benefit_lots": [
+    "account-benefit-lots/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "account_holds": [
+    "account-holds/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "account_ledger": [
+    "account-ledger/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "request_settlements": [
+    "request-settlements/2026-04-dev-account-kernel-expansion.json"
+  ],
+  "account_reconciliation": [
+    "account-reconciliation/2026-04-dev-account-kernel-expansion.json"
+  ]
+}

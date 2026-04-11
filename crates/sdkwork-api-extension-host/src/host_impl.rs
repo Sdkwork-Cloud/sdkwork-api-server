@@ -209,6 +209,128 @@ impl ExtensionHost {
         })
     }
 
+    fn resolve_provider_extension_id(&self, runtime_key: &str) -> Option<String> {
+        if self.manifests.contains_key(runtime_key) {
+            Some(runtime_key.to_owned())
+        } else {
+            self.provider_aliases.get(runtime_key).cloned()
+        }
+    }
+
+    fn resolve_raw_native_dynamic_runtime(
+        &self,
+        runtime_key: &str,
+        operation: &str,
+    ) -> Result<Option<Arc<NativeDynamicRuntime>>, ExtensionHostError> {
+        let Some(extension_id) = self.resolve_provider_extension_id(runtime_key) else {
+            return Ok(None);
+        };
+        let Some(manifest) = self.manifests.get(&extension_id) else {
+            return Ok(None);
+        };
+        if !manifest.runtime.supports_raw_provider_execution() {
+            return Ok(None);
+        }
+        if !manifest.capabilities.iter().any(|capability| {
+            capability.operation == operation
+                && capability.compatibility != CompatibilityLevel::Unsupported
+        }) {
+            return Ok(None);
+        }
+
+        let entrypoint = manifest.entrypoint.as_deref().ok_or(
+            ExtensionHostError::ManifestReadFailed {
+                path: extension_id.clone(),
+                message: "native dynamic extension manifest has no entrypoint".to_owned(),
+            },
+        )?;
+        let library_path = resolve_entrypoint(
+            entrypoint,
+            self.package_roots.get(&extension_id).map(|path| path.as_path()),
+        );
+        let (runtime, _) = load_or_reuse_native_dynamic_runtime(&library_path)?;
+        Ok(Some(runtime))
+    }
+
+    pub fn execute_raw_provider_json(
+        &self,
+        runtime_key: &str,
+        base_url: impl Into<String>,
+        api_key: &str,
+        operation: &str,
+        path_params: Vec<String>,
+        body: Value,
+        headers: HashMap<String, String>,
+    ) -> Result<Option<Value>, ExtensionHostError> {
+        let Some(runtime) = self.resolve_raw_native_dynamic_runtime(runtime_key, operation)? else {
+            return Ok(None);
+        };
+        let invocation = ProviderInvocation::new(
+            operation,
+            api_key,
+            base_url,
+            path_params,
+            body,
+            false,
+        )
+        .with_headers(headers);
+        match execute_native_dynamic_invocation(runtime.as_ref(), &invocation)? {
+            ProviderInvocationResult::Json { body } => Ok(Some(body)),
+            ProviderInvocationResult::Unsupported { message } => {
+                Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                    entrypoint: runtime.entrypoint.clone(),
+                    message: message.unwrap_or_else(|| {
+                        "native dynamic provider reported unsupported operation".to_owned()
+                    }),
+                    code: None,
+                    retryable: None,
+                    retry_after_ms: None,
+                })
+            }
+            ProviderInvocationResult::Error {
+                message,
+                code,
+                retryable,
+                retry_after_ms,
+            } => {
+                Err(ExtensionHostError::NativeDynamicInvocationFailed {
+                    entrypoint: runtime.entrypoint.clone(),
+                    message,
+                    code,
+                    retryable,
+                    retry_after_ms,
+                })
+            }
+        }
+    }
+
+    pub async fn execute_raw_provider_stream(
+        &self,
+        runtime_key: &str,
+        base_url: impl Into<String>,
+        api_key: &str,
+        operation: &str,
+        path_params: Vec<String>,
+        body: Value,
+        headers: HashMap<String, String>,
+    ) -> Result<Option<ProviderStreamOutput>, ExtensionHostError> {
+        let Some(runtime) = self.resolve_raw_native_dynamic_runtime(runtime_key, operation)? else {
+            return Ok(None);
+        };
+        let invocation = ProviderInvocation::new(
+            operation,
+            api_key,
+            base_url,
+            path_params,
+            body,
+            true,
+        )
+        .with_headers(headers);
+        Ok(Some(
+            execute_native_dynamic_stream_invocation(runtime, &invocation).await?,
+        ))
+    }
+
     pub fn resolve_provider(
         &self,
         runtime_key: &str,
@@ -223,5 +345,10 @@ impl ExtensionHost {
                     .and_then(|extension_id| self.provider_factories.get(extension_id))
             })
             .map(|factory| factory(base_url))
+    }
+
+    pub fn can_resolve_provider(&self, runtime_key: &str) -> bool {
+        self.provider_factories.contains_key(runtime_key)
+            || self.provider_aliases.contains_key(runtime_key)
     }
 }

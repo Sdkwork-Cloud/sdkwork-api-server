@@ -22,6 +22,7 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
             primary_channel_id TEXT NOT NULL,
             extension_id TEXT NOT NULL DEFAULT '',
             adapter_kind TEXT NOT NULL DEFAULT 'openai',
+            protocol_kind TEXT NOT NULL DEFAULT '',
             base_url TEXT NOT NULL DEFAULT 'http://localhost',
             display_name TEXT NOT NULL,
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -86,6 +87,65 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_official_provider_configs (
+            provider_id TEXT PRIMARY KEY NOT NULL,
+            key_reference TEXT NOT NULL DEFAULT '',
+            base_url TEXT NOT NULL DEFAULT '',
+            enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_official_provider_configs_enabled
+         ON ai_official_provider_configs (enabled, provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_provider_account (
+            provider_account_id TEXT PRIMARY KEY NOT NULL,
+            provider_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            account_kind TEXT NOT NULL DEFAULT 'api_key',
+            owner_scope TEXT NOT NULL DEFAULT 'platform',
+            owner_tenant_id TEXT,
+            execution_instance_id TEXT NOT NULL,
+            base_url_override TEXT,
+            region TEXT,
+            priority INTEGER NOT NULL DEFAULT 0,
+            weight INTEGER NOT NULL DEFAULT 1,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            routing_tags_json TEXT NOT NULL DEFAULT '[]',
+            health_score_hint DOUBLE PRECISION,
+            latency_ms_hint BIGINT,
+            cost_hint DOUBLE PRECISION,
+            success_rate_hint DOUBLE PRECISION,
+            throughput_hint DOUBLE PRECISION,
+            max_concurrency BIGINT,
+            daily_budget DOUBLE PRECISION,
+            notes TEXT,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_provider_account_provider_active
+         ON ai_provider_account (provider_id, enabled, priority DESC, provider_account_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_provider_account_instance
+         ON ai_provider_account (execution_instance_id, provider_account_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_model (
             channel_id TEXT NOT NULL,
             model_id TEXT NOT NULL,
@@ -108,6 +168,41 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_proxy_provider_model (
+            proxy_provider_id TEXT NOT NULL,
+            channel_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            provider_model_id TEXT NOT NULL DEFAULT '',
+            provider_model_family TEXT,
+            capabilities_json TEXT NOT NULL DEFAULT '[]',
+            streaming_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            context_window BIGINT,
+            max_output_tokens BIGINT,
+            supports_prompt_caching BOOLEAN NOT NULL DEFAULT FALSE,
+            supports_reasoning_usage BOOLEAN NOT NULL DEFAULT FALSE,
+            supports_tool_usage_metrics BOOLEAN NOT NULL DEFAULT FALSE,
+            is_default_route BOOLEAN NOT NULL DEFAULT FALSE,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at_ms BIGINT NOT NULL DEFAULT 0,
+            updated_at_ms BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (proxy_provider_id, channel_id, model_id)
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_proxy_provider_model_channel_active
+         ON ai_proxy_provider_model (channel_id, model_id, is_active, proxy_provider_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_proxy_provider_model_provider_active
+         ON ai_proxy_provider_model (proxy_provider_id, is_active, channel_id, model_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_model_price (
             channel_id TEXT NOT NULL,
             model_id TEXT NOT NULL,
@@ -119,6 +214,9 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
             cache_read_price DOUBLE PRECISION NOT NULL DEFAULT 0,
             cache_write_price DOUBLE PRECISION NOT NULL DEFAULT 0,
             request_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            price_source_kind TEXT NOT NULL DEFAULT 'reference',
+            billing_notes TEXT,
+            pricing_tiers_json TEXT NOT NULL DEFAULT '[]',
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at_ms BIGINT NOT NULL DEFAULT 0,
             updated_at_ms BIGINT NOT NULL DEFAULT 0,
@@ -236,6 +334,11 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .execute(&pool)
     .await?;
     sqlx::query(
+        "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS protocol_kind TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "ALTER TABLE ai_proxy_provider ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT 'http://localhost'",
     )
     .execute(&pool)
@@ -306,6 +409,31 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .execute(&pool)
     .await?;
     sqlx::query(
+        "ALTER TABLE ai_official_provider_configs ADD COLUMN IF NOT EXISTS key_reference TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_official_provider_configs ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_official_provider_configs ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_official_provider_configs ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_official_provider_configs ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS capabilities_json TEXT NOT NULL DEFAULT '[]'",
     )
     .execute(&pool)
@@ -330,6 +458,71 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .await?;
     sqlx::query(
         "ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS provider_model_id TEXT NOT NULL DEFAULT ''",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS provider_model_family TEXT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS capabilities_json TEXT NOT NULL DEFAULT '[]'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS streaming_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS context_window BIGINT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS max_output_tokens BIGINT",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS supports_prompt_caching BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS supports_reasoning_usage BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS supports_tool_usage_metrics BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS is_default_route BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS created_at_ms BIGINT NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_proxy_provider_model ADD COLUMN IF NOT EXISTS updated_at_ms BIGINT NOT NULL DEFAULT 0",
     )
     .execute(&pool)
     .await?;
@@ -365,6 +558,19 @@ pub(crate) async fn apply_postgres_catalog_gateway_schema(pool: &PgPool) -> Resu
     .await?;
     sqlx::query(
         "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS request_price DOUBLE PRECISION NOT NULL DEFAULT 0",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS price_source_kind TEXT NOT NULL DEFAULT 'reference'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS billing_notes TEXT")
+        .execute(&pool)
+        .await?;
+    sqlx::query(
+        "ALTER TABLE ai_model_price ADD COLUMN IF NOT EXISTS pricing_tiers_json TEXT NOT NULL DEFAULT '[]'",
     )
     .execute(&pool)
     .await?;

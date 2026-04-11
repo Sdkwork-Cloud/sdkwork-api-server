@@ -1,6 +1,9 @@
 ﻿use super::*;
 
-fn write_runtime_config(root: &Path, enable_native_dynamic: bool, extension_root: &Path) {
+const ISOLATED_BOOTSTRAP_PROFILE_ID: &str = "isolated";
+
+pub(super) fn write_runtime_config(root: &Path, enable_native_dynamic: bool, extension_root: &Path) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     fs::write(
         root.join("config.yaml"),
         format!(
@@ -10,7 +13,7 @@ extension_paths:
 enable_connector_extensions: false
 enable_native_dynamic_extensions: {}
 require_signed_native_dynamic_extensions: false
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
             config_path_value(extension_root),
@@ -20,17 +23,18 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn write_gateway_runtime_config(root: &Path, gateway_bind: &str) {
+pub(super) fn write_gateway_runtime_config(root: &Path, gateway_bind: &str) {
     write_gateway_runtime_config_with_cache(root, gateway_bind, CacheBackendKind::Memory, None);
 }
 
-fn write_gateway_store_runtime_config_with_cache(
+pub(super) fn write_gateway_store_runtime_config_with_cache(
     root: &Path,
     gateway_bind: &str,
     database_url: &str,
     cache_backend: CacheBackendKind,
     cache_url: Option<&str>,
 ) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     let cache_url = cache_url
         .map(|value| format!("cache_url: \"{value}\"\n"))
         .unwrap_or_default();
@@ -43,7 +47,7 @@ database_url: "{database_url}"
 cache_backend: "{}"
 {cache_url}enable_connector_extensions: false
 enable_native_dynamic_extensions: false
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
             cache_backend.as_str(),
@@ -52,7 +56,7 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn write_gateway_runtime_config_with_cache(
+pub(super) fn write_gateway_runtime_config_with_cache(
     root: &Path,
     gateway_bind: &str,
     cache_backend: CacheBackendKind,
@@ -67,12 +71,13 @@ fn write_gateway_runtime_config_with_cache(
     );
 }
 
-fn write_gateway_secret_manager_runtime_config(
+pub(super) fn write_gateway_secret_manager_runtime_config(
     root: &Path,
     secret_local_file: &Path,
     credential_master_key: &str,
     credential_legacy_master_keys: &[&str],
 ) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     let legacy_keys = if credential_legacy_master_keys.is_empty() {
         "credential_legacy_master_keys: []".to_owned()
     } else {
@@ -95,7 +100,7 @@ credential_master_key: "{credential_master_key}"
 {legacy_keys}
 enable_connector_extensions: false
 enable_native_dynamic_extensions: false
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
             config_path_value(secret_local_file),
@@ -104,7 +109,7 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn write_gateway_security_posture_runtime_config(
+pub(super) fn write_gateway_security_posture_runtime_config(
     root: &Path,
     gateway_bind: &str,
     admin_jwt_signing_secret: &str,
@@ -112,6 +117,7 @@ fn write_gateway_security_posture_runtime_config(
     credential_master_key: &str,
     allow_insecure_dev_defaults: bool,
 ) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     fs::write(
         root.join("config.yaml"),
         format!(
@@ -124,7 +130,7 @@ credential_master_key: "{credential_master_key}"
 allow_insecure_dev_defaults: {allow_insecure_dev_defaults}
 enable_connector_extensions: false
 enable_native_dynamic_extensions: false
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
         ),
@@ -132,7 +138,7 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn temp_root(suffix: &str) -> PathBuf {
+pub(super) fn temp_root(suffix: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -143,18 +149,18 @@ fn temp_root(suffix: &str) -> PathBuf {
     path
 }
 
-fn cleanup_dir(path: &Path) {
+pub(super) fn cleanup_dir(path: &Path) {
     let _ = fs::remove_dir_all(path);
 }
 
-fn unix_timestamp_ms() -> u64 {
+pub(super) fn unix_timestamp_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("unix time")
         .as_millis() as u64
 }
 
-async fn seed_model_store(database_url: &str, model_id: &str) -> Arc<dyn AdminStore> {
+pub(super) async fn seed_model_store(database_url: &str, model_id: &str) -> Arc<dyn AdminStore> {
     if let Some(path) = sqlite_path_from_url(database_url) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
@@ -190,30 +196,30 @@ async fn seed_model_store(database_url: &str, model_id: &str) -> Arc<dyn AdminSt
     Arc::new(store)
 }
 
-async fn empty_store() -> Arc<dyn AdminStore> {
+pub(super) async fn empty_store() -> Arc<dyn AdminStore> {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     Arc::new(SqliteAdminStore::new(pool))
 }
 
-fn health_router(label: &'static str) -> Router {
+pub(super) fn health_router(label: &'static str) -> Router {
     Router::new().route("/health", get(move || async move { label }))
 }
 
-fn http_client() -> Client {
+pub(super) fn http_client() -> Client {
     Client::builder()
         .timeout(StdDuration::from_millis(200))
         .build()
         .unwrap()
 }
 
-fn available_bind() -> String {
+pub(super) fn available_bind() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let bind = listener.local_addr().unwrap().to_string();
     drop(listener);
     bind
 }
 
-async fn wait_for_health_response(bind: &str, expected: &str) {
+pub(super) async fn wait_for_health_response(bind: &str, expected: &str) {
     let client = http_client();
     let url = format!("http://{bind}/health");
     for _ in 0..240 {
@@ -230,7 +236,7 @@ async fn wait_for_health_response(bind: &str, expected: &str) {
     panic!("listener did not respond with expected health payload: {url}");
 }
 
-async fn wait_for_health_unreachable(bind: &str) {
+pub(super) async fn wait_for_health_unreachable(bind: &str) {
     let client = http_client();
     let url = format!("http://{bind}/health");
     for _ in 0..240 {
@@ -243,7 +249,7 @@ async fn wait_for_health_unreachable(bind: &str) {
     panic!("listener remained reachable unexpectedly: {url}");
 }
 
-async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
+pub(super) async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
     for _ in 0..160 {
         if fs::read_to_string(path)
             .ok()
@@ -267,7 +273,15 @@ async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
     );
 }
 
-async fn wait_for_models(live_store: &Reloadable<Arc<dyn AdminStore>>, expected: &[&str]) {
+pub(super) async fn wait_for_models(
+    live_store: &Reloadable<Arc<dyn AdminStore>>,
+    expected: &[&str],
+) {
+    let expected = expected
+        .iter()
+        .map(|value| (*value).to_owned())
+        .collect::<Vec<_>>();
+    let mut last_seen = Vec::new();
     for _ in 0..200 {
         let current = live_store
             .snapshot()
@@ -277,21 +291,22 @@ async fn wait_for_models(live_store: &Reloadable<Arc<dyn AdminStore>>, expected:
             .into_iter()
             .map(|entry| entry.external_name)
             .collect::<Vec<_>>();
-        if current
-            == expected
-                .iter()
-                .map(|value| (*value).to_owned())
-                .collect::<Vec<_>>()
-        {
+        if expected.iter().all(|model_id| current.iter().any(|entry| entry == model_id)) {
             return;
         }
+        last_seen = current;
         sleep(Duration::from_millis(25)).await;
     }
 
-    panic!("live store did not reach expected models");
+    panic!(
+        "live store did not reach expected models: expected={expected:?} actual={last_seen:?}"
+    );
 }
 
-async fn wait_for_reloadable_string(live_value: &Reloadable<String>, expected: &str) {
+pub(super) async fn wait_for_reloadable_string(
+    live_value: &Reloadable<String>,
+    expected: &str,
+) {
     for _ in 0..200 {
         if live_value.snapshot() == expected {
             return;
@@ -302,7 +317,7 @@ async fn wait_for_reloadable_string(live_value: &Reloadable<String>, expected: &
     panic!("reloadable string did not reach expected value");
 }
 
-async fn wait_for_pricing_plan_status(
+pub(super) async fn wait_for_pricing_plan_status(
     store: &SqliteAdminStore,
     pricing_plan_id: u64,
     expected_status: &str,
@@ -324,7 +339,7 @@ async fn wait_for_pricing_plan_status(
     panic!("pricing plan did not reach expected status");
 }
 
-async fn wait_for_pricing_rate_status(
+pub(super) async fn wait_for_pricing_rate_status(
     store: &SqliteAdminStore,
     pricing_rate_id: u64,
     expected_status: &str,
@@ -346,7 +361,7 @@ async fn wait_for_pricing_rate_status(
     panic!("pricing rate did not reach expected status");
 }
 
-async fn wait_for_secret_manager_master_key(
+pub(super) async fn wait_for_secret_manager_master_key(
     live_secret_manager: &Reloadable<CredentialSecretManager>,
     expected_master_key: &str,
 ) {
@@ -362,7 +377,7 @@ async fn wait_for_secret_manager_master_key(
     panic!("live secret manager did not reach expected master key");
 }
 
-async fn wait_for_extension_runtime_rollout_status(
+pub(super) async fn wait_for_extension_runtime_rollout_status(
     store: &dyn AdminStore,
     rollout_id: &str,
     expected_status: &str,
@@ -385,7 +400,7 @@ async fn wait_for_extension_runtime_rollout_status(
     panic!("extension runtime rollout did not reach expected status");
 }
 
-async fn wait_for_standalone_config_rollout_status(
+pub(super) async fn wait_for_standalone_config_rollout_status(
     store: &dyn AdminStore,
     rollout_id: &str,
     expected_status: &str,
@@ -408,7 +423,7 @@ async fn wait_for_standalone_config_rollout_status(
     panic!("standalone config rollout did not reach expected status");
 }
 
-async fn wait_for_service_runtime_node(store: &dyn AdminStore, node_id: &str) {
+pub(super) async fn wait_for_service_runtime_node(store: &dyn AdminStore, node_id: &str) {
     for _ in 0..200 {
         if store
             .list_service_runtime_nodes()
@@ -426,13 +441,13 @@ async fn wait_for_service_runtime_node(store: &dyn AdminStore, node_id: &str) {
     panic!("service runtime node did not heartbeat into the shared store: {node_id}");
 }
 
-struct NativeDynamicLifecycleLogGuard {
+pub(super) struct NativeDynamicLifecycleLogGuard {
     path: PathBuf,
     previous: Option<String>,
 }
 
 impl NativeDynamicLifecycleLogGuard {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut path = std::env::temp_dir();
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -448,7 +463,7 @@ impl NativeDynamicLifecycleLogGuard {
         Self { path, previous }
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -463,7 +478,7 @@ impl Drop for NativeDynamicLifecycleLogGuard {
     }
 }
 
-fn native_dynamic_fixture_library_path() -> PathBuf {
+pub(super) fn native_dynamic_fixture_library_path() -> PathBuf {
     let current_exe = std::env::current_exe().expect("current exe");
     let directory = current_exe.parent().expect("exe dir");
     let prefix = if cfg!(windows) {
@@ -493,14 +508,15 @@ fn native_dynamic_fixture_library_path() -> PathBuf {
         .expect("native dynamic fixture library")
 }
 
-fn write_portal_runtime_config(root: &Path, database_url: &str, jwt_secret: &str) {
+pub(super) fn write_portal_runtime_config(root: &Path, database_url: &str, jwt_secret: &str) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     fs::write(
         root.join("config.yaml"),
         format!(
             r#"
 database_url: "{database_url}"
 portal_jwt_signing_secret: "{jwt_secret}"
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
         ),
@@ -508,12 +524,13 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn write_admin_pricing_runtime_config(
+pub(super) fn write_admin_pricing_runtime_config(
     root: &Path,
     database_url: &str,
     jwt_secret: &str,
     pricing_lifecycle_sync_interval_secs: u64,
 ) {
+    let bootstrap = isolated_bootstrap_yaml(root);
     fs::write(
         root.join("config.yaml"),
         format!(
@@ -521,7 +538,7 @@ fn write_admin_pricing_runtime_config(
 database_url: "{database_url}"
 admin_jwt_signing_secret: "{jwt_secret}"
 pricing_lifecycle_sync_interval_secs: {pricing_lifecycle_sync_interval_secs}
-runtime_snapshot_interval_secs: 0
+{bootstrap}runtime_snapshot_interval_secs: 0
 extension_hot_reload_interval_secs: 0
 "#,
         ),
@@ -529,7 +546,28 @@ extension_hot_reload_interval_secs: 0
     .unwrap();
 }
 
-fn sqlite_url_for_path(path: &Path) -> String {
+pub(super) fn ensure_isolated_bootstrap_data(root: &Path) -> PathBuf {
+    let data_root = root.join("bootstrap-data");
+    let profiles_dir = data_root.join("profiles");
+    fs::create_dir_all(&profiles_dir).unwrap();
+    fs::write(
+        profiles_dir.join(format!("{ISOLATED_BOOTSTRAP_PROFILE_ID}.json")),
+        format!(r#"{{"profile_id":"{ISOLATED_BOOTSTRAP_PROFILE_ID}"}}"#),
+    )
+    .unwrap();
+    data_root
+}
+
+pub(super) fn isolated_bootstrap_yaml(root: &Path) -> String {
+    let data_root = ensure_isolated_bootstrap_data(root);
+    format!(
+        "bootstrap_data_dir: \"{}\"\nbootstrap_profile: \"{}\"\n",
+        config_path_value(&data_root),
+        ISOLATED_BOOTSTRAP_PROFILE_ID,
+    )
+}
+
+pub(super) fn sqlite_url_for_path(path: &Path) -> String {
     let normalized = path.to_string_lossy().replace('\\', "/");
     if normalized.starts_with('/') {
         format!("sqlite://{normalized}")
@@ -538,7 +576,7 @@ fn sqlite_url_for_path(path: &Path) -> String {
     }
 }
 
-fn sqlite_path_from_url(url: &str) -> Option<PathBuf> {
+pub(super) fn sqlite_path_from_url(url: &str) -> Option<PathBuf> {
     let raw_path = url.strip_prefix("sqlite://")?;
     let normalized_path = raw_path
         .strip_prefix('/')
@@ -548,11 +586,11 @@ fn sqlite_path_from_url(url: &str) -> Option<PathBuf> {
     Some(PathBuf::from(normalized_path))
 }
 
-fn config_path_value(path: &Path) -> String {
+pub(super) fn config_path_value(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
-fn has_windows_drive_prefix(path: &str) -> bool {
+pub(super) fn has_windows_drive_prefix(path: &str) -> bool {
     let bytes = path.as_bytes();
     bytes.len() >= 3
         && bytes[0].is_ascii_alphabetic()
@@ -560,7 +598,7 @@ fn has_windows_drive_prefix(path: &str) -> bool {
         && (bytes[2] == b'/' || bytes[2] == b'\\')
 }
 
-fn native_dynamic_manifest(library_path: &Path) -> ExtensionManifest {
+pub(super) fn native_dynamic_manifest(library_path: &Path) -> ExtensionManifest {
     ExtensionManifest::new(
         FIXTURE_EXTENSION_ID,
         ExtensionKind::Provider,
@@ -589,6 +627,26 @@ fn native_dynamic_manifest(library_path: &Path) -> ExtensionManifest {
     ))
     .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
         "responses.stream",
+        CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.create",
+        CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.count_tokens",
+        CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.generate_content",
+        CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.stream_generate_content",
+        CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.count_tokens",
         CompatibilityLevel::Native,
     ))
     .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(

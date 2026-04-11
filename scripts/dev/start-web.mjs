@@ -90,10 +90,12 @@ if (settings.help) {
 
 const env = webHostEnv(settings.bind, {
   adminTarget: settings.adminTarget,
+  adminSiteTarget: settings.adminSiteTarget,
   portalTarget: settings.portalTarget,
+  portalSiteTarget: settings.portalSiteTarget,
   gatewayTarget: settings.gatewayTarget,
 });
-for (const line of webAccessLines(settings.bind)) {
+for (const line of webAccessLines(settings.bind, { proxyDev: settings.proxyDev })) {
   console.log(line);
 }
 
@@ -105,7 +107,7 @@ for (const appRoot of appRoots) {
     requiredBinCommands: ['vite', 'tsc'],
     verifyInstalled: () => frontendViteConfigHealthy({
       appRoot,
-      command: 'build',
+      command: settings.proxyDev ? 'serve' : 'build',
     }),
   });
   const needInstall = settings.install || installStatus !== 'ready';
@@ -114,9 +116,11 @@ for (const appRoot of appRoots) {
   }
 }
 
-for (const appRoot of appRoots) {
-  if (!runPnpmStep(['--dir', appRoot, 'build'], settings.dryRun, `build ${appRoot}`, env, `${appRoot}/dist`)) {
-    process.exit(1);
+if (!settings.proxyDev) {
+  for (const appRoot of appRoots) {
+    if (!runPnpmStep(['--dir', appRoot, 'build'], settings.dryRun, `build ${appRoot}`, env, `${appRoot}/dist`)) {
+      process.exit(1);
+    }
   }
 }
 

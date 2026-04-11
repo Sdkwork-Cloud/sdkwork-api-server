@@ -1,0 +1,127 @@
+{
+  "coupons": [],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-provider-mix-15",
+      "template_key": "provider-mix-15",
+      "display_name": "Provider Mix 15 Percent",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "percentage_off",
+        "discount_percent": 15,
+        "discount_amount_minor": null,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 15000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 10000,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "provider-mix",
+        "stacking_policy": "best_of_group",
+        "max_redemptions_per_subject": 2,
+        "eligible_target_kinds": ["subscription_plan", "recharge_pack"]
+      },
+      "created_at_ms": 1710000490000,
+      "updated_at_ms": 1710000490000
+    },
+    {
+      "coupon_template_id": "template-china-direct-888",
+      "template_key": "china-direct-888",
+      "display_name": "China Direct 888",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 88800,
+        "grant_units": null,
+        "currency_code": "CNY",
+        "max_discount_minor": 88800
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 188800,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "china-direct",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 1,
+        "eligible_target_kinds": ["subscription_plan", "custom_recharge"]
+      },
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491000
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-provider-mix-2026",
+      "coupon_template_id": "template-provider-mix-15",
+      "display_name": "Provider Mix 2026",
+      "status": "active",
+      "start_at_ms": 1710000490000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000490000,
+      "updated_at_ms": 1710000490000
+    },
+    {
+      "marketing_campaign_id": "campaign-china-direct-2026",
+      "coupon_template_id": "template-china-direct-888",
+      "display_name": "China Direct 2026",
+      "status": "active",
+      "start_at_ms": 1710000491000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491000
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-provider-mix-2026",
+      "marketing_campaign_id": "campaign-provider-mix-2026",
+      "status": "active",
+      "total_budget_minor": 4000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000490000,
+      "updated_at_ms": 1710000490000
+    },
+    {
+      "campaign_budget_id": "budget-china-direct-2026",
+      "marketing_campaign_id": "campaign-china-direct-2026",
+      "status": "active",
+      "total_budget_minor": 8000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491000
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-provider-mix-15-global",
+      "coupon_template_id": "template-provider-mix-15",
+      "code_value": "PROVIDERMIX15",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000490000,
+      "updated_at_ms": 1710000490000
+    },
+    {
+      "coupon_code_id": "coupon-code-china-direct-888-global",
+      "coupon_template_id": "template-china-direct-888",
+      "code_value": "CNDIRECT888",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000491000
+    }
+  ]
+}

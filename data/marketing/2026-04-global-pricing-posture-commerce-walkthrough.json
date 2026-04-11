@@ -1,0 +1,150 @@
+{
+  "coupons": [
+    {
+      "id": "coupon-official-direct-100",
+      "code": "OFFICIALDIRECT100",
+      "discount_label": "$100 official direct credit",
+      "audience": "official_direct_operators",
+      "remaining": 2000,
+      "active": true,
+      "note": "Bootstrap activation credit for official direct commercial launch flows.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710000494000
+    },
+    {
+      "id": "coupon-edge-local-20",
+      "code": "EDGELOCAL20",
+      "discount_label": "$20 edge local capacity credit",
+      "audience": "self_hosted_workspaces",
+      "remaining": 1500,
+      "active": true,
+      "note": "Bootstrap local-edge credit for Ollama-backed workspace capacity packs.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710000494100
+    }
+  ],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-official-direct-100",
+      "template_key": "official-direct-credit-100",
+      "display_name": "Official Direct Credit 100",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 10000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 10000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 50000,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "official-direct",
+        "stacking_policy": "best_of_group",
+        "max_redemptions_per_subject": 2,
+        "eligible_target_kinds": ["custom_recharge", "recharge_pack", "enterprise_contract"]
+      },
+      "created_at_ms": 1710000494000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "coupon_template_id": "template-edge-local-20",
+      "template_key": "edge-local-credit-20",
+      "display_name": "Edge Local Credit 20",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 2000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 2000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 5000,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "edge-local",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 3,
+        "eligible_target_kinds": ["custom_recharge", "enterprise_contract"]
+      },
+      "created_at_ms": 1710000494100,
+      "updated_at_ms": 1710000494100
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-official-direct-2026",
+      "coupon_template_id": "template-official-direct-100",
+      "display_name": "Official Direct Activation 2026",
+      "status": "active",
+      "start_at_ms": 1710000494000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000494000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "marketing_campaign_id": "campaign-edge-local-2026",
+      "coupon_template_id": "template-edge-local-20",
+      "display_name": "Edge Local Launch 2026",
+      "status": "active",
+      "start_at_ms": 1710000494100,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000494100,
+      "updated_at_ms": 1710000494100
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-official-direct-2026",
+      "marketing_campaign_id": "campaign-official-direct-2026",
+      "status": "active",
+      "total_budget_minor": 6000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000494000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "campaign_budget_id": "budget-edge-local-2026",
+      "marketing_campaign_id": "campaign-edge-local-2026",
+      "status": "active",
+      "total_budget_minor": 3000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000494100,
+      "updated_at_ms": 1710000494100
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-official-direct-100",
+      "coupon_template_id": "template-official-direct-100",
+      "code_value": "OFFICIALDIRECT100",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000494000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "coupon_code_id": "coupon-code-edge-local-20",
+      "coupon_template_id": "template-edge-local-20",
+      "code_value": "EDGELOCAL20",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000494100,
+      "updated_at_ms": 1710000494100
+    }
+  ]
+}

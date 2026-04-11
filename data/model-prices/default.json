@@ -1,0 +1,1462 @@
+[
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2,
+    "output_price": 8,
+    "cache_read_price": 0.5,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official OpenAI pricing, including cached-input pricing for prompt caching.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2,
+        "output_price": 8,
+        "cache_read_price": 0.5,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.4,
+    "output_price": 1.6,
+    "cache_read_price": 0.1,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official OpenAI pricing, including cached-input pricing for prompt caching.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.4,
+        "output_price": 1.6,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4o-mini",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.15,
+    "output_price": 0.6,
+    "cache_read_price": 0.075,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official OpenAI pricing, including cached-input pricing for prompt caching.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.15,
+        "output_price": 0.6,
+        "cache_read_price": 0.075,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-small",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.02,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.02,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "text-embedding-3-large",
+    "proxy_provider_id": "provider-openai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.13,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.13,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "proxy_provider_id": "provider-anthropic-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 15,
+    "cache_read_price": 0.3,
+    "cache_write_price": 3.75,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official Anthropic pricing. Top-level cache write reflects the common 5-minute prompt-cache write tier; detailed tiers include the 1-hour variant.",
+    "pricing_tiers": [
+      {
+        "tier_id": "cache-5m",
+        "display_name": "Prompt cache write 5m",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 3.75,
+        "request_price": 0,
+        "cache_ttl": "5m"
+      },
+      {
+        "tier_id": "cache-1h",
+        "display_name": "Prompt cache write 1h",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 6,
+        "request_price": 0,
+        "cache_ttl": "1h"
+      }
+    ]
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-5-haiku",
+    "proxy_provider_id": "provider-anthropic-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 4,
+    "cache_read_price": 0.08,
+    "cache_write_price": 1,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official Anthropic pricing. Top-level cache write reflects the common 5-minute prompt-cache write tier; detailed tiers include the 1-hour variant.",
+    "pricing_tiers": [
+      {
+        "tier_id": "cache-5m",
+        "display_name": "Prompt cache write 5m",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 4,
+        "cache_read_price": 0.08,
+        "cache_write_price": 1,
+        "request_price": 0,
+        "cache_ttl": "5m"
+      },
+      {
+        "tier_id": "cache-1h",
+        "display_name": "Prompt cache write 1h",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 4,
+        "cache_read_price": 0.08,
+        "cache_write_price": 1.6,
+        "request_price": 0,
+        "cache_ttl": "1h"
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "proxy_provider_id": "provider-gemini-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 1.25,
+    "output_price": 10,
+    "cache_read_price": 0.125,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official Gemini pricing. Top-level prices reflect the standard text tier for prompts up to 200k tokens; pricing tiers capture prompt-length breakpoints and explicit cache storage costs.",
+    "pricing_tiers": [
+      {
+        "tier_id": "le-200k",
+        "display_name": "Prompts up to 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1.25,
+        "output_price": 10,
+        "cache_read_price": 0.125,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "max_input_tokens": 200000
+      },
+      {
+        "tier_id": "gt-200k",
+        "display_name": "Prompts above 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2.5,
+        "output_price": 15,
+        "cache_read_price": 0.25,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "min_input_tokens": 200001
+      },
+      {
+        "tier_id": "cache-storage",
+        "display_name": "Explicit cache storage",
+        "condition_kind": "cache_storage",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens_per_hour",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 4.5,
+        "request_price": 0,
+        "cache_ttl": "1h",
+        "notes": "Gemini explicit cache storage price per hour."
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-flash",
+    "proxy_provider_id": "provider-gemini-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.3,
+    "output_price": 2.5,
+    "cache_read_price": 0.03,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official Gemini pricing. Top-level prices reflect the standard text/image/video tier; pricing tiers capture audio input and explicit cache storage costs.",
+    "pricing_tiers": [
+      {
+        "tier_id": "text-image-video",
+        "display_name": "Text, image, and video input",
+        "condition_kind": "modality",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.3,
+        "output_price": 2.5,
+        "cache_read_price": 0.03,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "modality": "text_image_video"
+      },
+      {
+        "tier_id": "audio",
+        "display_name": "Audio input",
+        "condition_kind": "modality",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1,
+        "output_price": 2.5,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "modality": "audio"
+      },
+      {
+        "tier_id": "cache-storage",
+        "display_name": "Explicit cache storage",
+        "condition_kind": "cache_storage",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens_per_hour",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 1,
+        "request_price": 0,
+        "cache_ttl": "1h",
+        "notes": "Gemini explicit cache storage price per hour."
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "text-embedding-004",
+    "proxy_provider_id": "provider-gemini-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.15,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.15,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "proxy_provider_id": "provider-deepseek-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.27,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.27,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-reasoner",
+    "proxy_provider_id": "provider-deepseek-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.55,
+    "output_price": 2.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.55,
+        "output_price": 2.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-max",
+    "proxy_provider_id": "provider-qwen-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 2.4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 2.4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-plus",
+    "proxy_provider_id": "provider-qwen-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "text-embedding-v3",
+    "proxy_provider_id": "provider-qwen-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.05,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.05,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6",
+    "proxy_provider_id": "provider-doubao-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "doubao",
+    "model_id": "doubao-seed-1.6-thinking",
+    "proxy_provider_id": "provider-doubao-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.55,
+    "output_price": 1.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.55,
+        "output_price": 1.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "proxy_provider_id": "provider-xai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 12,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 12,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "xai",
+    "model_id": "grok-3-mini",
+    "proxy_provider_id": "provider-xai-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 3.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 3.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "proxy_provider_id": "provider-moonshot-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.6,
+    "output_price": 2.4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.6,
+        "output_price": 2.4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "moonshot-v1-128k",
+    "proxy_provider_id": "provider-moonshot-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.45,
+    "output_price": 1.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.45,
+        "output_price": 1.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "glm-5",
+    "proxy_provider_id": "provider-zhipu-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 2.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 2.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "glm-4.7",
+    "proxy_provider_id": "provider-zhipu-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "zhipu",
+    "model_id": "embedding-3",
+    "proxy_provider_id": "provider-zhipu-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.05,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.05,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-turbos-latest",
+    "proxy_provider_id": "provider-hunyuan-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.5,
+    "output_price": 1.5,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.5,
+        "output_price": 1.5,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-t1-latest",
+    "proxy_provider_id": "provider-hunyuan-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 1,
+    "output_price": 4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1,
+        "output_price": 4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "hunyuan",
+    "model_id": "hunyuan-embedding",
+    "proxy_provider_id": "provider-hunyuan-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.05,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.05,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-large-latest",
+    "proxy_provider_id": "provider-mistral-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2,
+    "output_price": 6,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2,
+        "output_price": 6,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-small-latest",
+    "proxy_provider_id": "provider-mistral-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.35,
+    "output_price": 1.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.35,
+        "output_price": 1.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-embed",
+    "proxy_provider_id": "provider-mistral-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.1,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.1,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "command-a-03-2025",
+    "proxy_provider_id": "provider-cohere-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2.5,
+    "output_price": 10,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2.5,
+        "output_price": 10,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "command-r7b-12-2024",
+    "proxy_provider_id": "provider-cohere-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.45,
+    "output_price": 1.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.45,
+        "output_price": 1.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "cohere",
+    "model_id": "embed-v4.0",
+    "proxy_provider_id": "provider-cohere-official",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.1,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "official",
+    "billing_notes": "Bootstrap snapshot of official provider pricing. Refresh with update packs when upstream pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.1,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2,
+    "output_price": 8,
+    "cache_read_price": 0.5,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2,
+        "output_price": 8,
+        "cache_read_price": 0.5,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "openai",
+    "model_id": "gpt-4.1-mini",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.4,
+    "output_price": 1.6,
+    "cache_read_price": 0.1,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "standard",
+        "display_name": "Standard text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.4,
+        "output_price": 1.6,
+        "cache_read_price": 0.1,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "anthropic",
+    "model_id": "claude-3-7-sonnet",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 15,
+    "cache_read_price": 0.3,
+    "cache_write_price": 3.75,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "cache-5m",
+        "display_name": "Prompt cache write 5m",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 3.75,
+        "request_price": 0,
+        "cache_ttl": "5m"
+      },
+      {
+        "tier_id": "cache-1h",
+        "display_name": "Prompt cache write 1h",
+        "condition_kind": "cache_window",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0.3,
+        "cache_write_price": 6,
+        "request_price": 0,
+        "cache_ttl": "1h"
+      }
+    ]
+  },
+  {
+    "channel_id": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 1.25,
+    "output_price": 10,
+    "cache_read_price": 0.125,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "le-200k",
+        "display_name": "Prompts up to 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 1.25,
+        "output_price": 10,
+        "cache_read_price": 0.125,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "max_input_tokens": 200000
+      },
+      {
+        "tier_id": "gt-200k",
+        "display_name": "Prompts above 200k tokens",
+        "condition_kind": "prompt_length",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2.5,
+        "output_price": 15,
+        "cache_read_price": 0.25,
+        "cache_write_price": 0,
+        "request_price": 0,
+        "min_input_tokens": 200001
+      },
+      {
+        "tier_id": "cache-storage",
+        "display_name": "Explicit cache storage",
+        "condition_kind": "cache_storage",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens_per_hour",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 4.5,
+        "request_price": 0,
+        "cache_ttl": "1h",
+        "notes": "Gemini explicit cache storage price per hour."
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-chat",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.27,
+    "output_price": 1.1,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.27,
+        "output_price": 1.1,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen-max",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.8,
+    "output_price": 2.4,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.8,
+        "output_price": 2.4,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "meta",
+    "model_id": "llama-3.2-3b-instruct",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.18,
+    "output_price": 0.18,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing. Refresh when upstream routing or OpenRouter billing policies change.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.18,
+        "output_price": 0.18,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "deepseek",
+    "model_id": "deepseek-v3",
+    "proxy_provider_id": "provider-siliconflow-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.25,
+    "output_price": 0.95,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of proxy-provider reference pricing. Refresh when proxy provider pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.25,
+        "output_price": 0.95,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-72b-instruct",
+    "proxy_provider_id": "provider-siliconflow-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.2,
+    "output_price": 0.8,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of proxy-provider reference pricing. Refresh when proxy provider pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.2,
+        "output_price": 0.8,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "baai",
+    "model_id": "bge-m3",
+    "proxy_provider_id": "provider-siliconflow-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.02,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of proxy-provider reference pricing. Refresh when proxy provider pricing changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.02,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "qwen",
+    "model_id": "qwen2.5-14b-instruct",
+    "proxy_provider_id": "provider-ollama-local",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "local",
+    "billing_notes": "Local runtime price placeholder. Replace with internal infrastructure or transfer pricing as needed.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "meta",
+    "model_id": "llama-3.2-3b-instruct",
+    "proxy_provider_id": "provider-ollama-local",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "local",
+    "billing_notes": "Local runtime price placeholder. Replace with internal infrastructure or transfer pricing as needed.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "nomic",
+    "model_id": "nomic-embed-text-v1.5",
+    "proxy_provider_id": "provider-ollama-local",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0,
+    "output_price": 0,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "local",
+    "billing_notes": "Local runtime price placeholder. Replace with internal infrastructure or transfer pricing as needed.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0,
+        "output_price": 0,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  }
+]

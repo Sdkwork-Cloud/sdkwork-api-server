@@ -1,6 +1,6 @@
 use super::*;
 
-async fn upstream_videos_handler(
+pub(super) async fn upstream_videos_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -21,7 +21,7 @@ async fn upstream_videos_handler(
     )
 }
 
-async fn upstream_videos_list_handler(
+pub(super) async fn upstream_videos_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -42,7 +42,7 @@ async fn upstream_videos_list_handler(
     )
 }
 
-async fn upstream_video_retrieve_handler(
+pub(super) async fn upstream_video_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -60,7 +60,7 @@ async fn upstream_video_retrieve_handler(
     )
 }
 
-async fn upstream_video_delete_handler(
+pub(super) async fn upstream_video_delete_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -78,7 +78,7 @@ async fn upstream_video_delete_handler(
     )
 }
 
-async fn upstream_video_content_handler(
+pub(super) async fn upstream_video_content_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (
@@ -95,7 +95,7 @@ async fn upstream_video_content_handler(
     )
 }
 
-async fn upstream_video_remix_handler(
+pub(super) async fn upstream_video_remix_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -116,7 +116,7 @@ async fn upstream_video_remix_handler(
     )
 }
 
-async fn upstream_video_characters_list_handler(
+pub(super) async fn upstream_video_characters_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -137,7 +137,7 @@ async fn upstream_video_characters_list_handler(
     )
 }
 
-async fn upstream_video_character_retrieve_handler(
+pub(super) async fn upstream_video_character_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -155,7 +155,7 @@ async fn upstream_video_character_retrieve_handler(
     )
 }
 
-async fn upstream_video_character_update_handler(
+pub(super) async fn upstream_video_character_update_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -173,7 +173,7 @@ async fn upstream_video_character_update_handler(
     )
 }
 
-async fn upstream_video_extend_handler(
+pub(super) async fn upstream_video_extend_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -194,7 +194,7 @@ async fn upstream_video_extend_handler(
     )
 }
 
-async fn upstream_video_character_create_handler(
+pub(super) async fn upstream_video_character_create_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -212,7 +212,7 @@ async fn upstream_video_character_create_handler(
     )
 }
 
-async fn upstream_video_character_canonical_retrieve_handler(
+pub(super) async fn upstream_video_character_canonical_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -230,7 +230,7 @@ async fn upstream_video_character_canonical_retrieve_handler(
     )
 }
 
-async fn upstream_video_edit_handler(
+pub(super) async fn upstream_video_edit_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -253,7 +253,7 @@ async fn upstream_video_edit_handler(
     )
 }
 
-async fn upstream_video_extensions_handler(
+pub(super) async fn upstream_video_extensions_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {

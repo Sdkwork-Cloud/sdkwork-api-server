@@ -28,7 +28,7 @@ pub async fn relay_chat_completion_from_store_with_execution_context(
     request: &CreateChatCompletionRequest,
     options: &ProviderRequestOptions,
 ) -> Result<GatewayExecutionResult<Value>> {
-    let decision = select_gateway_route(
+    let original_decision = select_gateway_route(
         store,
         tenant_id,
         Some(project_id),
@@ -38,24 +38,29 @@ pub async fn relay_chat_completion_from_store_with_execution_context(
     .await?;
     let execution_policy = gateway_execution_policy_for_decision(
         store,
-        &decision,
+        &original_decision,
         &ProviderRequest::ChatCompletions(request),
     )
     .await?;
-    let selected_provider_id = decision.selected_provider_id.clone();
-    let Some(provider) = store.find_provider(&selected_provider_id).await? else {
-        return Ok(GatewayExecutionResult::new(None, None));
-    };
-    let Some(api_key) =
-        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
-            .await?
+    let Some((decision, provider, descriptor)) = resolve_store_relay_provider_for_decision(
+        store,
+        secret_manager,
+        tenant_id,
+        &original_decision,
+        execution_policy.failover_enabled,
+    )
+    .await?
     else {
         return Ok(GatewayExecutionResult::new(None, None));
     };
-    match execute_json_provider_request_for_provider_with_options(
+    let selected_provider_id = decision.selected_provider_id.clone();
+    let preflight_failover_from_provider_id = (selected_provider_id
+        != original_decision.selected_provider_id)
+        .then(|| original_decision.selected_provider_id.clone());
+    match execute_json_provider_request_for_descriptor_with_options(
         store,
         &provider,
-        &api_key,
+        &descriptor,
         ProviderRequest::ChatCompletions(request),
         options,
         execution_policy.retry_policy,
@@ -63,6 +68,24 @@ pub async fn relay_chat_completion_from_store_with_execution_context(
     .await
     {
         Ok(Some(response)) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "chat_completion",
+                    from_provider_id,
+                    &provider.id,
+                    "success",
+                );
+                persist_gateway_execution_failover_decision_log(
+                    store,
+                    tenant_id,
+                    project_id,
+                    "chat_completion",
+                    &request.model,
+                    &original_decision,
+                    &provider.id,
+                )
+                .await?;
+            }
             let usage_context = gateway_usage_context_for_decision_provider(
                 store,
                 tenant_id,
@@ -79,6 +102,14 @@ pub async fn relay_chat_completion_from_store_with_execution_context(
         }
         Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
         Err(mut last_error) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "chat_completion",
+                    from_provider_id,
+                    &provider.id,
+                    "failure",
+                );
+            }
             if !execution_policy.failover_enabled {
                 return Err(last_error);
             }
@@ -91,20 +122,22 @@ pub async fn relay_chat_completion_from_store_with_execution_context(
                 else {
                     continue;
                 };
-                let Some(candidate_api_key) = resolve_provider_secret_with_manager(
-                    store,
-                    secret_manager,
-                    tenant_id,
-                    &candidate_provider.id,
-                )
-                .await?
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        decision.requested_region.as_deref(),
+                    )
+                    .await?
                 else {
                     continue;
                 };
-                match execute_json_provider_request_for_provider_with_options(
+                match execute_json_provider_request_for_descriptor_with_options(
                     store,
                     &candidate_provider,
-                    &candidate_api_key,
+                    &candidate_descriptor,
                     ProviderRequest::ChatCompletions(request),
                     options,
                     execution_policy.retry_policy,
@@ -179,6 +212,134 @@ pub async fn relay_chat_completion_from_store_with_options(
     )
     .await?
     .response)
+}
+
+pub async fn relay_chat_completion_from_planned_execution_context_with_options(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateChatCompletionRequest,
+    options: &ProviderRequestOptions,
+    planned: &PlannedExecutionProviderContext,
+) -> Result<GatewayExecutionResult<Value>> {
+    persist_planned_execution_decision_log(
+        store,
+        tenant_id,
+        project_id,
+        "chat_completion",
+        &request.model,
+        &planned.decision,
+    )
+    .await?;
+
+    let execution_policy = gateway_execution_policy_for_decision(
+        store,
+        &planned.decision,
+        &ProviderRequest::ChatCompletions(request),
+    )
+    .await?;
+    let selected_provider_id = planned.provider.id.clone();
+    let descriptor = provider_execution_descriptor_from_planned_context(planned);
+    match execute_json_provider_request_for_descriptor_with_options(
+        store,
+        &planned.provider,
+        &descriptor,
+        ProviderRequest::ChatCompletions(request),
+        options,
+        execution_policy.retry_policy,
+    )
+    .await
+    {
+        Ok(Some(response)) => Ok(GatewayExecutionResult::new(
+            Some(response),
+            Some(planned.usage_context.clone()),
+        )),
+        Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
+        Err(mut last_error) => {
+            if !execution_policy.failover_enabled {
+                return Err(last_error);
+            }
+            for candidate_provider_id in planned
+                .decision
+                .candidate_ids
+                .iter()
+                .filter(|provider_id| provider_id.as_str() != selected_provider_id)
+            {
+                let Some(candidate_provider) = store.find_provider(candidate_provider_id).await?
+                else {
+                    continue;
+                };
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        planned.decision.requested_region.as_deref(),
+                    )
+                    .await?
+                else {
+                    continue;
+                };
+                match execute_json_provider_request_for_descriptor_with_options(
+                    store,
+                    &candidate_provider,
+                    &candidate_descriptor,
+                    ProviderRequest::ChatCompletions(request),
+                    options,
+                    execution_policy.retry_policy,
+                )
+                .await
+                {
+                    Ok(Some(response)) => {
+                        record_gateway_execution_failover(
+                            "chat_completion",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "success",
+                        );
+                        persist_gateway_execution_failover_decision_log(
+                            store,
+                            tenant_id,
+                            project_id,
+                            "chat_completion",
+                            &request.model,
+                            &planned.decision,
+                            &candidate_provider.id,
+                        )
+                        .await?;
+                        let usage_context = gateway_usage_context_for_decision_provider(
+                            store,
+                            tenant_id,
+                            &planned.decision,
+                            &candidate_provider.id,
+                            current_request_api_key_group_id(),
+                            gateway_execution_failover_fallback_reason(
+                                planned.decision.fallback_reason.as_deref(),
+                            ),
+                        )
+                        .await?;
+                        return Ok(GatewayExecutionResult::new(
+                            Some(response),
+                            Some(usage_context),
+                        ));
+                    }
+                    Ok(None) => continue,
+                    Err(error) => {
+                        record_gateway_execution_failover(
+                            "chat_completion",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "failure",
+                        );
+                        last_error = error;
+                    }
+                }
+            }
+            Err(last_error)
+        }
+    }
 }
 
 pub async fn relay_list_chat_completions_from_store(
@@ -381,7 +542,7 @@ pub async fn relay_chat_completion_stream_from_store_with_execution_context(
     request: &CreateChatCompletionRequest,
     options: &ProviderRequestOptions,
 ) -> Result<GatewayExecutionResult<ProviderStreamOutput>> {
-    let decision = select_gateway_route(
+    let original_decision = select_gateway_route(
         store,
         tenant_id,
         Some(project_id),
@@ -391,24 +552,29 @@ pub async fn relay_chat_completion_stream_from_store_with_execution_context(
     .await?;
     let execution_policy = gateway_execution_policy_for_decision(
         store,
-        &decision,
+        &original_decision,
         &ProviderRequest::ChatCompletionsStream(request),
     )
     .await?;
-    let selected_provider_id = decision.selected_provider_id.clone();
-    let Some(provider) = store.find_provider(&selected_provider_id).await? else {
-        return Ok(GatewayExecutionResult::new(None, None));
-    };
-    let Some(api_key) =
-        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
-            .await?
+    let Some((decision, provider, descriptor)) = resolve_store_relay_provider_for_decision(
+        store,
+        secret_manager,
+        tenant_id,
+        &original_decision,
+        execution_policy.failover_enabled,
+    )
+    .await?
     else {
         return Ok(GatewayExecutionResult::new(None, None));
     };
-    match execute_stream_provider_request_for_provider_with_options(
+    let selected_provider_id = decision.selected_provider_id.clone();
+    let preflight_failover_from_provider_id = (selected_provider_id
+        != original_decision.selected_provider_id)
+        .then(|| original_decision.selected_provider_id.clone());
+    match execute_stream_provider_request_for_descriptor_with_options(
         store,
         &provider,
-        &api_key,
+        &descriptor,
         ProviderRequest::ChatCompletionsStream(request),
         options,
         execution_policy.retry_policy,
@@ -416,6 +582,24 @@ pub async fn relay_chat_completion_stream_from_store_with_execution_context(
     .await
     {
         Ok(Some(response)) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "chat_completion",
+                    from_provider_id,
+                    &provider.id,
+                    "success",
+                );
+                persist_gateway_execution_failover_decision_log(
+                    store,
+                    tenant_id,
+                    project_id,
+                    "chat_completion",
+                    &request.model,
+                    &original_decision,
+                    &provider.id,
+                )
+                .await?;
+            }
             let usage_context = gateway_usage_context_for_decision_provider(
                 store,
                 tenant_id,
@@ -432,6 +616,14 @@ pub async fn relay_chat_completion_stream_from_store_with_execution_context(
         }
         Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
         Err(mut last_error) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "chat_completion",
+                    from_provider_id,
+                    &provider.id,
+                    "failure",
+                );
+            }
             if !execution_policy.failover_enabled {
                 return Err(last_error);
             }
@@ -444,20 +636,22 @@ pub async fn relay_chat_completion_stream_from_store_with_execution_context(
                 else {
                     continue;
                 };
-                let Some(candidate_api_key) = resolve_provider_secret_with_manager(
-                    store,
-                    secret_manager,
-                    tenant_id,
-                    &candidate_provider.id,
-                )
-                .await?
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        decision.requested_region.as_deref(),
+                    )
+                    .await?
                 else {
                     continue;
                 };
-                match execute_stream_provider_request_for_provider_with_options(
+                match execute_stream_provider_request_for_descriptor_with_options(
                     store,
                     &candidate_provider,
-                    &candidate_api_key,
+                    &candidate_descriptor,
                     ProviderRequest::ChatCompletionsStream(request),
                     options,
                     execution_policy.retry_policy,
@@ -534,6 +728,134 @@ pub async fn relay_chat_completion_stream_from_store_with_options(
         .await?
         .response,
     )
+}
+
+pub async fn relay_chat_completion_stream_from_planned_execution_context_with_options(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateChatCompletionRequest,
+    options: &ProviderRequestOptions,
+    planned: &PlannedExecutionProviderContext,
+) -> Result<GatewayExecutionResult<ProviderStreamOutput>> {
+    persist_planned_execution_decision_log(
+        store,
+        tenant_id,
+        project_id,
+        "chat_completion",
+        &request.model,
+        &planned.decision,
+    )
+    .await?;
+
+    let execution_policy = gateway_execution_policy_for_decision(
+        store,
+        &planned.decision,
+        &ProviderRequest::ChatCompletionsStream(request),
+    )
+    .await?;
+    let selected_provider_id = planned.provider.id.clone();
+    let descriptor = provider_execution_descriptor_from_planned_context(planned);
+    match execute_stream_provider_request_for_descriptor_with_options(
+        store,
+        &planned.provider,
+        &descriptor,
+        ProviderRequest::ChatCompletionsStream(request),
+        options,
+        execution_policy.retry_policy,
+    )
+    .await
+    {
+        Ok(Some(response)) => Ok(GatewayExecutionResult::new(
+            Some(response),
+            Some(planned.usage_context.clone()),
+        )),
+        Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
+        Err(mut last_error) => {
+            if !execution_policy.failover_enabled {
+                return Err(last_error);
+            }
+            for candidate_provider_id in planned
+                .decision
+                .candidate_ids
+                .iter()
+                .filter(|provider_id| provider_id.as_str() != selected_provider_id)
+            {
+                let Some(candidate_provider) = store.find_provider(candidate_provider_id).await?
+                else {
+                    continue;
+                };
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        planned.decision.requested_region.as_deref(),
+                    )
+                    .await?
+                else {
+                    continue;
+                };
+                match execute_stream_provider_request_for_descriptor_with_options(
+                    store,
+                    &candidate_provider,
+                    &candidate_descriptor,
+                    ProviderRequest::ChatCompletionsStream(request),
+                    options,
+                    execution_policy.retry_policy,
+                )
+                .await
+                {
+                    Ok(Some(response)) => {
+                        record_gateway_execution_failover(
+                            "chat_completion",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "success",
+                        );
+                        persist_gateway_execution_failover_decision_log(
+                            store,
+                            tenant_id,
+                            project_id,
+                            "chat_completion",
+                            &request.model,
+                            &planned.decision,
+                            &candidate_provider.id,
+                        )
+                        .await?;
+                        let usage_context = gateway_usage_context_for_decision_provider(
+                            store,
+                            tenant_id,
+                            &planned.decision,
+                            &candidate_provider.id,
+                            current_request_api_key_group_id(),
+                            gateway_execution_failover_fallback_reason(
+                                planned.decision.fallback_reason.as_deref(),
+                            ),
+                        )
+                        .await?;
+                        return Ok(GatewayExecutionResult::new(
+                            Some(response),
+                            Some(usage_context),
+                        ));
+                    }
+                    Ok(None) => continue,
+                    Err(error) => {
+                        record_gateway_execution_failover(
+                            "chat_completion",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "failure",
+                        );
+                        last_error = error;
+                    }
+                }
+            }
+            Err(last_error)
+        }
+    }
 }
 
 pub fn create_chat_completion(

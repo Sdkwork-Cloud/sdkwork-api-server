@@ -1,0 +1,155 @@
+{
+  "orders": [
+    {
+      "order_id": "order-growth-lab-asia-launch",
+      "project_id": "project_growth_lab",
+      "user_id": "user_growth_lab_owner",
+      "target_kind": "subscription_plan",
+      "target_id": "plan-growth-lab-apac",
+      "target_name": "Growth Lab APAC",
+      "list_price_cents": 14900,
+      "payable_price_cents": 11900,
+      "list_price_label": "$149 / month",
+      "payable_price_label": "$119 / month",
+      "granted_units": 8000000,
+      "bonus_units": 1200000,
+      "currency_code": "USD",
+      "pricing_plan_id": "global-default-commercial",
+      "pricing_plan_version": 1,
+      "pricing_snapshot_json": "{\"plan_code\":\"plan-growth-lab-apac\",\"billing_interval\":\"monthly\",\"included_units\":8000000}",
+      "applied_coupon_code": "GLABAPAC3000",
+      "coupon_reservation_id": null,
+      "coupon_redemption_id": null,
+      "marketing_campaign_id": "campaign-growth-lab-apac-launch",
+      "subsidy_amount_minor": 3000,
+      "payment_method_id": "payment-stripe-test",
+      "latest_payment_attempt_id": "attempt-growth-lab-asia-launch",
+      "status": "fulfilled",
+      "settlement_status": "settled",
+      "source": "bootstrap_update",
+      "refundable_amount_minor": 10700,
+      "refunded_amount_minor": 1200,
+      "created_at_ms": 1710001504000,
+      "updated_at_ms": 1710001504700
+    }
+  ],
+  "payment_attempts": [
+    {
+      "payment_attempt_id": "attempt-growth-lab-asia-launch",
+      "order_id": "order-growth-lab-asia-launch",
+      "project_id": "project_growth_lab",
+      "user_id": "user_growth_lab_owner",
+      "payment_method_id": "payment-stripe-test",
+      "provider": "stripe",
+      "channel": "hosted_checkout",
+      "status": "succeeded",
+      "idempotency_key": "attempt:order-growth-lab-asia-launch:1",
+      "attempt_sequence": 1,
+      "amount_minor": 11900,
+      "currency_code": "USD",
+      "captured_amount_minor": 11900,
+      "refunded_amount_minor": 1200,
+      "provider_payment_intent_id": "pi_growth_lab_asia_launch",
+      "provider_checkout_session_id": "cs_growth_lab_asia_launch",
+      "provider_reference": "stripe-payment-reference-growth-lab-asia-launch",
+      "checkout_url": "https://checkout.stripe.test/pay/cs_growth_lab_asia_launch",
+      "qr_code_payload": null,
+      "request_payload_json": "{\"order_id\":\"order-growth-lab-asia-launch\",\"amount_minor\":11900,\"currency_code\":\"USD\"}",
+      "response_payload_json": "{\"payment_intent\":\"pi_growth_lab_asia_launch\",\"status\":\"succeeded\"}",
+      "error_code": null,
+      "error_message": null,
+      "initiated_at_ms": 1710001504200,
+      "expires_at_ms": 1710002104200,
+      "completed_at_ms": 1710001504600,
+      "updated_at_ms": 1710001504700
+    }
+  ],
+  "payment_events": [
+    {
+      "payment_event_id": "payment-event-growth-lab-asia-launch",
+      "order_id": "order-growth-lab-asia-launch",
+      "project_id": "project_growth_lab",
+      "user_id": "user_growth_lab_owner",
+      "provider": "stripe",
+      "provider_event_id": "evt_growth_lab_asia_launch",
+      "dedupe_key": "stripe:evt_growth_lab_asia_launch",
+      "event_type": "checkout.session.completed",
+      "payload_json": "{\"id\":\"evt_growth_lab_asia_launch\",\"provider\":\"stripe\",\"mode\":\"subscription\"}",
+      "processing_status": "processed",
+      "processing_message": "growth lab APAC launch checkout completed",
+      "received_at_ms": 1710001504550,
+      "processed_at_ms": 1710001504700,
+      "order_status_after": "fulfilled"
+    }
+  ],
+  "webhook_inbox_records": [
+    {
+      "webhook_inbox_id": "webhook-inbox-growth-lab-asia-launch",
+      "provider": "stripe",
+      "payment_method_id": "payment-stripe-test",
+      "provider_event_id": "evt_growth_lab_asia_launch",
+      "dedupe_key": "stripe:evt_growth_lab_asia_launch",
+      "signature_header": "t=1710001504,v1=testsig",
+      "payload_json": "{\"id\":\"evt_growth_lab_asia_launch\",\"type\":\"checkout.session.completed\",\"mode\":\"subscription\"}",
+      "processing_status": "processed",
+      "retry_count": 0,
+      "max_retry_count": 8,
+      "last_error_message": null,
+      "next_retry_at_ms": null,
+      "first_received_at_ms": 1710001504520,
+      "last_received_at_ms": 1710001504550,
+      "processed_at_ms": 1710001504700
+    }
+  ],
+  "refunds": [
+    {
+      "refund_id": "refund-growth-lab-asia-launch",
+      "order_id": "order-growth-lab-asia-launch",
+      "payment_attempt_id": "attempt-growth-lab-asia-launch",
+      "payment_method_id": "payment-stripe-test",
+      "provider": "stripe",
+      "provider_refund_id": "re_growth_lab_asia_launch",
+      "idempotency_key": "refund:order-growth-lab-asia-launch:1",
+      "reason": "launch_credit_adjustment",
+      "status": "succeeded",
+      "amount_minor": 1200,
+      "currency_code": "USD",
+      "request_payload_json": "{\"amount_minor\":1200,\"reason\":\"launch_credit_adjustment\"}",
+      "response_payload_json": "{\"refund_id\":\"re_growth_lab_asia_launch\",\"status\":\"succeeded\"}",
+      "created_at_ms": 1710001505200,
+      "updated_at_ms": 1710001505600,
+      "completed_at_ms": 1710001505600
+    }
+  ],
+  "reconciliation_runs": [
+    {
+      "reconciliation_run_id": "recon-run-growth-lab-apac",
+      "provider": "stripe",
+      "payment_method_id": "payment-stripe-test",
+      "scope_started_at_ms": 1710001500000,
+      "scope_ended_at_ms": 1710001560000,
+      "status": "completed",
+      "summary_json": "{\"matched\":1,\"refunds\":1,\"discrepancies\":1}",
+      "created_at_ms": 1710001506000,
+      "updated_at_ms": 1710001506400,
+      "completed_at_ms": 1710001506400
+    }
+  ],
+  "reconciliation_items": [
+    {
+      "reconciliation_item_id": "recon-item-growth-lab-apac",
+      "reconciliation_run_id": "recon-run-growth-lab-apac",
+      "order_id": "order-growth-lab-asia-launch",
+      "payment_attempt_id": "attempt-growth-lab-asia-launch",
+      "refund_id": "refund-growth-lab-asia-launch",
+      "external_reference": "stripe:evt_growth_lab_asia_launch",
+      "discrepancy_type": "manual_refund_review",
+      "status": "open",
+      "expected_amount_minor": 1200,
+      "provider_amount_minor": 1200,
+      "detail_json": "{\"note\":\"APAC launch sandbox refund left open for operator reconciliation training\"}",
+      "created_at_ms": 1710001506500,
+      "updated_at_ms": 1710001506500
+    }
+  ]
+}

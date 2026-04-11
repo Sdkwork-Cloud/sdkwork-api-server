@@ -104,11 +104,12 @@ test('users, tenants, coupons, and gateway pages delegate registry, detail, and 
   assert.match(tenantsDrawer, /DrawerBody/);
 
   assert.match(coupons, /CouponsDetailDrawer/);
-  assert.match(coupons, /CouponsDetailPanel/);
   assert.match(coupons, /CouponsRegistrySection/);
-  assert.match(coupons, /CouponDialog/);
+  assert.match(coupons, /Canonical marketing derived/);
+  assert.match(coupons, /Template governance/);
   assert.match(coupons, /<form/);
   assert.doesNotMatch(coupons, /CouponsManagementWorkbench/);
+  assert.doesNotMatch(coupons, /CouponDialog/);
   assert.doesNotMatch(coupons, /detail=\{/);
   assert.doesNotMatch(coupons, /title="Coupons"/);
   assert.doesNotMatch(coupons, /DialogContent/);

@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
-use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
+use sdkwork_api_app_catalog::{
+    create_provider_with_config, create_provider_with_default_plugin_family_and_bindings,
+};
+use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProviderChannelBinding};
+use sdkwork_api_domain_credential::UpstreamCredential;
 use sdkwork_api_domain_routing::{
     CompiledRoutingSnapshotRecord, RoutingDecisionLog, RoutingDecisionSource,
 };
@@ -14,6 +18,15 @@ use tower::ServiceExt;
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     serde_json::from_slice(&bytes).unwrap()
+}
+
+fn find_provider_option<'a>(summary_json: &'a Value, provider_id: &str) -> &'a Value {
+    summary_json["provider_options"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|option| option["provider_id"] == provider_id)
+        .unwrap_or_else(|| panic!("missing provider option for {provider_id}"))
 }
 
 async fn memory_pool() -> SqlitePool {
@@ -52,24 +65,40 @@ async fn portal_routing_preferences_preview_and_logs_are_project_scoped() {
         .insert_channel(&Channel::new("openai", "OpenAI"))
         .await
         .unwrap();
-    store
-        .insert_provider(&ProxyProvider::new(
+    let openrouter_provider = create_provider_with_default_plugin_family_and_bindings(
+        "provider-openrouter",
+        "openrouter",
+        "openrouter",
+        "https://openrouter.example/v1",
+        "OpenRouter",
+        &[ProviderChannelBinding::new("provider-openrouter", "openai")],
+    )
+    .unwrap();
+    assert_eq!(openrouter_provider.channel_id, "openrouter");
+    assert_eq!(openrouter_provider.adapter_kind, "openrouter");
+    assert_eq!(openrouter_provider.protocol_kind(), "openai");
+    assert_eq!(
+        openrouter_provider.extension_id,
+        "sdkwork.provider.openrouter"
+    );
+    assert!(openrouter_provider
+        .channel_bindings
+        .contains(&ProviderChannelBinding::new(
             "provider-openrouter",
-            "openai",
-            "openai",
-            "https://openrouter.example/v1",
-            "OpenRouter",
-        ))
-        .await
-        .unwrap();
+            "openai"
+        )));
+    store.insert_provider(&openrouter_provider).await.unwrap();
     store
-        .insert_provider(&ProxyProvider::new(
-            "provider-openai-official",
-            "openai",
-            "openai",
-            "https://openai.example/v1",
-            "OpenAI Official",
-        ))
+        .insert_provider(
+            &create_provider_with_config(
+                "provider-openai-official",
+                "openai",
+                "openai",
+                "https://openai.example/v1",
+                "OpenAI Official",
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
     store
@@ -100,7 +129,25 @@ async fn portal_routing_preferences_preview_and_logs_are_project_scoped() {
         .await
         .unwrap();
     let workspace_json = read_json(workspace_response).await;
+    let tenant_id = workspace_json["tenant"]["id"].as_str().unwrap().to_owned();
     let project_id = workspace_json["project"]["id"].as_str().unwrap().to_owned();
+
+    store
+        .insert_credential(&UpstreamCredential::new(
+            &tenant_id,
+            "provider-openrouter",
+            "cred-openrouter",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_credential(&UpstreamCredential::new(
+            "tenant-other",
+            "provider-openai-official",
+            "cred-openai-other",
+        ))
+        .await
+        .unwrap();
 
     store
         .insert_routing_decision_log(
@@ -258,6 +305,27 @@ async fn portal_routing_preferences_preview_and_logs_are_project_scoped() {
         summary_json["provider_options"].as_array().unwrap().len(),
         2
     );
+    let openrouter_option = find_provider_option(&summary_json, "provider-openrouter");
+    assert_eq!(openrouter_option["protocol_kind"], "openai");
+    assert_eq!(openrouter_option["integration"]["mode"], "default_plugin");
+    assert_eq!(
+        openrouter_option["integration"]["default_plugin_family"],
+        "openrouter"
+    );
+    assert_eq!(openrouter_option["credential_readiness"]["ready"], true);
+    assert_eq!(
+        openrouter_option["credential_readiness"]["state"],
+        "configured"
+    );
+    let openai_option = find_provider_option(&summary_json, "provider-openai-official");
+    assert_eq!(openai_option["protocol_kind"], "openai");
+    assert_eq!(
+        openai_option["integration"]["mode"],
+        "standard_passthrough"
+    );
+    assert!(openai_option["integration"]["default_plugin_family"].is_null());
+    assert_eq!(openai_option["credential_readiness"]["ready"], false);
+    assert_eq!(openai_option["credential_readiness"]["state"], "missing");
 
     let snapshots_response = app
         .oneshot(

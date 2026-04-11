@@ -11,12 +11,15 @@ use sdkwork_api_domain_billing::{
     AccountCommerceReconciliationStateRecord, AccountHoldAllocationRecord, AccountHoldRecord,
     AccountHoldStatus, AccountLedgerAllocationRecord, AccountLedgerEntryRecord,
     AccountLedgerEntryType, AccountRecord, AccountStatus, AccountType, BillingAccountingMode,
-    BillingEventRecord, LedgerEntry, PricingPlanRecord, PricingRateRecord, QuotaPolicy,
-    RequestSettlementRecord, RequestSettlementStatus,
+    BillingEventRecord, LedgerEntry, PricingPlanRecord,
+    PricingRateRecord, QuotaPolicy, RequestSettlementRecord, RequestSettlementStatus,
 };
 use sdkwork_api_domain_catalog::{
-    normalize_provider_extension_id, Channel, ChannelModelRecord, ModelCapability,
-    ModelCatalogEntry, ModelPriceRecord, ProviderChannelBinding, ProxyProvider,
+    normalize_provider_extension_id, normalize_provider_protocol_kind,
+    CatalogPublicationLifecycleAction, CatalogPublicationLifecycleAuditOutcome,
+    CatalogPublicationLifecycleAuditRecord, Channel, ChannelModelRecord, ModelCapability,
+    ModelCatalogEntry, ModelPriceRecord, ModelPriceTier, ProviderChannelBinding,
+    ProviderAccountRecord, ProviderModelRecord, ProxyProvider,
 };
 use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, CommercePaymentAttemptRecord, CommercePaymentEventProcessingStatus,
@@ -25,8 +28,7 @@ use sdkwork_api_domain_commerce::{
     CommerceWebhookDeliveryAttemptRecord, CommerceWebhookInboxRecord,
     PaymentMethodCredentialBindingRecord, PaymentMethodRecord, ProjectMembershipRecord,
 };
-use sdkwork_api_domain_coupon::CouponCampaign;
-use sdkwork_api_domain_credential::UpstreamCredential;
+use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_domain_identity::{
     AdminUserRecord, ApiKeyGroupRecord, CanonicalApiKeyRecord, GatewayApiKeyRecord,
     IdentityBindingRecord, IdentityUserRecord, PortalUserRecord,
@@ -36,10 +38,12 @@ use sdkwork_api_domain_jobs::{
     AsyncJobCallbackStatus, AsyncJobRecord, AsyncJobStatus,
 };
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CampaignBudgetStatus, CouponCodeRecord, CouponCodeStatus,
+    CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord, CampaignBudgetStatus,
+    CouponCodeLifecycleAuditRecord, CouponCodeRecord, CouponCodeStatus,
     CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
     CouponReservationRecord, CouponReservationStatus, CouponRollbackRecord, CouponRollbackStatus,
-    CouponRollbackType, CouponTemplateRecord, CouponTemplateStatus, MarketingCampaignRecord,
+    CouponRollbackType, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
+    CouponTemplateStatus, MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord,
     MarketingCampaignStatus, MarketingOutboxEventRecord, MarketingOutboxEventStatus,
     MarketingSubjectScope,
 };
@@ -82,7 +86,6 @@ mod admin_store_impl;
 mod catalog_store;
 mod catalog_support;
 mod commerce_store;
-mod coupon_store;
 mod identity_kernel_store;
 mod identity_store;
 mod jobs_store;

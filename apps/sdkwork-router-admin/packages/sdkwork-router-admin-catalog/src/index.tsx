@@ -8,8 +8,8 @@ import {
   StatCard,
 } from '@sdkwork/ui-pc-react';
 import { Search } from 'lucide-react';
-import { useAdminI18n } from 'sdkwork-router-admin-core';
-import type { AdminPageProps } from 'sdkwork-router-admin-types';
+import { type SaveProviderInput, useAdminI18n } from 'sdkwork-router-admin-core';
+import type { AdminPageProps, ModelPriceTier } from 'sdkwork-router-admin-types';
 
 import { CatalogDetailDrawer } from './page/CatalogDetailDrawer';
 import {
@@ -25,15 +25,7 @@ import { useCatalogWorkspaceState } from './page/useCatalogWorkspaceState';
 
 type CatalogPageProps = AdminPageProps & {
   onSaveChannel: (input: { id: string; name: string }) => Promise<void>;
-  onSaveProvider: (input: {
-    id: string;
-    channel_id: string;
-    extension_id?: string;
-    adapter_kind: string;
-    base_url: string;
-    display_name: string;
-    channel_bindings: Array<{ channel_id: string; is_primary: boolean }>;
-  }) => Promise<void>;
+  onSaveProvider: (input: SaveProviderInput) => Promise<void>;
   onSaveCredential: (input: {
     tenant_id: string;
     provider_id: string;
@@ -67,6 +59,9 @@ type CatalogPageProps = AdminPageProps & {
     cache_read_price: number;
     cache_write_price: number;
     request_price: number;
+    price_source_kind: string;
+    billing_notes?: string | null;
+    pricing_tiers: ModelPriceTier[];
     is_active: boolean;
   }) => Promise<void>;
   onDeleteChannel: (channelId: string) => Promise<void>;
@@ -118,6 +113,8 @@ export function CatalogPage({
     selectedCredential,
     selectedCredentialKey,
     selectedModelPrices,
+    selectedProviderModels,
+    selectedProviderModelPrices,
     selectedPublication,
     selectedProvider,
     selectedVariant,
@@ -422,6 +419,8 @@ export function CatalogPage({
         selectedChannelProviderCount={selectedChannelProviderCount}
         selectedCredential={selectedCredential}
         selectedModelPrices={selectedModelPrices}
+        selectedProviderModels={selectedProviderModels}
+        selectedProviderModelPrices={selectedProviderModelPrices}
         selectedProvider={selectedProvider}
         selectedPublication={selectedPublication}
         selectedVariant={selectedVariant}

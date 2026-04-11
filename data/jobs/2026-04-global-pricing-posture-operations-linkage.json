@@ -1,0 +1,130 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-global-official-direct-capacity-plan",
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "user_id": 3001,
+      "account_id": 7001001,
+      "request_id": 5006,
+      "provider_id": "provider-openai-official",
+      "model_code": "gpt-4.1-mini",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "capacity_plan_generate",
+      "status": "succeeded",
+      "external_job_id": "openai-job-global-official-direct-capacity-plan",
+      "idempotency_key": "job:global:official-direct-capacity-plan",
+      "callback_url": "https://portal.sdkwork.ai/api/jobs/callbacks/official-direct",
+      "input_summary": "Generate a launch capacity plan for the official-direct OpenAI commercial walkthrough workspace.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710000498200,
+      "updated_at_ms": 1710000498800,
+      "started_at_ms": 1710000498300,
+      "completed_at_ms": 1710000498800
+    },
+    {
+      "job_id": "job-global-edge-local-capacity-audit",
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "user_id": 3001,
+      "account_id": 7001001,
+      "request_id": 5007,
+      "provider_id": "provider-ollama-local",
+      "model_code": "qwen2.5:14b",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "capacity_audit",
+      "status": "succeeded",
+      "external_job_id": "ollama-job-global-edge-local-capacity-audit",
+      "idempotency_key": "job:global:edge-local-capacity-audit",
+      "callback_url": "https://portal.sdkwork.ai/api/jobs/callbacks/edge-local-capacity",
+      "input_summary": "Audit the local-edge Ollama capacity pack and summarize current private serving headroom.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710000499000,
+      "updated_at_ms": 1710000499600,
+      "started_at_ms": 1710000499100,
+      "completed_at_ms": 1710000499600
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": 9814,
+      "job_id": "job-global-official-direct-capacity-plan",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "openai",
+      "endpoint": "https://api.openai.com/v1/responses",
+      "external_job_id": "openai-job-global-official-direct-capacity-plan",
+      "claimed_at_ms": 1710000498320,
+      "finished_at_ms": 1710000498780,
+      "error_message": null,
+      "created_at_ms": 1710000498200,
+      "updated_at_ms": 1710000498780
+    },
+    {
+      "attempt_id": 9815,
+      "job_id": "job-global-edge-local-capacity-audit",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "ollama",
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "external_job_id": "ollama-job-global-edge-local-capacity-audit",
+      "claimed_at_ms": 1710000499120,
+      "finished_at_ms": 1710000499580,
+      "error_message": null,
+      "created_at_ms": 1710000499000,
+      "updated_at_ms": 1710000499580
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset-global-official-direct-capacity-plan-md",
+      "job_id": "job-global-official-direct-capacity-plan",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1001/jobs/job-global-official-direct-capacity-plan/plan.md",
+      "download_url": "https://cdn.sdkwork.ai/jobs/job-global-official-direct-capacity-plan/plan.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 3328,
+      "checksum_sha256": "9c78c3270e9d71e0d7b55af0f8aa99693211a555d650a0eb967618ac66a52db6",
+      "created_at_ms": 1710000498790
+    },
+    {
+      "asset_id": "asset-global-edge-local-capacity-audit-md",
+      "job_id": "job-global-edge-local-capacity-audit",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1001/jobs/job-global-edge-local-capacity-audit/audit.md",
+      "download_url": "https://cdn.sdkwork.ai/jobs/job-global-edge-local-capacity-audit/audit.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 2688,
+      "checksum_sha256": "f2fdb54e4e95ef8c423fd7b7396b70a9739325e5525967fd80ebcf03522b09a6",
+      "created_at_ms": 1710000499590
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_id": 10814,
+      "job_id": "job-global-official-direct-capacity-plan",
+      "event_type": "job.completed",
+      "dedupe_key": "openai:openai-job-global-official-direct-capacity-plan:completed",
+      "payload_json": "{\"job_id\":\"job-global-official-direct-capacity-plan\",\"status\":\"succeeded\",\"provider\":\"openai\"}",
+      "status": "processed",
+      "received_at_ms": 1710000498810,
+      "processed_at_ms": 1710000498840
+    },
+    {
+      "callback_id": 10815,
+      "job_id": "job-global-edge-local-capacity-audit",
+      "event_type": "job.completed",
+      "dedupe_key": "ollama:ollama-job-global-edge-local-capacity-audit:completed",
+      "payload_json": "{\"job_id\":\"job-global-edge-local-capacity-audit\",\"status\":\"succeeded\",\"provider\":\"ollama\"}",
+      "status": "processed",
+      "received_at_ms": 1710000499610,
+      "processed_at_ms": 1710000499640
+    }
+  ]
+}

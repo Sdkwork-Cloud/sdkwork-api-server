@@ -1,11 +1,11 @@
 use super::*;
 
 #[derive(Clone, Default)]
-struct UpstreamCaptureState {
-    authorization: Arc<Mutex<Option<String>>>,
+pub(super) struct UpstreamCaptureState {
+    pub(super) authorization: Arc<Mutex<Option<String>>>,
 }
 
-fn chat_request(model: &str) -> CreateChatCompletionRequest {
+pub(super) fn chat_request(model: &str) -> CreateChatCompletionRequest {
     CreateChatCompletionRequest {
         model: model.to_owned(),
         messages: vec![ChatMessageInput {
@@ -18,7 +18,7 @@ fn chat_request(model: &str) -> CreateChatCompletionRequest {
     }
 }
 
-async fn upstream_chat_handler(
+pub(super) async fn upstream_chat_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> Json<Value> {
@@ -35,13 +35,13 @@ async fn upstream_chat_handler(
     }))
 }
 
-async fn upstream_health_handler() -> Json<Value> {
+pub(super) async fn upstream_health_handler() -> Json<Value> {
     Json(json!({
         "status": "ok"
     }))
 }
 
-fn serve_connector_compatible_upstream(
+pub(super) fn serve_connector_compatible_upstream(
     listener: std::net::TcpListener,
     state: UpstreamCaptureState,
     expected_requests: usize,
@@ -106,7 +106,7 @@ fn serve_connector_compatible_upstream(
     }
 }
 
-fn discovered_connector_manifest() -> &'static str {
+pub(super) fn discovered_connector_manifest() -> &'static str {
     r#"
 api_version = "sdkwork.extension/v1"
 id = "sdkwork.provider.custom-openai"
@@ -129,7 +129,7 @@ compatibility = "relay"
 "#
 }
 
-fn temp_extension_root(suffix: &str) -> PathBuf {
+pub(super) fn temp_extension_root(suffix: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -139,11 +139,11 @@ fn temp_extension_root(suffix: &str) -> PathBuf {
     path
 }
 
-fn cleanup_dir(path: &Path) {
+pub(super) fn cleanup_dir(path: &Path) {
     let _ = fs::remove_dir_all(path);
 }
 
-async fn wait_for_health(base_url: &str) {
+pub(super) async fn wait_for_health(base_url: &str) {
     let health_url = format!("{}/health", base_url.trim_end_matches('/'));
     for _ in 0..20 {
         if let Ok(response) = reqwest::get(&health_url).await {
@@ -157,7 +157,7 @@ async fn wait_for_health(base_url: &str) {
     panic!("health endpoint did not become ready: {health_url}");
 }
 
-async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
+pub(super) async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
     for _ in 0..120 {
         if read_log_lines(path)
             == expected
@@ -176,7 +176,7 @@ async fn wait_for_lifecycle_log(path: &Path, expected: &[&str]) {
     );
 }
 
-async fn wait_for_log_line(path: &Path, expected: &str) {
+pub(super) async fn wait_for_log_line(path: &Path, expected: &str) {
     for _ in 0..120 {
         if read_log_lines(path).iter().any(|line| line == expected) {
             return;
@@ -187,7 +187,7 @@ async fn wait_for_log_line(path: &Path, expected: &str) {
     panic!("log did not contain {expected}: {}", path.display());
 }
 
-fn read_log_lines(path: &Path) -> Vec<String> {
+pub(super) fn read_log_lines(path: &Path) -> Vec<String> {
     std::fs::read_to_string(path)
         .unwrap_or_default()
         .lines()
@@ -195,11 +195,11 @@ fn read_log_lines(path: &Path) -> Vec<String> {
         .collect()
 }
 
-fn extension_env_guard(path: &Path) -> ExtensionEnvGuard {
+pub(super) fn extension_env_guard(path: &Path) -> ExtensionEnvGuard {
     extension_env_guard_with_signature_requirement(path, false)
 }
 
-fn extension_env_guard_with_signature_requirement(
+pub(super) fn extension_env_guard_with_signature_requirement(
     path: &Path,
     require_connector_signature: bool,
 ) -> ExtensionEnvGuard {
@@ -235,7 +235,7 @@ fn extension_env_guard_with_signature_requirement(
     }
 }
 
-struct ExtensionEnvGuard {
+pub(super) struct ExtensionEnvGuard {
     previous_paths: Option<String>,
     previous_connector: Option<String>,
     previous_native: Option<String>,
@@ -270,14 +270,14 @@ impl Drop for ExtensionEnvGuard {
     }
 }
 
-fn restore_env_var(key: &str, value: Option<&str>) {
+pub(super) fn restore_env_var(key: &str, value: Option<&str>) {
     match value {
         Some(value) => std::env::set_var(key, value),
         None => std::env::remove_var(key),
     }
 }
 
-fn native_dynamic_env_guard(path: &Path, public_key: &str) -> ExtensionEnvGuard {
+pub(super) fn native_dynamic_env_guard(path: &Path, public_key: &str) -> ExtensionEnvGuard {
     let previous_paths = std::env::var("SDKWORK_EXTENSION_PATHS").ok();
     let previous_connector = std::env::var("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS").ok();
     let previous_native = std::env::var("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS").ok();
@@ -314,7 +314,7 @@ fn native_dynamic_env_guard(path: &Path, public_key: &str) -> ExtensionEnvGuard 
     }
 }
 
-fn native_dynamic_fixture_library_path() -> PathBuf {
+pub(super) fn native_dynamic_fixture_library_path() -> PathBuf {
     let current_exe = std::env::current_exe().expect("current exe");
     let directory = current_exe.parent().expect("exe dir");
     let prefix = if cfg!(windows) {
@@ -344,7 +344,9 @@ fn native_dynamic_fixture_library_path() -> PathBuf {
         .expect("native dynamic fixture library")
 }
 
-fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::ExtensionManifest {
+pub(super) fn native_dynamic_manifest(
+    library_path: &Path,
+) -> sdkwork_api_extension_core::ExtensionManifest {
     sdkwork_api_extension_core::ExtensionManifest::new(
         FIXTURE_EXTENSION_ID,
         sdkwork_api_extension_core::ExtensionKind::Provider,
@@ -376,6 +378,26 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
     .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.create",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.stream_generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
         "audio.speech.create",
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
@@ -389,7 +411,7 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
     ))
 }
 
-fn sign_native_dynamic_package(
+pub(super) fn sign_native_dynamic_package(
     package_dir: &Path,
     manifest: &sdkwork_api_extension_core::ExtensionManifest,
     signing_key: &SigningKey,
@@ -430,7 +452,7 @@ fn sign_native_dynamic_package(
     STANDARD.encode(signature.to_bytes())
 }
 
-fn sha256_hex_path(path: &Path) -> String {
+pub(super) fn sha256_hex_path(path: &Path) -> String {
     let digest = Sha256::digest(std::fs::read(path).unwrap());
     let mut encoded = String::with_capacity(digest.len() * 2);
     for byte in digest {
@@ -439,13 +461,13 @@ fn sha256_hex_path(path: &Path) -> String {
     encoded
 }
 
-struct NativeDynamicLifecycleLogGuard {
+pub(super) struct NativeDynamicLifecycleLogGuard {
     path: PathBuf,
     previous: Option<String>,
 }
 
 impl NativeDynamicLifecycleLogGuard {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut path = std::env::temp_dir();
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -461,7 +483,7 @@ impl NativeDynamicLifecycleLogGuard {
         Self { path, previous }
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -476,13 +498,13 @@ impl Drop for NativeDynamicLifecycleLogGuard {
     }
 }
 
-struct NativeDynamicInvocationLogGuard {
+pub(super) struct NativeDynamicInvocationLogGuard {
     path: PathBuf,
     previous: Option<String>,
 }
 
 impl NativeDynamicInvocationLogGuard {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut path = std::env::temp_dir();
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -498,7 +520,7 @@ impl NativeDynamicInvocationLogGuard {
         Self { path, previous }
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -513,13 +535,13 @@ impl Drop for NativeDynamicInvocationLogGuard {
     }
 }
 
-struct NativeDynamicMockDelayGuard {
+pub(super) struct NativeDynamicMockDelayGuard {
     previous_json_delay_ms: Option<String>,
     previous_stream_delay_ms: Option<String>,
 }
 
 impl NativeDynamicMockDelayGuard {
-    fn json(delay_ms: u64) -> Self {
+    pub(super) fn json(delay_ms: u64) -> Self {
         let previous_json_delay_ms = std::env::var("SDKWORK_NATIVE_MOCK_JSON_DELAY_MS").ok();
         let previous_stream_delay_ms = std::env::var("SDKWORK_NATIVE_MOCK_STREAM_DELAY_MS").ok();
         std::env::set_var("SDKWORK_NATIVE_MOCK_JSON_DELAY_MS", delay_ms.to_string());
@@ -544,12 +566,12 @@ impl Drop for NativeDynamicMockDelayGuard {
     }
 }
 
-struct NativeDynamicDrainTimeoutGuard {
+pub(super) struct NativeDynamicDrainTimeoutGuard {
     previous_timeout_ms: Option<String>,
 }
 
 impl NativeDynamicDrainTimeoutGuard {
-    fn new(timeout_ms: u64) -> Self {
+    pub(super) fn new(timeout_ms: u64) -> Self {
         let previous_timeout_ms =
             std::env::var("SDKWORK_NATIVE_DYNAMIC_SHUTDOWN_DRAIN_TIMEOUT_MS").ok();
         std::env::set_var(

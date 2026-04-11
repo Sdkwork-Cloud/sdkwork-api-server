@@ -27,16 +27,17 @@ pub fn ensure_connector_runtime_started(
     }
 
     if probe_http_health(&launch_config.health_url)? {
-        return Ok(ConnectorRuntimeStatus {
-            instance_id: load_plan.instance_id.clone(),
-            extension_id: load_plan.extension_id.clone(),
-            display_name: load_plan.display_name.clone(),
-            base_url: base_url.to_owned(),
-            health_url: launch_config.health_url,
-            process_id: None,
-            running: true,
-            healthy: true,
-        });
+        return Ok(external_connector_runtime_status(load_plan, base_url, &launch_config));
+    }
+
+    if connector_entrypoint_missing(&launch_config.entrypoint)
+        && wait_for_external_connector_health(
+            &launch_config.health_url,
+            launch_config.startup_timeout,
+            launch_config.startup_poll_interval,
+        )?
+    {
+        return Ok(external_connector_runtime_status(load_plan, base_url, &launch_config));
     }
 
     let mut command = Command::new(&launch_config.entrypoint);
@@ -109,6 +110,23 @@ pub fn ensure_connector_runtime_started(
         running: true,
         healthy: true,
     })
+}
+
+fn external_connector_runtime_status(
+    load_plan: &ExtensionLoadPlan,
+    base_url: &str,
+    launch_config: &ConnectorLaunchConfig,
+) -> ConnectorRuntimeStatus {
+    ConnectorRuntimeStatus {
+        instance_id: load_plan.instance_id.clone(),
+        extension_id: load_plan.extension_id.clone(),
+        display_name: load_plan.display_name.clone(),
+        base_url: base_url.to_owned(),
+        health_url: launch_config.health_url.clone(),
+        process_id: None,
+        running: true,
+        healthy: true,
+    }
 }
 
 pub fn shutdown_connector_runtime(instance_id: &str) -> Result<(), ExtensionHostError> {
@@ -352,6 +370,25 @@ fn wait_for_connector_health(
     }
 }
 
+fn wait_for_external_connector_health(
+    health_url: &str,
+    timeout: Duration,
+    poll_interval: Duration,
+) -> Result<bool, ExtensionHostError> {
+    let start = Instant::now();
+    loop {
+        if probe_http_health(health_url)? {
+            return Ok(true);
+        }
+
+        if start.elapsed() >= timeout {
+            return Ok(false);
+        }
+
+        std::thread::sleep(poll_interval);
+    }
+}
+
 fn connector_process_exited(instance_id: &str) -> Result<bool, ExtensionHostError> {
     let mut registry = connector_process_registry()?;
     let mut should_remove = false;
@@ -412,6 +449,14 @@ pub(crate) fn resolve_entrypoint(entrypoint: &str, package_root: Option<&Path>) 
     }
 
     path
+}
+
+fn connector_entrypoint_missing(entrypoint: &Path) -> bool {
+    connector_entrypoint_requires_filesystem_presence(entrypoint) && !entrypoint.exists()
+}
+
+fn connector_entrypoint_requires_filesystem_presence(entrypoint: &Path) -> bool {
+    entrypoint.is_absolute() || entrypoint.components().count() > 1
 }
 
 fn config_string(value: &Value, key: &str) -> Option<String> {
