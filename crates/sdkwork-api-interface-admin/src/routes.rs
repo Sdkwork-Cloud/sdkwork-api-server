@@ -69,6 +69,10 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
             post(|| async { "change-password" }),
         )
         .route("/admin/tenants", get(|| async { "tenants" }))
+        .route(
+            "/admin/tenants/{tenant_id}/providers/readiness",
+            get(|| async { "tenant-provider-readiness" }),
+        )
         .route("/admin/projects", get(|| async { "projects" }))
         .route("/admin/api-keys", get(|| async { "api-keys" }))
         .route("/admin/api-key-groups", get(|| async { "api-key-groups" }))
@@ -84,6 +88,22 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
         .route("/admin/providers", get(|| async { "providers" }))
         .route("/admin/credentials", get(|| async { "credentials" }))
         .route("/admin/channel-models", get(|| async { "channel-models" }))
+        .route(
+            "/admin/provider-accounts",
+            get(|| async { "provider-accounts" }),
+        )
+        .route(
+            "/admin/provider-models",
+            get(|| async { "provider-models" }),
+        )
+        .route(
+            "/admin/provider-accounts/{provider_account_id}",
+            delete(|| async { "provider-accounts-delete" }),
+        )
+        .route(
+            "/admin/provider-models/{proxy_provider_id}/channels/{channel_id}/models/{model_id}",
+            delete(|| async { "provider-models-delete" }),
+        )
         .route("/admin/models", get(|| async { "models" }))
         .route("/admin/model-prices", get(|| async { "model-prices" }))
         .route(
@@ -154,6 +174,26 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
         .route(
             "/admin/commerce/orders",
             get(|| async { "commerce-orders" }),
+        )
+        .route(
+            "/admin/commerce/catalog-publications",
+            get(|| async { "commerce-catalog-publications" }),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}",
+            get(|| async { "commerce-catalog-publication-detail" }),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/publish",
+            post(|| async { "commerce-catalog-publication-publish" }),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/schedule",
+            post(|| async { "commerce-catalog-publication-schedule" }),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/retire",
+            post(|| async { "commerce-catalog-publication-retire" }),
         )
         .route(
             "/admin/commerce/payment-methods",
@@ -399,14 +439,6 @@ pub fn admin_router_with_state_and_http_exposure(
             post(users::reset_portal_user_password_handler),
         )
         .route(
-            "/admin/coupons",
-            get(marketing::list_coupons_handler).post(marketing::create_coupon_handler),
-        )
-        .route(
-            "/admin/coupons/{coupon_id}",
-            delete(marketing::delete_coupon_handler),
-        )
-        .route(
             "/admin/marketing/coupon-templates",
             get(marketing::list_marketing_coupon_templates_handler)
                 .post(marketing::create_marketing_coupon_template_handler),
@@ -414,6 +446,42 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/marketing/coupon-templates/{coupon_template_id}/status",
             post(marketing::update_marketing_coupon_template_status_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/clone",
+            post(marketing::clone_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/compare",
+            post(marketing::compare_marketing_coupon_templates_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/submit-for-approval",
+            post(marketing::submit_marketing_coupon_template_for_approval_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/approve",
+            post(marketing::approve_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/reject",
+            post(marketing::reject_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/publish",
+            post(marketing::publish_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/schedule",
+            post(marketing::schedule_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/retire",
+            post(marketing::retire_marketing_coupon_template_handler),
+        )
+        .route(
+            "/admin/marketing/coupon-templates/{coupon_template_id}/lifecycle-audits",
+            get(marketing::list_marketing_coupon_template_lifecycle_audits_handler),
         )
         .route(
             "/admin/marketing/campaigns",
@@ -425,6 +493,42 @@ pub fn admin_router_with_state_and_http_exposure(
             post(marketing::update_marketing_campaign_status_handler),
         )
         .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/clone",
+            post(marketing::clone_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/compare",
+            post(marketing::compare_marketing_campaigns_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/submit-for-approval",
+            post(marketing::submit_marketing_campaign_for_approval_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/approve",
+            post(marketing::approve_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/reject",
+            post(marketing::reject_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/publish",
+            post(marketing::publish_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/schedule",
+            post(marketing::schedule_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/retire",
+            post(marketing::retire_marketing_campaign_handler),
+        )
+        .route(
+            "/admin/marketing/campaigns/{marketing_campaign_id}/lifecycle-audits",
+            get(marketing::list_marketing_campaign_lifecycle_audits_handler),
+        )
+        .route(
             "/admin/marketing/budgets",
             get(marketing::list_marketing_budgets_handler)
                 .post(marketing::create_marketing_budget_handler),
@@ -434,6 +538,18 @@ pub fn admin_router_with_state_and_http_exposure(
             post(marketing::update_marketing_budget_status_handler),
         )
         .route(
+            "/admin/marketing/budgets/{campaign_budget_id}/activate",
+            post(marketing::activate_marketing_campaign_budget_handler),
+        )
+        .route(
+            "/admin/marketing/budgets/{campaign_budget_id}/close",
+            post(marketing::close_marketing_campaign_budget_handler),
+        )
+        .route(
+            "/admin/marketing/budgets/{campaign_budget_id}/lifecycle-audits",
+            get(marketing::list_marketing_campaign_budget_lifecycle_audits_handler),
+        )
+        .route(
             "/admin/marketing/codes",
             get(marketing::list_marketing_coupon_codes_handler)
                 .post(marketing::create_marketing_coupon_code_handler),
@@ -441,6 +557,18 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/marketing/codes/{coupon_code_id}/status",
             post(marketing::update_marketing_coupon_code_status_handler),
+        )
+        .route(
+            "/admin/marketing/codes/{coupon_code_id}/disable",
+            post(marketing::disable_marketing_coupon_code_handler),
+        )
+        .route(
+            "/admin/marketing/codes/{coupon_code_id}/restore",
+            post(marketing::restore_marketing_coupon_code_handler),
+        )
+        .route(
+            "/admin/marketing/codes/{coupon_code_id}/lifecycle-audits",
+            get(marketing::list_marketing_coupon_code_lifecycle_audits_handler),
         )
         .route(
             "/admin/marketing/reservations",
@@ -461,6 +589,10 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/tenants/{tenant_id}",
             delete(tenant::delete_tenant_handler),
+        )
+        .route(
+            "/admin/tenants/{tenant_id}/providers/readiness",
+            get(catalog::list_tenant_provider_readiness_handler),
         )
         .route(
             "/admin/projects",
@@ -508,6 +640,11 @@ pub fn admin_router_with_state_and_http_exposure(
             get(catalog::list_providers_handler).post(catalog::create_provider_handler),
         )
         .route(
+            "/admin/providers/official-configs",
+            get(catalog::list_official_provider_configs_handler)
+                .post(catalog::upsert_official_provider_config_handler),
+        )
+        .route(
             "/admin/providers/{provider_id}",
             delete(catalog::delete_provider_handler),
         )
@@ -526,6 +663,23 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/channel-models/{channel_id}/models/{model_id}",
             delete(catalog::delete_channel_model_handler),
+        )
+        .route(
+            "/admin/provider-accounts",
+            get(catalog::list_provider_accounts_handler)
+                .post(catalog::create_provider_account_handler),
+        )
+        .route(
+            "/admin/provider-accounts/{provider_account_id}",
+            delete(catalog::delete_provider_account_handler),
+        )
+        .route(
+            "/admin/provider-models",
+            get(catalog::list_provider_models_handler).post(catalog::create_provider_model_handler),
+        )
+        .route(
+            "/admin/provider-models/{proxy_provider_id}/channels/{channel_id}/models/{model_id}",
+            delete(catalog::delete_provider_model_handler),
         )
         .route(
             "/admin/models",
@@ -631,6 +785,26 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/commerce/orders",
             get(commerce::list_recent_commerce_orders_handler),
+        )
+        .route(
+            "/admin/commerce/catalog-publications",
+            get(commerce::list_commercial_catalog_publications_handler),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}",
+            get(commerce::get_commercial_catalog_publication_handler),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/publish",
+            post(commerce::publish_commercial_catalog_publication_handler),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/schedule",
+            post(commerce::schedule_commercial_catalog_publication_handler),
+        )
+        .route(
+            "/admin/commerce/catalog-publications/{publication_id}/retire",
+            post(commerce::retire_commercial_catalog_publication_handler),
         )
         .route(
             "/admin/commerce/payment-methods",

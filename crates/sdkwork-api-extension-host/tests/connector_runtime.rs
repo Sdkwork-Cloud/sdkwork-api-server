@@ -175,6 +175,80 @@ fn host_reuses_healthy_external_connector_endpoint_without_spawning() {
     cleanup_dir(&root);
 }
 
+#[test]
+fn host_waits_for_external_connector_endpoint_to_become_healthy_without_spawning() {
+    let root = temp_extension_root("connector-external-delayed-runtime");
+    let package_dir = root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+
+    let port = free_port();
+    let server = thread::spawn(move || {
+        thread::sleep(std::time::Duration::from_millis(150));
+        let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut buffer = [0_u8; 1024];
+            let _ = stream.read(&mut buffer);
+            let response =
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 15\r\nConnection: close\r\n\r\n{\"status\":\"ok\"}";
+            let _ = stream.write_all(response);
+            let _ = stream.flush();
+        }
+    });
+
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        connector_manifest("sdkwork.provider.custom-openai"),
+    )
+    .unwrap();
+
+    let policy = ExtensionDiscoveryPolicy::new(vec![root.clone()])
+        .with_connector_extensions(true)
+        .with_native_dynamic_extensions(false);
+    let packages = discover_extension_packages(&policy).unwrap();
+
+    let mut host = ExtensionHost::new();
+    host.register_discovered_manifest(packages[0].clone());
+    host.install(
+        ExtensionInstallation::new(
+            "custom-openai-installation",
+            "sdkwork.provider.custom-openai",
+            ExtensionRuntime::Connector,
+        )
+        .with_entrypoint("bin/sdkwork-provider-custom-openai")
+        .with_config(serde_json::json!({
+            "health_path": "/health",
+            "startup_timeout_ms": 1000,
+            "startup_poll_interval_ms": 25
+        })),
+    )
+    .unwrap();
+    host.mount_instance(
+        ExtensionInstance::new(
+            "provider-custom-openai-delayed-external",
+            "custom-openai-installation",
+            "sdkwork.provider.custom-openai",
+        )
+        .with_base_url(format!("http://127.0.0.1:{port}"))
+        .with_config(serde_json::json!({
+            "health_path": "/health"
+        })),
+    )
+    .unwrap();
+
+    let plan = host.load_plan("provider-custom-openai-delayed-external").unwrap();
+    let status =
+        ensure_connector_runtime_started(&plan, plan.base_url.as_deref().expect("base url"))
+            .unwrap();
+
+    assert_eq!(status.process_id, None);
+    assert!(status.running);
+    assert!(status.healthy);
+    assert_eq!(status.health_url, format!("http://127.0.0.1:{port}/health"));
+
+    server.join().unwrap();
+    cleanup_dir(&root);
+}
+
 fn connector_manifest(extension_id: &str) -> String {
     format!(
         r#"

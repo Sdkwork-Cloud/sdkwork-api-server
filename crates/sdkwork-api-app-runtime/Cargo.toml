@@ -6,17 +6,34 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+argon2.workspace = true
 async-trait.workspace = true
 axum.workspace = true
 futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
+sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-cache-core = { path = "../sdkwork-api-cache-core" }
 sdkwork-api-cache-memory = { path = "../sdkwork-api-cache-memory" }
 sdkwork-api-cache-redis = { path = "../sdkwork-api-cache-redis" }
 sdkwork-api-config = { path = "../sdkwork-api-config" }
+sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
+sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
+sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
+sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }
+sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
+sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
+sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }
+sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
+sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
 sdkwork-api-storage-postgres = { path = "../sdkwork-api-storage-postgres" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
@@ -27,15 +44,11 @@ axum.workspace = true
 base64.workspace = true
 ed25519-dalek.workspace = true
 reqwest.workspace = true
-sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
-sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
 sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }
 serial_test.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 sha2.workspace = true
 tokio.workspace = true
 toml.workspace = true

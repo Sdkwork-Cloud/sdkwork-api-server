@@ -1,0 +1,130 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-growth-lab-minimax-brief",
+      "tenant_id": 1004,
+      "organization_id": 2004,
+      "user_id": 3004,
+      "account_id": 7002003,
+      "request_id": 5005,
+      "provider_id": "provider-minimax-official",
+      "model_code": "minimax-m1",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "growth_brief_generate",
+      "status": "succeeded",
+      "external_job_id": "minimax-job-growth-lab-minimax-brief",
+      "idempotency_key": "job:growth-lab:minimax-brief",
+      "callback_url": "https://growth.sdkwork.local/api/jobs/callbacks/minimax",
+      "input_summary": "Generate the APAC growth launch brief using the growth_lab Asia official routing preset.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710001508000,
+      "updated_at_ms": 1710001508600,
+      "started_at_ms": 1710001508120,
+      "completed_at_ms": 1710001508600
+    },
+    {
+      "job_id": "job-growth-lab-ernie-localization",
+      "tenant_id": 1004,
+      "organization_id": 2004,
+      "user_id": 3004,
+      "account_id": 7002003,
+      "request_id": 5006,
+      "provider_id": "provider-ernie-official",
+      "model_code": "ernie-4.5-turbo",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "localized_brief_review",
+      "status": "succeeded",
+      "external_job_id": "ernie-job-growth-lab-localization",
+      "idempotency_key": "job:growth-lab:ernie-localization",
+      "callback_url": "https://growth.sdkwork.local/api/jobs/callbacks/ernie",
+      "input_summary": "Localize the APAC launch brief for Chinese-language review and regional operator handoff.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710001509000,
+      "updated_at_ms": 1710001509600,
+      "started_at_ms": 1710001509120,
+      "completed_at_ms": 1710001509600
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": 9804,
+      "job_id": "job-growth-lab-minimax-brief",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "minimax",
+      "endpoint": "https://api.minimax.chat/v1/text/chatcompletion_v2",
+      "external_job_id": "minimax-job-growth-lab-minimax-brief",
+      "claimed_at_ms": 1710001508140,
+      "finished_at_ms": 1710001508560,
+      "error_message": null,
+      "created_at_ms": 1710001508000,
+      "updated_at_ms": 1710001508560
+    },
+    {
+      "attempt_id": 9805,
+      "job_id": "job-growth-lab-ernie-localization",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "ernie",
+      "endpoint": "https://qianfan.baidubce.com/v2/chat/completions",
+      "external_job_id": "ernie-job-growth-lab-localization",
+      "claimed_at_ms": 1710001509140,
+      "finished_at_ms": 1710001509560,
+      "error_message": null,
+      "created_at_ms": 1710001509000,
+      "updated_at_ms": 1710001509560
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset-growth-lab-minimax-brief-json",
+      "job_id": "job-growth-lab-minimax-brief",
+      "asset_kind": "json",
+      "storage_key": "tenant-1004/jobs/job-growth-lab-minimax-brief/brief.json",
+      "download_url": "https://growth.sdkwork.local/artifacts/job-growth-lab-minimax-brief/brief.json",
+      "mime_type": "application/json",
+      "size_bytes": 4096,
+      "checksum_sha256": "8c5c9b0f45aebcf364a1d130a1f6044e7791de7134c8876cbd0c4d6f1b67f1c8",
+      "created_at_ms": 1710001508620
+    },
+    {
+      "asset_id": "asset-growth-lab-ernie-localization-md",
+      "job_id": "job-growth-lab-ernie-localization",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1004/jobs/job-growth-lab-ernie-localization/localization.md",
+      "download_url": "https://growth.sdkwork.local/artifacts/job-growth-lab-ernie-localization/localization.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 2816,
+      "checksum_sha256": "7ce1a6ea0a4ec9f2d6c5197ed1d2c2524f4c4fef5eb4fd874e3f73725e83aa92",
+      "created_at_ms": 1710001509620
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_id": 10806,
+      "job_id": "job-growth-lab-minimax-brief",
+      "event_type": "job.completed",
+      "dedupe_key": "minimax:minimax-job-growth-lab-minimax-brief:completed",
+      "payload_json": "{\"job_id\":\"job-growth-lab-minimax-brief\",\"status\":\"succeeded\",\"provider\":\"minimax\"}",
+      "status": "processed",
+      "received_at_ms": 1710001508640,
+      "processed_at_ms": 1710001508680
+    },
+    {
+      "callback_id": 10807,
+      "job_id": "job-growth-lab-ernie-localization",
+      "event_type": "job.completed",
+      "dedupe_key": "ernie:ernie-job-growth-lab-localization:completed",
+      "payload_json": "{\"job_id\":\"job-growth-lab-ernie-localization\",\"status\":\"succeeded\",\"provider\":\"ernie\"}",
+      "status": "processed",
+      "received_at_ms": 1710001509640,
+      "processed_at_ms": 1710001509680
+    }
+  ]
+}

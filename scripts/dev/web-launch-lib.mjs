@@ -12,12 +12,15 @@ function requireValue(argv, index, flag) {
 export function parseWebArgs(argv) {
   const settings = {
     adminTarget: '127.0.0.1:9981',
+    adminSiteTarget: null,
     bind: '0.0.0.0:9983',
     dryRun: false,
     gatewayTarget: '127.0.0.1:9980',
     help: false,
     install: false,
     portalTarget: '127.0.0.1:9982',
+    portalSiteTarget: null,
+    proxyDev: false,
     preview: false,
     tauri: false,
   };
@@ -33,8 +36,16 @@ export function parseWebArgs(argv) {
         settings.adminTarget = requireValue(argv, index, arg);
         index += 1;
         break;
+      case '--admin-site-target':
+        settings.adminSiteTarget = requireValue(argv, index, arg);
+        index += 1;
+        break;
       case '--portal-target':
         settings.portalTarget = requireValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--portal-site-target':
+        settings.portalSiteTarget = requireValue(argv, index, arg);
         index += 1;
         break;
       case '--gateway-target':
@@ -49,6 +60,9 @@ export function parseWebArgs(argv) {
         break;
       case '--preview':
         settings.preview = true;
+        break;
+      case '--proxy-dev':
+        settings.proxyDev = true;
         break;
       case '--tauri':
         settings.tauri = true;
@@ -73,10 +87,13 @@ Builds the standalone admin and portal apps, then exposes them through the Pingo
 Options:
   --bind <bind> Use a specific SDKWORK_WEB_BIND value, default 0.0.0.0:9983
   --admin-target <host:port>   Upstream target for /api/admin/*, default 127.0.0.1:9981
+  --admin-site-target <host:port>  Optional upstream target for /admin/* page traffic in proxy-dev mode
   --portal-target <host:port>  Upstream target for /api/portal/*, default 127.0.0.1:9982
+  --portal-site-target <host:port> Optional upstream target for /portal/* page traffic in proxy-dev mode
   --gateway-target <host:port> Upstream target for /api/v1/*, default 127.0.0.1:9980
   --install     Run pnpm install before starting
   --preview     Alias for static web-host mode
+  --proxy-dev   Proxy admin and portal Vite dev servers instead of serving built static assets
   --tauri       Build static assets for the admin Tauri host and external Pingora site
   --dry-run     Print the commands without running them
   -h, --help    Show this help
@@ -128,7 +145,9 @@ export function withSupportedWindowsCmakeGenerator(
 export function webHostEnv(bind, targets = {}, options = {}) {
   const {
     adminTarget = '127.0.0.1:9981',
+    adminSiteTarget = null,
     portalTarget = '127.0.0.1:9982',
+    portalSiteTarget = null,
     gatewayTarget = '127.0.0.1:9980',
   } = targets;
   const {
@@ -143,7 +162,9 @@ export function webHostEnv(bind, targets = {}, options = {}) {
     SDKWORK_ADMIN_SITE_DIR: 'apps/sdkwork-router-admin/dist',
     SDKWORK_PORTAL_SITE_DIR: 'apps/sdkwork-router-portal/dist',
     SDKWORK_ADMIN_PROXY_TARGET: adminTarget,
+    ...(adminSiteTarget ? { SDKWORK_ADMIN_SITE_PROXY_TARGET: adminSiteTarget } : {}),
     SDKWORK_PORTAL_PROXY_TARGET: portalTarget,
+    ...(portalSiteTarget ? { SDKWORK_PORTAL_SITE_PROXY_TARGET: portalSiteTarget } : {}),
     SDKWORK_GATEWAY_PROXY_TARGET: gatewayTarget,
   }, {
     platform,
@@ -175,8 +196,12 @@ export function publicEntryUrls(bind) {
   return [...new Set(urls)];
 }
 
-export function webAccessLines(bind) {
+export function webAccessLines(bind, options = {}) {
+  const { proxyDev = false } = options;
   const lines = [`[start-web] SDKWORK_WEB_BIND=${bind}`];
+  if (proxyDev) {
+    lines.push('[start-web] Frontend delivery: proxy hot reload');
+  }
   for (const baseUrl of publicEntryUrls(bind)) {
     lines.push(`[start-web] Pingora admin: ${baseUrl}/admin/`);
     lines.push(`[start-web] Pingora portal: ${baseUrl}/portal/`);

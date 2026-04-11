@@ -169,6 +169,35 @@ async fn portal_commerce_order_center_aggregates_order_payment_and_checkout_view
     assert_eq!(json["orders"][0]["order"]["order_id"], order_id);
     assert_eq!(json["orders"][0]["order"]["status"], "refunded");
     assert_eq!(
+        json["orders"][0]["order"]["product_id"],
+        "product:recharge_pack:pack-100k"
+    );
+    assert_eq!(
+        json["orders"][0]["order"]["offer_id"],
+        "offer:recharge_pack:pack-100k"
+    );
+    assert_eq!(
+        json["orders"][0]["order"]["publication_id"],
+        "publication:portal_catalog:offer:recharge_pack:pack-100k"
+    );
+    assert_eq!(
+        json["orders"][0]["order"]["publication_kind"],
+        "portal_catalog"
+    );
+    assert_eq!(
+        json["orders"][0]["order"]["publication_status"],
+        "published"
+    );
+    assert_eq!(
+        json["orders"][0]["order"]["publication_revision_id"],
+        "publication_revision:portal_catalog:offer:recharge_pack:pack-100k:v1"
+    );
+    assert_eq!(json["orders"][0]["order"]["publication_version"], 1);
+    assert_eq!(
+        json["orders"][0]["order"]["publication_source_kind"],
+        "catalog_seed"
+    );
+    assert_eq!(
         json["orders"][0]["checkout_session"]["payment_simulation_enabled"],
         true
     );
@@ -306,6 +335,25 @@ async fn portal_commerce_order_detail_returns_canonical_order_view() {
     assert_eq!(json["target_kind"], "recharge_pack");
     assert_eq!(json["target_id"], "pack-100k");
     assert_eq!(json["status"], "pending_payment");
+    assert_eq!(json["product_id"], "product:recharge_pack:pack-100k");
+    assert_eq!(json["offer_id"], "offer:recharge_pack:pack-100k");
+    assert_eq!(
+        json["publication_id"],
+        "publication:portal_catalog:offer:recharge_pack:pack-100k"
+    );
+    assert_eq!(json["publication_kind"], "portal_catalog");
+    assert_eq!(json["publication_status"], "published");
+    assert_eq!(
+        json["publication_revision_id"],
+        "publication_revision:portal_catalog:offer:recharge_pack:pack-100k:v1"
+    );
+    assert_eq!(json["publication_version"], 1);
+    assert_eq!(json["publication_source_kind"], "catalog_seed");
+    assert_eq!(
+        json["pricing_plan_id"],
+        "pricing_plan:recharge_pack:pack-100k"
+    );
+    assert_eq!(json["pricing_plan_version"], 1);
     assert!(json["latest_payment_attempt_id"].is_null());
 }
 
@@ -344,10 +392,16 @@ async fn portal_commerce_payment_methods_return_filtered_configured_methods_for_
     .await;
     seed_portal_payment_method(
         &store,
-        &PaymentMethodRecord::new("pm_subscription_only", "Subscription Only", "stripe", "hosted_checkout", 2)
-            .with_description("Not valid for recharge orders")
-            .with_supported_currency_codes(vec!["USD".to_owned()])
-            .with_supported_order_kinds(vec!["subscription_plan".to_owned()]),
+        &PaymentMethodRecord::new(
+            "pm_subscription_only",
+            "Subscription Only",
+            "stripe",
+            "hosted_checkout",
+            2,
+        )
+        .with_description("Not valid for recharge orders")
+        .with_supported_currency_codes(vec!["USD".to_owned()])
+        .with_supported_order_kinds(vec!["subscription_plan".to_owned()]),
     )
     .await;
 
@@ -460,7 +514,10 @@ async fn portal_commerce_payment_attempt_detail_returns_workspace_visible_attemp
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    assert_eq!(json["payment_attempt_id"], payment_attempt.payment_attempt_id);
+    assert_eq!(
+        json["payment_attempt_id"],
+        payment_attempt.payment_attempt_id
+    );
     assert_eq!(json["order_id"], order_id);
     assert_eq!(json["payment_method_id"], "pm_stripe_checkout");
     assert_eq!(json["status"], "requires_action");

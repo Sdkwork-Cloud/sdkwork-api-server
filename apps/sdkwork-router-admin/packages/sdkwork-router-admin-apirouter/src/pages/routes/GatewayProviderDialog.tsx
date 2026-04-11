@@ -17,7 +17,16 @@ import {
   FormSection,
   Input,
 } from '@sdkwork/ui-pc-react';
-import { useAdminI18n } from 'sdkwork-router-admin-core';
+import {
+  applyProviderDefaultPluginFamily,
+  applyProviderIntegrationMode,
+  applyProviderStandardProtocol,
+  CUSTOM_PLUGIN_PROTOCOL_OPTIONS,
+  DEFAULT_PLUGIN_FAMILY_OPTIONS,
+  STANDARD_PROVIDER_PROTOCOL_OPTIONS,
+  type DefaultPluginFamily,
+  useAdminI18n,
+} from 'sdkwork-router-admin-core';
 import type {
   AdminWorkspaceSnapshot,
   ProxyProviderRecord,
@@ -94,19 +103,67 @@ export function GatewayProviderDialog({
                   value={providerDraft.display_name}
                 />
               </DialogField>
-              <DialogField htmlFor="gateway-provider-adapter" label={t('Adapter kind')}>
-                <Input
-                  id="gateway-provider-adapter"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    setProviderDraft((current) => ({
-                      ...current,
-                      adapter_kind: event.target.value,
-                    }))
+              <SelectField
+                label={t('Integration mode')}
+                onValueChange={(value) =>
+                  setProviderDraft((current) =>
+                    applyProviderIntegrationMode(current, value),
+                  )
+                }
+                options={[
+                  { label: t('Standard passthrough'), value: 'standard_passthrough' },
+                  { label: t('Default plugin'), value: 'default_plugin' },
+                  { label: t('Custom plugin'), value: 'custom_plugin' },
+                ]}
+                value={providerDraft.integration_mode}
+              />
+              {providerDraft.integration_mode === 'standard_passthrough' ? (
+                <SelectField
+                  label={t('Provider standard')}
+                  onValueChange={(value) =>
+                    setProviderDraft((current) =>
+                      applyProviderStandardProtocol(current, value),
+                    )
                   }
-                  required
-                  value={providerDraft.adapter_kind}
+                  options={STANDARD_PROVIDER_PROTOCOL_OPTIONS.map((option) => ({
+                    label: t(option.label),
+                    value: option.value,
+                  }))}
+                  value={providerDraft.standard_protocol}
                 />
-              </DialogField>
+              ) : null}
+              {providerDraft.integration_mode === 'default_plugin' ? (
+                <SelectField<DefaultPluginFamily>
+                  label={t('Default plugin family')}
+                  onValueChange={(value) =>
+                    setProviderDraft((current) =>
+                      applyProviderDefaultPluginFamily(current, value),
+                    )
+                  }
+                  options={DEFAULT_PLUGIN_FAMILY_OPTIONS.map((option) => ({
+                    label: t(option.label),
+                    value: option.value,
+                  }))}
+                  value={
+                    (providerDraft.default_plugin_family || 'openrouter') as DefaultPluginFamily
+                  }
+                />
+              ) : null}
+              {providerDraft.integration_mode === 'custom_plugin' ? (
+                <DialogField htmlFor="gateway-provider-adapter" label={t('Adapter kind')}>
+                  <Input
+                    id="gateway-provider-adapter"
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setProviderDraft((current) => ({
+                        ...current,
+                        adapter_kind: event.target.value,
+                      }))
+                    }
+                    required
+                    value={providerDraft.adapter_kind}
+                  />
+                </DialogField>
+              ) : null}
               <DialogField htmlFor="gateway-provider-base-url" label={t('Base URL')}>
                 <Input
                   id="gateway-provider-base-url"
@@ -120,21 +177,39 @@ export function GatewayProviderDialog({
                   value={providerDraft.base_url}
                 />
               </DialogField>
-              <DialogField
-                htmlFor="gateway-provider-extension"
-                label={t('Extension id')}
-              >
-                <Input
-                  id="gateway-provider-extension"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              {providerDraft.integration_mode === 'custom_plugin' ? (
+                <SelectField
+                  label={t('External protocol')}
+                  onValueChange={(value) =>
                     setProviderDraft((current) => ({
                       ...current,
-                      extension_id: event.target.value,
+                      protocol_kind: value,
                     }))
                   }
-                  value={providerDraft.extension_id}
+                  options={CUSTOM_PLUGIN_PROTOCOL_OPTIONS.map((option) => ({
+                    label: t(option.label),
+                    value: option.value,
+                  }))}
+                  value={providerDraft.protocol_kind || 'custom'}
                 />
-              </DialogField>
+              ) : null}
+              {providerDraft.integration_mode === 'custom_plugin' ? (
+                <DialogField
+                  htmlFor="gateway-provider-extension"
+                  label={t('Extension id')}
+                >
+                  <Input
+                    id="gateway-provider-extension"
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setProviderDraft((current) => ({
+                        ...current,
+                        extension_id: event.target.value,
+                      }))
+                    }
+                    value={providerDraft.extension_id}
+                  />
+                </DialogField>
+              ) : null}
               <SelectField
                 label={t('Primary channel')}
                 onValueChange={(value) =>

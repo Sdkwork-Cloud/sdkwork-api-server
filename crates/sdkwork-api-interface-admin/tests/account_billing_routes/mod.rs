@@ -25,6 +25,7 @@ use tower::ServiceExt;
 
 mod billing_views;
 mod commerce_audit;
+mod commerce_catalog;
 mod commerce_mutations;
 mod pricing_crud;
 mod pricing_lifecycle;

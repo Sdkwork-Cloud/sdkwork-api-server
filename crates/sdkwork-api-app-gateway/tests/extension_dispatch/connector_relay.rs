@@ -1,5 +1,22 @@
 use super::*;
+use sdkwork_api_app_gateway::relay_chat_completion_from_planned_execution_context_with_options;
+use sdkwork_api_app_routing::persist_routing_policy;
+use sdkwork_api_domain_routing::RoutingPolicy;
+use sdkwork_api_provider_core::ProviderRequestOptions;
 
+#[derive(Clone, Default)]
+struct HealthProbeState {
+    count: Arc<AtomicUsize>,
+}
+
+async fn counting_health_handler(State(state): State<HealthProbeState>) -> Json<Value> {
+    state.count.fetch_add(1, Ordering::SeqCst);
+    Json(json!({
+        "status": "ok"
+    }))
+}
+
+#[serial(extension_env)]
 #[tokio::test]
 async fn relay_uses_persisted_extension_instance_base_url_override() {
     let upstream_state = UpstreamCaptureState::default();
@@ -95,6 +112,331 @@ async fn relay_uses_persisted_extension_instance_base_url_override() {
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn planned_execution_context_probes_external_connector_health_once() {
+    let extension_root = temp_extension_root("planned-external-connector");
+    let package_dir = extension_root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        discovered_connector_manifest(),
+    )
+    .unwrap();
+    let _guard = extension_env_guard(&extension_root);
+
+    let health_state = HealthProbeState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/health", get(counting_health_handler))
+        .with_state(health_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+    wait_for_health(&format!("http://{address}")).await;
+    health_state.count.store(0, Ordering::SeqCst);
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let secret_manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-custom-openai",
+                "openai",
+                "custom-openai",
+                "http://127.0.0.1:1",
+                "Custom OpenAI",
+            )
+            .with_extension_id("sdkwork.provider.custom-openai"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(
+            &ModelCatalogEntry::new("gpt-4.1", "provider-custom-openai").with_streaming(true),
+        )
+        .await
+        .unwrap();
+    persist_credential_with_secret_and_manager(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "provider-custom-openai",
+        "cred-custom-openai",
+        "sk-upstream-openai",
+    )
+    .await
+    .unwrap();
+    store
+        .insert_extension_installation(
+            &ExtensionInstallation::new(
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+                ExtensionRuntime::Connector,
+            )
+            .with_enabled(true)
+            .with_entrypoint("bin/sdkwork-provider-custom-openai")
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-custom-openai",
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+            )
+            .with_enabled(true)
+            .with_base_url(format!("http://{address}"))
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+
+    let planned = planned_execution_provider_context_for_route_without_log(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "project-1",
+        "chat_completion",
+        "gpt-4.1",
+    )
+    .await
+    .unwrap()
+    .expect("planned execution context");
+
+    assert_eq!(planned.provider.id, "provider-custom-openai");
+    assert_eq!(planned.execution.runtime, ExtensionRuntime::Connector);
+    assert_eq!(planned.usage_context.provider_id, "provider-custom-openai");
+    assert_eq!(health_state.count.load(Ordering::SeqCst), 1);
+
+    cleanup_dir(&extension_root);
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn planned_execution_context_fails_over_when_selected_connector_cannot_start() {
+    let extension_root = temp_extension_root("planned-connector-failover");
+    let package_dir = extension_root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        discovered_connector_manifest(),
+    )
+    .unwrap();
+    let _guard = extension_env_guard(&extension_root);
+
+    let failed_port = {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap().port()
+    };
+
+    let upstream_state = UpstreamCaptureState::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route("/health", get(upstream_health_handler))
+        .route("/v1/chat/completions", post(upstream_chat_handler))
+        .with_state(upstream_state.clone());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+    wait_for_health(&format!("http://{address}")).await;
+
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let secret_manager = CredentialSecretManager::database_encrypted("local-dev-master-key");
+
+    store
+        .insert_channel(&Channel::new("openai", "OpenAI"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-primary-connector",
+                "openai",
+                "custom-openai",
+                format!("http://127.0.0.1:{failed_port}"),
+                "Primary Connector",
+            )
+            .with_extension_id("sdkwork.provider.custom-openai"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &ProxyProvider::new(
+                "provider-backup-openai",
+                "openai",
+                "openai",
+                "http://127.0.0.1:1",
+                "Backup OpenAI",
+            )
+            .with_extension_id("sdkwork.provider.openai.official"),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(
+            &ModelCatalogEntry::new("gpt-4.1", "provider-primary-connector").with_streaming(true),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_model(
+            &ModelCatalogEntry::new("gpt-4.1", "provider-backup-openai").with_streaming(true),
+        )
+        .await
+        .unwrap();
+    persist_credential_with_secret_and_manager(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "provider-primary-connector",
+        "cred-primary-connector",
+        "sk-primary-connector",
+    )
+    .await
+    .unwrap();
+    persist_credential_with_secret_and_manager(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "provider-backup-openai",
+        "cred-backup-openai",
+        "sk-backup-openai",
+    )
+    .await
+    .unwrap();
+    store
+        .insert_extension_installation(
+            &ExtensionInstallation::new(
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+                ExtensionRuntime::Connector,
+            )
+            .with_enabled(true)
+            .with_entrypoint("bin/sdkwork-provider-custom-openai")
+            .with_config(json!({
+                "health_path": "/health",
+                "startup_timeout_ms": 25,
+                "startup_poll_interval_ms": 5
+            })),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-primary-connector",
+                "custom-openai-installation",
+                "sdkwork.provider.custom-openai",
+            )
+            .with_enabled(true)
+            .with_base_url(format!("http://127.0.0.1:{failed_port}"))
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_installation(
+            &ExtensionInstallation::new(
+                "openai-builtin",
+                "sdkwork.provider.openai.official",
+                ExtensionRuntime::Builtin,
+            )
+            .with_enabled(true)
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_extension_instance(
+            &ExtensionInstance::new(
+                "provider-backup-openai",
+                "openai-builtin",
+                "sdkwork.provider.openai.official",
+            )
+            .with_enabled(true)
+            .with_base_url(format!("http://{address}"))
+            .with_config(json!({})),
+        )
+        .await
+        .unwrap();
+
+    let policy = RoutingPolicy::new("policy-gpt-4-1", "chat_completion", "gpt-4.1")
+        .with_priority(100)
+        .with_ordered_provider_ids(vec![
+            "provider-primary-connector".to_owned(),
+            "provider-backup-openai".to_owned(),
+        ]);
+    persist_routing_policy(&store, &policy).await.unwrap();
+
+    let planned = planned_execution_provider_context_for_route_without_log(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "project-1",
+        "chat_completion",
+        "gpt-4.1",
+    )
+    .await
+    .unwrap()
+    .expect("planned execution context");
+
+    assert_eq!(planned.provider.id, "provider-backup-openai");
+    assert_eq!(
+        planned.decision.selected_provider_id,
+        "provider-backup-openai"
+    );
+    assert_eq!(planned.usage_context.provider_id, "provider-backup-openai");
+    assert_eq!(
+        planned.decision.fallback_reason.as_deref(),
+        Some("gateway_execution_failover")
+    );
+
+    let response = relay_chat_completion_from_planned_execution_context_with_options(
+        &store,
+        &secret_manager,
+        "tenant-1",
+        "project-1",
+        &chat_request("gpt-4.1"),
+        &ProviderRequestOptions::default(),
+        &planned,
+    )
+    .await
+    .unwrap()
+    .response
+    .expect("backup response");
+
+    assert_eq!(response["id"], "chatcmpl_upstream");
+    assert_eq!(
+        upstream_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-backup-openai")
+    );
+
+    let logs = store.list_routing_decision_logs().await.unwrap();
+    assert_eq!(logs.len(), 1);
+    assert_eq!(logs[0].selected_provider_id, "provider-backup-openai");
+    assert_eq!(
+        logs[0].fallback_reason.as_deref(),
+        Some("gateway_execution_failover")
+    );
+
+    cleanup_dir(&extension_root);
 }
 
 #[serial(extension_env)]

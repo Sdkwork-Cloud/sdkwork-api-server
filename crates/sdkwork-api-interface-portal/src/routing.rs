@@ -1,4 +1,5 @@
 use super::*;
+use sdkwork_api_app_catalog::provider_integration_view;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SaveRoutingPreferencesRequest {
@@ -62,6 +63,9 @@ struct PortalRoutingProviderOption {
     provider_id: String,
     display_name: String,
     channel_id: String,
+    protocol_kind: String,
+    integration: sdkwork_api_app_catalog::ProviderIntegrationView,
+    credential_readiness: sdkwork_api_app_credential::ProviderCredentialReadinessView,
     #[serde(default)]
     preferred: bool,
     #[serde(default)]
@@ -248,8 +252,13 @@ pub(crate) async fn routing_summary_handler(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let provider_options =
-        load_routing_provider_options(state.store.as_ref(), &latest_model_hint, &preferences)
-            .await?;
+        load_routing_provider_options(
+            state.store.as_ref(),
+            &workspace.tenant.id,
+            &latest_model_hint,
+            &preferences,
+        )
+        .await?;
 
     Ok(Json(PortalRoutingSummary {
         project_id: workspace.project.id,
@@ -333,6 +342,7 @@ async fn load_latest_route_hint(
 
 async fn load_routing_provider_options(
     store: &dyn AdminStore,
+    tenant_id: &str,
     model: &str,
     preferences: &ProjectRoutingPreferences,
 ) -> Result<Vec<PortalRoutingProviderOption>, StatusCode> {
@@ -356,16 +366,31 @@ async fn load_routing_provider_options(
         .iter()
         .cloned()
         .collect::<HashSet<_>>();
+    let configured_provider_ids =
+        sdkwork_api_app_credential::list_configured_provider_ids_for_tenant(store, tenant_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     sort_routing_provider_options(&mut providers, &preference_ranks);
 
     Ok(providers
         .into_iter()
-        .map(|provider| PortalRoutingProviderOption {
-            preferred: preferred_provider_ids.contains(&provider.id),
-            default_provider: preferences.default_provider_id.as_deref() == Some(&provider.id),
-            provider_id: provider.id,
-            display_name: provider.display_name,
-            channel_id: provider.channel_id,
+        .map(|provider| {
+            let protocol_kind = provider.protocol_kind().to_owned();
+            let integration = provider_integration_view(&provider);
+            let credential_readiness =
+                sdkwork_api_app_credential::provider_credential_readiness_view(
+                    configured_provider_ids.contains(&provider.id),
+                );
+            PortalRoutingProviderOption {
+                preferred: preferred_provider_ids.contains(&provider.id),
+                default_provider: preferences.default_provider_id.as_deref() == Some(&provider.id),
+                provider_id: provider.id,
+                display_name: provider.display_name,
+                channel_id: provider.channel_id,
+                protocol_kind,
+                integration,
+                credential_readiness,
+            }
         })
         .collect())
 }

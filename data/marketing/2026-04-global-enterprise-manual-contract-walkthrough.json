@@ -1,0 +1,81 @@
+{
+  "coupons": [
+    {
+      "id": "coupon-enterprise-contract-500",
+      "code": "ENTERPRISE500",
+      "discount_label": "$500 enterprise contract credit",
+      "audience": "enterprise_pipeline",
+      "remaining": 500,
+      "active": true,
+      "note": "Bootstrap contract credit for enterprise annual commitment walkthroughs.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710000499800
+    }
+  ],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-enterprise-contract-500",
+      "template_key": "enterprise-contract-credit-500",
+      "display_name": "Enterprise Contract Credit 500",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 50000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 50000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 300000,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "enterprise-contract",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 1,
+        "eligible_target_kinds": ["enterprise_contract"]
+      },
+      "created_at_ms": 1710000499800,
+      "updated_at_ms": 1710000499800
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-enterprise-contract-2026",
+      "coupon_template_id": "template-enterprise-contract-500",
+      "display_name": "Enterprise Contract Launch 2026",
+      "status": "active",
+      "start_at_ms": 1710000499800,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710000499800,
+      "updated_at_ms": 1710000499800
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-enterprise-contract-2026",
+      "marketing_campaign_id": "campaign-enterprise-contract-2026",
+      "status": "active",
+      "total_budget_minor": 25000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710000499800,
+      "updated_at_ms": 1710000499800
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-enterprise-contract-500",
+      "coupon_template_id": "template-enterprise-contract-500",
+      "code_value": "ENTERPRISE500",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710000499800,
+      "updated_at_ms": 1710000499800
+    }
+  ]
+}

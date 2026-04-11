@@ -1,0 +1,18 @@
+[
+  {
+    "group_id": "group-growth-lab-sandbox",
+    "tenant_id": "tenant_growth_lab",
+    "project_id": "project_growth_lab",
+    "environment": "sandbox",
+    "name": "Growth Lab Sandbox",
+    "slug": "growth-lab-sandbox",
+    "description": "Sandbox traffic group for the update-pack seeded growth lab workspace.",
+    "color": "#c2410c",
+    "default_capability_scope": "responses",
+    "default_routing_profile_id": "profile-growth-lab-asia-official",
+    "default_accounting_mode": "platform_credit",
+    "active": true,
+    "created_at_ms": 1710001400000,
+    "updated_at_ms": 1710001400000
+  }
+]

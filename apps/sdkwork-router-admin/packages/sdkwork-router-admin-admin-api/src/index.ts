@@ -5,6 +5,8 @@ import type {
   BillingEventRecord,
   BillingEventSummary,
   BillingSummary,
+  CampaignBudgetLifecycleAuditRecord,
+  CampaignBudgetMutationResult,
   CampaignBudgetRecord,
   ChannelRecord,
   ChannelModelRecord,
@@ -21,32 +23,44 @@ import type {
   CommercialPricingRateRecord,
   CommercialRequestSettlementRecord,
   CompiledRoutingSnapshotRecord,
+  CouponCodeLifecycleAuditRecord,
+  CouponCodeMutationResult,
   CouponCodeRecord,
   CouponCodeStatus,
-  CouponRecord,
   CouponRedemptionRecord,
   CouponReservationRecord,
   CouponRollbackRecord,
+  CouponTemplateComparisonResult,
+  CouponTemplateLifecycleAuditRecord,
   CouponTemplateRecord,
+  CouponTemplateMutationResult,
   CouponTemplateStatus,
   CreatedGatewayApiKey,
   CredentialRecord,
   GatewayApiKeyRecord,
+  MarketingCampaignComparisonResult,
+  MarketingCampaignLifecycleAuditRecord,
   MarketingCampaignRecord,
+  MarketingCampaignMutationResult,
   MarketingCampaignStatus,
   ModelCatalogRecord,
   ModelPriceRecord,
+  ModelPriceTier,
   OperatorUserRecord,
   PortalUserRecord,
   ProjectRecord,
   ProviderHealthSnapshot,
+  ProviderCatalogRecord,
+  ProviderModelRecord,
   ProxyProviderRecord,
+  ProviderRecordWithIntegration,
   RateLimitPolicyRecord,
   RateLimitWindowRecord,
   RoutingDecisionLogRecord,
   RoutingProfileRecord,
   RuntimeReloadReport,
   RuntimeStatusRecord,
+  SaveProviderInput,
   TenantRecord,
   UsageRecord,
   UsageSummary,
@@ -124,18 +138,6 @@ export function listPortalUsers(token?: string): Promise<PortalUserRecord[]> {
   return getJson<PortalUserRecord[]>('/users/portal', token);
 }
 
-export function listCoupons(token?: string): Promise<CouponRecord[]> {
-  return getJson<CouponRecord[]>('/coupons', token);
-}
-
-export function saveCoupon(input: CouponRecord): Promise<CouponRecord> {
-  return postJson<CouponRecord, CouponRecord>('/coupons', input, requiredToken());
-}
-
-export function deleteCoupon(couponId: string): Promise<void> {
-  return deleteEmpty(`/coupons/${couponId}`, requiredToken());
-}
-
 export function listMarketingCouponTemplates(token?: string): Promise<CouponTemplateRecord[]> {
   return getJson<CouponTemplateRecord[]>('/marketing/coupon-templates', requiredToken(token));
 }
@@ -158,6 +160,112 @@ export function updateMarketingCouponTemplateStatus(
     `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/status`,
     { status },
     requiredToken(),
+  );
+}
+
+export function cloneMarketingCouponTemplate(
+  couponTemplateId: string,
+  input: {
+    coupon_template_id: string;
+    template_key: string;
+    display_name?: string | null;
+    reason: string;
+  },
+): Promise<CouponTemplateMutationResult> {
+  return postJson<typeof input, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/clone`,
+    input,
+    requiredToken(),
+  );
+}
+
+export function compareMarketingCouponTemplates(
+  couponTemplateId: string,
+  targetCouponTemplateId: string,
+): Promise<CouponTemplateComparisonResult> {
+  return postJson<
+    { target_coupon_template_id: string },
+    CouponTemplateComparisonResult
+  >(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/compare`,
+    { target_coupon_template_id: targetCouponTemplateId },
+    requiredToken(),
+  );
+}
+
+export function submitMarketingCouponTemplateForApproval(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/submit-for-approval`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function approveMarketingCouponTemplate(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/approve`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function rejectMarketingCouponTemplate(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/reject`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function publishMarketingCouponTemplate(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/publish`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function scheduleMarketingCouponTemplate(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/schedule`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function retireMarketingCouponTemplate(
+  couponTemplateId: string,
+  reason: string,
+): Promise<CouponTemplateMutationResult> {
+  return postJson<{ reason: string }, CouponTemplateMutationResult>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/retire`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function listMarketingCouponTemplateLifecycleAudits(
+  couponTemplateId: string,
+  token?: string,
+): Promise<CouponTemplateLifecycleAuditRecord[]> {
+  return getJson<CouponTemplateLifecycleAuditRecord[]>(
+    `/marketing/coupon-templates/${encodeURIComponent(couponTemplateId)}/lifecycle-audits`,
+    requiredToken(token),
   );
 }
 
@@ -186,6 +294,111 @@ export function updateMarketingCampaignStatus(
   );
 }
 
+export function cloneMarketingCampaign(
+  marketingCampaignId: string,
+  input: {
+    marketing_campaign_id: string;
+    display_name?: string | null;
+    reason: string;
+  },
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<typeof input, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/clone`,
+    input,
+    requiredToken(),
+  );
+}
+
+export function compareMarketingCampaigns(
+  marketingCampaignId: string,
+  targetMarketingCampaignId: string,
+): Promise<MarketingCampaignComparisonResult> {
+  return postJson<
+    { target_marketing_campaign_id: string },
+    MarketingCampaignComparisonResult
+  >(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/compare`,
+    { target_marketing_campaign_id: targetMarketingCampaignId },
+    requiredToken(),
+  );
+}
+
+export function submitMarketingCampaignForApproval(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/submit-for-approval`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function approveMarketingCampaign(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/approve`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function rejectMarketingCampaign(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/reject`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function publishMarketingCampaign(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/publish`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function scheduleMarketingCampaign(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/schedule`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function retireMarketingCampaign(
+  marketingCampaignId: string,
+  reason: string,
+): Promise<MarketingCampaignMutationResult> {
+  return postJson<{ reason: string }, MarketingCampaignMutationResult>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/retire`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function listMarketingCampaignLifecycleAudits(
+  marketingCampaignId: string,
+  token?: string,
+): Promise<MarketingCampaignLifecycleAuditRecord[]> {
+  return getJson<MarketingCampaignLifecycleAuditRecord[]>(
+    `/marketing/campaigns/${encodeURIComponent(marketingCampaignId)}/lifecycle-audits`,
+    requiredToken(token),
+  );
+}
+
 export function listMarketingCampaignBudgets(token?: string): Promise<CampaignBudgetRecord[]> {
   return getJson<CampaignBudgetRecord[]>('/marketing/budgets', requiredToken(token));
 }
@@ -211,6 +424,38 @@ export function updateMarketingCampaignBudgetStatus(
   );
 }
 
+export function activateMarketingCampaignBudget(
+  campaignBudgetId: string,
+  reason: string,
+): Promise<CampaignBudgetMutationResult> {
+  return postJson<{ reason: string }, CampaignBudgetMutationResult>(
+    `/marketing/budgets/${encodeURIComponent(campaignBudgetId)}/activate`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function closeMarketingCampaignBudget(
+  campaignBudgetId: string,
+  reason: string,
+): Promise<CampaignBudgetMutationResult> {
+  return postJson<{ reason: string }, CampaignBudgetMutationResult>(
+    `/marketing/budgets/${encodeURIComponent(campaignBudgetId)}/close`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function listMarketingCampaignBudgetLifecycleAudits(
+  campaignBudgetId: string,
+  token?: string,
+): Promise<CampaignBudgetLifecycleAuditRecord[]> {
+  return getJson<CampaignBudgetLifecycleAuditRecord[]>(
+    `/marketing/budgets/${encodeURIComponent(campaignBudgetId)}/lifecycle-audits`,
+    requiredToken(token),
+  );
+}
+
 export function listMarketingCouponCodes(token?: string): Promise<CouponCodeRecord[]> {
   return getJson<CouponCodeRecord[]>('/marketing/codes', requiredToken(token));
 }
@@ -231,6 +476,38 @@ export function updateMarketingCouponCodeStatus(
     `/marketing/codes/${encodeURIComponent(couponCodeId)}/status`,
     { status },
     requiredToken(),
+  );
+}
+
+export function disableMarketingCouponCode(
+  couponCodeId: string,
+  reason: string,
+): Promise<CouponCodeMutationResult> {
+  return postJson<{ reason: string }, CouponCodeMutationResult>(
+    `/marketing/codes/${encodeURIComponent(couponCodeId)}/disable`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function restoreMarketingCouponCode(
+  couponCodeId: string,
+  reason: string,
+): Promise<CouponCodeMutationResult> {
+  return postJson<{ reason: string }, CouponCodeMutationResult>(
+    `/marketing/codes/${encodeURIComponent(couponCodeId)}/restore`,
+    { reason },
+    requiredToken(),
+  );
+}
+
+export function listMarketingCouponCodeLifecycleAudits(
+  couponCodeId: string,
+  token?: string,
+): Promise<CouponCodeLifecycleAuditRecord[]> {
+  return getJson<CouponCodeLifecycleAuditRecord[]>(
+    `/marketing/codes/${encodeURIComponent(couponCodeId)}/lifecycle-audits`,
+    requiredToken(token),
   );
 }
 
@@ -487,20 +764,16 @@ export function deleteChannel(channelId: string): Promise<void> {
   return deleteEmpty(`/channels/${encodeURIComponent(channelId)}`, requiredToken());
 }
 
-export function listProviders(token?: string): Promise<ProxyProviderRecord[]> {
-  return getJson<ProxyProviderRecord[]>('/providers', token);
+export function listProviders(token?: string): Promise<ProviderCatalogRecord[]> {
+  return getJson<ProviderCatalogRecord[]>('/providers', token);
 }
 
-export function saveProvider(input: {
-  id: string;
-  channel_id: string;
-  extension_id?: string;
-  adapter_kind: string;
-  base_url: string;
-  display_name: string;
-  channel_bindings: Array<{ channel_id: string; is_primary: boolean }>;
-}): Promise<ProxyProviderRecord> {
-  return postJson<typeof input, ProxyProviderRecord>('/providers', input, requiredToken());
+export function saveProvider(input: SaveProviderInput): Promise<ProviderRecordWithIntegration> {
+  return postJson<SaveProviderInput, ProviderRecordWithIntegration>(
+    '/providers',
+    input,
+    requiredToken(),
+  );
 }
 
 export function deleteProvider(providerId: string): Promise<void> {
@@ -539,6 +812,10 @@ export function listChannelModels(token?: string): Promise<ChannelModelRecord[]>
   return getJson<ChannelModelRecord[]>('/channel-models', token);
 }
 
+export function listProviderModels(token?: string): Promise<ProviderModelRecord[]> {
+  return getJson<ProviderModelRecord[]>('/provider-models', token);
+}
+
 export function saveChannelModel(input: {
   channel_id: string;
   model_id: string;
@@ -554,6 +831,40 @@ export function saveChannelModel(input: {
 export function deleteChannelModel(channelId: string, modelId: string): Promise<void> {
   return deleteEmpty(
     `/channel-models/${encodeURIComponent(channelId)}/models/${encodeURIComponent(modelId)}`,
+    requiredToken(),
+  );
+}
+
+export function saveProviderModel(input: {
+  proxy_provider_id: string;
+  channel_id: string;
+  model_id: string;
+  provider_model_id?: string | null;
+  provider_model_family?: string | null;
+  capabilities: string[];
+  streaming?: boolean | null;
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+  supports_prompt_caching?: boolean;
+  supports_reasoning_usage?: boolean;
+  supports_tool_usage_metrics?: boolean;
+  is_default_route?: boolean;
+  is_active?: boolean;
+}): Promise<ProviderModelRecord> {
+  return postJson<typeof input, ProviderModelRecord>(
+    '/provider-models',
+    input,
+    requiredToken(),
+  );
+}
+
+export function deleteProviderModel(
+  proxyProviderId: string,
+  channelId: string,
+  modelId: string,
+): Promise<void> {
+  return deleteEmpty(
+    `/provider-models/${encodeURIComponent(proxyProviderId)}/channels/${encodeURIComponent(channelId)}/models/${encodeURIComponent(modelId)}`,
     requiredToken(),
   );
 }
@@ -590,6 +901,9 @@ export function saveModelPrice(input: {
   cache_read_price: number;
   cache_write_price: number;
   request_price: number;
+  price_source_kind: string;
+  billing_notes?: string | null;
+  pricing_tiers: ModelPriceTier[];
   is_active: boolean;
 }): Promise<ModelPriceRecord> {
   return postJson<typeof input, ModelPriceRecord>('/model-prices', input, requiredToken());

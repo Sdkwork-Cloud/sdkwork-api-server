@@ -23,7 +23,7 @@ import {
   embeddedAdminDataTableSlotProps,
   useAdminI18n,
 } from 'sdkwork-router-admin-core';
-import type { ProxyProviderRecord } from 'sdkwork-router-admin-types';
+import type { ProviderCatalogRecord } from 'sdkwork-router-admin-types';
 
 import type { GatewayRouteInventoryRow } from '../../services/gatewayViewService';
 
@@ -32,8 +32,8 @@ type GatewayRoutesRegistrySectionProps = {
   degradedCount: number;
   filteredInventory: GatewayRouteInventoryRow[];
   inventory: GatewayRouteInventoryRow[];
-  onDeleteProvider: (provider: ProxyProviderRecord) => void;
-  onEditProvider: (provider: ProxyProviderRecord) => void;
+  onDeleteProvider: (provider: ProviderCatalogRecord) => void;
+  onEditProvider: (provider: ProviderCatalogRecord) => void;
   onSelectProvider: (row: GatewayRouteInventoryRow) => void;
   selectedRow: GatewayRouteInventoryRow | null;
 };

@@ -15,6 +15,7 @@ use axum::{
     extract::Json as ExtractJson,
     extract::Multipart,
     extract::Path,
+    extract::Query,
     extract::State,
     http::HeaderMap,
     http::HeaderValue,
@@ -35,9 +36,8 @@ use compat_anthropic::{
 };
 use compat_gemini::{
     GeminiCompatAction, gemini_bad_gateway_response, gemini_count_tokens_request,
-    gemini_invalid_request_response, gemini_request_to_chat_completion,
-    gemini_stream_from_openai, openai_chat_response_to_gemini,
-    openai_count_tokens_to_gemini, parse_gemini_compat_tail,
+    gemini_invalid_request_response, gemini_request_to_chat_completion, gemini_stream_from_openai,
+    openai_chat_response_to_gemini, openai_count_tokens_to_gemini, parse_gemini_compat_tail,
 };
 use sdkwork_api_app_billing::{
     BillingAccountingMode, CaptureAccountHoldInput, CreateAccountHoldInput,
@@ -168,33 +168,43 @@ use sdkwork_api_app_gateway::update_video_character;
 use sdkwork_api_app_gateway::update_webhook;
 use sdkwork_api_app_gateway::video_content;
 use sdkwork_api_app_gateway::{
-    PlannedExecutionUsageContext, create_embedding, create_response, delete_model_from_store,
+    PlannedExecutionProviderContext, PlannedExecutionUsageContext, create_embedding,
+    create_response, delete_model_from_store,
+    execute_raw_json_provider_operation_from_planned_execution_context_with_options,
+    execute_raw_stream_provider_operation_from_planned_execution_context_with_options,
     execute_json_provider_request_with_runtime_and_options,
+    execute_raw_json_provider_operation_with_runtime,
+    execute_raw_stream_provider_operation_with_runtime,
     execute_stream_provider_request_with_runtime_and_options, list_models_from_store,
+    persist_planned_execution_decision_log,
+    planned_execution_provider_context_for_route_without_log,
     planned_execution_usage_context_for_route, relay_assistant_from_store,
     relay_audio_voice_consent_from_store, relay_audio_voices_from_store, relay_batch_from_store,
     relay_cancel_batch_from_store, relay_cancel_fine_tuning_job_from_store,
     relay_cancel_response_from_store, relay_cancel_thread_run_from_store,
     relay_cancel_upload_from_store, relay_cancel_vector_store_file_batch_from_store,
+    relay_chat_completion_from_planned_execution_context_with_options,
     relay_chat_completion_from_store_with_execution_context,
+    relay_chat_completion_stream_from_planned_execution_context_with_options,
     relay_chat_completion_stream_from_store_with_execution_context,
     relay_compact_response_from_store, relay_complete_upload_from_store,
     relay_completion_from_store, relay_conversation_from_store,
-    relay_conversation_items_from_store, relay_count_response_input_tokens_from_store,
-    relay_delete_assistant_from_store, relay_delete_chat_completion_from_store,
-    relay_delete_conversation_from_store, relay_delete_conversation_item_from_store,
-    relay_delete_eval_from_store, relay_delete_file_from_store, relay_delete_music_from_store,
-    relay_delete_response_from_store, relay_delete_thread_from_store,
-    relay_delete_thread_message_from_store, relay_delete_vector_store_file_from_store,
-    relay_delete_vector_store_from_store, relay_delete_video_from_store,
-    relay_delete_webhook_from_store, relay_embedding_from_store, relay_eval_from_store,
-    relay_eval_run_from_store, relay_extend_video_from_store, relay_file_content_from_store,
-    relay_file_from_store, relay_fine_tuning_job_from_store, relay_get_assistant_from_store,
-    relay_get_batch_from_store, relay_get_chat_completion_from_store,
-    relay_get_conversation_from_store, relay_get_conversation_item_from_store,
-    relay_get_eval_from_store, relay_get_eval_run_from_store, relay_get_file_from_store,
-    relay_get_fine_tuning_job_from_store, relay_get_music_from_store,
-    relay_get_response_from_store, relay_get_thread_from_store,
+    relay_conversation_items_from_store,
+    relay_count_response_input_tokens_from_planned_execution_context,
+    relay_count_response_input_tokens_from_store, relay_delete_assistant_from_store,
+    relay_delete_chat_completion_from_store, relay_delete_conversation_from_store,
+    relay_delete_conversation_item_from_store, relay_delete_eval_from_store,
+    relay_delete_file_from_store, relay_delete_music_from_store, relay_delete_response_from_store,
+    relay_delete_thread_from_store, relay_delete_thread_message_from_store,
+    relay_delete_vector_store_file_from_store, relay_delete_vector_store_from_store,
+    relay_delete_video_from_store, relay_delete_webhook_from_store, relay_embedding_from_store,
+    relay_eval_from_store, relay_eval_run_from_store, relay_extend_video_from_store,
+    relay_file_content_from_store, relay_file_from_store, relay_fine_tuning_job_from_store,
+    relay_get_assistant_from_store, relay_get_batch_from_store,
+    relay_get_chat_completion_from_store, relay_get_conversation_from_store,
+    relay_get_conversation_item_from_store, relay_get_eval_from_store,
+    relay_get_eval_run_from_store, relay_get_file_from_store, relay_get_fine_tuning_job_from_store,
+    relay_get_music_from_store, relay_get_response_from_store, relay_get_thread_from_store,
     relay_get_thread_message_from_store, relay_get_thread_run_from_store,
     relay_get_thread_run_step_from_store, relay_get_vector_store_file_batch_from_store,
     relay_get_vector_store_file_from_store, relay_get_vector_store_from_store,
@@ -326,15 +336,15 @@ use sdkwork_api_policy_billing::{
 use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions, ProviderStreamOutput};
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::SqlitePool;
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::openapi::Server;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::{Modify, OpenApi};
+use utoipa::{Modify, OpenApi, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::{Config as SwaggerUiConfig, SwaggerUi, Url as SwaggerUiUrl};
-
 
 include!("gateway_openapi.rs");
 include!("gateway_http.rs");
@@ -368,6 +378,7 @@ include!("gateway_batches.rs");
 include!("gateway_vector_stores.rs");
 include!("gateway_vector_store_files.rs");
 include!("gateway_compat_handlers.rs");
+include!("gateway_market.rs");
 include!("gateway_commercial.rs");
 include!("gateway_stateless_relay.rs");
 include!("gateway_streaming_support.rs");

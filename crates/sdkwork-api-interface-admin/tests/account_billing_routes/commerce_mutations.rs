@@ -2,9 +2,7 @@ use super::*;
 use sdkwork_api_app_billing::{
     issue_commerce_order_credits, IssueCommerceOrderCreditsInput, QuotaPolicy,
 };
-use sdkwork_api_app_identity::{
-    gateway_auth_subject_from_request_context, GatewayRequestContext,
-};
+use sdkwork_api_app_identity::{gateway_auth_subject_from_request_context, GatewayRequestContext};
 use sdkwork_api_domain_commerce::CommercePaymentAttemptRecord;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 
@@ -82,7 +80,10 @@ async fn admin_commerce_refund_route_refunds_manual_recharge_order_and_updates_b
     assert_eq!(stored_order.status, "refunded");
     assert_eq!(stored_order.settlement_status, "refunded");
     assert_eq!(stored_order.refundable_amount_minor, 0);
-    assert_eq!(stored_order.refunded_amount_minor, order.payable_price_cents);
+    assert_eq!(
+        stored_order.refunded_amount_minor,
+        order.payable_price_cents
+    );
 
     let checkpoint = store
         .find_account_commerce_reconciliation_state(account.account_id, DEMO_PROJECT_ID)
@@ -179,7 +180,10 @@ async fn admin_commerce_reconciliation_run_route_records_missing_checkout_sessio
     assert_eq!(items.status(), StatusCode::OK);
     let items_json = read_json(items).await;
     assert_eq!(items_json.as_array().unwrap().len(), 1);
-    assert_eq!(items_json[0]["discrepancy_type"], "missing_checkout_session");
+    assert_eq!(
+        items_json[0]["discrepancy_type"],
+        "missing_checkout_session"
+    );
     assert_eq!(
         items_json[0]["payment_attempt_id"],
         "attempt-stripe-missing-checkout"
@@ -326,9 +330,7 @@ async fn seed_reconciliation_attempt_fixture(store: &SqliteAdminStore) {
         100,
     )
     .with_payment_method_id_option(Some("pm-stripe-main".to_owned()))
-    .with_latest_payment_attempt_id_option(Some(
-        "attempt-stripe-missing-checkout".to_owned(),
-    ))
+    .with_latest_payment_attempt_id_option(Some("attempt-stripe-missing-checkout".to_owned()))
     .with_updated_at_ms(120);
     let payment_attempt = CommercePaymentAttemptRecord::new(
         "attempt-stripe-missing-checkout",
@@ -346,7 +348,7 @@ async fn seed_reconciliation_attempt_fixture(store: &SqliteAdminStore) {
     )
     .with_status("succeeded")
     .with_captured_amount_minor(2_000)
-        .with_updated_at_ms(160);
+    .with_updated_at_ms(160);
 
     store.insert_commerce_order(&order).await.unwrap();
     store

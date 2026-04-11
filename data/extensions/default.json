@@ -1,0 +1,454 @@
+{
+  "installations": [
+    {
+      "installation_id": "installation-openai-official-builtin",
+      "extension_id": "sdkwork.provider.openai.official",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "plugin_family": "openai",
+        "managed_by": "bootstrap",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings",
+          "audio",
+          "image",
+          "video"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-anthropic-official-builtin",
+      "extension_id": "sdkwork.provider.anthropic",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/messages",
+        "provider_family": "anthropic",
+        "managed_by": "bootstrap",
+        "commercial_tier": "frontier",
+        "capabilities": [
+          "responses",
+          "chat_completions"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-gemini-official-builtin",
+      "extension_id": "sdkwork.provider.gemini",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1beta/models",
+        "provider_family": "gemini",
+        "managed_by": "bootstrap",
+        "commercial_tier": "frontier",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-xai-official-builtin",
+      "extension_id": "sdkwork.provider.xai",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "xai",
+        "managed_by": "bootstrap",
+        "commercial_tier": "frontier",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-deepseek-official-builtin",
+      "extension_id": "sdkwork.provider.deepseek",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "deepseek",
+        "managed_by": "bootstrap",
+        "commercial_tier": "high-volume",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-qwen-official-builtin",
+      "extension_id": "sdkwork.provider.qwen",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "qwen",
+        "managed_by": "bootstrap",
+        "commercial_tier": "high-volume",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-doubao-official-builtin",
+      "extension_id": "sdkwork.provider.doubao",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "doubao",
+        "managed_by": "bootstrap",
+        "commercial_tier": "high-volume",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-hunyuan-official-builtin",
+      "extension_id": "sdkwork.provider.hunyuan",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "hunyuan",
+        "managed_by": "bootstrap",
+        "commercial_tier": "enterprise-cn",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-moonshot-official-builtin",
+      "extension_id": "sdkwork.provider.moonshot",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "moonshot",
+        "managed_by": "bootstrap",
+        "commercial_tier": "consumer-scale",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-zhipu-official-builtin",
+      "extension_id": "sdkwork.provider.zhipu",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "zhipu",
+        "managed_by": "bootstrap",
+        "commercial_tier": "enterprise-cn",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-mistral-official-builtin",
+      "extension_id": "sdkwork.provider.mistral",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "mistral",
+        "managed_by": "bootstrap",
+        "commercial_tier": "eu-frontier",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-cohere-official-builtin",
+      "extension_id": "sdkwork.provider.cohere",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "cohere",
+        "managed_by": "bootstrap",
+        "commercial_tier": "enterprise-search",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-openrouter-builtin",
+      "extension_id": "sdkwork.provider.openrouter",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "plugin_family": "openrouter",
+        "managed_by": "bootstrap",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-siliconflow-builtin",
+      "extension_id": "sdkwork.provider.siliconflow",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "plugin_family": "siliconflow",
+        "managed_by": "bootstrap",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-ollama-builtin",
+      "extension_id": "sdkwork.provider.ollama",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "plugin_family": "ollama",
+        "managed_by": "bootstrap",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "provider-openai-official",
+      "installation_id": "installation-openai-official-builtin",
+      "extension_id": "sdkwork.provider.openai.official",
+      "enabled": true,
+      "base_url": "https://api.openai.com/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-official-ranked",
+        "commercial_tier": "flagship"
+      }
+    },
+    {
+      "instance_id": "provider-anthropic-official",
+      "installation_id": "installation-anthropic-official-builtin",
+      "extension_id": "sdkwork.provider.anthropic",
+      "enabled": true,
+      "base_url": "https://api.anthropic.com",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-official-ranked",
+        "preferred_region": "global"
+      }
+    },
+    {
+      "instance_id": "provider-gemini-official",
+      "installation_id": "installation-gemini-official-builtin",
+      "extension_id": "sdkwork.provider.gemini",
+      "enabled": true,
+      "base_url": "https://generativelanguage.googleapis.com",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-gemini-official",
+        "preferred_region": "global"
+      }
+    },
+    {
+      "instance_id": "provider-xai-official",
+      "installation_id": "installation-xai-official-builtin",
+      "extension_id": "sdkwork.provider.xai",
+      "enabled": true,
+      "base_url": "https://api.x.ai/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-low-latency",
+        "preferred_region": "global"
+      }
+    },
+    {
+      "instance_id": "provider-deepseek-official",
+      "installation_id": "installation-deepseek-official-builtin",
+      "extension_id": "sdkwork.provider.deepseek",
+      "enabled": true,
+      "base_url": "https://api.deepseek.com",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-low-cost",
+        "preferred_region": "global"
+      }
+    },
+    {
+      "instance_id": "provider-qwen-official",
+      "installation_id": "installation-qwen-official-builtin",
+      "extension_id": "sdkwork.provider.qwen",
+      "enabled": true,
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-china-ranked",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-doubao-official",
+      "installation_id": "installation-doubao-official-builtin",
+      "extension_id": "sdkwork.provider.doubao",
+      "enabled": true,
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-china-ranked",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-hunyuan-official",
+      "installation_id": "installation-hunyuan-official-builtin",
+      "extension_id": "sdkwork.provider.hunyuan",
+      "enabled": true,
+      "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-china-ranked",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-moonshot-official",
+      "installation_id": "installation-moonshot-official-builtin",
+      "extension_id": "sdkwork.provider.moonshot",
+      "enabled": true,
+      "base_url": "https://api.moonshot.cn/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-china-ranked",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-zhipu-official",
+      "installation_id": "installation-zhipu-official-builtin",
+      "extension_id": "sdkwork.provider.zhipu",
+      "enabled": true,
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-china-ranked",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-mistral-official",
+      "installation_id": "installation-mistral-official-builtin",
+      "extension_id": "sdkwork.provider.mistral",
+      "enabled": true,
+      "base_url": "https://api.mistral.ai/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-official-ranked",
+        "preferred_region": "eu"
+      }
+    },
+    {
+      "instance_id": "provider-cohere-official",
+      "installation_id": "installation-cohere-official-builtin",
+      "extension_id": "sdkwork.provider.cohere",
+      "enabled": true,
+      "base_url": "https://api.cohere.ai/compatibility/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-embeddings-ranked",
+        "preferred_region": "global"
+      }
+    },
+    {
+      "instance_id": "provider-openrouter-main",
+      "installation_id": "installation-openrouter-builtin",
+      "extension_id": "sdkwork.provider.openrouter",
+      "enabled": true,
+      "base_url": "https://openrouter.ai/api/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-balanced",
+        "catalog_role": "ecosystem-aggregator"
+      }
+    },
+    {
+      "instance_id": "provider-siliconflow-main",
+      "installation_id": "installation-siliconflow-builtin",
+      "extension_id": "sdkwork.provider.siliconflow",
+      "enabled": true,
+      "base_url": "https://api.siliconflow.cn/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-low-cost",
+        "catalog_role": "cn-aggregator"
+      }
+    },
+    {
+      "instance_id": "provider-ollama-local",
+      "installation_id": "installation-ollama-builtin",
+      "extension_id": "sdkwork.provider.ollama",
+      "enabled": true,
+      "base_url": "http://127.0.0.1:11434",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "local-first",
+        "deployment_role": "edge-local"
+      }
+    }
+  ]
+}

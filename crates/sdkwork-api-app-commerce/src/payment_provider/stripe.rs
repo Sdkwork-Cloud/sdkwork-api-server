@@ -1,5 +1,5 @@
 use crate::error::{CommerceError, CommerceResult};
-use crate::payment_provider::{PaymentMethodConfig, render_template};
+use crate::payment_provider::{render_template, PaymentMethodConfig};
 use crate::types::{AdminCommerceRefundCreateRequest, PortalCommercePaymentAttemptCreateRequest};
 use hmac::{Hmac, Mac};
 use reqwest::Client;

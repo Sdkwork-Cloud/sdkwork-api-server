@@ -64,6 +64,17 @@ async fn gateway_routing_policy_for_decision(
         .find(|policy| policy.policy_id == policy_id))
 }
 
+pub(crate) async fn gateway_execution_failover_enabled_for_decision(
+    store: &dyn AdminStore,
+    decision: &RoutingDecision,
+) -> Result<bool> {
+    Ok(gateway_routing_policy_for_decision(store, decision)
+        .await?
+        .as_ref()
+        .map(|policy| policy.execution_failover_enabled)
+        .unwrap_or(true))
+}
+
 pub(crate) async fn gateway_execution_policy_for_decision(
     store: &dyn AdminStore,
     decision: &RoutingDecision,
@@ -79,11 +90,34 @@ pub(crate) async fn gateway_execution_policy_for_decision(
     })
 }
 
+pub(crate) async fn gateway_upstream_retry_policy_for_decision_and_capability(
+    store: &dyn AdminStore,
+    decision: &RoutingDecision,
+    capability: &str,
+) -> Result<GatewayUpstreamRetryPolicy> {
+    let routing_policy = gateway_routing_policy_for_decision(store, decision).await?;
+    Ok(gateway_upstream_retry_policy_for_capability(
+        capability,
+        routing_policy.as_ref(),
+    ))
+}
+
 pub(crate) fn gateway_upstream_retry_policy(
     request: &ProviderRequest<'_>,
     routing_policy: Option<&RoutingPolicy>,
 ) -> GatewayUpstreamRetryPolicy {
     if !gateway_request_supports_retry(request) {
+        return GatewayUpstreamRetryPolicy::disabled();
+    }
+
+    gateway_upstream_retry_policy_for_capability("request", routing_policy)
+}
+
+pub(crate) fn gateway_upstream_retry_policy_for_capability(
+    capability: &str,
+    routing_policy: Option<&RoutingPolicy>,
+) -> GatewayUpstreamRetryPolicy {
+    if capability != "request" && !gateway_capability_supports_retry(capability) {
         return GatewayUpstreamRetryPolicy::disabled();
     }
 
@@ -121,6 +155,10 @@ pub(crate) fn gateway_upstream_retry_policy(
     }
 }
 
+fn gateway_capability_supports_retry(capability: &str) -> bool {
+    matches!(capability, "chat_completion" | "responses")
+}
+
 fn gateway_request_supports_retry(request: &ProviderRequest<'_>) -> bool {
     matches!(
         request,
@@ -137,6 +175,10 @@ pub(crate) fn gateway_upstream_error_is_retryable(error: &anyhow::Error) -> bool
             error.kind(),
             GatewayExecutionContextErrorKind::RequestTimeout
         );
+    }
+
+    if let Some(error) = gateway_extension_host_error(error) {
+        return error.native_dynamic_retryable();
     }
 
     if let Some(error) = gateway_provider_http_error(error) {
@@ -193,6 +235,12 @@ pub(crate) fn gateway_retry_reason_for_error(error: &anyhow::Error) -> &'static 
             GatewayExecutionContextErrorKind::DeadlineExceeded => "deadline_exceeded",
             GatewayExecutionContextErrorKind::ProviderOverloaded => "provider_overloaded",
         };
+    }
+
+    if let Some(error) = gateway_extension_host_error(error) {
+        if error.native_dynamic_retryable() {
+            return "plugin_retryable";
+        }
     }
 
     if let Some(error) = gateway_provider_http_error(error) {
@@ -350,14 +398,25 @@ pub(crate) fn gateway_retry_delay_for_error(
     error: &anyhow::Error,
 ) -> GatewayRetryDelayDecision {
     let base_delay = retry_policy.delay_before_next_attempt(failed_attempt);
-    let retry_after = gateway_provider_http_error(error).and_then(|error| {
-        Some((
-            Duration::from_secs(error.retry_after_secs()?),
-            error.retry_after_source(),
-        ))
-    });
+    let retry_after = gateway_provider_http_error(error)
+        .and_then(|error| {
+            Some((
+                Duration::from_secs(error.retry_after_secs()?),
+                error.retry_after_source(),
+                "provider_retry_after",
+            ))
+        })
+        .or_else(|| {
+            gateway_extension_host_error(error).and_then(|error| {
+                Some((
+                    Duration::from_millis(error.native_dynamic_retry_after_ms()?),
+                    None,
+                    "plugin_retry_after_ms",
+                ))
+            })
+        });
     let retry_after_delay = retry_after
-        .map(|(delay, _)| delay)
+        .map(|(delay, _, _)| delay)
         .unwrap_or(Duration::from_millis(0));
     let capped_retry_after = if retry_after_delay.is_zero() {
         retry_after_delay
@@ -365,11 +424,19 @@ pub(crate) fn gateway_retry_delay_for_error(
         retry_after_delay.min(Duration::from_millis(retry_policy.max_delay_ms))
     };
     if !capped_retry_after.is_zero() && capped_retry_after > base_delay {
-        let source = match retry_after.and_then(|(_, source)| source) {
-            Some(ProviderRetryAfterSource::Seconds) => "retry_after_seconds",
-            Some(ProviderRetryAfterSource::HttpDate) => "retry_after_http_date",
-            None => "retry_after",
-        };
+        let source = retry_after
+            .map(|(_, source, kind)| match (kind, source) {
+                ("provider_retry_after", Some(ProviderRetryAfterSource::Seconds)) => {
+                    "retry_after_seconds"
+                }
+                ("provider_retry_after", Some(ProviderRetryAfterSource::HttpDate)) => {
+                    "retry_after_http_date"
+                }
+                ("provider_retry_after", None) => "retry_after",
+                ("plugin_retry_after_ms", _) => "plugin_retry_after_ms",
+                _ => "retry_after",
+            })
+            .unwrap_or("retry_after");
         return GatewayRetryDelayDecision {
             delay: capped_retry_after,
             source,
@@ -386,6 +453,12 @@ pub(crate) fn gateway_provider_http_error(error: &anyhow::Error) -> Option<&Prov
     error
         .chain()
         .find_map(|cause| cause.downcast_ref::<ProviderHttpError>())
+}
+
+pub(crate) fn gateway_extension_host_error(error: &anyhow::Error) -> Option<&ExtensionHostError> {
+    error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<ExtensionHostError>())
 }
 
 pub(crate) fn gateway_execution_context_error(
@@ -444,13 +517,14 @@ fn try_acquire_gateway_provider_in_flight_permit(
     }
 }
 
-pub(crate) async fn execute_provider_request_with_execution_context(
-    adapter: &dyn ProviderExecutionAdapter,
+pub(crate) async fn execute_gateway_future_with_execution_context<T, F>(
     provider_id: Option<&str>,
-    api_key: &str,
-    request: ProviderRequest<'_>,
     options: &ProviderRequestOptions,
-) -> Result<ProviderOutput> {
+    future: F,
+) -> Result<T>
+where
+    F: Future<Output = Result<T>>,
+{
     let now_ms = gateway_execution_observed_at_ms();
     if options.deadline_expired(now_ms) {
         return Err(anyhow::Error::new(
@@ -461,12 +535,7 @@ pub(crate) async fn execute_provider_request_with_execution_context(
     let _in_flight_permit = try_acquire_gateway_provider_in_flight_permit(provider_id)?;
 
     if let Some(timeout_ms) = options.effective_timeout_ms(now_ms) {
-        return match tokio::time::timeout(
-            Duration::from_millis(timeout_ms),
-            adapter.execute_with_options(api_key, request, options),
-        )
-        .await
-        {
+        return match tokio::time::timeout(Duration::from_millis(timeout_ms), future).await {
             Ok(result) => result,
             Err(_) => Err(anyhow::Error::new(
                 GatewayExecutionContextError::request_timeout(timeout_ms, options.deadline_at_ms()),
@@ -474,7 +543,60 @@ pub(crate) async fn execute_provider_request_with_execution_context(
         };
     }
 
-    adapter
-        .execute_with_options(api_key, request, options)
-        .await
+    future.await
+}
+
+pub(crate) async fn execute_gateway_blocking_operation_with_execution_context<T, F>(
+    provider_id: Option<&str>,
+    options: &ProviderRequestOptions,
+    operation: F,
+) -> Result<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T> + Send + 'static,
+{
+    let now_ms = gateway_execution_observed_at_ms();
+    if options.deadline_expired(now_ms) {
+        return Err(anyhow::Error::new(
+            GatewayExecutionContextError::deadline_exceeded(options.deadline_at_ms()),
+        ));
+    }
+
+    let in_flight_permit = try_acquire_gateway_provider_in_flight_permit(provider_id)?;
+    let handle = tokio::task::spawn_blocking(move || {
+        let _in_flight_permit = in_flight_permit;
+        operation()
+    });
+
+    if let Some(timeout_ms) = options.effective_timeout_ms(now_ms) {
+        return match tokio::time::timeout(Duration::from_millis(timeout_ms), handle).await {
+            Ok(result) => match result {
+                Ok(result) => result,
+                Err(error) => Err(error.into()),
+            },
+            Err(_) => Err(anyhow::Error::new(
+                GatewayExecutionContextError::request_timeout(timeout_ms, options.deadline_at_ms()),
+            )),
+        };
+    }
+
+    match handle.await {
+        Ok(result) => result,
+        Err(error) => Err(error.into()),
+    }
+}
+
+pub(crate) async fn execute_provider_request_with_execution_context(
+    adapter: &dyn ProviderExecutionAdapter,
+    provider_id: Option<&str>,
+    api_key: &str,
+    request: ProviderRequest<'_>,
+    options: &ProviderRequestOptions,
+) -> Result<ProviderOutput> {
+    execute_gateway_future_with_execution_context(
+        provider_id,
+        options,
+        adapter.execute_with_options(api_key, request, options),
+    )
+    .await
 }

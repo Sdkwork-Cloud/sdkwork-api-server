@@ -272,4 +272,41 @@ impl PostgresAdminStore {
             updated_at_ms: u64::try_from(row.try_get::<i64, _>("updated_at_ms")?)?,
         })
     }
+
+    pub(crate) fn map_postgres_catalog_publication_lifecycle_audit_row(
+        row: PgRow,
+    ) -> Result<CatalogPublicationLifecycleAuditRecord> {
+        Ok(CatalogPublicationLifecycleAuditRecord {
+            audit_id: row.try_get::<String, _>("audit_id")?,
+            publication_id: row.try_get::<String, _>("publication_id")?,
+            publication_revision_id: row.try_get::<String, _>("publication_revision_id")?,
+            publication_version: u64::try_from(row.try_get::<i64, _>("publication_version")?)?,
+            publication_source_kind: row.try_get::<String, _>("publication_source_kind")?,
+            action: CatalogPublicationLifecycleAction::from_str(
+                &row.try_get::<String, _>("action")?,
+            )
+            .map_err(anyhow::Error::msg)?,
+            outcome: CatalogPublicationLifecycleAuditOutcome::from_str(
+                &row.try_get::<String, _>("outcome")?,
+            )
+            .map_err(anyhow::Error::msg)?,
+            operator_id: row.try_get::<String, _>("operator_id")?,
+            request_id: row.try_get::<String, _>("request_id")?,
+            operator_reason: row.try_get::<String, _>("operator_reason")?,
+            publication_status_before: row.try_get::<String, _>("publication_status_before")?,
+            publication_status_after: row.try_get::<String, _>("publication_status_after")?,
+            governed_pricing_plan_id: row
+                .try_get::<Option<i64>, _>("governed_pricing_plan_id")?
+                .map(u64::try_from)
+                .transpose()?,
+            governed_pricing_status_before: row
+                .try_get::<Option<String>, _>("governed_pricing_status_before")?,
+            governed_pricing_status_after: row
+                .try_get::<Option<String>, _>("governed_pricing_status_after")?,
+            decision_reasons: decode_string_list(
+                &row.try_get::<String, _>("decision_reasons_json")?,
+            )?,
+            recorded_at_ms: u64::try_from(row.try_get::<i64, _>("recorded_at_ms")?)?,
+        })
+    }
 }

@@ -1,0 +1,236 @@
+{
+  "entries": [
+    {
+      "ledger_entry_id": 8201007,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": null,
+      "hold_id": null,
+      "entry_type": "grant_issue",
+      "benefit_type": "cash_credit",
+      "quantity": 5000000.0,
+      "amount": 0.0,
+      "created_at_ms": 1710000449500
+    },
+    {
+      "ledger_entry_id": 8201008,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610004,
+      "hold_id": 8101004,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -3000.0,
+      "amount": -0.003,
+      "created_at_ms": 1710000451000
+    },
+    {
+      "ledger_entry_id": 8201009,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610005,
+      "hold_id": 8101005,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -7200.0,
+      "amount": -0.0072,
+      "created_at_ms": 1710000452000
+    },
+    {
+      "ledger_entry_id": 8201010,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610006,
+      "hold_id": 8101006,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -3800.0,
+      "amount": -0.0038,
+      "created_at_ms": 1710000453000
+    },
+    {
+      "ledger_entry_id": 8201011,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610007,
+      "hold_id": 8101007,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -30000.0,
+      "amount": -0.03,
+      "created_at_ms": 1710000454000
+    },
+    {
+      "ledger_entry_id": 8201012,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610008,
+      "hold_id": 8101008,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -7500.0,
+      "amount": -0.0075,
+      "created_at_ms": 1710000455000
+    },
+    {
+      "ledger_entry_id": 8201013,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610009,
+      "hold_id": 8101009,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -8900.0,
+      "amount": -0.0089,
+      "created_at_ms": 1710000456000
+    },
+    {
+      "ledger_entry_id": 8201014,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610010,
+      "hold_id": 8101010,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -10400.0,
+      "amount": -0.0104,
+      "created_at_ms": 1710000457000
+    },
+    {
+      "ledger_entry_id": 8201015,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610011,
+      "hold_id": 8101011,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -14800.0,
+      "amount": -0.0148,
+      "created_at_ms": 1710000458000
+    },
+    {
+      "ledger_entry_id": 8201016,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610012,
+      "hold_id": 8101012,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -26000.0,
+      "amount": -0.026,
+      "created_at_ms": 1710000459000
+    }
+  ],
+  "allocations": [
+    {
+      "ledger_allocation_id": 8501007,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201007,
+      "lot_id": 8001004,
+      "quantity_delta": 5000000.0,
+      "created_at_ms": 1710000449500
+    },
+    {
+      "ledger_allocation_id": 8501008,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201008,
+      "lot_id": 8001004,
+      "quantity_delta": -3000.0,
+      "created_at_ms": 1710000451000
+    },
+    {
+      "ledger_allocation_id": 8501009,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201009,
+      "lot_id": 8001004,
+      "quantity_delta": -7200.0,
+      "created_at_ms": 1710000452000
+    },
+    {
+      "ledger_allocation_id": 8501010,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201010,
+      "lot_id": 8001004,
+      "quantity_delta": -3800.0,
+      "created_at_ms": 1710000453000
+    },
+    {
+      "ledger_allocation_id": 8501011,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201011,
+      "lot_id": 8001004,
+      "quantity_delta": -30000.0,
+      "created_at_ms": 1710000454000
+    },
+    {
+      "ledger_allocation_id": 8501012,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201012,
+      "lot_id": 8001004,
+      "quantity_delta": -7500.0,
+      "created_at_ms": 1710000455000
+    },
+    {
+      "ledger_allocation_id": 8501013,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201013,
+      "lot_id": 8001004,
+      "quantity_delta": -8900.0,
+      "created_at_ms": 1710000456000
+    },
+    {
+      "ledger_allocation_id": 8501014,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201014,
+      "lot_id": 8001004,
+      "quantity_delta": -10400.0,
+      "created_at_ms": 1710000457000
+    },
+    {
+      "ledger_allocation_id": 8501015,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201015,
+      "lot_id": 8001004,
+      "quantity_delta": -14800.0,
+      "created_at_ms": 1710000458000
+    },
+    {
+      "ledger_allocation_id": 8501016,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201016,
+      "lot_id": 8001004,
+      "quantity_delta": -26000.0,
+      "created_at_ms": 1710000459000
+    }
+  ]
+}

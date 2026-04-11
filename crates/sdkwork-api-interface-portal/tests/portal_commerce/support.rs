@@ -219,3 +219,27 @@ pub(super) async fn seed_marketing_catalog_coupon(store: &SqliteAdminStore) {
         .with_updated_at_ms(1_710_000_000_000);
     store.insert_coupon_code_record(&code).await.unwrap();
 }
+
+pub(super) async fn seed_pricing_plan(
+    store: &SqliteAdminStore,
+    pricing_plan_id: u64,
+    plan_code: &str,
+    plan_version: u64,
+    status: &str,
+) {
+    let pricing_plan = sdkwork_api_domain_billing::PricingPlanRecord::new(
+        pricing_plan_id,
+        1001,
+        2002,
+        plan_code,
+        plan_version,
+    )
+    .with_display_name(format!("{plan_code} v{plan_version}"))
+    .with_status(status.to_owned())
+    .with_effective_from_ms(1_710_000_000_000)
+    .with_created_at_ms(1_710_000_000_000 + pricing_plan_id)
+    .with_updated_at_ms(1_710_000_000_000 + pricing_plan_id);
+    AccountKernelStore::insert_pricing_plan_record(store, &pricing_plan)
+        .await
+        .unwrap();
+}

@@ -1,0 +1,26 @@
+{
+  "quota_policies": [
+    {
+      "policy_id": "quota-growth-lab-sandbox",
+      "project_id": "project_growth_lab",
+      "max_units": 12000000,
+      "enabled": true
+    }
+  ],
+  "rate_limit_policies": [
+    {
+      "policy_id": "rate-limit-growth-lab-sandbox",
+      "project_id": "project_growth_lab",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": null,
+      "requests_per_window": 240,
+      "window_seconds": 60,
+      "burst_requests": 360,
+      "enabled": true,
+      "notes": "Growth lab sandbox responses rate limit",
+      "created_at_ms": 1710001400000,
+      "updated_at_ms": 1710001400000
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "admin_users": [
+    {
+      "id": "admin_growth_lab",
+      "email": "growth.admin@sdkwork.local",
+      "display_name": "Growth Lab Admin",
+      "password_salt": "c2Rrd29ya0FkbWluU2VlZA",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya0FkbWluU2VlZA$Qqn9CGRiZIU7JwoSPHszrNY459YXH9M3WSwuNnJSwxM",
+      "active": true,
+      "created_at_ms": 1710001500000
+    }
+  ],
+  "portal_users": [
+    {
+      "id": "user_growth_lab_owner",
+      "email": "growthlab@sdkwork.local",
+      "display_name": "Growth Lab Owner",
+      "password_salt": "c2Rrd29ya1BvcnRhbFNlZWQ",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya1BvcnRhbFNlZWQ$A2N73CiDSUv+hpFm7j0p3Jx6SJv2+JEpqUbqUdhSRgU",
+      "workspace_tenant_id": "tenant_growth_lab",
+      "workspace_project_id": "project_growth_lab",
+      "active": true,
+      "created_at_ms": 1710001500500
+    }
+  ],
+  "gateway_api_keys": [
+    {
+      "tenant_id": "tenant_growth_lab",
+      "project_id": "project_growth_lab",
+      "environment": "sandbox",
+      "hashed_key": "0b876ce2ce1d23240f74458337efe74eaccbf178ab962288d119afea1922cdec",
+      "api_key_group_id": "group-growth-lab-sandbox",
+      "raw_key": "skw_growth_lab_sandbox_2026",
+      "label": "Growth Lab APAC Sandbox Key",
+      "notes": "Growth lab bootstrap key pinned to the Asia official routing profile for APAC launch rehearsal.",
+      "created_at_ms": 1710001501000,
+      "last_used_at_ms": null,
+      "expires_at_ms": null,
+      "active": true
+    }
+  ]
+}

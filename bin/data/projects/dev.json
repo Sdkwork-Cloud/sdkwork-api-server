@@ -1,0 +1,12 @@
+[
+  {
+    "tenant_id": "tenant_local_demo",
+    "id": "project_local_demo",
+    "name": "demo-local"
+  },
+  {
+    "tenant_id": "tenant_partner_demo",
+    "id": "project_partner_demo",
+    "name": "partner-sandbox"
+  }
+]

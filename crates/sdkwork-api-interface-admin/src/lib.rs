@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod auth;
@@ -20,84 +19,86 @@ mod types;
 mod users;
 
 use axum::{
-    Json, Router,
     body::Bytes,
     extract::FromRequestParts,
     extract::Path,
     extract::State,
-    http::HeaderMap,
-    http::StatusCode,
     http::header,
     http::request::Parts,
+    http::HeaderMap,
+    http::StatusCode,
     response::{Html, IntoResponse},
     routing::{delete, get, patch, post, put},
+    Json, Router,
 };
 use sdkwork_api_app_billing::{
-    AccountBalanceSnapshot, AccountLedgerHistoryEntry, CommercialBillingAdminKernel,
-    PricingLifecycleSynchronizationReport, create_quota_policy, list_billing_events,
-    list_ledger_entries, list_quota_policies, persist_quota_policy,
-    summarize_billing_events_from_store, summarize_billing_from_store,
+    create_quota_policy, list_billing_events, list_ledger_entries, list_quota_policies,
+    persist_quota_policy, summarize_billing_events_from_store, summarize_billing_from_store,
     synchronize_due_pricing_plan_lifecycle, synchronize_due_pricing_plan_lifecycle_with_report,
+    AccountBalanceSnapshot, AccountLedgerHistoryEntry, CommercialBillingAdminKernel,
+    PricingLifecycleSynchronizationReport,
 };
 use sdkwork_api_app_catalog::{
-    PersistProviderWithBindingsRequest, delete_channel as delete_catalog_channel,
-    delete_channel_model as delete_catalog_channel_model,
+    delete_channel as delete_catalog_channel, delete_channel_model as delete_catalog_channel_model,
     delete_model_price as delete_catalog_model_price, delete_model_variant,
-    delete_provider as delete_catalog_provider, list_channel_models, list_channels,
-    list_model_entries, list_model_prices, list_providers, persist_channel,
-    persist_channel_model_with_metadata, persist_model_price_with_rates,
-    persist_model_with_metadata, persist_provider_with_bindings_and_extension_id,
+    delete_provider as delete_catalog_provider,
+    delete_provider_account as delete_catalog_provider_account, delete_provider_model,
+    list_channel_models, list_channels, list_model_entries, list_model_prices,
+    list_provider_accounts as list_catalog_provider_accounts, list_provider_models, list_providers,
+    normalize_provider_integration, persist_channel, persist_channel_model_with_metadata,
+    persist_model_price_with_rates_and_metadata, persist_model_with_metadata,
+    persist_provider_account, persist_provider_model_with_metadata,
+    persist_provider_with_bindings_and_extension_id, PersistProviderWithBindingsRequest,
 };
 use sdkwork_api_app_commerce::{
     AdminCommerceReconciliationRunCreateRequest, AdminCommerceRefundCreateRequest, CommerceError,
 };
-use sdkwork_api_app_coupon::{delete_coupon, list_coupons, persist_coupon};
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_credential::{
     delete_credential_with_manager, delete_provider_credentials_with_manager,
-    delete_tenant_credentials_with_manager, list_credentials,
-    persist_credential_with_secret_and_manager,
+    delete_tenant_credentials_with_manager, list_credentials, list_official_provider_configs,
+    official_provider_secret_configured, persist_credential_with_secret_and_manager,
+    persist_official_provider_config_with_secret_and_manager,
 };
 use sdkwork_api_app_extension::{
-    PersistExtensionInstanceInput, configured_extension_discovery_policy_from_env,
-    list_discovered_extension_packages, list_extension_installations, list_extension_instances,
-    list_extension_runtime_statuses, list_provider_health_snapshots,
-    persist_extension_installation, persist_extension_instance,
+    configured_extension_discovery_policy_from_env, list_discovered_extension_packages,
+    list_extension_installations, list_extension_instances, list_extension_runtime_statuses,
+    list_provider_health_snapshots, persist_extension_installation, persist_extension_instance,
+    PersistExtensionInstanceInput,
 };
 use sdkwork_api_app_gateway::{
-    ConfiguredExtensionHostReloadScope, invalidate_capability_catalog_cache,
-    reload_extension_host_with_scope,
+    inspect_provider_execution_views, invalidate_capability_catalog_cache,
+    reload_extension_host_with_scope, ConfiguredExtensionHostReloadScope,
 };
 use sdkwork_api_app_identity::{
-    AdminIdentityError, ApiKeyGroupInput, Claims, CreatedGatewayApiKey, PortalIdentityError,
     change_admin_password, create_api_key_group, delete_admin_user, delete_api_key_group,
     delete_gateway_api_key, delete_portal_user, list_admin_user_profiles, list_api_key_groups,
     list_gateway_api_keys, list_portal_user_profiles, load_admin_user_profile, login_admin_user,
     reset_admin_user_password, reset_portal_user_password, set_admin_user_active,
     set_api_key_group_active, set_gateway_api_key_active, set_portal_user_active,
     update_api_key_group, update_gateway_api_key_metadata, upsert_admin_user, upsert_portal_user,
-    verify_jwt,
+    verify_jwt, AdminIdentityError, ApiKeyGroupInput, Claims, CreatedGatewayApiKey,
+    PortalIdentityError,
 };
 use sdkwork_api_app_jobs::{
     find_async_job, list_async_job_assets, list_async_job_attempts, list_async_job_callbacks,
     list_async_jobs,
 };
-use sdkwork_api_app_marketing::project_legacy_coupon_campaign;
 use sdkwork_api_app_rate_limit::{
     create_rate_limit_policy, list_rate_limit_policies, persist_rate_limit_policy,
 };
 use sdkwork_api_app_routing::{
-    CreateRoutingPolicyInput, CreateRoutingProfileInput, RouteSelectionContext,
     create_routing_policy, create_routing_profile, list_compiled_routing_snapshots,
     list_routing_decision_logs, list_routing_policies, list_routing_profiles,
     persist_routing_policy, persist_routing_profile, select_route_with_store_context,
+    CreateRoutingPolicyInput, CreateRoutingProfileInput, RouteSelectionContext,
 };
 use sdkwork_api_app_runtime::{
-    CreateExtensionRuntimeRolloutRequest, CreateStandaloneConfigRolloutRequest,
-    ExtensionRuntimeRolloutDetails, StandaloneConfigRolloutDetails,
     create_extension_runtime_rollout_with_request, create_standalone_config_rollout,
     find_extension_runtime_rollout, find_standalone_config_rollout,
     list_extension_runtime_rollouts, list_standalone_config_rollouts,
+    CreateExtensionRuntimeRolloutRequest, CreateStandaloneConfigRolloutRequest,
+    ExtensionRuntimeRolloutDetails, StandaloneConfigRolloutDetails,
 };
 use sdkwork_api_app_tenant::{
     delete_project as delete_tenant_project, delete_tenant as delete_workspace_tenant,
@@ -113,7 +114,8 @@ use sdkwork_api_domain_billing::{
 };
 use sdkwork_api_domain_catalog::{
     Channel, ChannelModelRecord, ModelCapability, ModelCatalogEntry, ModelPriceRecord,
-    ProviderChannelBinding, ProxyProvider,
+    ModelPriceTier, ProviderAccountRecord, ProviderChannelBinding, ProviderModelRecord,
+    ProxyProvider,
 };
 use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, CommercePaymentAttemptRecord, CommercePaymentEventRecord,
@@ -121,8 +123,7 @@ use sdkwork_api_domain_commerce::{
     CommerceWebhookDeliveryAttemptRecord, CommerceWebhookInboxRecord,
     PaymentMethodCredentialBindingRecord, PaymentMethodRecord,
 };
-use sdkwork_api_domain_coupon::CouponCampaign;
-use sdkwork_api_domain_credential::UpstreamCredential;
+use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_domain_identity::{
     AdminUserProfile, ApiKeyGroupRecord, GatewayApiKeyRecord, PortalUserProfile,
 };
@@ -130,10 +131,17 @@ use sdkwork_api_domain_jobs::{
     AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobCallbackRecord, AsyncJobRecord,
 };
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CampaignBudgetStatus, CouponCodeRecord, CouponCodeStatus,
-    CouponRedemptionRecord, CouponReservationRecord, CouponRollbackRecord, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord, MarketingCampaignStatus,
-    MarketingSubjectScope,
+    CampaignBudgetLifecycleAction, CampaignBudgetLifecycleAuditOutcome,
+    CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord, CampaignBudgetStatus,
+    CouponCodeLifecycleAction, CouponCodeLifecycleAuditOutcome,
+    CouponCodeLifecycleAuditRecord, CouponCodeRecord, CouponCodeStatus,
+    CouponRedemptionRecord, CouponReservationRecord, CouponRollbackRecord,
+    CouponTemplateApprovalState,
+    CouponTemplateLifecycleAuditOutcome, CouponTemplateLifecycleAuditRecord,
+    CouponTemplateLifecycleAction, CouponTemplateRecord, CouponTemplateStatus,
+    MarketingCampaignLifecycleAction,
+    MarketingCampaignLifecycleAuditOutcome, MarketingCampaignLifecycleAuditRecord,
+    MarketingCampaignApprovalState, MarketingCampaignRecord, MarketingCampaignStatus,
 };
 use sdkwork_api_domain_rate_limit::{RateLimitPolicy, RateLimitWindowSnapshot};
 use sdkwork_api_domain_routing::{
@@ -144,18 +152,23 @@ use sdkwork_api_domain_routing::{
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_domain_usage::{UsageRecord, UsageSummary};
 use sdkwork_api_extension_core::{ExtensionInstallation, ExtensionInstance, ExtensionRuntime};
-use sdkwork_api_observability::{HttpMetricsRegistry, observe_http_metrics, observe_http_tracing};
+use sdkwork_api_observability::{
+    observe_http_metrics, observe_http_tracing, HttpMetricsRegistry,
+};
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use utoipa::openapi::Server;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::Server;
 use utoipa::{Modify, OpenApi, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::{Config as SwaggerUiConfig, SwaggerUi, Url as SwaggerUiUrl};
 
-use commerce::CommerceOrderAuditRecord;
+use commerce::{
+    CommerceOrderAuditRecord, CommercialCatalogPublicationDetail,
+    CommercialCatalogPublicationMutationResult, CommercialCatalogPublicationProjection,
+};
 use types::*;
 
 pub use routes::{

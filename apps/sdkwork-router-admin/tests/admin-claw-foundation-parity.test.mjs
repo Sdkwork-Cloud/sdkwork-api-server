@@ -66,7 +66,6 @@ test('admin no longer ships the legacy commons package and keeps localization in
 
 test('admin modal forms reuse shared Textarea instead of raw textarea tags', () => {
   const files = [
-    'packages/sdkwork-router-admin-coupons/src/page/CouponDialog.tsx',
     'packages/sdkwork-router-admin-tenants/src/page/ApiKeyDialog.tsx',
     'packages/sdkwork-router-admin-catalog/src/page/CatalogCredentialDialog.tsx',
     'packages/sdkwork-router-admin-catalog/src/page/CatalogChannelModelDialog.tsx',
@@ -74,6 +73,20 @@ test('admin modal forms reuse shared Textarea instead of raw textarea tags', () 
     'packages/sdkwork-router-admin-apirouter/src/pages/access/GatewayApiKeyCreateDialog.tsx',
     'packages/sdkwork-router-admin-apirouter/src/pages/access/GatewayApiKeyEditDialog.tsx',
   ];
+
+  assert.equal(
+    existsSync(
+      path.join(
+        appRoot,
+        'packages',
+        'sdkwork-router-admin-coupons',
+        'src',
+        'page',
+        'CouponDialog.tsx',
+      ),
+    ),
+    false,
+  );
 
   for (const relativePath of files) {
     const source = readFromApp(relativePath);

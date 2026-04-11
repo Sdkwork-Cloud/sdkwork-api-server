@@ -1,0 +1,47 @@
+{
+  "quota_policies": [],
+  "rate_limit_policies": [
+    {
+      "policy_id": "rate-limit-openrouter-main",
+      "project_id": "project_global_default",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": "gpt-4.1-mini",
+      "requests_per_window": 240,
+      "window_seconds": 60,
+      "burst_requests": 360,
+      "enabled": true,
+      "notes": "Proxy marketplace frontier responses rate limit for install-time production samples.",
+      "created_at_ms": 1710000469000,
+      "updated_at_ms": 1710000469000
+    },
+    {
+      "policy_id": "rate-limit-siliconflow-main",
+      "project_id": "project_global_default",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": "deepseek-v3",
+      "requests_per_window": 480,
+      "window_seconds": 60,
+      "burst_requests": 720,
+      "enabled": true,
+      "notes": "Proxy low-cost open-weight responses rate limit for China-friendly traffic.",
+      "created_at_ms": 1710000470000,
+      "updated_at_ms": 1710000470000
+    },
+    {
+      "policy_id": "rate-limit-ollama-local",
+      "project_id": "project_global_default",
+      "api_key_hash": null,
+      "route_key": "responses",
+      "model_name": "qwen2.5-14b-instruct",
+      "requests_per_window": 120,
+      "window_seconds": 60,
+      "burst_requests": 180,
+      "enabled": true,
+      "notes": "Local edge responses rate limit for private Ollama-backed execution.",
+      "created_at_ms": 1710000471000,
+      "updated_at_ms": 1710000471000
+    }
+  ]
+}

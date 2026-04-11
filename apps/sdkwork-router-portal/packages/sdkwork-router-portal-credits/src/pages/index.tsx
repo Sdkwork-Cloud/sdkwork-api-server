@@ -362,6 +362,88 @@ function rewardHistoryRollbackDetail(
   });
 }
 
+function rewardHistoryAccountArrivalDetail(
+  item: PortalMarketingRewardHistoryItem,
+  t: TranslateFn,
+) {
+  if (item.effect.effect_kind !== 'account_entitlement') {
+    return (
+      <span className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+        {t('No account arrival for checkout discount')}
+      </span>
+    );
+  }
+
+  if (item.account_arrival.benefit_lot_count === 0) {
+    return (
+      <span className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+        {t('No linked account lot evidence yet')}
+      </span>
+    );
+  }
+
+  const primaryLot = item.account_arrival.benefit_lots[0];
+  const facts = [
+    t('{count} units', { count: formatUnits(item.account_arrival.credited_quantity) }),
+    t('{count} lot(s)', { count: item.account_arrival.benefit_lot_count }),
+  ];
+  const lineage = [];
+
+  if (item.account_arrival.account_id !== null && item.account_arrival.account_id !== undefined) {
+    lineage.push(t('Account #{id}', { id: item.account_arrival.account_id }));
+  }
+  lineage.push(t('Lot #{id}', { id: primaryLot.lot_id }));
+
+  return (
+    <div className="space-y-1">
+      <strong>{t('Arrived to account')}</strong>
+      <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">{facts.join(' / ')}</p>
+      <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">{lineage.join(' / ')}</p>
+    </div>
+  );
+}
+
+function couponEffectLabel(
+  item: Pick<PortalMarketingCodeItem, 'effect'> | Pick<PortalMarketingRewardHistoryItem, 'effect'>,
+  t: TranslateFn,
+): string {
+  if (item.effect.effect_kind === 'account_entitlement') {
+    return item.effect.grant_units
+      ? t('Grant {count} units', { count: formatUnits(item.effect.grant_units) })
+      : t('Account entitlement');
+  }
+
+  if (item.effect.discount_percent !== null && item.effect.discount_percent !== undefined) {
+    return t('{percent}% off', { percent: item.effect.discount_percent });
+  }
+
+  if (
+    item.effect.discount_amount_minor !== null
+    && item.effect.discount_amount_minor !== undefined
+  ) {
+    return t('Fixed discount');
+  }
+
+  return t('Checkout discount');
+}
+
+function couponApplicabilityLabel(
+  item:
+    | Pick<PortalMarketingCodeItem, 'applicability'>
+    | Pick<PortalMarketingRewardHistoryItem, 'applicability'>,
+  t: TranslateFn,
+): string {
+  if (item.applicability.all_target_kinds_eligible) {
+    return t('All market targets');
+  }
+
+  if (!item.applicability.target_kinds.length) {
+    return t('Target scope pending');
+  }
+
+  return item.applicability.target_kinds.map((target) => titleCaseToken(target)).join(', ');
+}
+
 function redemptionCoverageHeadline(
   projection: PortalCreditsFinanceProjection | null,
   t: TranslateFn,
@@ -875,7 +957,14 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
               {
                 id: 'code',
                 header: t('Coupon'),
-                cell: (row: PortalMarketingCodeItem) => <strong>{row.code.code_value}</strong>,
+                cell: (row: PortalMarketingCodeItem) => (
+                  <div className="space-y-1">
+                    <strong>{row.code.code_value}</strong>
+                    <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                      {`${row.template.display_name} · ${couponEffectLabel(row, t)} · ${couponApplicabilityLabel(row, t)}`}
+                    </p>
+                  </div>
+                ),
               },
               {
                 id: 'status',
@@ -976,7 +1065,14 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
               {
                 id: 'code',
                 header: t('Coupon'),
-                cell: (row: PortalMarketingRewardHistoryItem) => <strong>{row.code.code_value}</strong>,
+                cell: (row: PortalMarketingRewardHistoryItem) => (
+                  <div className="space-y-1">
+                    <strong>{row.code.code_value}</strong>
+                    <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                      {`${row.template.display_name} · ${couponEffectLabel(row, t)} · ${couponApplicabilityLabel(row, t)}`}
+                    </p>
+                  </div>
+                ),
               },
               {
                 id: 'status',
@@ -991,6 +1087,12 @@ export function PortalCreditsPage({ workspace }: PortalCreditsPageProps) {
                 id: 'rollback',
                 header: t('Rollback'),
                 cell: (row: PortalMarketingRewardHistoryItem) => rewardHistoryRollbackDetail(row, t),
+              },
+              {
+                id: 'arrival',
+                header: t('Arrival'),
+                cell: (row: PortalMarketingRewardHistoryItem) =>
+                  rewardHistoryAccountArrivalDetail(row, t),
               },
               {
                 id: 'evidence',

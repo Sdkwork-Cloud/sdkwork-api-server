@@ -1,0 +1,20 @@
+[
+  {
+    "node_id": "node-global-gateway-sg-01",
+    "service_kind": "gateway",
+    "started_at_ms": 1711000000000,
+    "last_seen_at_ms": 1711003600000
+  },
+  {
+    "node_id": "node-global-admin-us-01",
+    "service_kind": "admin",
+    "started_at_ms": 1711000100000,
+    "last_seen_at_ms": 1711003500000
+  },
+  {
+    "node_id": "node-global-portal-eu-01",
+    "service_kind": "portal",
+    "started_at_ms": 1711000200000,
+    "last_seen_at_ms": 1711003400000
+  }
+]

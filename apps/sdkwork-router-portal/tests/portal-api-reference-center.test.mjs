@@ -4,9 +4,14 @@ import path from 'node:path';
 import test from 'node:test';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
+const workspaceRoot = path.resolve(appRoot, '..', '..');
 
 function read(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
+}
+
+function readWorkspace(relativePath) {
+  return readFileSync(path.join(workspaceRoot, relativePath), 'utf8');
 }
 
 test('public site exposes a dedicated API reference center after models and before docs', () => {
@@ -52,5 +57,30 @@ test('API reference center derives route coverage and schema facts from live Ope
   assert.match(apiReferencePage, /case 'vector-stores':/);
   assert.match(apiReferencePage, /case 'threads':/);
   assert.match(apiReferencePage, /case 'runs':/);
+  assert.match(apiReferencePage, /case 'market':/);
+  assert.match(apiReferencePage, /case 'marketing':/);
+  assert.match(apiReferencePage, /case 'commercial':/);
   assert.doesNotMatch(apiReferencePage, /routeFamilies:\s*\[/);
+});
+
+test('gateway API reference documents coupon-first market and commercial public routes for downstream consumers', () => {
+  const apiReferencePage = read('packages/sdkwork-router-portal-api-reference/src/index.tsx');
+  const gatewayApiDoc = readWorkspace('docs/api-reference/gateway-api.md');
+
+  assert.match(
+    apiReferencePage,
+    /market, coupon, and commercial account workflows/i,
+  );
+  assert.match(gatewayApiDoc, /\| market \| `GET \/market\/products`, `GET \/market\/offers`, `POST \/market\/quotes` \|/);
+  assert.match(
+    gatewayApiDoc,
+    /\| marketing \| `POST \/marketing\/coupons\/validate`, `POST \/marketing\/coupons\/reserve`, `POST \/marketing\/coupons\/confirm`, `POST \/marketing\/coupons\/rollback` \|/,
+  );
+  assert.match(
+    gatewayApiDoc,
+    /\| commercial \| `GET \/commercial\/account`, `GET \/commercial\/account\/benefit-lots` \|/,
+  );
+  assert.match(gatewayApiDoc, /after_lot_id/);
+  assert.match(gatewayApiDoc, /next_after_lot_id/);
+  assert.match(gatewayApiDoc, /scope_order_id/);
 });

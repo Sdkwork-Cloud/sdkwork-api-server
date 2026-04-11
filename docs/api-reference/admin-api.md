@@ -118,7 +118,7 @@ Fresh databases now create only `ai_*` physical tables. Legacy names such as `id
 | provider catalog | `GET/POST /channels`, `DELETE /channels/{channel_id}`, `GET/POST /providers`, `DELETE /providers/{provider_id}`, `GET/POST /credentials`, `DELETE /credentials/{tenant_id}/providers/{provider_id}/keys/{key_reference}` | channel, provider, and credential management |
 | channel models | `GET/POST /channel-models`, `DELETE /channel-models/{channel_id}/models/{model_id}` | channel-to-model mapping management |
 | model pricing | `GET/POST /model-prices`, `DELETE /model-prices/{channel_id}/models/{model_id}/providers/{proxy_provider_id}` | per-channel-model, per-provider pricing control |
-| marketing workbench | `GET/POST /marketing/coupon-templates`, `POST /marketing/coupon-templates/{coupon_template_id}/status`, `GET/POST /marketing/campaigns`, `POST /marketing/campaigns/{marketing_campaign_id}/status`, `GET/POST /marketing/budgets`, `POST /marketing/budgets/{campaign_budget_id}/status`, `GET/POST /marketing/codes`, `POST /marketing/codes/{coupon_code_id}/status`, `GET /marketing/reservations`, `GET /marketing/redemptions`, `GET /marketing/rollbacks`, `GET/POST /coupons`, `DELETE /coupons/{coupon_id}` | canonical coupon governance plus legacy `/admin/coupons` compatibility |
+| marketing workbench | `GET/POST /marketing/coupon-templates`, `POST /marketing/coupon-templates/{coupon_template_id}/status`, `GET/POST /marketing/campaigns`, `POST /marketing/campaigns/{marketing_campaign_id}/status`, `GET/POST /marketing/budgets`, `POST /marketing/budgets/{campaign_budget_id}/status`, `GET/POST /marketing/codes`, `POST /marketing/codes/{coupon_code_id}/status`, `GET /marketing/reservations`, `GET /marketing/redemptions`, `GET /marketing/rollbacks` | canonical coupon governance owned only by `/admin/marketing/*` |
 | compatibility model routes | `GET/POST /models`, `DELETE /models/{external_name}/providers/{provider_id}` | legacy provider-scoped model compatibility routes backed by canonical catalog tables |
 | extensions | `GET/POST /extensions/installations`, `GET /extensions/packages`, `GET/POST /extensions/instances`, `GET /extensions/runtime-statuses`, `POST /extensions/runtime-reloads` | extension runtime management |
 | extension rollouts | `GET/POST /extensions/runtime-rollouts`, `GET /extensions/runtime-rollouts/{rollout_id}` | coordinated extension rollout control |
@@ -145,7 +145,7 @@ If you need to operate the gateway, this is the API that changes the underlying 
 - `POST /admin/marketing/campaigns/{marketing_campaign_id}/status` controls campaign activation and pause workflows for the attached template.
 - `POST /admin/marketing/budgets/{campaign_budget_id}/status` closes or re-activates a canonical budget while preserving consumed and reserved counters for auditability.
 - `POST /admin/marketing/codes/{coupon_code_id}/status` disables or re-enables a canonical coupon code without deleting redemption history.
-- `GET/POST /admin/coupons` remains a compatibility surface; new governance operations should target the canonical `/admin/marketing/*` resources.
+- `/admin/coupons` has been removed. Coupon governance and coupon-facing lifecycle control now exist only under canonical `/admin/marketing/*` resources.
 
 ## API Key Group Notes
 

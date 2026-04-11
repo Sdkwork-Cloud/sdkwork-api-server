@@ -58,6 +58,12 @@ pub(crate) async fn apply_postgres_billing_schema(pool: &PgPool) -> Result<()> {
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_account_benefit_lot_account_lot
+         ON ai_account_benefit_lot (account_id, lot_id)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_account_hold (
             hold_id BIGINT PRIMARY KEY NOT NULL,
             tenant_id BIGINT NOT NULL,
@@ -288,6 +294,7 @@ pub(crate) async fn apply_postgres_billing_schema(pool: &PgPool) -> Result<()> {
             currency_code TEXT NOT NULL DEFAULT 'USD',
             credit_unit_code TEXT NOT NULL DEFAULT 'credit',
             status TEXT NOT NULL DEFAULT 'draft',
+            ownership_scope TEXT NOT NULL DEFAULT 'workspace',
             effective_from_ms BIGINT NOT NULL DEFAULT 0,
             effective_to_ms BIGINT,
             created_at_ms BIGINT NOT NULL DEFAULT 0,
@@ -299,6 +306,11 @@ pub(crate) async fn apply_postgres_billing_schema(pool: &PgPool) -> Result<()> {
     sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_pricing_plan_code_version
          ON ai_pricing_plan (tenant_id, organization_id, plan_code, plan_version)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE ai_pricing_plan ADD COLUMN IF NOT EXISTS ownership_scope TEXT NOT NULL DEFAULT 'workspace'",
     )
     .execute(&pool)
     .await?;

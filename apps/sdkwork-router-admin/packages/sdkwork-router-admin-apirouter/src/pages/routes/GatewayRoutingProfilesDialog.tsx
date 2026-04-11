@@ -20,7 +20,7 @@ import { Search } from 'lucide-react';
 import { useAdminI18n } from 'sdkwork-router-admin-core';
 import type {
   AdminWorkspaceSnapshot,
-  ProxyProviderRecord,
+  ProviderCatalogRecord,
   RoutingProfileRecord,
 } from 'sdkwork-router-admin-types';
 
@@ -98,7 +98,7 @@ function createRoutingProfileDraft(
     slug: '',
     description: '',
     active: true,
-    strategy: 'priority',
+    strategy: 'deterministic_priority',
     ordered_provider_ids: [],
     default_provider_id: '',
     max_cost: '',
@@ -254,7 +254,7 @@ export function GatewayRoutingProfilesDialog({
         .map((providerId) =>
           providerOptions.find((provider) => provider.id === providerId) ?? null,
         )
-        .filter((provider): provider is ProxyProviderRecord => provider !== null),
+        .filter((provider): provider is ProviderCatalogRecord => provider !== null),
     [draft.ordered_provider_ids, providerOptions],
   );
 
@@ -351,7 +351,7 @@ export function GatewayRoutingProfilesDialog({
         slug: optionalString(draft.slug),
         description: optionalString(draft.description),
         active: draft.active,
-        strategy: optionalString(draft.strategy) ?? 'priority',
+        strategy: optionalString(draft.strategy) ?? 'deterministic_priority',
         ordered_provider_ids: orderedProviderIds,
         default_provider_id: defaultProviderId,
         max_cost: optionalNumber(draft.max_cost),
@@ -655,10 +655,10 @@ export function GatewayRoutingProfilesDialog({
                     }))
                   }
                   options={[
-                    { label: 'priority', value: 'priority' },
-                    { label: 'balanced', value: 'balanced' },
-                    { label: 'latency_optimized', value: 'latency_optimized' },
-                    { label: 'cost_optimized', value: 'cost_optimized' },
+                    { label: 'Deterministic priority', value: 'deterministic_priority' },
+                    { label: 'Weighted random', value: 'weighted_random' },
+                    { label: 'SLO aware', value: 'slo_aware' },
+                    { label: 'Geo affinity', value: 'geo_affinity' },
                   ]}
                   value={draft.strategy}
                 />

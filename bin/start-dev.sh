@@ -14,6 +14,7 @@ WAIT_SECONDS=600
 WAIT_SECONDS_OVERRIDDEN=0
 INSTALL_DEPS=0
 PREVIEW_MODE=1
+PROXY_DEV_MODE=0
 TAURI_MODE=0
 
 CLI_DATABASE_URL=''
@@ -44,16 +45,25 @@ while [ "$#" -gt 0 ]; do
       ;;
     --preview)
       PREVIEW_MODE=1
+      PROXY_DEV_MODE=0
       TAURI_MODE=0
       shift
       ;;
     --browser)
       PREVIEW_MODE=0
+      PROXY_DEV_MODE=0
+      TAURI_MODE=0
+      shift
+      ;;
+    --proxy-dev)
+      PREVIEW_MODE=0
+      PROXY_DEV_MODE=1
       TAURI_MODE=0
       shift
       ;;
     --tauri)
       PREVIEW_MODE=0
+      PROXY_DEV_MODE=0
       TAURI_MODE=1
       shift
       ;;
@@ -96,8 +106,9 @@ if router_is_windows; then
   [ "$WAIT_SECONDS" != '600' ] && set -- "$@" -WaitSeconds "$WAIT_SECONDS"
   [ "$INSTALL_DEPS" = '1' ] && set -- "$@" -Install
   [ "$PREVIEW_MODE" = '1' ] && set -- "$@" -Preview
+  [ "$PROXY_DEV_MODE" = '1' ] && set -- "$@" -ProxyDev
   [ "$TAURI_MODE" = '1' ] && set -- "$@" -Tauri
-  [ "$PREVIEW_MODE" = '0' ] && [ "$TAURI_MODE" = '0' ] && set -- "$@" -Browser
+  [ "$PREVIEW_MODE" = '0' ] && [ "$PROXY_DEV_MODE" = '0' ] && [ "$TAURI_MODE" = '0' ] && set -- "$@" -Browser
   [ -n "$CLI_DATABASE_URL" ] && set -- "$@" -DatabaseUrl "$(router_windows_database_url "$CLI_DATABASE_URL")"
   [ -n "$CLI_GATEWAY_BIND" ] && set -- "$@" -GatewayBind "$CLI_GATEWAY_BIND"
   [ -n "$CLI_ADMIN_BIND" ] && set -- "$@" -AdminBind "$CLI_ADMIN_BIND"
@@ -132,11 +143,19 @@ router_ensure_dir "$RUN_DIR"
 
 router_load_env_file "$ENV_FILE"
 
+BOOTSTRAP_DATA_DIR="$REPO_ROOT/data"
 SDKWORK_DATABASE_URL=${SDKWORK_DATABASE_URL:-"sqlite://$(router_portable_path "$DATA_DIR")/sdkwork-api-router-dev.db"}
+SDKWORK_BOOTSTRAP_PROFILE=${SDKWORK_BOOTSTRAP_PROFILE:-"dev"}
+if [ -z "${SDKWORK_BOOTSTRAP_DATA_DIR:-}" ] && [ -d "$BOOTSTRAP_DATA_DIR" ]; then
+  SDKWORK_BOOTSTRAP_DATA_DIR=$(router_portable_path "$BOOTSTRAP_DATA_DIR")
+fi
 SDKWORK_GATEWAY_BIND=${SDKWORK_GATEWAY_BIND:-"127.0.0.1:9980"}
 SDKWORK_ADMIN_BIND=${SDKWORK_ADMIN_BIND:-"127.0.0.1:9981"}
 SDKWORK_PORTAL_BIND=${SDKWORK_PORTAL_BIND:-"127.0.0.1:9982"}
 SDKWORK_WEB_BIND=${SDKWORK_WEB_BIND:-"127.0.0.1:9983"}
+
+export SDKWORK_BOOTSTRAP_PROFILE
+[ -n "${SDKWORK_BOOTSTRAP_DATA_DIR:-}" ] && export SDKWORK_BOOTSTRAP_DATA_DIR
 
 [ -n "$CLI_DATABASE_URL" ] && SDKWORK_DATABASE_URL="$CLI_DATABASE_URL"
 [ -n "$CLI_GATEWAY_BIND" ] && SDKWORK_GATEWAY_BIND="$CLI_GATEWAY_BIND"
@@ -161,6 +180,7 @@ set -- \
 
 [ "$INSTALL_DEPS" = '1' ] && set -- "$@" --install
 [ "$PREVIEW_MODE" = '1' ] && set -- "$@" --preview
+[ "$PROXY_DEV_MODE" = '1' ] && set -- "$@" --proxy-dev
 [ "$TAURI_MODE" = '1' ] && set -- "$@" --tauri
 
 GATEWAY_HEALTH_URL=$(router_resolve_loopback_url "$SDKWORK_GATEWAY_BIND" "/health")
@@ -171,10 +191,11 @@ PREVIEW_PORTAL_URL=$(router_resolve_loopback_url "$SDKWORK_WEB_BIND" "/portal/")
 BROWSER_ADMIN_URL='http://127.0.0.1:5173/admin/'
 BROWSER_PORTAL_URL='http://127.0.0.1:5174/portal/'
 
-if [ "$PREVIEW_MODE" = '1' ] || [ "$TAURI_MODE" = '1' ]; then
+if [ "$PREVIEW_MODE" = '1' ] || [ "$PROXY_DEV_MODE" = '1' ] || [ "$TAURI_MODE" = '1' ]; then
   PRIMARY_ADMIN_URL="$PREVIEW_ADMIN_URL"
   PRIMARY_PORTAL_URL="$PREVIEW_PORTAL_URL"
   PRIMARY_MODE='development preview'
+  [ "$PROXY_DEV_MODE" = '1' ] && PRIMARY_MODE='development proxy hot reload'
   [ "$TAURI_MODE" = '1' ] && PRIMARY_MODE='development tauri'
   PRIMARY_UNIFIED_ACCESS_ENABLED='1'
   SECONDARY_ADMIN_URL="$BROWSER_ADMIN_URL"
@@ -327,6 +348,15 @@ if [ "$PREVIEW_MODE" = '1' ] || [ "$TAURI_MODE" = '1' ]; then
     "$SDKWORK_ADMIN_BIND" \
     "$SDKWORK_PORTAL_BIND" \
     "$SDKWORK_WEB_BIND"
+elif [ "$PROXY_DEV_MODE" = '1' ]; then
+  router_assert_bind_addresses_available \
+    "development workspace" \
+    "$SDKWORK_GATEWAY_BIND" \
+    "$SDKWORK_ADMIN_BIND" \
+    "$SDKWORK_PORTAL_BIND" \
+    "$SDKWORK_WEB_BIND" \
+    '127.0.0.1:5173' \
+    '127.0.0.1:5174'
 else
   router_assert_bind_addresses_available \
     "development workspace" \
@@ -405,6 +435,9 @@ fi
 router_log "started development workspace (pid=$PID)"
 if [ "$PREVIEW_MODE" = '1' ]; then
   ROUTER_MODE='development preview'
+  UNIFIED_ACCESS_ENABLED='1'
+elif [ "$PROXY_DEV_MODE" = '1' ]; then
+  ROUTER_MODE='development proxy hot reload'
   UNIFIED_ACCESS_ENABLED='1'
 elif [ "$TAURI_MODE" = '1' ]; then
   ROUTER_MODE='development tauri'

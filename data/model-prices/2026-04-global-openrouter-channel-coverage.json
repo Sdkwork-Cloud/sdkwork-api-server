@@ -1,0 +1,89 @@
+[
+  {
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 3,
+    "output_price": 15,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter starting-price reference for xAI Grok traffic. Web-search surcharges vary by request and should be tracked through update packs or runtime metering.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 3,
+        "output_price": 15,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 0.45,
+    "output_price": 2.2,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter starting-price reference for Moonshot Kimi traffic. Proxy marketplace pricing can move by route and should be refreshed with additive update packs.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 0.45,
+        "output_price": 2.2,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  },
+  {
+    "channel_id": "mistral",
+    "model_id": "mistral-large-latest",
+    "proxy_provider_id": "provider-openrouter-main",
+    "currency_code": "USD",
+    "price_unit": "per_1m_tokens",
+    "input_price": 2,
+    "output_price": 6,
+    "cache_read_price": 0,
+    "cache_write_price": 0,
+    "request_price": 0,
+    "is_active": true,
+    "price_source_kind": "proxy",
+    "billing_notes": "Bootstrap snapshot of OpenRouter pass-through reference pricing for Mistral Large. Refresh when OpenRouter route pricing or vendor passthrough changes.",
+    "pricing_tiers": [
+      {
+        "tier_id": "default",
+        "display_name": "Default text pricing",
+        "condition_kind": "default",
+        "currency_code": "USD",
+        "price_unit": "per_1m_tokens",
+        "input_price": 2,
+        "output_price": 6,
+        "cache_read_price": 0,
+        "cache_write_price": 0,
+        "request_price": 0
+      }
+    ]
+  }
+]

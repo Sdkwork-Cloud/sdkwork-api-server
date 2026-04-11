@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-10T19:21:41.244Z",
+  "source": {
+    "kind": "release-sync-audit-live-git",
+    "provenance": "s08-release-sync-external-blocker-reverify-loop-7"
+  },
+  "summary": {
+    "releasable": false,
+    "reports": [
+      {
+        "remoteHead": "",
+        "id": "sdkwork-api-router",
+        "branch": "wip/root-main-preserve-2026-04-09",
+        "targetDir": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-api-router",
+        "localHead": "ccbc7b875406b1be556783efe18621d2a6b4e847",
+        "expectedRef": "main",
+        "remoteUrl": "git@github.com:Sdkwork-Cloud/sdkwork-api-router.git",
+        "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-api-router",
+        "reasons": [
+          "dirty-working-tree",
+          "branch-not-synced",
+          "remote-unverifiable"
+        ],
+        "upstream": "",
+        "releasable": false,
+        "ahead": 0,
+        "behind": 0,
+        "topLevel": "D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router",
+        "isDirty": true
+      },
+      {
+        "remoteHead": "",
+        "id": "sdkwork-core",
+        "branch": "main",
+        "targetDir": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-core",
+        "localHead": "e8447e9e439b79d80c25a4c2aa40bc838e204c30",
+        "expectedRef": "main",
+        "remoteUrl": "https://github.com/Sdkwork-Cloud/sdkwork-backend-react-web.git",
+        "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-core",
+        "reasons": [
+          "not-standalone-root",
+          "dirty-working-tree",
+          "remote-url-mismatch",
+          "remote-unverifiable"
+        ],
+        "upstream": "origin/main",
+        "releasable": false,
+        "ahead": 0,
+        "behind": 0,
+        "topLevel": "D:/javasource/spring-ai-plus",
+        "isDirty": true
+      },
+      {
+        "remoteHead": "",
+        "id": "sdkwork-ui",
+        "branch": "main",
+        "targetDir": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-ui",
+        "localHead": "4f3ff3678dde945a22f699d8cca6be69412c646e",
+        "expectedRef": "main",
+        "remoteUrl": "git@github.com:Sdkwork-Cloud/sdkwork-ui.git",
+        "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-ui",
+        "reasons": [
+          "dirty-working-tree",
+          "remote-unverifiable"
+        ],
+        "upstream": "origin/main",
+        "releasable": false,
+        "ahead": 0,
+        "behind": 0,
+        "topLevel": "D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-ui",
+        "isDirty": true
+      },
+      {
+        "remoteHead": "",
+        "id": "sdkwork-appbase",
+        "branch": "main",
+        "targetDir": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-appbase",
+        "localHead": "68131f684485efb284d85e8123fe13d9832a536d",
+        "expectedRef": "main",
+        "remoteUrl": "https://github.com/Sdkwork-Cloud/sdkwork-appbase.git",
+        "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-appbase",
+        "reasons": [
+          "dirty-working-tree",
+          "remote-unverifiable"
+        ],
+        "upstream": "origin/main",
+        "releasable": false,
+        "ahead": 0,
+        "behind": 0,
+        "topLevel": "D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-appbase",
+        "isDirty": true
+      },
+      {
+        "remoteHead": "",
+        "id": "sdkwork-im-sdk",
+        "branch": "main",
+        "targetDir": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\openchat\\sdkwork-im-sdk",
+        "localHead": "c71a0f115c08cb164d5a857cdac15ea6d3adc006",
+        "expectedRef": "main",
+        "remoteUrl": "git@github.com:Sdkwork-Cloud/sdkwork-im-sdk.git",
+        "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\openchat\\sdkwork-im-sdk",
+        "reasons": [
+          "dirty-working-tree",
+          "remote-unverifiable"
+        ],
+        "upstream": "origin/main",
+        "releasable": false,
+        "ahead": 0,
+        "behind": 0,
+        "topLevel": "D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/openchat/sdkwork-im-sdk",
+        "isDirty": true
+      }
+    ]
+  }
+}

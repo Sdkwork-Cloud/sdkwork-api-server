@@ -54,6 +54,48 @@ pub(crate) async fn apply_postgres_marketing_schema(pool: &PgPool) -> Result<()>
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_marketing_coupon_template_lifecycle_audit (
+            audit_id TEXT PRIMARY KEY NOT NULL,
+            coupon_template_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            operator_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            previous_status TEXT NOT NULL,
+            resulting_status TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            decision_reasons_json TEXT NOT NULL DEFAULT '[]',
+            requested_at_ms BIGINT NOT NULL DEFAULT 0,
+            record_json TEXT NOT NULL
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_template_lifecycle_audit_template
+         ON ai_marketing_coupon_template_lifecycle_audit (
+            coupon_template_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_template_lifecycle_audit_request
+         ON ai_marketing_coupon_template_lifecycle_audit (
+            request_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_template_lifecycle_audit_operator
+         ON ai_marketing_coupon_template_lifecycle_audit (
+            operator_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_marketing_campaign (
             marketing_campaign_id TEXT PRIMARY KEY NOT NULL,
             coupon_template_id TEXT NOT NULL,
@@ -76,6 +118,49 @@ pub(crate) async fn apply_postgres_marketing_schema(pool: &PgPool) -> Result<()>
     .execute(&pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_marketing_campaign_lifecycle_audit (
+            audit_id TEXT PRIMARY KEY NOT NULL,
+            marketing_campaign_id TEXT NOT NULL,
+            coupon_template_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            operator_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            previous_status TEXT NOT NULL,
+            resulting_status TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            decision_reasons_json TEXT NOT NULL DEFAULT '[]',
+            requested_at_ms BIGINT NOT NULL DEFAULT 0,
+            record_json TEXT NOT NULL
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_lifecycle_audit_campaign
+         ON ai_marketing_campaign_lifecycle_audit (
+            marketing_campaign_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_lifecycle_audit_request
+         ON ai_marketing_campaign_lifecycle_audit (
+            request_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_lifecycle_audit_operator
+         ON ai_marketing_campaign_lifecycle_audit (
+            operator_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_marketing_campaign_budget (
             campaign_budget_id TEXT PRIMARY KEY NOT NULL,
             marketing_campaign_id TEXT NOT NULL,
@@ -91,6 +176,49 @@ pub(crate) async fn apply_postgres_marketing_schema(pool: &PgPool) -> Result<()>
         "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_budget_campaign_status
          ON ai_marketing_campaign_budget (
             marketing_campaign_id, status, updated_at_ms DESC, campaign_budget_id
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_marketing_campaign_budget_lifecycle_audit (
+            audit_id TEXT PRIMARY KEY NOT NULL,
+            campaign_budget_id TEXT NOT NULL,
+            marketing_campaign_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            operator_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            previous_status TEXT NOT NULL,
+            resulting_status TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            decision_reasons_json TEXT NOT NULL DEFAULT '[]',
+            requested_at_ms BIGINT NOT NULL DEFAULT 0,
+            record_json TEXT NOT NULL
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_budget_lifecycle_audit_budget
+         ON ai_marketing_campaign_budget_lifecycle_audit (
+            campaign_budget_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_budget_lifecycle_audit_request
+         ON ai_marketing_campaign_budget_lifecycle_audit (
+            request_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_campaign_budget_lifecycle_audit_operator
+         ON ai_marketing_campaign_budget_lifecycle_audit (
+            operator_id, requested_at_ms DESC, audit_id DESC
          )",
     )
     .execute(&pool)
@@ -130,6 +258,49 @@ pub(crate) async fn apply_postgres_marketing_schema(pool: &PgPool) -> Result<()>
         "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_code_subject
          ON ai_marketing_coupon_code (
             claimed_subject_scope, claimed_subject_id, updated_at_ms DESC, coupon_code_id
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_marketing_coupon_code_lifecycle_audit (
+            audit_id TEXT PRIMARY KEY NOT NULL,
+            coupon_code_id TEXT NOT NULL,
+            coupon_template_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            operator_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            previous_status TEXT NOT NULL,
+            resulting_status TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            decision_reasons_json TEXT NOT NULL DEFAULT '[]',
+            requested_at_ms BIGINT NOT NULL DEFAULT 0,
+            record_json TEXT NOT NULL
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_code_lifecycle_audit_code
+         ON ai_marketing_coupon_code_lifecycle_audit (
+            coupon_code_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_code_lifecycle_audit_request
+         ON ai_marketing_coupon_code_lifecycle_audit (
+            request_id, requested_at_ms DESC, audit_id DESC
+         )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_marketing_coupon_code_lifecycle_audit_operator
+         ON ai_marketing_coupon_code_lifecycle_audit (
+            operator_id, requested_at_ms DESC, audit_id DESC
          )",
     )
     .execute(&pool)

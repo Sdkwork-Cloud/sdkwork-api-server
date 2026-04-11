@@ -1,0 +1,42 @@
+[
+  {
+    "request_settlement_id": 8301002,
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "request_id": 610002,
+    "account_id": 7001001,
+    "user_id": 3001,
+    "hold_id": 8101002,
+    "status": "partially_released",
+    "estimated_credit_hold": 4500.0,
+    "released_credit_amount": 300.0,
+    "captured_credit_amount": 4200.0,
+    "provider_cost_amount": 0.0018,
+    "retail_charge_amount": 0.0042,
+    "shortfall_amount": 0.0,
+    "refunded_amount": 0.0,
+    "settled_at_ms": 1710000501000,
+    "created_at_ms": 1710000499000,
+    "updated_at_ms": 1710000501000
+  },
+  {
+    "request_settlement_id": 8301003,
+    "tenant_id": 1001,
+    "organization_id": 2001,
+    "request_id": 610003,
+    "account_id": 7001001,
+    "user_id": 3001,
+    "hold_id": 8101003,
+    "status": "partially_released",
+    "estimated_credit_hold": 9000.0,
+    "released_credit_amount": 600.0,
+    "captured_credit_amount": 8400.0,
+    "provider_cost_amount": 0.0038,
+    "retail_charge_amount": 0.0084,
+    "shortfall_amount": 0.0,
+    "refunded_amount": 0.0,
+    "settled_at_ms": 1710000502000,
+    "created_at_ms": 1710000500000,
+    "updated_at_ms": 1710000502000
+  }
+]

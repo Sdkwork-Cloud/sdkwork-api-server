@@ -1,6 +1,6 @@
 use super::*;
 
-async fn upstream_evals_handler(
+pub(super) async fn upstream_evals_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -20,7 +20,7 @@ async fn upstream_evals_handler(
     )
 }
 
-async fn upstream_evals_list_handler(
+pub(super) async fn upstream_evals_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -43,7 +43,7 @@ async fn upstream_evals_list_handler(
     )
 }
 
-async fn upstream_eval_retrieve_handler(
+pub(super) async fn upstream_eval_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -63,7 +63,7 @@ async fn upstream_eval_retrieve_handler(
     )
 }
 
-async fn upstream_eval_update_handler(
+pub(super) async fn upstream_eval_update_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -83,7 +83,7 @@ async fn upstream_eval_update_handler(
     )
 }
 
-async fn upstream_eval_delete_handler(
+pub(super) async fn upstream_eval_delete_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -102,7 +102,7 @@ async fn upstream_eval_delete_handler(
     )
 }
 
-async fn upstream_eval_runs_list_handler(
+pub(super) async fn upstream_eval_runs_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -124,7 +124,7 @@ async fn upstream_eval_runs_list_handler(
     )
 }
 
-async fn upstream_eval_runs_create_handler(
+pub(super) async fn upstream_eval_runs_create_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -143,7 +143,7 @@ async fn upstream_eval_runs_create_handler(
     )
 }
 
-async fn upstream_eval_run_retrieve_handler(
+pub(super) async fn upstream_eval_run_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -162,7 +162,7 @@ async fn upstream_eval_run_retrieve_handler(
     )
 }
 
-async fn upstream_eval_run_delete_handler(
+pub(super) async fn upstream_eval_run_delete_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -181,7 +181,7 @@ async fn upstream_eval_run_delete_handler(
     )
 }
 
-async fn upstream_eval_run_cancel_handler(
+pub(super) async fn upstream_eval_run_cancel_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -200,7 +200,7 @@ async fn upstream_eval_run_cancel_handler(
     )
 }
 
-async fn upstream_eval_run_output_items_list_handler(
+pub(super) async fn upstream_eval_run_output_items_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -224,7 +224,7 @@ async fn upstream_eval_run_output_items_list_handler(
     )
 }
 
-async fn upstream_eval_run_output_item_retrieve_handler(
+pub(super) async fn upstream_eval_run_output_item_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {

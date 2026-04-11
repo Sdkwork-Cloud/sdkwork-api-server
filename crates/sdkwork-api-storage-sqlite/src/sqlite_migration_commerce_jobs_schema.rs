@@ -507,6 +507,41 @@ pub(crate) async fn apply_sqlite_commerce_jobs_schema(pool: &SqlitePool) -> Resu
     .execute(pool)
     .await?;
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_catalog_publication_lifecycle_audit (
+            audit_id TEXT PRIMARY KEY NOT NULL,
+            publication_id TEXT NOT NULL,
+            publication_revision_id TEXT NOT NULL,
+            publication_version INTEGER NOT NULL,
+            publication_source_kind TEXT NOT NULL,
+            action TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            operator_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            operator_reason TEXT NOT NULL DEFAULT '',
+            publication_status_before TEXT NOT NULL,
+            publication_status_after TEXT NOT NULL,
+            governed_pricing_plan_id INTEGER,
+            governed_pricing_status_before TEXT,
+            governed_pricing_status_after TEXT,
+            decision_reasons_json TEXT NOT NULL DEFAULT '[]',
+            recorded_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_catalog_publication_lifecycle_audit_publication
+         ON ai_catalog_publication_lifecycle_audit (publication_id, recorded_at_ms DESC, audit_id DESC)",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_catalog_publication_lifecycle_audit_request
+         ON ai_catalog_publication_lifecycle_audit (request_id, recorded_at_ms DESC, audit_id DESC)",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS ai_async_jobs (
             job_id TEXT PRIMARY KEY NOT NULL,
             tenant_id INTEGER NOT NULL,

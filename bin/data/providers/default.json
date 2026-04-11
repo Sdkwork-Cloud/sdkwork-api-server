@@ -1,0 +1,162 @@
+[
+  {
+    "id": "provider-openai-official",
+    "channel_id": "openai",
+    "extension_id": "sdkwork.provider.openai.official",
+    "adapter_kind": "openai",
+    "protocol_kind": "openai",
+    "base_url": "https://api.openai.com/v1",
+    "display_name": "OpenAI Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-openai-official",
+        "channel_id": "openai",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-anthropic-official",
+    "channel_id": "anthropic",
+    "extension_id": "sdkwork.provider.anthropic",
+    "adapter_kind": "anthropic",
+    "protocol_kind": "anthropic",
+    "base_url": "https://api.anthropic.com",
+    "display_name": "Anthropic Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-anthropic-official",
+        "channel_id": "anthropic",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-gemini-official",
+    "channel_id": "gemini",
+    "extension_id": "sdkwork.provider.gemini",
+    "adapter_kind": "gemini",
+    "protocol_kind": "gemini",
+    "base_url": "https://generativelanguage.googleapis.com",
+    "display_name": "Gemini Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-gemini-official",
+        "channel_id": "gemini",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-xai-official",
+    "channel_id": "xai",
+    "extension_id": "sdkwork.provider.xai",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://api.x.ai/v1",
+    "display_name": "xAI Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-xai-official",
+        "channel_id": "xai",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-deepseek-official",
+    "channel_id": "deepseek",
+    "extension_id": "sdkwork.provider.deepseek",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://api.deepseek.com",
+    "display_name": "DeepSeek Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-deepseek-official",
+        "channel_id": "deepseek",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-qwen-official",
+    "channel_id": "qwen",
+    "extension_id": "sdkwork.provider.qwen",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "display_name": "Qwen Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-qwen-official",
+        "channel_id": "qwen",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-doubao-official",
+    "channel_id": "doubao",
+    "extension_id": "sdkwork.provider.doubao",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "display_name": "Doubao Official",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-doubao-official",
+        "channel_id": "doubao",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-openrouter-main",
+    "channel_id": "openrouter",
+    "extension_id": "sdkwork.provider.openrouter",
+    "adapter_kind": "openrouter",
+    "protocol_kind": "openai",
+    "base_url": "https://openrouter.ai/api/v1",
+    "display_name": "OpenRouter Main",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-openrouter-main",
+        "channel_id": "openrouter",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-siliconflow-main",
+    "channel_id": "siliconflow",
+    "extension_id": "sdkwork.provider.siliconflow",
+    "adapter_kind": "openai-compatible",
+    "protocol_kind": "openai",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "display_name": "SiliconFlow Main",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-siliconflow-main",
+        "channel_id": "siliconflow",
+        "is_primary": true
+      }
+    ]
+  },
+  {
+    "id": "provider-ollama-local",
+    "channel_id": "ollama",
+    "extension_id": "sdkwork.provider.ollama",
+    "adapter_kind": "ollama",
+    "protocol_kind": "custom",
+    "base_url": "http://127.0.0.1:11434",
+    "display_name": "Ollama Local",
+    "channel_bindings": [
+      {
+        "provider_id": "provider-ollama-local",
+        "channel_id": "ollama",
+        "is_primary": true
+      }
+    ]
+  }
+]

@@ -1,0 +1,66 @@
+{
+  "installations": [
+    {
+      "installation_id": "installation-ernie-official-builtin",
+      "extension_id": "sdkwork.provider.ernie",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/models",
+        "provider_family": "ernie",
+        "managed_by": "bootstrap-update",
+        "commercial_tier": "enterprise-cn",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    },
+    {
+      "installation_id": "installation-minimax-official-builtin",
+      "extension_id": "sdkwork.provider.minimax",
+      "runtime": "builtin",
+      "enabled": true,
+      "entrypoint": null,
+      "config": {
+        "health_path": "/v1/models",
+        "provider_family": "minimax",
+        "managed_by": "bootstrap-update",
+        "commercial_tier": "frontier-apac",
+        "capabilities": [
+          "responses",
+          "chat_completions",
+          "embeddings"
+        ]
+      }
+    }
+  ],
+  "instances": [
+    {
+      "instance_id": "provider-ernie-official",
+      "installation_id": "installation-ernie-official-builtin",
+      "extension_id": "sdkwork.provider.ernie",
+      "enabled": true,
+      "base_url": "https://qianfan.baidubce.com/v2",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-asia-official",
+        "preferred_region": "cn"
+      }
+    },
+    {
+      "instance_id": "provider-minimax-official",
+      "installation_id": "installation-minimax-official-builtin",
+      "extension_id": "sdkwork.provider.minimax",
+      "enabled": true,
+      "base_url": "https://api.minimax.chat/v1",
+      "credential_ref": null,
+      "config": {
+        "routing_hint": "global-asia-official",
+        "preferred_region": "sg"
+      }
+    }
+  ]
+}

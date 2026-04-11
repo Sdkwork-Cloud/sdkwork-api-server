@@ -40,6 +40,10 @@ impl PostgresAdminStore {
             .bind(channel_id)
             .execute(&self.pool)
             .await?;
+        sqlx::query("DELETE FROM ai_proxy_provider_model WHERE channel_id = $1")
+            .bind(channel_id)
+            .execute(&self.pool)
+            .await?;
         sqlx::query("DELETE FROM ai_model_price WHERE channel_id = $1")
             .bind(channel_id)
             .execute(&self.pool)
@@ -63,16 +67,18 @@ impl PostgresAdminStore {
                 primary_channel_id,
                 extension_id,
                 adapter_kind,
+                protocol_kind,
                 base_url,
                 display_name,
                 is_active,
                 created_at_ms,
                 updated_at_ms
-            ) VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
              ON CONFLICT(proxy_provider_id) DO UPDATE SET
                 primary_channel_id = excluded.primary_channel_id,
                 extension_id = excluded.extension_id,
                 adapter_kind = excluded.adapter_kind,
+                protocol_kind = excluded.protocol_kind,
                 base_url = excluded.base_url,
                 display_name = excluded.display_name,
                 is_active = TRUE,
@@ -82,6 +88,7 @@ impl PostgresAdminStore {
         .bind(&provider.channel_id)
         .bind(&provider.extension_id)
         .bind(&provider.adapter_kind)
+        .bind(provider.protocol_kind())
         .bind(&provider.base_url)
         .bind(&provider.display_name)
         .bind(now)
@@ -118,8 +125,8 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_providers(&self) -> Result<Vec<ProxyProvider>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, base_url, display_name
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name
              FROM ai_proxy_provider
              WHERE is_active = TRUE
              ORDER BY proxy_provider_id",
@@ -128,12 +135,16 @@ impl PostgresAdminStore {
         .await?;
         let provider_keys = rows
             .iter()
-            .map(|(id, channel_id, _, _, _, _)| (id.clone(), channel_id.clone()))
+            .map(|(id, channel_id, _, _, _, _, _)| (id.clone(), channel_id.clone()))
             .collect::<Vec<_>>();
         let bindings_by_provider =
             load_provider_channel_bindings_for_providers(&self.pool, &provider_keys).await?;
         let mut providers = Vec::with_capacity(rows.len());
-        for (id, channel_id, extension_id, adapter_kind, base_url, display_name) in rows {
+        for (id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name) in
+            rows
+        {
+            let protocol_kind =
+                normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
             let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
                 vec![ProviderChannelBinding::primary(
                     id.clone(),
@@ -145,6 +156,7 @@ impl PostgresAdminStore {
                 channel_id,
                 extension_id: normalize_provider_extension_id(extension_id, &adapter_kind),
                 adapter_kind,
+                protocol_kind,
                 base_url,
                 display_name,
                 channel_bindings,
@@ -154,16 +166,13 @@ impl PostgresAdminStore {
     }
 
     pub async fn list_providers_for_model(&self, model: &str) -> Result<Vec<ProxyProvider>> {
-        let rows = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT DISTINCT providers.proxy_provider_id, providers.primary_channel_id, providers.extension_id, providers.adapter_kind, providers.base_url, providers.display_name
-             FROM ai_model models
-             INNER JOIN ai_model_price prices
-                 ON prices.channel_id = models.channel_id
-                AND prices.model_id = models.model_id
+        let rows = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT DISTINCT providers.proxy_provider_id, providers.primary_channel_id, providers.extension_id, providers.adapter_kind, providers.protocol_kind, providers.base_url, providers.display_name
+             FROM ai_proxy_provider_model provider_models
              INNER JOIN ai_proxy_provider providers
-                 ON providers.proxy_provider_id = prices.proxy_provider_id
-             WHERE models.model_id = $1
-               AND prices.is_active = TRUE
+                 ON providers.proxy_provider_id = provider_models.proxy_provider_id
+             WHERE provider_models.model_id = $1
+               AND provider_models.is_active = TRUE
                AND providers.is_active = TRUE
              ORDER BY providers.proxy_provider_id",
         )
@@ -172,12 +181,16 @@ impl PostgresAdminStore {
         .await?;
         let provider_keys = rows
             .iter()
-            .map(|(id, channel_id, _, _, _, _)| (id.clone(), channel_id.clone()))
+            .map(|(id, channel_id, _, _, _, _, _)| (id.clone(), channel_id.clone()))
             .collect::<Vec<_>>();
         let bindings_by_provider =
             load_provider_channel_bindings_for_providers(&self.pool, &provider_keys).await?;
         let mut providers = Vec::with_capacity(rows.len());
-        for (id, channel_id, extension_id, adapter_kind, base_url, display_name) in rows {
+        for (id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name) in
+            rows
+        {
+            let protocol_kind =
+                normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
             let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
                 vec![ProviderChannelBinding::primary(
                     id.clone(),
@@ -189,6 +202,7 @@ impl PostgresAdminStore {
                 channel_id,
                 extension_id: normalize_provider_extension_id(extension_id, &adapter_kind),
                 adapter_kind,
+                protocol_kind,
                 base_url,
                 display_name,
                 channel_bindings,
@@ -198,8 +212,8 @@ impl PostgresAdminStore {
     }
 
     pub async fn find_provider(&self, provider_id: &str) -> Result<Option<ProxyProvider>> {
-        let row = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, base_url, display_name
+        let row = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT proxy_provider_id, primary_channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name
              FROM ai_proxy_provider
              WHERE proxy_provider_id = $1",
         )
@@ -207,17 +221,21 @@ impl PostgresAdminStore {
         .fetch_optional(&self.pool)
         .await?;
 
-        let Some((id, channel_id, extension_id, adapter_kind, base_url, display_name)) = row else {
+        let Some((id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name)) =
+            row
+        else {
             return Ok(None);
         };
 
         let channel_bindings = load_provider_channel_bindings(&self.pool, &id, &channel_id).await?;
+        let protocol_kind = normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
 
         Ok(Some(ProxyProvider {
             id,
             channel_id,
             extension_id: normalize_provider_extension_id(extension_id, &adapter_kind),
             adapter_kind,
+            protocol_kind,
             base_url,
             display_name,
             channel_bindings,
@@ -226,6 +244,14 @@ impl PostgresAdminStore {
 
     pub async fn delete_provider(&self, provider_id: &str) -> Result<bool> {
         sqlx::query("DELETE FROM ai_router_credential_records WHERE proxy_provider_id = $1")
+            .bind(provider_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM ai_provider_account WHERE provider_id = $1")
+            .bind(provider_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM ai_proxy_provider_model WHERE proxy_provider_id = $1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
@@ -251,6 +277,130 @@ impl PostgresAdminStore {
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn upsert_provider_account(
+        &self,
+        record: &ProviderAccountRecord,
+    ) -> Result<ProviderAccountRecord> {
+        let now = current_timestamp_ms();
+        sqlx::query(
+            "INSERT INTO ai_provider_account (
+                provider_account_id,
+                provider_id,
+                display_name,
+                account_kind,
+                owner_scope,
+                owner_tenant_id,
+                execution_instance_id,
+                base_url_override,
+                region,
+                priority,
+                weight,
+                enabled,
+                routing_tags_json,
+                health_score_hint,
+                latency_ms_hint,
+                cost_hint,
+                success_rate_hint,
+                throughput_hint,
+                max_concurrency,
+                daily_budget,
+                notes,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+             ON CONFLICT(provider_account_id) DO UPDATE SET
+                provider_id = excluded.provider_id,
+                display_name = excluded.display_name,
+                account_kind = excluded.account_kind,
+                owner_scope = excluded.owner_scope,
+                owner_tenant_id = excluded.owner_tenant_id,
+                execution_instance_id = excluded.execution_instance_id,
+                base_url_override = excluded.base_url_override,
+                region = excluded.region,
+                priority = excluded.priority,
+                weight = excluded.weight,
+                enabled = excluded.enabled,
+                routing_tags_json = excluded.routing_tags_json,
+                health_score_hint = excluded.health_score_hint,
+                latency_ms_hint = excluded.latency_ms_hint,
+                cost_hint = excluded.cost_hint,
+                success_rate_hint = excluded.success_rate_hint,
+                throughput_hint = excluded.throughput_hint,
+                max_concurrency = excluded.max_concurrency,
+                daily_budget = excluded.daily_budget,
+                notes = excluded.notes,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&record.provider_account_id)
+        .bind(&record.provider_id)
+        .bind(&record.display_name)
+        .bind(&record.account_kind)
+        .bind(&record.owner_scope)
+        .bind(record.owner_tenant_id.clone())
+        .bind(&record.execution_instance_id)
+        .bind(record.base_url_override.clone())
+        .bind(record.region.clone())
+        .bind(record.priority)
+        .bind(i32::try_from(record.weight)?)
+        .bind(record.enabled)
+        .bind(encode_string_list(&record.routing_tags)?)
+        .bind(record.health_score_hint)
+        .bind(record.latency_ms_hint.map(i64::try_from).transpose()?)
+        .bind(record.cost_hint)
+        .bind(record.success_rate_hint)
+        .bind(record.throughput_hint)
+        .bind(record.max_concurrency.map(i64::from))
+        .bind(record.daily_budget)
+        .bind(record.notes.clone())
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    pub async fn list_provider_accounts(&self) -> Result<Vec<ProviderAccountRecord>> {
+        let rows = sqlx::query(
+            "SELECT
+                provider_account_id,
+                provider_id,
+                display_name,
+                account_kind,
+                owner_scope,
+                owner_tenant_id,
+                execution_instance_id,
+                base_url_override,
+                region,
+                priority,
+                weight,
+                enabled,
+                routing_tags_json,
+                health_score_hint,
+                latency_ms_hint,
+                cost_hint,
+                success_rate_hint,
+                throughput_hint,
+                max_concurrency,
+                daily_budget,
+                notes
+             FROM ai_provider_account
+             ORDER BY provider_id, priority DESC, provider_account_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(decode_provider_account_pg_row).collect()
+    }
+
+    pub async fn delete_provider_account(&self, provider_account_id: &str) -> Result<bool> {
+        let result = sqlx::query(
+            "DELETE FROM ai_provider_account WHERE provider_account_id = $1",
+        )
+        .bind(provider_account_id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -470,6 +620,99 @@ impl PostgresAdminStore {
         Ok(result.rows_affected() > 0)
     }
 
+    pub async fn upsert_official_provider_config(
+        &self,
+        config: &OfficialProviderConfig,
+    ) -> Result<OfficialProviderConfig> {
+        let now = current_timestamp_ms();
+        sqlx::query(
+            "INSERT INTO ai_official_provider_configs (
+                provider_id,
+                key_reference,
+                base_url,
+                enabled,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT(provider_id) DO UPDATE SET
+                key_reference = excluded.key_reference,
+                base_url = excluded.base_url,
+                enabled = excluded.enabled,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&config.provider_id)
+        .bind(&config.key_reference)
+        .bind(&config.base_url)
+        .bind(config.enabled)
+        .bind(i64::try_from(now)?)
+        .bind(i64::try_from(now)?)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(OfficialProviderConfig {
+            provider_id: config.provider_id.clone(),
+            key_reference: config.key_reference.clone(),
+            base_url: config.base_url.clone(),
+            enabled: config.enabled,
+            created_at_ms: u64::try_from(now)?,
+            updated_at_ms: u64::try_from(now)?,
+        })
+    }
+
+    pub async fn list_official_provider_configs(&self) -> Result<Vec<OfficialProviderConfig>> {
+        let rows = sqlx::query_as::<_, (String, String, String, bool, i64, i64)>(
+            "SELECT provider_id, key_reference, base_url, enabled, created_at_ms, updated_at_ms
+             FROM ai_official_provider_configs
+             ORDER BY provider_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(
+                |(provider_id, key_reference, base_url, enabled, created_at_ms, updated_at_ms)| {
+                    Ok(OfficialProviderConfig {
+                        provider_id,
+                        key_reference,
+                        base_url,
+                        enabled,
+                        created_at_ms: u64::try_from(created_at_ms)?,
+                        updated_at_ms: u64::try_from(updated_at_ms)?,
+                    })
+                },
+            )
+            .collect()
+    }
+
+    pub async fn find_official_provider_config(
+        &self,
+        provider_id: &str,
+    ) -> Result<Option<OfficialProviderConfig>> {
+        let row = sqlx::query_as::<_, (String, String, String, bool, i64, i64)>(
+            "SELECT provider_id, key_reference, base_url, enabled, created_at_ms, updated_at_ms
+             FROM ai_official_provider_configs
+             WHERE provider_id = $1",
+        )
+        .bind(provider_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some((provider_id, key_reference, base_url, enabled, created_at_ms, updated_at_ms)) =
+            row
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(OfficialProviderConfig {
+            provider_id,
+            key_reference,
+            base_url,
+            enabled,
+            created_at_ms: u64::try_from(created_at_ms)?,
+            updated_at_ms: u64::try_from(updated_at_ms)?,
+        }))
+    }
+
     pub async fn insert_model(&self, model: &ModelCatalogEntry) -> Result<ModelCatalogEntry> {
         let provider = self
             .find_provider(&model.provider_id)
@@ -486,6 +729,15 @@ impl PostgresAdminStore {
             channel_model = channel_model.with_capability(capability.clone());
         }
         self.insert_channel_model(&channel_model).await?;
+        let mut provider_model =
+            ProviderModelRecord::new(&model.provider_id, &provider.channel_id, &model.external_name)
+                .with_provider_model_id(&model.external_name)
+                .with_streaming(model.streaming)
+                .with_context_window_option(model.context_window);
+        for capability in &model.capabilities {
+            provider_model = provider_model.with_capability(capability.clone());
+        }
+        self.upsert_provider_model(&provider_model).await?;
         self.insert_model_price(&ModelPriceRecord::new(
             &provider.channel_id,
             &model.external_name,
@@ -498,6 +750,24 @@ impl PostgresAdminStore {
     pub async fn list_models(&self) -> Result<Vec<ModelCatalogEntry>> {
         let rows = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
             "SELECT
+                provider_models.model_id,
+                provider_models.proxy_provider_id,
+                CASE
+                    WHEN provider_models.capabilities_json = '[]' THEN models.capabilities_json
+                    ELSE provider_models.capabilities_json
+                END,
+                CASE
+                    WHEN provider_models.streaming_enabled THEN provider_models.streaming_enabled
+                    ELSE models.streaming_enabled
+                END,
+                COALESCE(provider_models.context_window, models.context_window)
+             FROM ai_proxy_provider_model provider_models
+             INNER JOIN ai_model models
+                 ON models.channel_id = provider_models.channel_id
+                AND models.model_id = provider_models.model_id
+             WHERE provider_models.is_active = TRUE
+             UNION ALL
+             SELECT
                 models.model_id,
                 prices.proxy_provider_id,
                 models.capabilities_json,
@@ -508,7 +778,15 @@ impl PostgresAdminStore {
                  ON prices.channel_id = models.channel_id
                 AND prices.model_id = models.model_id
              WHERE prices.is_active = TRUE
-             ORDER BY models.model_id, prices.proxy_provider_id",
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ai_proxy_provider_model provider_models
+                   WHERE provider_models.proxy_provider_id = prices.proxy_provider_id
+                     AND provider_models.channel_id = models.channel_id
+                     AND provider_models.model_id = models.model_id
+                     AND provider_models.is_active = TRUE
+               )
+             ORDER BY 1, 2",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -531,6 +809,25 @@ impl PostgresAdminStore {
     ) -> Result<Vec<ModelCatalogEntry>> {
         let rows = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
             "SELECT
+                provider_models.model_id,
+                provider_models.proxy_provider_id,
+                CASE
+                    WHEN provider_models.capabilities_json = '[]' THEN models.capabilities_json
+                    ELSE provider_models.capabilities_json
+                END,
+                CASE
+                    WHEN provider_models.streaming_enabled THEN provider_models.streaming_enabled
+                    ELSE models.streaming_enabled
+                END,
+                COALESCE(provider_models.context_window, models.context_window)
+             FROM ai_proxy_provider_model provider_models
+             INNER JOIN ai_model models
+                 ON models.channel_id = provider_models.channel_id
+                AND models.model_id = provider_models.model_id
+             WHERE provider_models.model_id = $1
+               AND provider_models.is_active = TRUE
+             UNION ALL
+             SELECT
                 models.model_id,
                 prices.proxy_provider_id,
                 models.capabilities_json,
@@ -540,10 +837,19 @@ impl PostgresAdminStore {
              INNER JOIN ai_model_price prices
                  ON prices.channel_id = models.channel_id
                 AND prices.model_id = models.model_id
-             WHERE models.model_id = $1
+             WHERE models.model_id = $2
                AND prices.is_active = TRUE
-             ORDER BY prices.proxy_provider_id",
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ai_proxy_provider_model provider_models
+                   WHERE provider_models.proxy_provider_id = prices.proxy_provider_id
+                     AND provider_models.channel_id = models.channel_id
+                     AND provider_models.model_id = models.model_id
+                     AND provider_models.is_active = TRUE
+               )
+             ORDER BY 2",
         )
+        .bind(external_name)
         .bind(external_name)
         .fetch_all(&self.pool)
         .await?;
@@ -564,6 +870,24 @@ impl PostgresAdminStore {
     pub async fn find_any_model(&self) -> Result<Option<ModelCatalogEntry>> {
         let row = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
             "SELECT
+                provider_models.model_id,
+                provider_models.proxy_provider_id,
+                CASE
+                    WHEN provider_models.capabilities_json = '[]' THEN models.capabilities_json
+                    ELSE provider_models.capabilities_json
+                END,
+                CASE
+                    WHEN provider_models.streaming_enabled THEN provider_models.streaming_enabled
+                    ELSE models.streaming_enabled
+                END,
+                COALESCE(provider_models.context_window, models.context_window)
+             FROM ai_proxy_provider_model provider_models
+             INNER JOIN ai_model models
+                 ON models.channel_id = provider_models.channel_id
+                AND models.model_id = provider_models.model_id
+             WHERE provider_models.is_active = TRUE
+             UNION ALL
+             SELECT
                 models.model_id,
                 prices.proxy_provider_id,
                 models.capabilities_json,
@@ -574,7 +898,15 @@ impl PostgresAdminStore {
                  ON prices.channel_id = models.channel_id
                 AND prices.model_id = models.model_id
              WHERE prices.is_active = TRUE
-             ORDER BY models.model_id, prices.proxy_provider_id
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ai_proxy_provider_model provider_models
+                   WHERE provider_models.proxy_provider_id = prices.proxy_provider_id
+                     AND provider_models.channel_id = models.channel_id
+                     AND provider_models.model_id = models.model_id
+                     AND provider_models.is_active = TRUE
+               )
+             ORDER BY 1, 2
              LIMIT 1",
         )
         .fetch_optional(&self.pool)
@@ -597,6 +929,25 @@ impl PostgresAdminStore {
     pub async fn find_model(&self, external_name: &str) -> Result<Option<ModelCatalogEntry>> {
         let row = sqlx::query_as::<_, (String, String, String, bool, Option<i64>)>(
             "SELECT
+                provider_models.model_id,
+                provider_models.proxy_provider_id,
+                CASE
+                    WHEN provider_models.capabilities_json = '[]' THEN models.capabilities_json
+                    ELSE provider_models.capabilities_json
+                END,
+                CASE
+                    WHEN provider_models.streaming_enabled THEN provider_models.streaming_enabled
+                    ELSE models.streaming_enabled
+                END,
+                COALESCE(provider_models.context_window, models.context_window)
+             FROM ai_proxy_provider_model provider_models
+             INNER JOIN ai_model models
+                 ON models.channel_id = provider_models.channel_id
+                AND models.model_id = provider_models.model_id
+             WHERE provider_models.model_id = $1
+               AND provider_models.is_active = TRUE
+             UNION ALL
+             SELECT
                 models.model_id,
                 prices.proxy_provider_id,
                 models.capabilities_json,
@@ -606,11 +957,20 @@ impl PostgresAdminStore {
              INNER JOIN ai_model_price prices
                  ON prices.channel_id = models.channel_id
                 AND prices.model_id = models.model_id
-             WHERE models.model_id = $1
+             WHERE models.model_id = $2
                AND prices.is_active = TRUE
-             ORDER BY prices.proxy_provider_id
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ai_proxy_provider_model provider_models
+                   WHERE provider_models.proxy_provider_id = prices.proxy_provider_id
+                     AND provider_models.channel_id = models.channel_id
+                     AND provider_models.model_id = models.model_id
+                     AND provider_models.is_active = TRUE
+               )
+             ORDER BY 2
              LIMIT 1",
         )
+        .bind(external_name)
         .bind(external_name)
         .fetch_optional(&self.pool)
         .await?;
@@ -646,6 +1006,13 @@ impl PostgresAdminStore {
         external_name: &str,
         provider_id: &str,
     ) -> Result<bool> {
+        sqlx::query(
+            "DELETE FROM ai_proxy_provider_model WHERE model_id = $1 AND proxy_provider_id = $2",
+        )
+        .bind(external_name)
+        .bind(provider_id)
+        .execute(&self.pool)
+        .await?;
         let result = sqlx::query(
             "DELETE FROM ai_model_price WHERE model_id = $1 AND proxy_provider_id = $2",
         )
@@ -727,6 +1094,11 @@ impl PostgresAdminStore {
     }
 
     pub async fn delete_channel_model(&self, channel_id: &str, model_id: &str) -> Result<bool> {
+        sqlx::query("DELETE FROM ai_proxy_provider_model WHERE channel_id = $1 AND model_id = $2")
+            .bind(channel_id)
+            .bind(model_id)
+            .execute(&self.pool)
+            .await?;
         sqlx::query("DELETE FROM ai_model_price WHERE channel_id = $1 AND model_id = $2")
             .bind(channel_id)
             .bind(model_id)
@@ -737,6 +1109,108 @@ impl PostgresAdminStore {
             .bind(model_id)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn upsert_provider_model(
+        &self,
+        record: &ProviderModelRecord,
+    ) -> Result<ProviderModelRecord> {
+        let now = current_timestamp_ms();
+        sqlx::query(
+            "INSERT INTO ai_proxy_provider_model (
+                proxy_provider_id,
+                channel_id,
+                model_id,
+                provider_model_id,
+                provider_model_family,
+                capabilities_json,
+                streaming_enabled,
+                context_window,
+                max_output_tokens,
+                supports_prompt_caching,
+                supports_reasoning_usage,
+                supports_tool_usage_metrics,
+                is_default_route,
+                is_active,
+                created_at_ms,
+                updated_at_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+             ON CONFLICT(proxy_provider_id, channel_id, model_id) DO UPDATE SET
+                provider_model_id = excluded.provider_model_id,
+                provider_model_family = excluded.provider_model_family,
+                capabilities_json = excluded.capabilities_json,
+                streaming_enabled = excluded.streaming_enabled,
+                context_window = excluded.context_window,
+                max_output_tokens = excluded.max_output_tokens,
+                supports_prompt_caching = excluded.supports_prompt_caching,
+                supports_reasoning_usage = excluded.supports_reasoning_usage,
+                supports_tool_usage_metrics = excluded.supports_tool_usage_metrics,
+                is_default_route = excluded.is_default_route,
+                is_active = excluded.is_active,
+                updated_at_ms = excluded.updated_at_ms",
+        )
+        .bind(&record.proxy_provider_id)
+        .bind(&record.channel_id)
+        .bind(&record.model_id)
+        .bind(&record.provider_model_id)
+        .bind(record.provider_model_family.clone())
+        .bind(encode_model_capabilities(&record.capabilities)?)
+        .bind(record.streaming)
+        .bind(record.context_window.map(i64::try_from).transpose()?)
+        .bind(record.max_output_tokens.map(i64::try_from).transpose()?)
+        .bind(record.supports_prompt_caching)
+        .bind(record.supports_reasoning_usage)
+        .bind(record.supports_tool_usage_metrics)
+        .bind(record.is_default_route)
+        .bind(record.is_active)
+        .bind(i64::try_from(now)?)
+        .bind(i64::try_from(now)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    pub async fn list_provider_models(&self) -> Result<Vec<ProviderModelRecord>> {
+        let rows = sqlx::query_as::<_, ProviderModelRow>(
+            "SELECT
+                proxy_provider_id,
+                channel_id,
+                model_id,
+                provider_model_id,
+                provider_model_family,
+                capabilities_json,
+                streaming_enabled,
+                context_window,
+                max_output_tokens,
+                supports_prompt_caching,
+                supports_reasoning_usage,
+                supports_tool_usage_metrics,
+                is_default_route,
+                is_active
+             FROM ai_proxy_provider_model
+             ORDER BY proxy_provider_id, channel_id, model_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(decode_provider_model_row).collect()
+    }
+
+    pub async fn delete_provider_model(
+        &self,
+        proxy_provider_id: &str,
+        channel_id: &str,
+        model_id: &str,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            "DELETE FROM ai_proxy_provider_model
+             WHERE proxy_provider_id = $1 AND channel_id = $2 AND model_id = $3",
+        )
+        .bind(proxy_provider_id)
+        .bind(channel_id)
+        .bind(model_id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -754,10 +1228,13 @@ impl PostgresAdminStore {
                 cache_read_price,
                 cache_write_price,
                 request_price,
+                price_source_kind,
+                billing_notes,
+                pricing_tiers_json,
                 is_active,
                 created_at_ms,
                 updated_at_ms
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
              ON CONFLICT(channel_id, model_id, proxy_provider_id) DO UPDATE SET
                 currency_code = excluded.currency_code,
                 price_unit = excluded.price_unit,
@@ -766,6 +1243,9 @@ impl PostgresAdminStore {
                 cache_read_price = excluded.cache_read_price,
                 cache_write_price = excluded.cache_write_price,
                 request_price = excluded.request_price,
+                price_source_kind = excluded.price_source_kind,
+                billing_notes = excluded.billing_notes,
+                pricing_tiers_json = excluded.pricing_tiers_json,
                 is_active = excluded.is_active,
                 updated_at_ms = excluded.updated_at_ms",
         )
@@ -779,6 +1259,9 @@ impl PostgresAdminStore {
         .bind(record.cache_read_price)
         .bind(record.cache_write_price)
         .bind(record.request_price)
+        .bind(&record.price_source_kind)
+        .bind(record.billing_notes.clone())
+        .bind(encode_model_price_tiers(&record.pricing_tiers)?)
         .bind(record.is_active)
         .bind(now)
         .bind(now)
@@ -800,6 +1283,9 @@ impl PostgresAdminStore {
                 cache_read_price,
                 cache_write_price,
                 request_price,
+                price_source_kind,
+                billing_notes,
+                pricing_tiers_json,
                 is_active
              FROM ai_model_price
              ORDER BY channel_id, model_id, proxy_provider_id",

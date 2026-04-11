@@ -48,6 +48,9 @@ OpenAPI is generated from the current `axum` route implementation, so the JSON d
 | evals | `GET/POST /evals`, `GET/POST/DELETE /evals/{eval_id}`, nested runs and output item routes | evaluation workflows |
 | videos | `GET/POST /videos`, retrieve, delete, content, remix, edits, extensions, extend, and character routes | includes both canonical and nested video resources |
 | music | `GET/POST /music`, `GET/DELETE /music/{music_id}`, `GET /music/{music_id}/content`, `POST /music/lyrics` | resource-oriented music generation, retrieval, binary content fetch, and lyrics creation |
+| market | `GET /market/products`, `GET /market/offers`, `POST /market/quotes` | public API product catalog, offer discovery, and quote workflows |
+| marketing | `POST /marketing/coupons/validate`, `POST /marketing/coupons/reserve`, `POST /marketing/coupons/confirm`, `POST /marketing/coupons/rollback` | coupon-first validation, reservation, redemption, and rollback surface |
+| commercial | `GET /commercial/account`, `GET /commercial/account/benefit-lots` | commercial account summary plus benefit-lot traversal and coupon/account-arrival evidence |
 
 ## Gateway Semantics
 
@@ -56,6 +59,8 @@ OpenAPI is generated from the current `axum` route implementation, so the JSON d
 - create-like routes may preserve route-key-based provider selection while recording usage against created resource IDs
 - generation-style routes such as chat, completions, responses, embeddings, and moderations keep billing keyed to the request model even when upstream responses return resource IDs
 - generation-style media routes such as images, videos, and music keep billing keyed to the request model while preserving created resource IDs as downstream references
+- commercial benefit-lot traversal supports `after_lot_id` and `limit`, and returns `page.after_lot_id`, `page.next_after_lot_id`, `page.has_more`, and `page.returned_count`
+- coupon-to-account-arrival evidence stays explicit through `scope_order_id` on `GET /commercial/account/benefit-lots`
 
 ## Helpful Headers
 

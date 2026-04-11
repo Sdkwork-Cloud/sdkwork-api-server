@@ -1,0 +1,20 @@
+{
+  "update_id": "2026-04-global-catalog-pricing-admin-readiness",
+  "release_version": "2026.04.20",
+  "description": "Refine provider-model defaults, friendly catalog pricing metadata, and provider-first route presets so admin operators can manage official, proxy, and local execution coverage without post-install cleanup.",
+  "depends_on": [
+    "2026-04-global-catalog-expansion",
+    "2026-04-global-official-route-matrix",
+    "2026-04-global-provider-operations-readiness",
+    "2026-04-global-openrouter-channel-coverage"
+  ],
+  "provider_models": [
+    "provider-models/2026-04-global-catalog-pricing-admin-readiness.json"
+  ],
+  "model_prices": [
+    "model-prices/2026-04-global-catalog-pricing-admin-readiness.json"
+  ],
+  "routing": [
+    "routing/2026-04-global-catalog-pricing-admin-readiness.json"
+  ]
+}

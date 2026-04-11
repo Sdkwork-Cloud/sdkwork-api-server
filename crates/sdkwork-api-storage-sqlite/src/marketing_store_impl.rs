@@ -76,6 +76,83 @@ impl MarketingStore for SqliteAdminStore {
             .transpose()
     }
 
+    async fn insert_coupon_template_lifecycle_audit_record(
+        &self,
+        record: &CouponTemplateLifecycleAuditRecord,
+    ) -> Result<CouponTemplateLifecycleAuditRecord> {
+        sqlx::query(
+            "INSERT INTO ai_marketing_coupon_template_lifecycle_audit (
+                audit_id, coupon_template_id, action, outcome, operator_id, request_id,
+                previous_status, resulting_status, reason, decision_reasons_json,
+                requested_at_ms, record_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(audit_id) DO UPDATE SET
+                coupon_template_id = excluded.coupon_template_id,
+                action = excluded.action,
+                outcome = excluded.outcome,
+                operator_id = excluded.operator_id,
+                request_id = excluded.request_id,
+                previous_status = excluded.previous_status,
+                resulting_status = excluded.resulting_status,
+                reason = excluded.reason,
+                decision_reasons_json = excluded.decision_reasons_json,
+                requested_at_ms = excluded.requested_at_ms,
+                record_json = excluded.record_json",
+        )
+        .bind(&record.audit_id)
+        .bind(&record.coupon_template_id)
+        .bind(record.action.as_str())
+        .bind(record.outcome.as_str())
+        .bind(&record.operator_id)
+        .bind(&record.request_id)
+        .bind(coupon_template_status_as_str(record.previous_status))
+        .bind(coupon_template_status_as_str(record.resulting_status))
+        .bind(&record.reason)
+        .bind(encode_string_list(&record.decision_reasons)?)
+        .bind(i64::try_from(record.requested_at_ms)?)
+        .bind(serde_json::to_string(record)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    async fn list_coupon_template_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_coupon_template_lifecycle_audit
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<CouponTemplateLifecycleAuditRecord>(&json)?)
+            })
+            .collect()
+    }
+
+    async fn list_coupon_template_lifecycle_audit_records_for_template(
+        &self,
+        coupon_template_id: &str,
+    ) -> Result<Vec<CouponTemplateLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_coupon_template_lifecycle_audit
+             WHERE coupon_template_id = ?
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .bind(coupon_template_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<CouponTemplateLifecycleAuditRecord>(&json)?)
+            })
+            .collect()
+    }
+
     async fn insert_marketing_campaign_record(
         &self,
         record: &MarketingCampaignRecord,
@@ -138,6 +215,85 @@ impl MarketingStore for SqliteAdminStore {
             .collect()
     }
 
+    async fn insert_marketing_campaign_lifecycle_audit_record(
+        &self,
+        record: &MarketingCampaignLifecycleAuditRecord,
+    ) -> Result<MarketingCampaignLifecycleAuditRecord> {
+        sqlx::query(
+            "INSERT INTO ai_marketing_campaign_lifecycle_audit (
+                audit_id, marketing_campaign_id, coupon_template_id, action, outcome,
+                operator_id, request_id, previous_status, resulting_status, reason,
+                decision_reasons_json, requested_at_ms, record_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(audit_id) DO UPDATE SET
+                marketing_campaign_id = excluded.marketing_campaign_id,
+                coupon_template_id = excluded.coupon_template_id,
+                action = excluded.action,
+                outcome = excluded.outcome,
+                operator_id = excluded.operator_id,
+                request_id = excluded.request_id,
+                previous_status = excluded.previous_status,
+                resulting_status = excluded.resulting_status,
+                reason = excluded.reason,
+                decision_reasons_json = excluded.decision_reasons_json,
+                requested_at_ms = excluded.requested_at_ms,
+                record_json = excluded.record_json",
+        )
+        .bind(&record.audit_id)
+        .bind(&record.marketing_campaign_id)
+        .bind(&record.coupon_template_id)
+        .bind(record.action.as_str())
+        .bind(record.outcome.as_str())
+        .bind(&record.operator_id)
+        .bind(&record.request_id)
+        .bind(marketing_campaign_status_as_str(record.previous_status))
+        .bind(marketing_campaign_status_as_str(record.resulting_status))
+        .bind(&record.reason)
+        .bind(encode_string_list(&record.decision_reasons)?)
+        .bind(i64::try_from(record.requested_at_ms)?)
+        .bind(serde_json::to_string(record)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    async fn list_marketing_campaign_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_campaign_lifecycle_audit
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<MarketingCampaignLifecycleAuditRecord>(&json)?)
+            })
+            .collect()
+    }
+
+    async fn list_marketing_campaign_lifecycle_audit_records_for_campaign(
+        &self,
+        marketing_campaign_id: &str,
+    ) -> Result<Vec<MarketingCampaignLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_campaign_lifecycle_audit
+             WHERE marketing_campaign_id = ?
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .bind(marketing_campaign_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<MarketingCampaignLifecycleAuditRecord>(&json)?)
+            })
+            .collect()
+    }
+
     async fn insert_campaign_budget_record(
         &self,
         record: &CampaignBudgetRecord,
@@ -193,6 +349,85 @@ impl MarketingStore for SqliteAdminStore {
         .await?;
         rows.into_iter()
             .map(|(json,)| Ok(serde_json::from_str::<CampaignBudgetRecord>(&json)?))
+            .collect()
+    }
+
+    async fn insert_campaign_budget_lifecycle_audit_record(
+        &self,
+        record: &CampaignBudgetLifecycleAuditRecord,
+    ) -> Result<CampaignBudgetLifecycleAuditRecord> {
+        sqlx::query(
+            "INSERT INTO ai_marketing_campaign_budget_lifecycle_audit (
+                audit_id, campaign_budget_id, marketing_campaign_id, action, outcome,
+                operator_id, request_id, previous_status, resulting_status, reason,
+                decision_reasons_json, requested_at_ms, record_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(audit_id) DO UPDATE SET
+                campaign_budget_id = excluded.campaign_budget_id,
+                marketing_campaign_id = excluded.marketing_campaign_id,
+                action = excluded.action,
+                outcome = excluded.outcome,
+                operator_id = excluded.operator_id,
+                request_id = excluded.request_id,
+                previous_status = excluded.previous_status,
+                resulting_status = excluded.resulting_status,
+                reason = excluded.reason,
+                decision_reasons_json = excluded.decision_reasons_json,
+                requested_at_ms = excluded.requested_at_ms,
+                record_json = excluded.record_json",
+        )
+        .bind(&record.audit_id)
+        .bind(&record.campaign_budget_id)
+        .bind(&record.marketing_campaign_id)
+        .bind(record.action.as_str())
+        .bind(record.outcome.as_str())
+        .bind(&record.operator_id)
+        .bind(&record.request_id)
+        .bind(campaign_budget_status_as_str(record.previous_status))
+        .bind(campaign_budget_status_as_str(record.resulting_status))
+        .bind(&record.reason)
+        .bind(encode_string_list(&record.decision_reasons)?)
+        .bind(i64::try_from(record.requested_at_ms)?)
+        .bind(serde_json::to_string(record)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    async fn list_campaign_budget_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_campaign_budget_lifecycle_audit
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<CampaignBudgetLifecycleAuditRecord>(&json)?)
+            })
+            .collect()
+    }
+
+    async fn list_campaign_budget_lifecycle_audit_records_for_budget(
+        &self,
+        campaign_budget_id: &str,
+    ) -> Result<Vec<CampaignBudgetLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_campaign_budget_lifecycle_audit
+             WHERE campaign_budget_id = ?
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .bind(campaign_budget_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| {
+                Ok(serde_json::from_str::<CampaignBudgetLifecycleAuditRecord>(&json)?)
+            })
             .collect()
     }
 
@@ -300,6 +535,81 @@ impl MarketingStore for SqliteAdminStore {
         .await?;
         rows.into_iter()
             .map(|(json,)| Ok(serde_json::from_str::<CouponCodeRecord>(&json)?))
+            .collect()
+    }
+
+    async fn insert_coupon_code_lifecycle_audit_record(
+        &self,
+        record: &CouponCodeLifecycleAuditRecord,
+    ) -> Result<CouponCodeLifecycleAuditRecord> {
+        sqlx::query(
+            "INSERT INTO ai_marketing_coupon_code_lifecycle_audit (
+                audit_id, coupon_code_id, coupon_template_id, action, outcome,
+                operator_id, request_id, previous_status, resulting_status, reason,
+                decision_reasons_json, requested_at_ms, record_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(audit_id) DO UPDATE SET
+                coupon_code_id = excluded.coupon_code_id,
+                coupon_template_id = excluded.coupon_template_id,
+                action = excluded.action,
+                outcome = excluded.outcome,
+                operator_id = excluded.operator_id,
+                request_id = excluded.request_id,
+                previous_status = excluded.previous_status,
+                resulting_status = excluded.resulting_status,
+                reason = excluded.reason,
+                decision_reasons_json = excluded.decision_reasons_json,
+                requested_at_ms = excluded.requested_at_ms,
+                record_json = excluded.record_json",
+        )
+        .bind(&record.audit_id)
+        .bind(&record.coupon_code_id)
+        .bind(&record.coupon_template_id)
+        .bind(record.action.as_str())
+        .bind(record.outcome.as_str())
+        .bind(&record.operator_id)
+        .bind(&record.request_id)
+        .bind(coupon_code_status_as_str(record.previous_status))
+        .bind(coupon_code_status_as_str(record.resulting_status))
+        .bind(&record.reason)
+        .bind(encode_string_list(&record.decision_reasons)?)
+        .bind(i64::try_from(record.requested_at_ms)?)
+        .bind(serde_json::to_string(record)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(record.clone())
+    }
+
+    async fn list_coupon_code_lifecycle_audit_records(
+        &self,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_coupon_code_lifecycle_audit
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| Ok(serde_json::from_str::<CouponCodeLifecycleAuditRecord>(&json)?))
+            .collect()
+    }
+
+    async fn list_coupon_code_lifecycle_audit_records_for_code(
+        &self,
+        coupon_code_id: &str,
+    ) -> Result<Vec<CouponCodeLifecycleAuditRecord>> {
+        let rows = sqlx::query_as::<_, (String,)>(
+            "SELECT record_json
+             FROM ai_marketing_coupon_code_lifecycle_audit
+             WHERE coupon_code_id = ?
+             ORDER BY requested_at_ms DESC, audit_id DESC",
+        )
+        .bind(coupon_code_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(json,)| Ok(serde_json::from_str::<CouponCodeLifecycleAuditRecord>(&json)?))
             .collect()
     }
 
@@ -539,3 +849,6 @@ impl MarketingStore for SqliteAdminStore {
     }
 }
 
+use sdkwork_api_domain_marketing::{
+    CampaignBudgetLifecycleAuditRecord, CouponCodeLifecycleAuditRecord,
+};

@@ -1,13 +1,16 @@
 use super::*;
 
-async fn read_json(response: axum::response::Response) -> Value {
+pub(super) async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
-async fn assert_video_not_found(response: axum::response::Response, message: &str) {
+pub(super) async fn assert_video_not_found(
+    response: axum::response::Response,
+    message: &str,
+) {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
     assert_eq!(json["error"]["message"], message);
@@ -15,27 +18,30 @@ async fn assert_video_not_found(response: axum::response::Response, message: &st
     assert_eq!(json["error"]["code"], "not_found");
 }
 
-async fn read_bytes(response: axum::response::Response) -> Vec<u8> {
+pub(super) async fn read_bytes(response: axum::response::Response) -> Vec<u8> {
     axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap()
         .to_vec()
 }
 
-async fn memory_pool() -> SqlitePool {
+pub(super) async fn memory_pool() -> SqlitePool {
     sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
         .unwrap()
 }
 
-struct LocalVideoTestContext {
-    admin_app: Router,
-    admin_token: String,
-    api_key: String,
-    gateway_app: Router,
+pub(super) struct LocalVideoTestContext {
+    pub(super) admin_app: Router,
+    pub(super) admin_token: String,
+    pub(super) api_key: String,
+    pub(super) gateway_app: Router,
 }
 
-async fn local_video_test_context(tenant_id: &str, project_id: &str) -> LocalVideoTestContext {
+pub(super) async fn local_video_test_context(
+    tenant_id: &str,
+    project_id: &str,
+) -> LocalVideoTestContext {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
@@ -51,6 +57,6 @@ async fn local_video_test_context(tenant_id: &str, project_id: &str) -> LocalVid
 }
 
 #[derive(Clone, Default)]
-struct UpstreamCaptureState {
-    authorization: Arc<Mutex<Option<String>>>,
+pub(super) struct UpstreamCaptureState {
+    pub(super) authorization: Arc<Mutex<Option<String>>>,
 }

@@ -1,4 +1,5 @@
 use super::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StorageDialect {
@@ -211,7 +212,7 @@ impl<T: Clone> Clone for Reloadable<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ServiceRuntimeNodeRecord {
     pub node_id: String,
     pub service_kind: String,
@@ -239,7 +240,7 @@ impl ServiceRuntimeNodeRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtensionRuntimeRolloutRecord {
     pub rollout_id: String,
     pub scope: String,
@@ -276,7 +277,7 @@ impl ExtensionRuntimeRolloutRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtensionRuntimeRolloutParticipantRecord {
     pub rollout_id: String,
     pub node_id: String,
@@ -310,7 +311,7 @@ impl ExtensionRuntimeRolloutParticipantRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StandaloneConfigRolloutRecord {
     pub rollout_id: String,
     pub requested_service_kind: Option<String>,
@@ -337,7 +338,7 @@ impl StandaloneConfigRolloutRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StandaloneConfigRolloutParticipantRecord {
     pub rollout_id: String,
     pub node_id: String,
@@ -370,4 +371,3 @@ impl StandaloneConfigRolloutParticipantRecord {
         self
     }
 }
-

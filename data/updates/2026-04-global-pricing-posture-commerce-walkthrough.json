@@ -1,0 +1,15 @@
+{
+  "update_id": "2026-04-global-pricing-posture-commerce-walkthrough",
+  "release_version": "2026.04.20",
+  "description": "Add install-ready official-direct and local-edge commercial walkthrough data so production and development bootstraps include richer marketing, checkout, payment, refund, and reconciliation samples aligned to the official/proxy/local pricing posture model.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness",
+    "2026-04-global-pricing-governance-linkage"
+  ],
+  "marketing": [
+    "marketing/2026-04-global-pricing-posture-commerce-walkthrough.json"
+  ],
+  "commerce": [
+    "commerce/2026-04-global-pricing-posture-commerce-walkthrough.json"
+  ]
+}

@@ -30,6 +30,15 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert_eq!(json["openapi"], "3.1.0");
     assert_eq!(json["info"]["title"], "SDKWORK Gateway API");
     assert!(json["paths"]["/health"]["get"].is_object());
+    assert!(json["paths"]["/market/products"]["get"].is_object());
+    assert!(json["paths"]["/market/offers"]["get"].is_object());
+    assert!(json["paths"]["/market/quotes"]["post"].is_object());
+    assert!(json["paths"]["/marketing/coupons/validate"]["post"].is_object());
+    assert!(json["paths"]["/marketing/coupons/reserve"]["post"].is_object());
+    assert!(json["paths"]["/marketing/coupons/confirm"]["post"].is_object());
+    assert!(json["paths"]["/marketing/coupons/rollback"]["post"].is_object());
+    assert!(json["paths"]["/commercial/account"]["get"].is_object());
+    assert!(json["paths"]["/commercial/account/benefit-lots"]["get"].is_object());
     assert!(json["paths"]["/v1/models"]["get"].is_object());
     assert!(json["paths"]["/v1/models/{model_id}"]["get"].is_object());
     assert!(json["paths"]["/v1/chat/completions"]["post"].is_object());
@@ -135,6 +144,18 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert!(json["paths"]["/v1beta/models/{tail}"]["post"].is_object());
     assert!(json["components"]["schemas"].is_object());
     assert!(json["components"]["schemas"]["ListModelsResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayMarketProductsResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayMarketOffersResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponValidationRequest"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponValidationResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponReservationRequest"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponReservationResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponRedemptionConfirmRequest"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponRedemptionConfirmResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponRedemptionRollbackRequest"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCouponRedemptionRollbackResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCommercialAccountResponse"].is_object());
+    assert!(json["components"]["schemas"]["GatewayCommercialBenefitLotsResponse"].is_object());
     assert!(json["components"]["schemas"]["ModelObject"].is_object());
     assert!(json["components"]["schemas"]["CreateChatCompletionRequest"].is_object());
     assert!(json["components"]["schemas"]["ChatCompletionResponse"].is_object());
@@ -224,6 +245,84 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert!(json["components"]["schemas"]["RunStepObject"].is_object());
     assert!(json["components"]["schemas"]["ListRunStepsResponse"].is_object());
     assert!(json["components"]["schemas"]["OpenAiErrorResponse"].is_object());
+    assert_eq!(
+        json["paths"]["/market/products"]["get"]["responses"]["200"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayMarketProductsResponse"
+    );
+    assert_eq!(
+        json["paths"]["/market/offers"]["get"]["responses"]["200"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayMarketOffersResponse"
+    );
+    assert_eq!(
+        json["paths"]["/market/quotes"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/PortalCommerceQuoteRequest"
+    );
+    assert_eq!(
+        json["paths"]["/market/quotes"]["post"]["responses"]["200"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/PortalCommerceQuote"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/validate"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponValidationRequest"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/validate"]["post"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponValidationResponse"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/reserve"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponReservationRequest"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/reserve"]["post"]["responses"]["201"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponReservationResponse"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/confirm"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponRedemptionConfirmRequest"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/confirm"]["post"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponRedemptionConfirmResponse"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/rollback"]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponRedemptionRollbackRequest"
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/rollback"]["post"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/GatewayCouponRedemptionRollbackResponse"
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account"]["get"]["responses"]["200"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/GatewayCommercialAccountResponse"
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account/benefit-lots"]["get"]["responses"]["200"]["content"]
+            ["application/json"]["schema"]["$ref"],
+        "#/components/schemas/GatewayCommercialBenefitLotsResponse"
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account/benefit-lots"]["get"]["parameters"][0]["name"],
+        "after_lot_id"
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account/benefit-lots"]["get"]["parameters"][1]["name"],
+        "limit"
+    );
     assert_eq!(
         json["paths"]["/v1/models"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
             ["$ref"],
@@ -798,6 +897,47 @@ async fn openapi_routes_expose_gateway_api_inventory() {
         json["paths"]["/v1/threads/{thread_id}/runs/{run_id}/steps/{step_id}"]["get"]["responses"]
             ["200"]["content"]["application/json"]["schema"]["$ref"],
         "#/components/schemas/RunStepObject"
+    );
+    assert_eq!(
+        json["paths"]["/market/products"]["get"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/market/offers"]["get"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/market/quotes"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/validate"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/reserve"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/confirm"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/marketing/coupons/rollback"]["post"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account"]["get"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["paths"]["/commercial/account/benefit-lots"]["get"]["security"][0]["bearerAuth"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        json["components"]["schemas"]["GatewayCommercialBenefitLotsResponse"]["properties"]["page"]
+            ["$ref"],
+        "#/components/schemas/GatewayCommercialBenefitLotPage"
     );
     assert_eq!(
         json["paths"]["/v1/chat/completions"]["post"]["security"][0]["bearerAuth"],

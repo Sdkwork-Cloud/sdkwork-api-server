@@ -1,0 +1,38 @@
+{
+  "update_id": "2026-04-global-catalog-expansion",
+  "release_version": "2026.04.10",
+  "description": "Expand the commercial bootstrap catalog with additional official Asia-focused providers, models, routing defaults, and observability samples.",
+  "channels": [
+    "channels/2026-04-global-expansion.json"
+  ],
+  "providers": [
+    "providers/2026-04-global-expansion.json"
+  ],
+  "official_provider_configs": [
+    "official-provider-configs/2026-04-global-expansion.json"
+  ],
+  "provider_accounts": [
+    "provider-accounts/2026-04-global-expansion.json"
+  ],
+  "models": [
+    "models/2026-04-global-expansion.json"
+  ],
+  "channel_models": [
+    "channel-models/2026-04-global-expansion.json"
+  ],
+  "model_prices": [
+    "model-prices/2026-04-global-expansion.json"
+  ],
+  "routing": [
+    "routing/2026-04-global-expansion.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-expansion.json"
+  ],
+  "billing": [
+    "billing/2026-04-global-expansion.json"
+  ],
+  "provider_models": [
+    "provider-models/2026-04-global-expansion.json"
+  ]
+}

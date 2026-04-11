@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "baselineId": "release-slo-governance-baseline-2026-04-08",
+  "baselineDate": "2026-04-08",
+  "generatedAt": "2026-04-10T18:38:58.588Z",
+  "targets": {
+    "gateway-non-streaming-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "gateway-streaming-completion-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "routing-simulation-p95-latency": {
+      "value": 30,
+      "burnRates": {
+        "1h": 0.05,
+        "6h": 0.05
+      }
+    },
+    "api-key-issuance-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "runtime-rollout-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "billing-event-write-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "gateway-fallback-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "gateway-provider-timeout-budget": {
+      "ratio": 0,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "account-hold-creation-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "request-settlement-finalize-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "pricing-lifecycle-synchronize-success-rate": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "gateway-availability": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "admin-api-availability": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    },
+    "portal-api-availability": {
+      "ratio": 1,
+      "burnRates": {
+        "1h": 0,
+        "6h": 0
+      }
+    }
+  }
+}

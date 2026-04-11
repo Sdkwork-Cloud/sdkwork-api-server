@@ -11,8 +11,13 @@ import {
   type DataTableColumn,
 } from '@sdkwork/ui-pc-react';
 import { Plus, Search } from 'lucide-react';
-import { useAdminI18n } from 'sdkwork-router-admin-core';
-import type { AdminPageProps, ProxyProviderRecord } from 'sdkwork-router-admin-types';
+import {
+  buildProviderSaveInput,
+  describeProviderIntegration,
+  type SaveProviderInput,
+  useAdminI18n,
+} from 'sdkwork-router-admin-core';
+import type { AdminPageProps, ProviderCatalogRecord } from 'sdkwork-router-admin-types';
 
 import { ConfirmActionDialog, SelectField } from './shared';
 import { GatewayRoutesDetailDrawer } from './routes/GatewayRoutesDetailDrawer';
@@ -55,15 +60,7 @@ type GatewayRoutesPageProps = AdminPageProps & {
     preferred_region?: string | null;
   }) => Promise<void>;
   onRefreshWorkspace: () => Promise<void>;
-  onSaveProvider: (input: {
-    id: string;
-    channel_id: string;
-    extension_id?: string;
-    adapter_kind: string;
-    base_url: string;
-    display_name: string;
-    channel_bindings: Array<{ channel_id: string; is_primary: boolean }>;
-  }) => Promise<void>;
+  onSaveProvider: (input: SaveProviderInput) => Promise<void>;
   onDeleteProvider: (providerId: string) => Promise<void>;
 };
 
@@ -80,7 +77,7 @@ export function GatewayRoutesPage({
   const [channelFilter, setChannelFilter] = useState('all');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
-  const [editingProvider, setEditingProvider] = useState<ProxyProviderRecord | null>(null);
+  const [editingProvider, setEditingProvider] = useState<ProviderCatalogRecord | null>(null);
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>(() =>
     emptyProviderDraft(defaultChannelId),
   );
@@ -88,7 +85,7 @@ export function GatewayRoutesPage({
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [isRoutingProfilesDialogOpen, setIsRoutingProfilesDialogOpen] = useState(false);
   const [isRoutingSnapshotsDialogOpen, setIsRoutingSnapshotsDialogOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<ProxyProviderRecord | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ProviderCatalogRecord | null>(null);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   const inventory = useMemo(() => buildGatewayRouteInventory(snapshot), [snapshot]);
@@ -124,6 +121,9 @@ export function GatewayRoutesPage({
           row.provider.id,
           row.provider.display_name,
           row.provider.adapter_kind,
+          row.provider.protocol_kind,
+          row.provider.integration.default_plugin_family ?? '',
+          describeProviderIntegration(row.provider),
           row.provider.base_url,
           ...row.channels.map((channel) => `${channel.id} ${channel.name}`),
           ...row.credentials.map((credential) => credential.key_reference),
@@ -180,7 +180,7 @@ export function GatewayRoutesPage({
               {row.provider.display_name}
             </div>
             <div className="text-sm text-[var(--sdk-color-text-secondary)]">
-              {row.provider.id} / {row.provider.adapter_kind}
+              {row.provider.id} / {describeProviderIntegration(row.provider)}
             </div>
           </div>
         ),
@@ -253,7 +253,7 @@ export function GatewayRoutesPage({
     setIsProviderDialogOpen(true);
   }
 
-  function openEditProviderDialog(provider: ProxyProviderRecord): void {
+  function openEditProviderDialog(provider: ProviderCatalogRecord): void {
     setEditingProvider(provider);
     setProviderDraft(providerDraftFromRecord(provider));
     setIsProviderDialogOpen(true);
@@ -275,25 +275,7 @@ export function GatewayRoutesPage({
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
-
-    const bindingIds = Array.from(
-      new Set(
-        [providerDraft.primary_channel_id, ...providerDraft.bound_channel_ids].filter(Boolean),
-      ),
-    );
-
-    await onSaveProvider({
-      id: providerDraft.id.trim(),
-      channel_id: providerDraft.primary_channel_id,
-      extension_id: providerDraft.extension_id.trim() || undefined,
-      adapter_kind: providerDraft.adapter_kind.trim(),
-      base_url: providerDraft.base_url.trim(),
-      display_name: providerDraft.display_name.trim(),
-      channel_bindings: bindingIds.map((channelId) => ({
-        channel_id: channelId,
-        is_primary: channelId === providerDraft.primary_channel_id,
-      })),
-    });
+    await onSaveProvider(buildProviderSaveInput(providerDraft));
 
     resetProviderDialog();
   }

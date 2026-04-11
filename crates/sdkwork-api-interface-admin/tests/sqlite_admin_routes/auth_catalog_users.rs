@@ -157,6 +157,24 @@ async fn builtin_channels_channel_models_and_model_prices_are_exposed_through_ad
         .iter()
         .any(|item| item["channel_id"] == "openai" && item["model_id"] == "gpt-4.1"));
 
+    let create_provider_model = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/provider-models")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"proxy_provider_id":"provider-openai-official","channel_id":"openai","model_id":"gpt-4.1","provider_model_id":"gpt-4.1","capabilities":["responses","chat_completions"],"streaming":true,"context_window":128000,"max_output_tokens":32768,"supports_prompt_caching":true,"supports_reasoning_usage":false,"supports_tool_usage_metrics":true,"is_default_route":true,"is_active":true}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_provider_model.status(), StatusCode::CREATED);
+
     let create_price = app
         .clone()
         .oneshot(
@@ -166,7 +184,7 @@ async fn builtin_channels_channel_models_and_model_prices_are_exposed_through_ad
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    r#"{"channel_id":"openai","model_id":"gpt-4.1","proxy_provider_id":"provider-openai-official","currency_code":"USD","price_unit":"per_1m_tokens","input_price":2.5,"output_price":10.0,"cache_read_price":0.3,"cache_write_price":1.0,"request_price":0.0,"is_active":true}"#,
+                    r#"{"channel_id":"openai","model_id":"gpt-4.1","proxy_provider_id":"provider-openai-official","currency_code":"USD","price_unit":"per_1m_tokens","input_price":2.5,"output_price":10.0,"cache_read_price":0.3,"cache_write_price":1.0,"request_price":0.0,"price_source_kind":"official","billing_notes":"Published from official OpenAI pricing.","pricing_tiers":[{"tier_id":"default","display_name":"Default","condition_kind":"default","currency_code":"USD","price_unit":"per_1m_tokens","input_price":2.5,"output_price":10.0,"cache_read_price":0.3,"cache_write_price":1.0,"request_price":0.0}],"is_active":true}"#,
                 ))
                 .unwrap(),
         )
@@ -193,6 +211,9 @@ async fn builtin_channels_channel_models_and_model_prices_are_exposed_through_ad
         item["channel_id"] == "openai"
             && item["model_id"] == "gpt-4.1"
             && item["proxy_provider_id"] == "provider-openai-official"
+            && item["price_source_kind"] == "official"
+            && item["billing_notes"] == "Published from official OpenAI pricing."
+            && item["pricing_tiers"].as_array().is_some_and(|tiers| tiers.len() == 1)
     }));
 }
 

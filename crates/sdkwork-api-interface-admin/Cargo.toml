@@ -13,7 +13,6 @@ sdkwork-api-config = { path = "../sdkwork-api-config" }
 sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
 sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
-sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
@@ -28,7 +27,6 @@ sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
-sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }

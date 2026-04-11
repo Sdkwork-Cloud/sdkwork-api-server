@@ -1,0 +1,130 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-local-sandbox-eval",
+      "tenant_id": 1002,
+      "organization_id": 2002,
+      "user_id": 3002,
+      "account_id": 7002001,
+      "request_id": 5003,
+      "provider_id": "provider-ollama-local",
+      "model_code": "llama3.2:latest",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "sandbox_eval",
+      "status": "succeeded",
+      "external_job_id": "ollama-job-local-sandbox-eval",
+      "idempotency_key": "job:local-sandbox:eval",
+      "callback_url": "http://127.0.0.1:3000/api/dev/jobs/callbacks/local",
+      "input_summary": "Run the local sandbox route evaluation pack against the default Ollama profile.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710001202000,
+      "updated_at_ms": 1710001202600,
+      "started_at_ms": 1710001202120,
+      "completed_at_ms": 1710001202600
+    },
+    {
+      "job_id": "job-partner-gemini-brief",
+      "tenant_id": 1003,
+      "organization_id": 2003,
+      "user_id": 3003,
+      "account_id": 7002002,
+      "request_id": 5004,
+      "provider_id": "provider-gemini-official",
+      "model_code": "gemini-2.5-pro",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "partner_brief_generate",
+      "status": "succeeded",
+      "external_job_id": "gemini-job-partner-gemini-brief",
+      "idempotency_key": "job:partner:gemini-brief",
+      "callback_url": "https://partner.sdkwork.local/api/jobs/callbacks/gemini",
+      "input_summary": "Generate the partner sandbox readiness brief using the seeded Gemini evaluation route.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710001203000,
+      "updated_at_ms": 1710001203700,
+      "started_at_ms": 1710001203150,
+      "completed_at_ms": 1710001203700
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": 9802,
+      "job_id": "job-local-sandbox-eval",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "ollama",
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "external_job_id": "ollama-job-local-sandbox-eval",
+      "claimed_at_ms": 1710001202140,
+      "finished_at_ms": 1710001202580,
+      "error_message": null,
+      "created_at_ms": 1710001202000,
+      "updated_at_ms": 1710001202580
+    },
+    {
+      "attempt_id": 9803,
+      "job_id": "job-partner-gemini-brief",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "gemini",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "external_job_id": "gemini-job-partner-gemini-brief",
+      "claimed_at_ms": 1710001203180,
+      "finished_at_ms": 1710001203660,
+      "error_message": null,
+      "created_at_ms": 1710001203000,
+      "updated_at_ms": 1710001203660
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset-local-sandbox-eval-md",
+      "job_id": "job-local-sandbox-eval",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1002/jobs/job-local-sandbox-eval/eval-report.md",
+      "download_url": "http://127.0.0.1:3000/artifacts/job-local-sandbox-eval/eval-report.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 2140,
+      "checksum_sha256": "7e4f165845ae0fa9ddf1f74172b7486db67a7f3ca93782545cdf2cb1a792634b",
+      "created_at_ms": 1710001202590
+    },
+    {
+      "asset_id": "asset-partner-gemini-brief-json",
+      "job_id": "job-partner-gemini-brief",
+      "asset_kind": "json",
+      "storage_key": "tenant-1003/jobs/job-partner-gemini-brief/brief.json",
+      "download_url": "https://partner.sdkwork.local/artifacts/job-partner-gemini-brief/brief.json",
+      "mime_type": "application/json",
+      "size_bytes": 3328,
+      "checksum_sha256": "6adf68ba4ef5b6255e6f88c34fef2788ad751df5eb098c9b76fd0db1b38d5773",
+      "created_at_ms": 1710001203680
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_id": 10805,
+      "job_id": "job-local-sandbox-eval",
+      "event_type": "job.completed",
+      "dedupe_key": "ollama:ollama-job-local-sandbox-eval:completed",
+      "payload_json": "{\"job_id\":\"job-local-sandbox-eval\",\"status\":\"succeeded\",\"provider\":\"ollama\"}",
+      "status": "processed",
+      "received_at_ms": 1710001202610,
+      "processed_at_ms": 1710001202640
+    },
+    {
+      "callback_id": 10803,
+      "job_id": "job-partner-gemini-brief",
+      "event_type": "job.completed",
+      "dedupe_key": "gemini:gemini-job-partner-gemini-brief:completed",
+      "payload_json": "{\"job_id\":\"job-partner-gemini-brief\",\"status\":\"succeeded\",\"provider\":\"gemini\"}",
+      "status": "processed",
+      "received_at_ms": 1710001203710,
+      "processed_at_ms": 1710001203750
+    }
+  ]
+}

@@ -125,6 +125,14 @@ pub(crate) fn decode_model_capabilities(capabilities: &str) -> Result<Vec<ModelC
     Ok(serde_json::from_str(capabilities)?)
 }
 
+pub(crate) fn encode_model_price_tiers(pricing_tiers: &[ModelPriceTier]) -> Result<String> {
+    Ok(serde_json::to_string(pricing_tiers)?)
+}
+
+pub(crate) fn decode_model_price_tiers(pricing_tiers: &str) -> Result<Vec<ModelPriceTier>> {
+    Ok(serde_json::from_str(pricing_tiers)?)
+}
+
 pub(crate) fn encode_extension_config(config: &Value) -> Result<String> {
     Ok(serde_json::to_string(config)?)
 }
@@ -210,6 +218,7 @@ pub(crate) fn normalize_coupon_code_value(code_value: &str) -> String {
 pub(crate) fn coupon_template_status_as_str(status: CouponTemplateStatus) -> &'static str {
     match status {
         CouponTemplateStatus::Draft => "draft",
+        CouponTemplateStatus::Scheduled => "scheduled",
         CouponTemplateStatus::Active => "active",
         CouponTemplateStatus::Archived => "archived",
     }
@@ -322,18 +331,6 @@ pub(crate) type PortalUserRow = (
 
 pub(crate) type AdminUserRow = (String, String, String, String, String, bool, i64);
 
-pub(crate) type CouponRow = (
-    String,
-    String,
-    String,
-    String,
-    i64,
-    bool,
-    String,
-    String,
-    i64,
-);
-
 pub(crate) type CredentialRow = (
     String,
     String,
@@ -346,6 +343,23 @@ pub(crate) type CredentialRow = (
 
 pub(crate) type ChannelModelRow = (String, String, String, String, bool, Option<i64>, String);
 
+pub(crate) type ProviderModelRow = (
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    bool,
+    Option<i64>,
+    Option<i64>,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+);
+
 pub(crate) type ModelPriceRow = (
     String,
     String,
@@ -357,6 +371,9 @@ pub(crate) type ModelPriceRow = (
     f64,
     f64,
     f64,
+    String,
+    Option<String>,
+    String,
     bool,
 );
 
@@ -401,35 +418,6 @@ pub(crate) fn decode_admin_user_row(row: Option<AdminUserRow>) -> Result<Option<
                 password_salt,
                 password_hash,
                 active,
-                created_at_ms: u64::try_from(created_at_ms)?,
-            })
-        },
-    )
-    .transpose()
-}
-
-pub(crate) fn decode_coupon_row(row: Option<CouponRow>) -> Result<Option<CouponCampaign>> {
-    row.map(
-        |(
-            id,
-            code,
-            discount_label,
-            audience,
-            remaining,
-            active,
-            note,
-            expires_on,
-            created_at_ms,
-        )| {
-            Ok(CouponCampaign {
-                id,
-                code,
-                discount_label,
-                audience,
-                remaining: u64::try_from(remaining)?,
-                active,
-                note,
-                expires_on,
                 created_at_ms: u64::try_from(created_at_ms)?,
             })
         },
@@ -587,6 +575,77 @@ pub(crate) fn decode_channel_model_row(row: ChannelModelRow) -> Result<ChannelMo
     Ok(record)
 }
 
+pub(crate) fn decode_provider_model_row(row: ProviderModelRow) -> Result<ProviderModelRecord> {
+    let (
+        proxy_provider_id,
+        channel_id,
+        model_id,
+        provider_model_id,
+        provider_model_family,
+        capabilities_json,
+        streaming_enabled,
+        context_window,
+        max_output_tokens,
+        supports_prompt_caching,
+        supports_reasoning_usage,
+        supports_tool_usage_metrics,
+        is_default_route,
+        is_active,
+    ) = row;
+
+    let mut record = ProviderModelRecord::new(proxy_provider_id, channel_id, model_id)
+        .with_provider_model_id(provider_model_id)
+        .with_provider_model_family_option(provider_model_family)
+        .with_streaming(streaming_enabled)
+        .with_context_window_option(context_window.map(u64::try_from).transpose()?)
+        .with_max_output_tokens_option(max_output_tokens.map(u64::try_from).transpose()?)
+        .with_supports_prompt_caching(supports_prompt_caching)
+        .with_supports_reasoning_usage(supports_reasoning_usage)
+        .with_supports_tool_usage_metrics(supports_tool_usage_metrics)
+        .with_default_route(is_default_route)
+        .with_active(is_active);
+    for capability in decode_model_capabilities(&capabilities_json)? {
+        record = record.with_capability(capability);
+    }
+    Ok(record)
+}
+
+pub(crate) fn decode_provider_account_pg_row(row: PgRow) -> Result<ProviderAccountRecord> {
+    Ok(ProviderAccountRecord::new(
+        row.try_get::<String, _>("provider_account_id")?,
+        row.try_get::<String, _>("provider_id")?,
+        row.try_get::<String, _>("display_name")?,
+        row.try_get::<String, _>("account_kind")?,
+        row.try_get::<String, _>("execution_instance_id")?,
+    )
+    .with_owner_scope(row.try_get::<String, _>("owner_scope")?)
+    .with_owner_tenant_id_option(row.try_get::<Option<String>, _>("owner_tenant_id")?)
+    .with_base_url_override_option(row.try_get::<Option<String>, _>("base_url_override")?)
+    .with_region_option(row.try_get::<Option<String>, _>("region")?)
+    .with_priority(row.try_get::<i32, _>("priority")?)
+    .with_weight(u32::try_from(row.try_get::<i32, _>("weight")?)?)
+    .with_enabled(row.try_get::<bool, _>("enabled")?)
+    .with_routing_tags(decode_string_list(
+        &row.try_get::<String, _>("routing_tags_json")?,
+    )?)
+    .with_health_score_hint_option(row.try_get::<Option<f64>, _>("health_score_hint")?)
+    .with_latency_ms_hint_option(
+        row.try_get::<Option<i64>, _>("latency_ms_hint")?
+            .map(u64::try_from)
+            .transpose()?,
+    )
+    .with_cost_hint_option(row.try_get::<Option<f64>, _>("cost_hint")?)
+    .with_success_rate_hint_option(row.try_get::<Option<f64>, _>("success_rate_hint")?)
+    .with_throughput_hint_option(row.try_get::<Option<f64>, _>("throughput_hint")?)
+    .with_max_concurrency_option(
+        row.try_get::<Option<i64>, _>("max_concurrency")?
+            .map(u32::try_from)
+            .transpose()?,
+    )
+    .with_daily_budget_option(row.try_get::<Option<f64>, _>("daily_budget")?)
+    .with_notes_option(row.try_get::<Option<String>, _>("notes")?))
+}
+
 pub(crate) fn decode_model_price_row(row: ModelPriceRow) -> ModelPriceRecord {
     let (
         channel_id,
@@ -599,6 +658,9 @@ pub(crate) fn decode_model_price_row(row: ModelPriceRow) -> ModelPriceRecord {
         cache_read_price,
         cache_write_price,
         request_price,
+        price_source_kind,
+        billing_notes,
+        pricing_tiers_json,
         is_active,
     ) = row;
 
@@ -610,6 +672,9 @@ pub(crate) fn decode_model_price_row(row: ModelPriceRow) -> ModelPriceRecord {
         .with_cache_read_price(cache_read_price)
         .with_cache_write_price(cache_write_price)
         .with_request_price(request_price)
+        .with_price_source_kind(price_source_kind)
+        .with_billing_notes_option(billing_notes)
+        .with_pricing_tiers(decode_model_price_tiers(&pricing_tiers_json).unwrap_or_default())
         .with_active(is_active)
 }
 

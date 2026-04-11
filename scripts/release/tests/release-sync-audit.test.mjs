@@ -137,6 +137,20 @@ test('release sync audit exposes repository specs and blocks non-standalone, dir
   assert.equal(cleanAudit.releasable, true);
   assert.deepEqual(cleanAudit.reasons, []);
 
+  const sshRemoteAudit = module.evaluateReleaseSyncRepositoryAudit({
+    spec: specs[0],
+    expectedRef: 'main',
+    topLevel: specs[0].expectedGitRoot,
+    statusText: '## main...origin/main',
+    remoteUrl: 'git@github.com:Sdkwork-Cloud/sdkwork-api-router.git',
+    remoteHeadResult: {
+      ok: true,
+      stdout: 'abc123\trefs/heads/main',
+    },
+  });
+  assert.equal(sshRemoteAudit.releasable, true);
+  assert.deepEqual(sshRemoteAudit.reasons, []);
+
   const nonStandaloneAudit = module.evaluateReleaseSyncRepositoryAudit({
     spec: specs[1],
     expectedRef: 'main',

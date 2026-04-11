@@ -1,0 +1,53 @@
+{
+  "profile_id": "dev",
+  "description": "Developer bootstrap profile with the full commercial catalog plus local demo workspace data and local-first routing preferences.",
+  "channels": [
+    "channels/default.json"
+  ],
+  "providers": [
+    "providers/default.json"
+  ],
+  "official_provider_configs": [
+    "official-provider-configs/default.json"
+  ],
+  "models": [
+    "models/default.json"
+  ],
+  "channel_models": [
+    "channel-models/default.json"
+  ],
+  "model_prices": [
+    "model-prices/default.json"
+  ],
+  "tenants": [
+    "tenants/default.json",
+    "tenants/dev.json"
+  ],
+  "projects": [
+    "projects/default.json",
+    "projects/dev.json"
+  ],
+  "routing": [
+    "routing/default.json",
+    "routing/dev.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/default.json",
+    "api-key-groups/dev.json"
+  ],
+  "quota_policies": [
+    "quota-policies/default.json",
+    "quota-policies/dev.json"
+  ],
+  "pricing": [
+    "pricing/default.json"
+  ],
+  "payment_methods": [
+    "payment-methods/default.json",
+    "payment-methods/dev.json"
+  ],
+  "marketing": [
+    "marketing/default.json",
+    "marketing/dev.json"
+  ]
+}

@@ -11,7 +11,6 @@ import {
   deleteChannel,
   deleteChannelModel,
   deleteCredential,
-  deleteCoupon,
   deleteModel,
   deleteModelPrice,
   deleteOperatorUser,
@@ -24,7 +23,6 @@ import {
   retireCommercialPricingPlan,
   saveChannel,
   saveChannelModel,
-  saveCoupon,
   saveCredential,
   saveModel,
   saveModelPrice,
@@ -55,11 +53,12 @@ import type {
   CommercialPricingPlanRecord,
   CommercialPricingRateCreateInput,
   CouponCodeStatus,
-  CouponRecord,
   CouponTemplateStatus,
   CreatedGatewayApiKey,
   MarketingCampaignStatus,
+  ModelPriceTier,
   RuntimeReloadReport,
+  SaveProviderInput,
 } from 'sdkwork-router-admin-types';
 
 export type SaveOperatorUserInput = {
@@ -78,16 +77,6 @@ export type SavePortalUserInput = {
   workspace_tenant_id: string;
   workspace_project_id: string;
   active: boolean;
-};
-
-export type SaveProviderInput = {
-  id: string;
-  channel_id: string;
-  extension_id?: string;
-  adapter_kind: string;
-  base_url: string;
-  display_name: string;
-  channel_bindings: Array<{ channel_id: string; is_primary: boolean }>;
 };
 
 export type SaveModelInput = {
@@ -119,6 +108,9 @@ export type SaveModelPriceInput = {
   cache_read_price: number;
   cache_write_price: number;
   request_price: number;
+  price_source_kind: string;
+  billing_notes?: string | null;
+  pricing_tiers: ModelPriceTier[];
   is_active: boolean;
 };
 
@@ -173,9 +165,6 @@ export interface WorkbenchActions {
   handleTogglePortalUser: (userId: string, active: boolean) => Promise<void>;
   handleDeleteOperatorUser: (userId: string) => Promise<void>;
   handleDeletePortalUser: (userId: string) => Promise<void>;
-  handleSaveCoupon: (coupon: CouponRecord) => Promise<void>;
-  handleToggleCoupon: (coupon: CouponRecord) => Promise<void>;
-  handleDeleteCoupon: (couponId: string) => Promise<void>;
   handleUpdateMarketingCouponTemplateStatus: (
     couponTemplateId: string,
     status: CouponTemplateStatus,
@@ -415,43 +404,6 @@ export function createWorkbenchActions({
         setStatus,
         startStatus: 'Deleting portal identity...',
         successStatus: 'Portal user deleted.',
-      });
-    },
-
-    async handleSaveCoupon(coupon) {
-      await runRefreshingAction({
-        action: () => saveCoupon(coupon),
-        failureStatus: 'Failed to save coupon.',
-        refreshWorkspace,
-        setStatus,
-        startStatus: coupon.id
-          ? 'Saving coupon campaign...'
-          : 'Creating coupon campaign...',
-        successStatus: 'Coupon campaign saved.',
-      });
-    },
-
-    async handleToggleCoupon(coupon) {
-      await runRefreshingAction({
-        action: () => saveCoupon({ ...coupon, active: !coupon.active }),
-        failureStatus: 'Failed to update coupon.',
-        refreshWorkspace,
-        setStatus,
-        startStatus: coupon.active
-          ? 'Archiving coupon campaign...'
-          : 'Restoring coupon campaign...',
-        successStatus: 'Coupon campaign status updated.',
-      });
-    },
-
-    async handleDeleteCoupon(couponId) {
-      await runRefreshingAction({
-        action: () => deleteCoupon(couponId),
-        failureStatus: 'Failed to delete coupon.',
-        refreshWorkspace,
-        setStatus,
-        startStatus: 'Deleting coupon campaign...',
-        successStatus: 'Coupon campaign deleted.',
       });
     },
 

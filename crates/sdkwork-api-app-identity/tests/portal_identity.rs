@@ -3,6 +3,7 @@ use sdkwork_api_app_identity::{
     load_portal_workspace_summary, login_portal_user, register_portal_user, verify_portal_jwt,
     PortalIdentityError,
 };
+use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
 async fn memory_store() -> SqliteAdminStore {
@@ -197,4 +198,33 @@ async fn portal_registration_rejects_weak_passwords() {
         PortalIdentityError::InvalidInput(message)
             if message == "password must include an uppercase letter"
     ));
+}
+
+#[tokio::test]
+async fn production_bootstrap_workspace_does_not_lazy_create_default_portal_user() {
+    let store = memory_store().await;
+    store
+        .insert_tenant(&Tenant::new("tenant_global_default", "Global Default Workspace"))
+        .await
+        .unwrap();
+    store
+        .insert_project(&Project::new(
+            "tenant_global_default",
+            "project_global_default",
+            "production-default",
+        ))
+        .await
+        .unwrap();
+
+    let error = login_portal_user(
+        &store,
+        "portal@sdkwork.local",
+        "ChangeMe123!",
+        "portal-test-secret",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(matches!(error, PortalIdentityError::InvalidCredentials));
+    assert!(store.list_portal_users().await.unwrap().is_empty());
 }

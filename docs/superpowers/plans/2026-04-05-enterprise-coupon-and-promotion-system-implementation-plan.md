@@ -1,5 +1,7 @@
 # Enterprise Coupon And Promotion System Implementation Plan
 
+> Status: historical implementation plan. It was superseded by `docs/架构/166-*` and the 2026-04-10 full legacy coupon exit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将当前 `sdkwork-api-router` 中的单表 `CouponCampaign` 能力升级为企业级优惠券与促销内核，落地模板、活动、预算、码池、验券、预占、核销、退款回滚、审计、监控与兼容迁移的完整闭环。
@@ -16,9 +18,9 @@
 
 **Current hard gaps to close first:**
 
-- `crates/sdkwork-api-domain-coupon/src/lib.rs` 只有 `CouponCampaign { code, discount_label, remaining, active }` 这类单记录模型，不能表达模板、批次、共享码、唯一券码、预算、堆叠和审计。
+- historical legacy coupon domain crate only had `CouponCampaign { code, discount_label, remaining, active }`-style single-record modeling, which could not express template, batch, shared-code, unique-code, budget, stacking, or audit semantics.
 - `crates/sdkwork-api-app-commerce/src/lib.rs` 在报价和下单过程中直接解析 `discount_label`，并通过重写 `remaining` 来“消费”优惠券，缺少预占、幂等、回滚和并发保护。
-- `crates/sdkwork-api-interface-admin/src/lib.rs` 仅暴露 `GET/POST /admin/coupons` 与 `DELETE /admin/coupons/{coupon_id}`，无法覆盖商用优惠券后台所需的模板、活动、批次、码池、核销明细与预算管理。
+- `crates/sdkwork-api-interface-admin/src/lib.rs` 当时仅暴露 legacy admin coupon CRUD routes，无法覆盖商用优惠券后台所需的模板、活动、批次、码池、核销明细与预算管理。
 - `crates/sdkwork-api-interface-portal/src/lib.rs` 和 Portal 页面仍将优惠券视为一次性报价附属字段，没有标准化的验券、锁券、支付确认、退款释放链路。
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/index.tsx` 仍是单表 CRUD 界面，`apps/sdkwork-router-portal/packages/sdkwork-router-portal-credits/src/pages/index.tsx` 仍是简单兑换入口，不具备运营、审计、退款与风控能力。
 
@@ -63,7 +65,7 @@
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-admin-api/src/index.ts`
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-types/src/index.ts`
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/index.tsx`
-- `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponDialog.tsx`
+- legacy coupon create dialog component（removed）
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsRegistrySection.tsx`
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsDetailPanel.tsx`
 - `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsDetailDrawer.tsx`
@@ -95,7 +97,7 @@
 - `rollback_coupon_redemption`
 - `claim_coupon_code`
 - `list_subject_coupon_assets`
-- `project_legacy_coupon_campaign`
+- legacy coupon projection helper
 
 ### 关键数据表命名约定
 
@@ -110,14 +112,14 @@
 - `ai_marketing_idempotency_key`
 - `ai_marketing_outbox_event`
 
-### Task 1: Freeze the current coupon model as a compatibility boundary
+### Task 1: Freeze the current coupon model as a historical compatibility boundary
 
 **Files:**
-- Modify: `crates/sdkwork-api-domain-coupon/src/lib.rs`
-- Modify: `crates/sdkwork-api-app-coupon/src/lib.rs`
+- Modify: historical legacy coupon domain compatibility layer
+- Modify: historical legacy coupon app compatibility layer
 - Modify: `crates/sdkwork-api-storage-core/src/lib.rs`
 - Modify: `crates/sdkwork-api-app-commerce/src/lib.rs`
-- Create: `crates/sdkwork-api-app-coupon/tests/compatibility_coupon_campaign.rs`
+- Create: historical coupon compatibility tests
 
 - [ ] **Step 1: 为 `CouponCampaign` 增加兼容层注释和边界说明**
 
@@ -133,14 +135,14 @@
 
 - [ ] **Step 4: 补兼容层测试**
 
-Run: `cargo test -p sdkwork-api-app-coupon compatibility_coupon_campaign -- --nocapture`
+Run: historical coupon compatibility tests for the campaign shim
 
-Expected: 现有 `/admin/coupons` 行为保持不变，新注释和测试通过。
+Expected: legacy admin coupon compatibility behavior remains stable and the historical shim tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/sdkwork-api-domain-coupon/src/lib.rs crates/sdkwork-api-app-coupon/src/lib.rs crates/sdkwork-api-storage-core/src/lib.rs crates/sdkwork-api-app-commerce/src/lib.rs crates/sdkwork-api-app-coupon/tests/compatibility_coupon_campaign.rs
+git add <historical legacy coupon compatibility files> crates/sdkwork-api-storage-core/src/lib.rs crates/sdkwork-api-app-commerce/src/lib.rs
 git commit -m "refactor: freeze coupon campaign as compatibility layer"
 ```
 
@@ -154,7 +156,7 @@ git commit -m "refactor: freeze coupon campaign as compatibility layer"
 
 - [ ] **Step 1: 创建 `sdkwork-api-domain-marketing` crate**
 
-目标：建立与旧 `sdkwork-api-domain-coupon` 并行的正式营销领域层。
+目标：建立与旧 legacy coupon 兼容层并行的正式营销领域层。
 
 - [ ] **Step 2: 定义核心聚合**
 
@@ -256,7 +258,7 @@ git commit -m "feat: add marketing storage contracts and schema"
 
 行为要求：支持超时释放、取消释放、全额退款回滚、部分退款回滚。
 
-- [ ] **Step 6: 实现 `project_legacy_coupon_campaign`**
+- [ ] **Step 6: 实现 legacy coupon projection helper**
 
 目标：将旧 `CouponCampaign` 映射成共享码模板 + 活动 + 默认批次的兼容投影。
 
@@ -314,7 +316,7 @@ git add crates/sdkwork-api-domain-commerce/src/lib.rs crates/sdkwork-api-app-com
 git commit -m "feat: connect marketing with commerce and billing closure"
 ```
 
-### Task 6: Add enterprise admin APIs while preserving `/admin/coupons` compatibility
+### Task 6: Add enterprise admin APIs while preserving legacy admin coupon compatibility
 
 **Files:**
 - Modify: `crates/sdkwork-api-interface-admin/src/lib.rs`
@@ -326,7 +328,7 @@ git commit -m "feat: connect marketing with commerce and billing closure"
 
 必须包含：`/admin/marketing/coupon-templates`、`/campaigns`、`/budgets`、`/code-batches`、`/codes`、`/reservations`、`/redemptions`、`/rollbacks`。
 
-- [ ] **Step 2: 保留 `/admin/coupons` 兼容接口**
+- [ ] **Step 2: 保留 legacy admin coupon 兼容接口**
 
 目标：旧页面和旧调用不立即失效，但内部转换到新投影层。
 
@@ -338,7 +340,7 @@ git commit -m "feat: connect marketing with commerce and billing closure"
 
 Run: `cargo test -p sdkwork-api-interface-admin marketing_coupon_routes -- --nocapture`
 
-Expected: 新后台路由可用，旧 `/admin/coupons` 保持兼容。
+Expected: 新后台路由可用，旧 legacy admin coupon compatibility route remains stable during migration.
 
 - [ ] **Step 5: Commit**
 
@@ -386,7 +388,7 @@ git commit -m "feat: add portal marketing coupon APIs"
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-admin-api/src/index.ts`
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-types/src/index.ts`
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/index.tsx`
-- Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponDialog.tsx`
+- Modify: legacy coupon create dialog component（removed）
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsRegistrySection.tsx`
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsDetailPanel.tsx`
 - Modify: `apps/sdkwork-router-admin/packages/sdkwork-router-admin-coupons/src/page/CouponsDetailDrawer.tsx`

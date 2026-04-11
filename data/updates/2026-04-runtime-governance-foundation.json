@@ -1,0 +1,17 @@
+{
+  "update_id": "2026-04-runtime-governance-foundation",
+  "release_version": "2026.04.14",
+  "description": "Seed service runtime nodes plus extension and standalone config rollout governance records so fresh installs have plugin/runtime coordination data immediately available.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness"
+  ],
+  "service_runtime_nodes": [
+    "service-runtime-nodes/2026-04-runtime-governance-foundation.json"
+  ],
+  "extension_runtime_rollouts": [
+    "extension-runtime-rollouts/2026-04-runtime-governance-foundation.json"
+  ],
+  "standalone_config_rollouts": [
+    "standalone-config-rollouts/2026-04-runtime-governance-foundation.json"
+  ]
+}

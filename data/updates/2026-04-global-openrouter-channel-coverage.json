@@ -1,0 +1,26 @@
+{
+  "update_id": "2026-04-global-openrouter-channel-coverage",
+  "release_version": "2026.04.16",
+  "description": "Expand OpenRouter default seed coverage for xAI, Moonshot, and Mistral channels so proxy bindings, pricing, and routing samples stay commercially usable by default.",
+  "depends_on": [
+    "2026-04-global-provider-operations-readiness"
+  ],
+  "provider_models": [
+    "provider-models/2026-04-global-openrouter-channel-coverage.json"
+  ],
+  "model_prices": [
+    "model-prices/2026-04-global-openrouter-channel-coverage.json"
+  ],
+  "routing": [
+    "routing/2026-04-global-openrouter-channel-coverage.json"
+  ],
+  "api_key_groups": [
+    "api-key-groups/2026-04-global-openrouter-channel-coverage.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-openrouter-channel-coverage.json"
+  ],
+  "billing": [
+    "billing/2026-04-global-openrouter-channel-coverage.json"
+  ]
+}

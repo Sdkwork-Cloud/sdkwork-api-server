@@ -1,0 +1,87 @@
+{
+  "holds": [
+    {
+      "hold_id": 8101019,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610019,
+      "status": "partially_released",
+      "estimated_quantity": 34400.0,
+      "captured_quantity": 32400.0,
+      "released_quantity": 2000.0,
+      "expires_at_ms": 1710001091000,
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "hold_id": 8101020,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610020,
+      "status": "partially_released",
+      "estimated_quantity": 7600.0,
+      "captured_quantity": 7100.0,
+      "released_quantity": 500.0,
+      "expires_at_ms": 1710001092000,
+      "created_at_ms": 1710000492000,
+      "updated_at_ms": 1710000495000
+    },
+    {
+      "hold_id": 8101021,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610021,
+      "status": "partially_released",
+      "estimated_quantity": 15600.0,
+      "captured_quantity": 14800.0,
+      "released_quantity": 800.0,
+      "expires_at_ms": 1710001093000,
+      "created_at_ms": 1710000493000,
+      "updated_at_ms": 1710000496000
+    }
+  ],
+  "allocations": [
+    {
+      "hold_allocation_id": 8401019,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "hold_id": 8101019,
+      "lot_id": 8001006,
+      "allocated_quantity": 34400.0,
+      "captured_quantity": 32400.0,
+      "released_quantity": 2000.0,
+      "created_at_ms": 1710000491000,
+      "updated_at_ms": 1710000494000
+    },
+    {
+      "hold_allocation_id": 8401020,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "hold_id": 8101020,
+      "lot_id": 8001006,
+      "allocated_quantity": 7600.0,
+      "captured_quantity": 7100.0,
+      "released_quantity": 500.0,
+      "created_at_ms": 1710000492000,
+      "updated_at_ms": 1710000495000
+    },
+    {
+      "hold_allocation_id": 8401021,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "hold_id": 8101021,
+      "lot_id": 8001006,
+      "allocated_quantity": 15600.0,
+      "captured_quantity": 14800.0,
+      "released_quantity": 800.0,
+      "created_at_ms": 1710000493000,
+      "updated_at_ms": 1710000496000
+    }
+  ]
+}

@@ -1,12 +1,21 @@
 ﻿use super::*;
 
-pub(crate) async fn ensure_default_admin_user(store: &dyn AdminStore) -> AdminResult<AdminUserRecord> {
+pub(crate) async fn ensure_default_admin_user(
+    store: &dyn AdminStore,
+) -> AdminResult<Option<AdminUserRecord>> {
     if let Some(user) = store
         .find_admin_user_by_email(DEFAULT_ADMIN_EMAIL)
         .await
         .map_err(AdminIdentityError::from)?
     {
-        return Ok(user);
+        return Ok(Some(user));
+    }
+
+    if !should_materialize_lazy_default_identities(store)
+        .await
+        .map_err(AdminIdentityError::from)?
+    {
+        return Ok(None);
     }
 
     let created_at_ms = now_epoch_millis().map_err(AdminIdentityError::from)?;
@@ -24,13 +33,14 @@ pub(crate) async fn ensure_default_admin_user(store: &dyn AdminStore) -> AdminRe
     );
 
     match store.insert_admin_user(&user).await {
-        Ok(saved) => Ok(saved),
+        Ok(saved) => Ok(Some(saved)),
         Err(error) => {
             if looks_like_duplicate_error(&error) {
                 store
                     .find_admin_user_by_email(DEFAULT_ADMIN_EMAIL)
                     .await
                     .map_err(AdminIdentityError::from)?
+                    .map(Some)
                     .ok_or_else(|| AdminIdentityError::Storage(error))
             } else {
                 Err(AdminIdentityError::Storage(error))
@@ -39,13 +49,22 @@ pub(crate) async fn ensure_default_admin_user(store: &dyn AdminStore) -> AdminRe
     }
 }
 
-pub(crate) async fn ensure_default_portal_user(store: &dyn AdminStore) -> PortalResult<PortalUserRecord> {
+pub(crate) async fn ensure_default_portal_user(
+    store: &dyn AdminStore,
+) -> PortalResult<Option<PortalUserRecord>> {
     if let Some(user) = store
         .find_portal_user_by_email(DEFAULT_PORTAL_EMAIL)
         .await
         .map_err(PortalIdentityError::from)?
     {
-        return Ok(user);
+        return Ok(Some(user));
+    }
+
+    if !should_materialize_lazy_default_identities(store)
+        .await
+        .map_err(PortalIdentityError::from)?
+    {
+        return Ok(None);
     }
 
     let tenant = Tenant::new(DEFAULT_PORTAL_TENANT_ID, "Portal Demo Workspace");
@@ -80,13 +99,14 @@ pub(crate) async fn ensure_default_portal_user(store: &dyn AdminStore) -> Portal
     );
 
     match store.insert_portal_user(&user).await {
-        Ok(saved) => Ok(saved),
+        Ok(saved) => Ok(Some(saved)),
         Err(error) => {
             if looks_like_duplicate_error(&error) {
                 store
                     .find_portal_user_by_email(DEFAULT_PORTAL_EMAIL)
                     .await
                     .map_err(PortalIdentityError::from)?
+                    .map(Some)
                     .ok_or_else(|| PortalIdentityError::Storage(error))
             } else {
                 Err(map_portal_store_error(error))
@@ -151,6 +171,22 @@ pub(crate) fn validate_registration_input(
         .map_err(PortalIdentityError::InvalidInput)?;
     validate_password_strength(password).map_err(PortalIdentityError::InvalidInput)?;
     Ok(())
+}
+
+async fn should_materialize_lazy_default_identities(store: &dyn AdminStore) -> Result<bool> {
+    if store.find_tenant(DEFAULT_PORTAL_TENANT_ID).await?.is_some() {
+        return Ok(true);
+    }
+
+    if !store.list_tenants().await?.is_empty() {
+        return Ok(false);
+    }
+
+    if !store.list_projects().await?.is_empty() {
+        return Ok(false);
+    }
+
+    Ok(true)
 }
 
 pub(crate) fn validate_identity_profile_input(

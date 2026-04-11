@@ -26,7 +26,6 @@ import {
   listCommercialPricingRates,
   listCommercialRequestSettlements,
   listCompiledRoutingSnapshots,
-  listCoupons,
   listCredentials,
   listMarketingCampaignBudgets,
   listMarketingCampaigns,
@@ -40,6 +39,7 @@ import {
   listOperatorUsers,
   listRecentCommerceOrders,
   listPortalUsers,
+  listProviderModels,
   listProjects,
   listProviderHealthSnapshots,
   listProviders,
@@ -182,7 +182,6 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
       ]);
 
       const [
-        coupons,
         tenants,
         projects,
         apiKeys,
@@ -196,6 +195,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         credentials,
         models,
         channelModels,
+        providerModels,
         modelPrices,
         usageRecords,
         usageSummary,
@@ -219,7 +219,6 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         providerHealth,
         runtimeStatuses,
       ] = await Promise.all([
-        listCoupons(),
         listTenants(),
         listProjects(),
         listApiKeys(),
@@ -233,6 +232,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         listCredentials(),
         listModels(),
         listChannelModels(),
+        listProviderModels(),
         listModelPrices(),
         listUsageRecords(),
         getUsageSummary(),
@@ -275,7 +275,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         )
       ).flat();
 
-      const nextSnapshot = buildSnapshot(explicitSessionUser, coupons, {
+      const nextSnapshot = buildSnapshot(explicitSessionUser, {
         operatorDirectory,
         portalDirectory,
         tenants,
@@ -291,6 +291,7 @@ export function AdminWorkbenchProvider({ children }: { children: ReactNode }) {
         credentials,
         models,
         channelModels,
+        providerModels,
         modelPrices,
         usageRecords,
         usageSummary,

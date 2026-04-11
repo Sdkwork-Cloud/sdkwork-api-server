@@ -45,12 +45,18 @@ impl NativeDynamicRuntime {
             return Err(ExtensionHostError::NativeDynamicInvocationFailed {
                 entrypoint: self.entrypoint.clone(),
                 message: "native dynamic runtime is not running".to_owned(),
+                code: None,
+                retryable: None,
+                retry_after_ms: None,
             });
         }
         if state.draining || state.shutdown_invoked {
             return Err(ExtensionHostError::NativeDynamicInvocationFailed {
                 entrypoint: self.entrypoint.clone(),
                 message: "native dynamic runtime is draining for shutdown".to_owned(),
+                code: None,
+                retryable: None,
+                retry_after_ms: None,
             });
         }
         state.active_invocations += 1;
@@ -85,6 +91,9 @@ impl NativeDynamicRuntime {
             Err(ExtensionHostError::NativeDynamicInvocationFailed {
                 entrypoint: self.entrypoint.clone(),
                 message: "native dynamic runtime is not running".to_owned(),
+                code: None,
+                retryable: None,
+                retry_after_ms: None,
             })
         }
     }
@@ -354,7 +363,18 @@ impl ProviderExecutionAdapter for NativeDynamicProviderAdapter {
                     || "native dynamic provider reported unsupported operation".to_owned()
                 )
             )),
-            ProviderInvocationResult::Error { message } => Err(anyhow!("{message}")),
+            ProviderInvocationResult::Error {
+                message,
+                code,
+                retryable,
+                retry_after_ms,
+            } => Err(anyhow::Error::new(ExtensionHostError::NativeDynamicInvocationFailed {
+                entrypoint: self.runtime.entrypoint.clone(),
+                message,
+                code,
+                retryable,
+                retry_after_ms,
+            })),
         }
     }
 
@@ -385,7 +405,18 @@ impl ProviderExecutionAdapter for NativeDynamicProviderAdapter {
                     || "native dynamic provider reported unsupported operation".to_owned()
                 )
             )),
-            ProviderInvocationResult::Error { message } => Err(anyhow!("{message}")),
+            ProviderInvocationResult::Error {
+                message,
+                code,
+                retryable,
+                retry_after_ms,
+            } => Err(anyhow::Error::new(ExtensionHostError::NativeDynamicInvocationFailed {
+                entrypoint: self.runtime.entrypoint.clone(),
+                message,
+                code,
+                retryable,
+                retry_after_ms,
+            })),
         }
     }
 }
@@ -666,7 +697,7 @@ pub(crate) fn ensure_native_dynamic_manifest_matches(
     }
 }
 
-fn execute_native_dynamic_invocation(
+pub(crate) fn execute_native_dynamic_invocation(
     runtime: &NativeDynamicRuntime,
     invocation: &ProviderInvocation,
 ) -> Result<ProviderInvocationResult, ExtensionHostError> {
@@ -697,7 +728,7 @@ fn execute_native_dynamic_invocation(
     })
 }
 
-async fn execute_native_dynamic_stream_invocation(
+pub(crate) async fn execute_native_dynamic_stream_invocation(
     runtime: Arc<NativeDynamicRuntime>,
     invocation: &ProviderInvocation,
 ) -> Result<ProviderStreamOutput, ExtensionHostError> {
@@ -706,6 +737,9 @@ async fn execute_native_dynamic_stream_invocation(
         return Err(ExtensionHostError::NativeDynamicInvocationFailed {
             entrypoint: runtime.entrypoint.clone(),
             message: "plugin does not export stream execution".to_owned(),
+            code: None,
+            retryable: None,
+            retry_after_ms: None,
         });
     };
 
@@ -790,12 +824,23 @@ async fn execute_native_dynamic_stream_invocation(
                             "native dynamic provider reported unsupported stream operation"
                                 .to_owned()
                         }),
+                        code: None,
+                        retryable: None,
+                        retry_after_ms: None,
                     })
                 }
-                ProviderStreamInvocationResult::Error { message } => {
+                ProviderStreamInvocationResult::Error {
+                    message,
+                    code,
+                    retryable,
+                    retry_after_ms,
+                } => {
                     Err(ExtensionHostError::NativeDynamicInvocationFailed {
                         entrypoint: runtime.entrypoint.clone(),
                         message,
+                        code,
+                        retryable,
+                        retry_after_ms,
                     })
                 }
             };
@@ -804,6 +849,9 @@ async fn execute_native_dynamic_stream_invocation(
             return Err(ExtensionHostError::NativeDynamicInvocationFailed {
                 entrypoint: runtime.entrypoint.clone(),
                 message: "plugin closed stream without producing metadata or chunks".to_owned(),
+                code: None,
+                retryable: None,
+                retry_after_ms: None,
             });
         }
     }
@@ -823,6 +871,7 @@ async fn execute_native_dynamic_stream_invocation(
             })))),
             NativeDynamicStreamEvent::Finished(ProviderStreamInvocationResult::Error {
                 message,
+                ..
             }) => Some(Err(io::Error::other(message))),
         }
     });

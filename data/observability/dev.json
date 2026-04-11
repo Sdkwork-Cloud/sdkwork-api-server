@@ -1,0 +1,203 @@
+{
+  "compiled_routing_snapshots": [
+    {
+      "snapshot_id": "snapshot-dev-local-sandbox",
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "api_key_group_id": "group-local-demo-sandbox",
+      "capability": "responses",
+      "route_key": "llama-3.2-3b-instruct",
+      "matched_policy_id": "policy-dev-local-responses",
+      "project_routing_preferences_project_id": "project_local_demo",
+      "applied_routing_profile_id": "profile-dev-local-first",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-deepseek-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 2,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710001100000,
+      "updated_at_ms": 1710001100500
+    },
+    {
+      "snapshot_id": "snapshot-dev-partner-staging",
+      "tenant_id": "tenant_partner_demo",
+      "project_id": "project_partner_demo",
+      "api_key_group_id": "group-partner-demo-staging",
+      "capability": "responses",
+      "route_key": "gemini-2.5-pro",
+      "matched_policy_id": "policy-default-responses",
+      "project_routing_preferences_project_id": "project_partner_demo",
+      "applied_routing_profile_id": "profile-partner-sandbox",
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-gemini-official",
+        "provider-anthropic-official",
+        "provider-openai-official",
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710001101000,
+      "updated_at_ms": 1710001101500
+    }
+  ],
+  "routing_decision_logs": [
+    {
+      "decision_id": "decision-dev-local-sandbox",
+      "decision_source": "gateway",
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "api_key_group_id": "group-local-demo-sandbox",
+      "capability": "responses",
+      "route_key": "llama-3.2-3b-instruct",
+      "selected_provider_id": "provider-ollama-local",
+      "matched_policy_id": "policy-dev-local-responses",
+      "applied_routing_profile_id": "profile-dev-local-first",
+      "compiled_routing_snapshot_id": "snapshot-dev-local-sandbox",
+      "strategy": "deterministic_priority",
+      "selection_seed": 301,
+      "selection_reason": "local runtime was healthy and satisfied the lowest-cost sandbox preference",
+      "fallback_reason": null,
+      "requested_region": "local",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710001102000,
+      "assessments": [
+        {
+          "provider_id": "provider-ollama-local",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 0,
+          "latency_ms": 140,
+          "region": "local",
+          "region_match": true,
+          "reasons": [
+            "local daemon ready"
+          ]
+        },
+        {
+          "provider_id": "provider-siliconflow-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.35,
+          "latency_ms": 580,
+          "region": "cn",
+          "region_match": false,
+          "reasons": [
+            "cost-effective fallback"
+          ]
+        },
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 2,
+          "cost": 0.4,
+          "latency_ms": 640,
+          "region": "global",
+          "region_match": false,
+          "reasons": [
+            "broad hosted fallback"
+          ]
+        }
+      ]
+    },
+    {
+      "decision_id": "decision-dev-partner-staging",
+      "decision_source": "portal_simulation",
+      "tenant_id": "tenant_partner_demo",
+      "project_id": "project_partner_demo",
+      "api_key_group_id": "group-partner-demo-staging",
+      "capability": "responses",
+      "route_key": "gemini-2.5-pro",
+      "selected_provider_id": "provider-gemini-official",
+      "matched_policy_id": "policy-default-responses",
+      "applied_routing_profile_id": "profile-partner-sandbox",
+      "compiled_routing_snapshot_id": "snapshot-dev-partner-staging",
+      "strategy": "weighted_random",
+      "selection_seed": 302,
+      "selection_reason": "partner preview favored the official Gemini path for large-context evaluation",
+      "fallback_reason": null,
+      "requested_region": "global",
+      "slo_applied": false,
+      "slo_degraded": false,
+      "created_at_ms": 1710001102600,
+      "assessments": [
+        {
+          "provider_id": "provider-gemini-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 0,
+          "cost": 1.4,
+          "latency_ms": 720,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "large context and strong multimodal coverage"
+          ]
+        },
+        {
+          "provider_id": "provider-openrouter-main",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 1,
+          "cost": 0.7,
+          "latency_ms": 650,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "aggregator fallback for cross-vendor models"
+          ]
+        },
+        {
+          "provider_id": "provider-anthropic-official",
+          "available": true,
+          "health": "healthy",
+          "policy_rank": 2,
+          "cost": 3,
+          "latency_ms": 860,
+          "region": "global",
+          "region_match": true,
+          "reasons": [
+            "high-quality reasoning backup"
+          ]
+        }
+      ]
+    }
+  ],
+  "provider_health_snapshots": [
+    {
+      "provider_id": "provider-ollama-local",
+      "extension_id": "sdkwork.provider.ollama",
+      "runtime": "builtin",
+      "observed_at_ms": 1710001103000,
+      "instance_id": "provider-ollama-local",
+      "running": true,
+      "healthy": true,
+      "message": "local daemon ready"
+    },
+    {
+      "provider_id": "provider-qwen-official",
+      "extension_id": "sdkwork.provider.qwen",
+      "runtime": "builtin",
+      "observed_at_ms": 1710001103200,
+      "instance_id": "provider-qwen-official",
+      "running": true,
+      "healthy": true,
+      "message": "cn official runtime healthy"
+    }
+  ]
+}

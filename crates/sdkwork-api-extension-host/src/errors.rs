@@ -56,6 +56,9 @@ pub enum ExtensionHostError {
     NativeDynamicInvocationFailed {
         entrypoint: String,
         message: String,
+        code: Option<String>,
+        retryable: Option<bool>,
+        retry_after_ms: Option<u64>,
     },
     NativeDynamicResponseParseFailed {
         entrypoint: String,
@@ -194,6 +197,7 @@ impl fmt::Display for ExtensionHostError {
             Self::NativeDynamicInvocationFailed {
                 entrypoint,
                 message,
+                ..
             } => write!(
                 f,
                 "native dynamic extension library {} failed during invocation: {}",
@@ -292,6 +296,25 @@ impl fmt::Display for ExtensionHostError {
                 "failed to shut down connector extension instance {}: {}",
                 instance_id, message
             ),
+        }
+    }
+}
+
+impl ExtensionHostError {
+    pub fn native_dynamic_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::NativeDynamicInvocationFailed {
+                retryable: Some(true),
+                ..
+            }
+        )
+    }
+
+    pub fn native_dynamic_retry_after_ms(&self) -> Option<u64> {
+        match self {
+            Self::NativeDynamicInvocationFailed { retry_after_ms, .. } => *retry_after_ms,
+            _ => None,
         }
     }
 }

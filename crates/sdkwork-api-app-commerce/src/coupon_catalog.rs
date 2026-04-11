@@ -19,36 +19,6 @@ async fn load_coupon_definitions(
         .collect::<BTreeMap<_, _>>();
     let now_ms = current_time_ms()?;
 
-    for coupon in list_active_coupons(store).await? {
-        let code = normalize_coupon_code(&coupon.code);
-        let prior = definitions.get(&code).cloned();
-        let parsed_benefit = CommerceCouponBenefit {
-            discount_percent: parse_discount_percent(&coupon.discount_label),
-            bonus_units: 0,
-        };
-        let benefit = merge_coupon_benefit(parsed_benefit, prior.as_ref().map(|item| item.benefit));
-
-        definitions.insert(
-            code.clone(),
-            CommerceCouponDefinition {
-                coupon: PortalCommerceCoupon {
-                    id: coupon.id,
-                    code,
-                    discount_label: coupon.discount_label,
-                    audience: coupon.audience,
-                    remaining: coupon.remaining,
-                    active: coupon.active,
-                    note: coupon.note,
-                    expires_on: coupon.expires_on,
-                    source: "live".to_owned(),
-                    discount_percent: benefit.discount_percent,
-                    bonus_units: benefit.bonus_units,
-                },
-                benefit,
-            },
-        );
-    }
-
     for definition in load_marketing_coupon_definitions(store, now_ms).await? {
         definitions.insert(normalize_coupon_code(&definition.coupon.code), definition);
     }
@@ -178,7 +148,7 @@ async fn load_marketing_coupon_context_by_value(
         }
     }
 
-    load_compatibility_marketing_coupon_context(store, &normalized).await
+    Ok(None)
 }
 
 pub async fn reclaim_expired_coupon_reservations_for_code_if_needed(
@@ -299,31 +269,6 @@ async fn load_marketing_coupon_context_from_code_record(
         code,
         source: "marketing".to_owned(),
     }))
-}
-
-pub(crate) async fn load_compatibility_marketing_coupon_context<T>(
-    store: &T,
-    code: &str,
-) -> CommerceResult<Option<MarketingCouponContext>>
-where
-    T: AdminStore + ?Sized,
-{
-    Ok(store
-        .list_active_coupons()
-        .await
-        .map_err(CommerceError::from)?
-        .into_iter()
-        .find(|coupon| normalize_coupon_code(&coupon.code) == code)
-        .map(|coupon| {
-            let (template, campaign, budget, code_record) = project_legacy_coupon_campaign(&coupon);
-            MarketingCouponContext {
-                template,
-                campaign,
-                budget,
-                code: code_record,
-                source: "live".to_owned(),
-            }
-        }))
 }
 
 pub(crate) fn select_effective_marketing_campaign(

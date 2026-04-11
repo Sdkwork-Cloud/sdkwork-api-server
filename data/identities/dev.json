@@ -1,0 +1,90 @@
+{
+  "admin_users": [
+    {
+      "id": "admin_local_default",
+      "email": "admin@sdkwork.local",
+      "display_name": "Admin Operator",
+      "password_salt": "c2Rrd29ya0FkbWluU2VlZA",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya0FkbWluU2VlZA$Qqn9CGRiZIU7JwoSPHszrNY459YXH9M3WSwuNnJSwxM",
+      "active": true,
+      "created_at_ms": 1710000000000
+    },
+    {
+      "id": "admin_ops_demo",
+      "email": "ops@sdkwork.local",
+      "display_name": "Operations Supervisor",
+      "password_salt": "c2Rrd29ya1BhcnRuZXJTZWVk",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya1BhcnRuZXJTZWVk$qIGl6qpZiz5gAlmUmVIS73VOK9JfKI5orbRWY9nwPsY",
+      "active": true,
+      "created_at_ms": 1710000005000
+    }
+  ],
+  "portal_users": [
+    {
+      "id": "user_local_demo",
+      "email": "portal@sdkwork.local",
+      "display_name": "Portal Demo",
+      "password_salt": "c2Rrd29ya1BvcnRhbFNlZWQ",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya1BvcnRhbFNlZWQ$A2N73CiDSUv+hpFm7j0p3Jx6SJv2+JEpqUbqUdhSRgU",
+      "workspace_tenant_id": "tenant_local_demo",
+      "workspace_project_id": "project_local_demo",
+      "active": true,
+      "created_at_ms": 1710000010000
+    },
+    {
+      "id": "user_partner_demo",
+      "email": "partner@sdkwork.local",
+      "display_name": "Partner Sandbox",
+      "password_salt": "c2Rrd29ya1BhcnRuZXJTZWVk",
+      "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya1BhcnRuZXJTZWVk$qIGl6qpZiz5gAlmUmVIS73VOK9JfKI5orbRWY9nwPsY",
+      "workspace_tenant_id": "tenant_partner_demo",
+      "workspace_project_id": "project_partner_demo",
+      "active": true,
+      "created_at_ms": 1710000015000
+    }
+  ],
+  "gateway_api_keys": [
+    {
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "environment": "live",
+      "hashed_key": "a19d2bf76318aa7f619d684271469bb383faf1cb5bd4c680088465cde9d0003b",
+      "api_key_group_id": "group-local-demo-live",
+      "raw_key": "skw_live_local_demo_2026",
+      "label": "Local Demo Live Key",
+      "notes": "Default live bootstrap key for dev and smoke testing.",
+      "created_at_ms": 1710002000000,
+      "last_used_at_ms": null,
+      "expires_at_ms": null,
+      "active": true
+    },
+    {
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "environment": "sandbox",
+      "hashed_key": "13072ae2c436e62116c61d76c68e7cc32a7a1e252a1d192490d6ac7cc92295eb",
+      "api_key_group_id": "group-local-demo-sandbox",
+      "raw_key": "skw_sandbox_local_demo_2026",
+      "label": "Local Demo Sandbox Key",
+      "notes": "Sandbox bootstrap key that prefers low-risk local-first routes.",
+      "created_at_ms": 1710002005000,
+      "last_used_at_ms": null,
+      "expires_at_ms": null,
+      "active": true
+    },
+    {
+      "tenant_id": "tenant_partner_demo",
+      "project_id": "project_partner_demo",
+      "environment": "staging",
+      "hashed_key": "79aac191d0637853cca289ebd01e2ab6949fa915da1bc809ff8349971f3fc71f",
+      "api_key_group_id": "group-partner-demo-staging",
+      "raw_key": "skw_partner_demo_staging_2026",
+      "label": "Partner Demo Staging Key",
+      "notes": "Partner acceptance bootstrap key with broader provider coverage.",
+      "created_at_ms": 1710002010000,
+      "last_used_at_ms": null,
+      "expires_at_ms": null,
+      "active": true
+    }
+  ]
+}

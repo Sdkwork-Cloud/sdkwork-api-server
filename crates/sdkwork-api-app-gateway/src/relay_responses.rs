@@ -25,7 +25,7 @@ pub async fn relay_response_from_store_with_execution_context(
     project_id: &str,
     request: &CreateResponseRequest,
 ) -> Result<GatewayExecutionResult<Value>> {
-    let decision = select_gateway_route(
+    let original_decision = select_gateway_route(
         store,
         tenant_id,
         Some(project_id),
@@ -35,26 +35,31 @@ pub async fn relay_response_from_store_with_execution_context(
     .await?;
     let execution_policy = gateway_execution_policy_for_decision(
         store,
-        &decision,
+        &original_decision,
         &ProviderRequest::Responses(request),
     )
     .await?;
-    let selected_provider_id = decision.selected_provider_id.clone();
-    let Some(provider) = store.find_provider(&selected_provider_id).await? else {
-        return Ok(GatewayExecutionResult::new(None, None));
-    };
-    let Some(api_key) =
-        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
-            .await?
+    let Some((decision, provider, descriptor)) = resolve_store_relay_provider_for_decision(
+        store,
+        secret_manager,
+        tenant_id,
+        &original_decision,
+        execution_policy.failover_enabled,
+    )
+    .await?
     else {
         return Ok(GatewayExecutionResult::new(None, None));
     };
+    let selected_provider_id = decision.selected_provider_id.clone();
+    let preflight_failover_from_provider_id = (selected_provider_id
+        != original_decision.selected_provider_id)
+        .then(|| original_decision.selected_provider_id.clone());
     let options = ProviderRequestOptions::default();
 
-    match execute_json_provider_request_for_provider_with_options(
+    match execute_json_provider_request_for_descriptor_with_options(
         store,
         &provider,
-        &api_key,
+        &descriptor,
         ProviderRequest::Responses(request),
         &options,
         execution_policy.retry_policy,
@@ -62,6 +67,24 @@ pub async fn relay_response_from_store_with_execution_context(
     .await
     {
         Ok(Some(response)) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "success",
+                );
+                persist_gateway_execution_failover_decision_log(
+                    store,
+                    tenant_id,
+                    project_id,
+                    "responses",
+                    &request.model,
+                    &original_decision,
+                    &provider.id,
+                )
+                .await?;
+            }
             let usage_context = gateway_usage_context_for_decision_provider(
                 store,
                 tenant_id,
@@ -78,6 +101,14 @@ pub async fn relay_response_from_store_with_execution_context(
         }
         Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
         Err(mut last_error) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "failure",
+                );
+            }
             if !execution_policy.failover_enabled {
                 return Err(last_error);
             }
@@ -90,20 +121,22 @@ pub async fn relay_response_from_store_with_execution_context(
                 else {
                     continue;
                 };
-                let Some(candidate_api_key) = resolve_provider_secret_with_manager(
-                    store,
-                    secret_manager,
-                    tenant_id,
-                    &candidate_provider.id,
-                )
-                .await?
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        decision.requested_region.as_deref(),
+                    )
+                    .await?
                 else {
                     continue;
                 };
-                match execute_json_provider_request_for_provider_with_options(
+                match execute_json_provider_request_for_descriptor_with_options(
                     store,
                     &candidate_provider,
-                    &candidate_api_key,
+                    &candidate_descriptor,
                     ProviderRequest::Responses(request),
                     &options,
                     execution_policy.retry_policy,
@@ -185,7 +218,7 @@ pub async fn relay_response_stream_from_store_with_execution_context(
     project_id: &str,
     request: &CreateResponseRequest,
 ) -> Result<GatewayExecutionResult<ProviderStreamOutput>> {
-    let decision = select_gateway_route(
+    let original_decision = select_gateway_route(
         store,
         tenant_id,
         Some(project_id),
@@ -195,26 +228,31 @@ pub async fn relay_response_stream_from_store_with_execution_context(
     .await?;
     let execution_policy = gateway_execution_policy_for_decision(
         store,
-        &decision,
+        &original_decision,
         &ProviderRequest::ResponsesStream(request),
     )
     .await?;
-    let selected_provider_id = decision.selected_provider_id.clone();
-    let Some(provider) = store.find_provider(&selected_provider_id).await? else {
-        return Ok(GatewayExecutionResult::new(None, None));
-    };
-    let Some(api_key) =
-        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
-            .await?
+    let Some((decision, provider, descriptor)) = resolve_store_relay_provider_for_decision(
+        store,
+        secret_manager,
+        tenant_id,
+        &original_decision,
+        execution_policy.failover_enabled,
+    )
+    .await?
     else {
         return Ok(GatewayExecutionResult::new(None, None));
     };
+    let selected_provider_id = decision.selected_provider_id.clone();
+    let preflight_failover_from_provider_id = (selected_provider_id
+        != original_decision.selected_provider_id)
+        .then(|| original_decision.selected_provider_id.clone());
     let options = ProviderRequestOptions::default();
 
-    match execute_stream_provider_request_for_provider_with_options(
+    match execute_stream_provider_request_for_descriptor_with_options(
         store,
         &provider,
-        &api_key,
+        &descriptor,
         ProviderRequest::ResponsesStream(request),
         &options,
         execution_policy.retry_policy,
@@ -222,6 +260,24 @@ pub async fn relay_response_stream_from_store_with_execution_context(
     .await
     {
         Ok(Some(response)) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "success",
+                );
+                persist_gateway_execution_failover_decision_log(
+                    store,
+                    tenant_id,
+                    project_id,
+                    "responses",
+                    &request.model,
+                    &original_decision,
+                    &provider.id,
+                )
+                .await?;
+            }
             let usage_context = gateway_usage_context_for_decision_provider(
                 store,
                 tenant_id,
@@ -238,6 +294,14 @@ pub async fn relay_response_stream_from_store_with_execution_context(
         }
         Ok(None) => Ok(GatewayExecutionResult::new(None, None)),
         Err(mut last_error) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "failure",
+                );
+            }
             if !execution_policy.failover_enabled {
                 return Err(last_error);
             }
@@ -250,20 +314,22 @@ pub async fn relay_response_stream_from_store_with_execution_context(
                 else {
                     continue;
                 };
-                let Some(candidate_api_key) = resolve_provider_secret_with_manager(
-                    store,
-                    secret_manager,
-                    tenant_id,
-                    &candidate_provider.id,
-                )
-                .await?
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        decision.requested_region.as_deref(),
+                    )
+                    .await?
                 else {
                     continue;
                 };
-                match execute_stream_provider_request_for_provider_with_options(
+                match execute_stream_provider_request_for_descriptor_with_options(
                     store,
                     &candidate_provider,
-                    &candidate_api_key,
+                    &candidate_descriptor,
                     ProviderRequest::ResponsesStream(request),
                     &options,
                     execution_policy.retry_policy,
@@ -324,32 +390,183 @@ pub async fn relay_count_response_input_tokens_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
     tenant_id: &str,
-    _project_id: &str,
+    project_id: &str,
     request: &CountResponseInputTokensRequest,
 ) -> Result<Option<Value>> {
-    let decision = select_gateway_route(
+    let original_decision = select_gateway_route(
         store,
         tenant_id,
-        Some(_project_id),
+        Some(project_id),
         "responses",
         &request.model,
     )
     .await?;
-    let Some(provider) = store.find_provider(&decision.selected_provider_id).await? else {
-        return Ok(None);
-    };
-    let Some(api_key) =
-        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
-            .await?
+    let execution_policy = gateway_execution_policy_for_decision(
+        store,
+        &original_decision,
+        &ProviderRequest::ResponsesInputTokens(request),
+    )
+    .await?;
+    let Some((decision, provider, descriptor)) = resolve_store_relay_provider_for_decision(
+        store,
+        secret_manager,
+        tenant_id,
+        &original_decision,
+        execution_policy.failover_enabled,
+    )
+    .await?
     else {
         return Ok(None);
     };
+    let selected_provider_id = decision.selected_provider_id.clone();
+    let preflight_failover_from_provider_id = (selected_provider_id
+        != original_decision.selected_provider_id)
+        .then(|| original_decision.selected_provider_id.clone());
+    let options = ProviderRequestOptions::default();
 
-    execute_json_provider_request_for_provider(
+    match execute_json_provider_request_for_descriptor_with_options(
         store,
         &provider,
-        &api_key,
+        &descriptor,
         ProviderRequest::ResponsesInputTokens(request),
+        &options,
+        execution_policy.retry_policy,
+    )
+    .await
+    {
+        Ok(Some(response)) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "success",
+                );
+                persist_gateway_execution_failover_decision_log(
+                    store,
+                    tenant_id,
+                    project_id,
+                    "responses",
+                    &request.model,
+                    &original_decision,
+                    &provider.id,
+                )
+                .await?;
+            }
+            Ok(Some(response))
+        }
+        Ok(None) => Ok(None),
+        Err(mut last_error) => {
+            if let Some(from_provider_id) = preflight_failover_from_provider_id.as_deref() {
+                record_gateway_execution_failover(
+                    "responses",
+                    from_provider_id,
+                    &provider.id,
+                    "failure",
+                );
+            }
+            if !execution_policy.failover_enabled {
+                return Err(last_error);
+            }
+            for candidate_provider_id in decision
+                .candidate_ids
+                .iter()
+                .filter(|provider_id| provider_id.as_str() != selected_provider_id)
+            {
+                let Some(candidate_provider) = store.find_provider(candidate_provider_id).await?
+                else {
+                    continue;
+                };
+                let Some(candidate_descriptor) =
+                    provider_execution_descriptor_for_provider_account_context(
+                        store,
+                        secret_manager,
+                        tenant_id,
+                        &candidate_provider,
+                        decision.requested_region.as_deref(),
+                    )
+                    .await?
+                else {
+                    continue;
+                };
+                match execute_json_provider_request_for_descriptor_with_options(
+                    store,
+                    &candidate_provider,
+                    &candidate_descriptor,
+                    ProviderRequest::ResponsesInputTokens(request),
+                    &options,
+                    execution_policy.retry_policy,
+                )
+                .await
+                {
+                    Ok(Some(response)) => {
+                        record_gateway_execution_failover(
+                            "responses",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "success",
+                        );
+                        persist_gateway_execution_failover_decision_log(
+                            store,
+                            tenant_id,
+                            project_id,
+                            "responses",
+                            &request.model,
+                            &decision,
+                            &candidate_provider.id,
+                        )
+                        .await?;
+                        return Ok(Some(response));
+                    }
+                    Ok(None) => continue,
+                    Err(error) => {
+                        record_gateway_execution_failover(
+                            "responses",
+                            &selected_provider_id,
+                            &candidate_provider.id,
+                            "failure",
+                        );
+                        last_error = error;
+                    }
+                }
+            }
+            Err(last_error)
+        }
+    }
+}
+
+pub async fn relay_count_response_input_tokens_from_planned_execution_context(
+    store: &dyn AdminStore,
+    tenant_id: &str,
+    project_id: &str,
+    request: &CountResponseInputTokensRequest,
+    planned: &PlannedExecutionProviderContext,
+) -> Result<Option<Value>> {
+    persist_planned_execution_decision_log(
+        store,
+        tenant_id,
+        project_id,
+        "responses",
+        &request.model,
+        &planned.decision,
+    )
+    .await?;
+
+    let execution_policy = gateway_execution_policy_for_decision(
+        store,
+        &planned.decision,
+        &ProviderRequest::ResponsesInputTokens(request),
+    )
+    .await?;
+    let descriptor = provider_execution_descriptor_from_planned_context(planned);
+
+    execute_json_provider_request_for_descriptor_with_options(
+        store,
+        &planned.provider,
+        &descriptor,
+        ProviderRequest::ResponsesInputTokens(request),
+        &ProviderRequestOptions::default(),
+        execution_policy.retry_policy,
     )
     .await
 }

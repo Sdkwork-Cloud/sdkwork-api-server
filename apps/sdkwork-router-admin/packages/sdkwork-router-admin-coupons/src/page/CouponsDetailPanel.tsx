@@ -143,21 +143,6 @@ export function CouponsDetailPanel({
                 )}
               </CardContent>
             </Card>
-            <Card className="border-[var(--sdk-color-border-subtle)] shadow-none">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-sm">{t('Legacy coupon compatibility')}</CardTitle>
-                <CardDescription>
-                  {t(
-                    'This record remains available for the compatibility layer while canonical marketing templates, budgets, codes, and rollbacks are governed in the marketing workbench.',
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-[var(--sdk-color-text-secondary)]">
-                {t(
-                  'Use this panel to review the historical coupon posture while the marketing control plane tracks the enterprise lifecycle around issuance and redemption.',
-                )}
-              </CardContent>
-            </Card>
             <Card className="border-[var(--sdk-color-border-subtle)] shadow-none md:col-span-2">
               <CardHeader className="space-y-1">
                 <CardTitle className="text-sm">{t('Governance controls')}</CardTitle>

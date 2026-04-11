@@ -1,0 +1,166 @@
+{
+  "profiles": [
+    {
+      "profile_id": "profile-dev-balanced",
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "name": "Developer Balanced",
+      "slug": "developer-balanced",
+      "description": "Balanced development routing across local, aggregator, and official providers.",
+      "active": true,
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-openai-official",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-moonshot-official",
+        "provider-zhipu-official",
+        "provider-siliconflow-main",
+        "provider-ollama-local"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 3.5,
+      "max_latency_ms": 10000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "profile_id": "profile-dev-local-first",
+      "tenant_id": "tenant_local_demo",
+      "project_id": "project_local_demo",
+      "name": "Developer Local First",
+      "slug": "developer-local-first",
+      "description": "Prefer Ollama locally, then fail over to low-cost hosted providers.",
+      "active": true,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-deepseek-official",
+        "provider-qwen-official",
+        "provider-zhipu-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 2.0,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "profile_id": "profile-partner-sandbox",
+      "tenant_id": "tenant_partner_demo",
+      "project_id": "project_partner_demo",
+      "name": "Partner Sandbox",
+      "slug": "partner-sandbox",
+      "description": "Partner-facing staging profile with broad model coverage and cost controls.",
+      "active": true,
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-gemini-official",
+        "provider-anthropic-official",
+        "provider-openai-official",
+        "provider-qwen-official",
+        "provider-moonshot-official",
+        "provider-zhipu-official",
+        "provider-doubao-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "policy-dev-local-responses",
+      "capability": "responses",
+      "model_pattern": "*",
+      "enabled": true,
+      "priority": 70,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-deepseek-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 2.0,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 250,
+      "upstream_retry_max_delay_ms": 1500
+    },
+    {
+      "policy_id": "policy-dev-local-embeddings",
+      "capability": "embeddings",
+      "model_pattern": "*",
+      "enabled": true,
+      "priority": 70,
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-openai-official",
+        "provider-zhipu-official"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 0.5,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "execution_failover_enabled": true,
+      "upstream_retry_max_attempts": 2,
+      "upstream_retry_base_delay_ms": 150,
+      "upstream_retry_max_delay_ms": 1000
+    }
+  ],
+  "project_preferences": [
+    {
+      "project_id": "project_local_demo",
+      "preset_id": "profile-dev-local-first",
+      "strategy": "deterministic_priority",
+      "ordered_provider_ids": [
+        "provider-ollama-local",
+        "provider-siliconflow-main",
+        "provider-deepseek-official",
+        "provider-openrouter-main"
+      ],
+      "default_provider_id": "provider-ollama-local",
+      "max_cost": 2.0,
+      "max_latency_ms": 20000,
+      "require_healthy": false,
+      "preferred_region": "local",
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "project_id": "project_partner_demo",
+      "preset_id": "profile-partner-sandbox",
+      "strategy": "weighted_random",
+      "ordered_provider_ids": [
+        "provider-openrouter-main",
+        "provider-gemini-official",
+        "provider-anthropic-official",
+        "provider-openai-official",
+        "provider-qwen-official"
+      ],
+      "default_provider_id": "provider-openrouter-main",
+      "max_cost": 4.5,
+      "max_latency_ms": 12000,
+      "require_healthy": false,
+      "preferred_region": "global",
+      "updated_at_ms": 1710001000000
+    }
+  ]
+}

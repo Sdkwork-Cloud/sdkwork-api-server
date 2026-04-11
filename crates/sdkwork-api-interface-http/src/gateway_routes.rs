@@ -417,6 +417,18 @@ pub fn gateway_router_with_state_and_http_exposure(
         .merge(gateway_docs_router())
         .route("/metrics", metrics_route(metrics.clone(), &http_exposure))
         .route("/health", get(|| async { "ok" }))
+        .route("/market/products", get(list_market_products_handler))
+        .route("/market/offers", get(list_market_offers_handler))
+        .route("/market/quotes", post(create_market_quote_handler))
+        .route("/marketing/coupons/validate", post(validate_coupon_handler))
+        .route("/marketing/coupons/reserve", post(reserve_coupon_handler))
+        .route("/marketing/coupons/confirm", post(confirm_coupon_handler))
+        .route("/marketing/coupons/rollback", post(rollback_coupon_handler))
+        .route("/commercial/account", get(get_commercial_account_handler))
+        .route(
+            "/commercial/account/benefit-lots",
+            get(list_commercial_account_benefit_lots_handler),
+        )
         .route("/v1/messages", post(anthropic_messages_with_state_handler))
         .route(
             "/v1/messages/count_tokens",

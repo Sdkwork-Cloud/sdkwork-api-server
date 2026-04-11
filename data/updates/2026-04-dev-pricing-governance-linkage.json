@@ -1,0 +1,12 @@
+{
+  "update_id": "2026-04-dev-pricing-governance-linkage",
+  "release_version": "2026.04.19-dev",
+  "description": "Relink dev-only request metering records to the same official, proxy, and local pricing-governance classes used by the production-ready bootstrap packs.",
+  "depends_on": [
+    "2026-04-global-pricing-governance-linkage",
+    "2026-04-dev-account-kernel-expansion"
+  ],
+  "request_metering": [
+    "request-metering/2026-04-dev-pricing-governance-linkage.json"
+  ]
+}

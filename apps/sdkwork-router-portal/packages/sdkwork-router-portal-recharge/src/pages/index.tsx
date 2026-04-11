@@ -12,7 +12,6 @@ import {
   DataTable,
 } from 'sdkwork-router-portal-commons/framework/display';
 import { Input } from 'sdkwork-router-portal-commons/framework/entry';
-import { EmptyState } from 'sdkwork-router-portal-commons/framework/feedback';
 import {
   Card,
   CardContent,
@@ -33,6 +32,7 @@ import {
 } from '../repository';
 import {
   buildPortalRechargeHistoryRows,
+  buildPortalRechargePickerOptions,
   buildPortalRechargeQuoteSnapshot,
   formatRechargeAmountInput,
   parseRechargeAmountInput,
@@ -76,26 +76,14 @@ function orderStatusVariant(
   }
 }
 
-function formatBalance(
-  summary: ProjectBillingSummary | null,
-  t: ReturnType<typeof usePortalI18n>['t'],
-) {
-  if (!summary) {
-    return t('Loading...');
-  }
-
-  return summary.remaining_units === null || summary.remaining_units === undefined
-    ? t('Unlimited')
-    : formatUnits(summary.remaining_units);
-}
-
 function resolveInitialAmountCents(
   options: PortalRechargeOption[],
   policy: PortalCustomRechargePolicy | null,
 ) {
+  const pickerOptions = buildPortalRechargePickerOptions(options, policy);
   return (
-    options.find((option) => option.recommended)?.amount_cents
-    ?? options[0]?.amount_cents
+    pickerOptions.find((option) => option.recommended)?.amount_cents
+    ?? pickerOptions[0]?.amount_cents
     ?? policy?.suggested_amount_cents
     ?? null
   );
@@ -108,17 +96,17 @@ function resolveRechargeValidationMessage(
 ) {
   switch (validation) {
     case 'disabled':
-      return t('Custom recharge is currently disabled for this workspace.');
+      return t('Custom amount unavailable.');
     case 'below_minimum':
-      return t('Custom recharge must be at least {amount}.', {
+      return t('Min {amount}.', {
         amount: formatRechargeAmountInput(policy?.min_amount_cents ?? null),
       });
     case 'above_maximum':
-      return t('Custom recharge must stay below {amount}.', {
+      return t('Max {amount}.', {
         amount: formatRechargeAmountInput(policy?.max_amount_cents ?? null),
       });
     case 'step_mismatch':
-      return t('Custom recharge must increase in steps of {amount}.', {
+      return t('Step {amount}.', {
         amount: formatRechargeAmountInput(policy?.step_amount_cents ?? null),
       });
     default:
@@ -128,9 +116,9 @@ function resolveRechargeValidationMessage(
 
 export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   const { t } = usePortalI18n();
-  const loadingStatus = t('Loading recharge workspace...');
-  const syncedStatus = t('Recharge options and payment information are synced with the current workspace balance.');
-  const defaultQuoteStatus = t('Choose a recharge package to load payment information.');
+  const loadingStatus = t('Loading recharge data...');
+  const syncedStatus = t('Recharge data synced.');
+  const defaultQuoteStatus = t('Choose amount to preview.');
   const [summary, setSummary] = useState<ProjectBillingSummary | null>(null);
   const [options, setOptions] = useState<PortalRechargeOption[]>([]);
   const [policy, setPolicy] = useState<PortalCustomRechargePolicy | null>(null);
@@ -203,7 +191,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
         }
 
         setQuote(nextQuote);
-        setQuoteStatus(t('Payment information is ready. Review the package before creating the recharge order.'));
+        setQuoteStatus(t('Ready to create order.'));
       } catch (error) {
         if (!cancelled) {
           setQuote(null);
@@ -223,24 +211,11 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     };
   }, [selection, summary, t]);
 
-  const sortedOptions = useMemo(
-    () =>
-      (options ?? [])
-        .slice()
-        .sort(
-          (left, right) =>
-            Number(right.recommended) - Number(left.recommended)
-            || left.amount_cents - right.amount_cents,
-        ),
-    [options],
+  const pickerOptions = useMemo(
+    () => buildPortalRechargePickerOptions((options ?? []).slice(), policy),
+    [options, policy],
   );
-  const selectedPresetOption = useMemo(
-    () =>
-      selection?.mode === 'preset'
-        ? sortedOptions.find((option) => option.amount_cents === selection.amountCents) ?? null
-        : null,
-    [selection, sortedOptions],
-  );
+  const isCustomSelected = selection?.mode === 'custom';
   const rechargeOrders = useMemo(() => buildPortalRechargeHistoryRows(orders), [orders]);
   const pendingPaymentOrders = useMemo(
     () => rechargeOrders.filter((order) => order.status === 'pending_payment'),
@@ -273,7 +248,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     const amountCents = parseRechargeAmountInput(customAmountInput);
 
     if (!amountCents) {
-      setQuoteStatus(t('Enter a valid recharge amount.'));
+      setQuoteStatus(t('Enter a valid amount.'));
       return;
     }
 
@@ -294,7 +269,7 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
 
   async function handleCreateRechargeOrder() {
     if (!selection?.amountCents) {
-      setQuoteStatus(t('Select a recharge amount before creating an order.'));
+      setQuoteStatus(t('Select an amount first.'));
       return;
     }
 
@@ -306,14 +281,14 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
     }
 
     setCreateLoading(true);
-    setQuoteStatus(t('Creating recharge order...'));
+    setQuoteStatus(t('Creating order...'));
 
     try {
       await createPortalRechargeOrder({
         amount_cents: selection.amountCents,
       });
       await refreshRechargePage({ preserveSelection: true });
-      setQuoteStatus(t('Recharge order created. Complete payment from billing when you are ready to settle it.'));
+      setQuoteStatus(t('Order created. Complete payment in billing.'));
       setPage(1);
     } catch (error) {
       setQuoteStatus(portalErrorMessage(error));
@@ -323,47 +298,47 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
   }
 
   return (
-    <div className="space-y-5" data-slot="portal-recharge-page">
+    <div className="space-y-6" data-slot="portal-recharge-page">
       {pageStatus ? (
         <div
-          className="rounded-[24px] border border-zinc-200 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300"
+          className="rounded-[24px] border border-primary-200/60 bg-primary-50/85 px-4 py-3 text-sm text-primary-800 shadow-sm dark:border-primary-900/45 dark:bg-primary-950/35 dark:text-primary-200"
           role="status"
         >
           {pageStatus}
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[1.14fr_0.86fr] xl:items-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)] xl:items-start">
         <Card
-          className="overflow-hidden border-zinc-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.07)] dark:border-zinc-800 dark:bg-zinc-950"
+          className="overflow-hidden border-primary-200/70 bg-gradient-to-b from-primary-100/95 via-primary-50/88 to-primary-100/65 dark:border-primary-900/40 dark:from-primary-950/45 dark:via-primary-950/32 dark:to-zinc-950"
           data-slot="portal-recharge-options"
+          style={{
+            boxShadow: '0 24px 80px color-mix(in srgb, var(--theme-primary-500) 10%, rgba(15,23,42,0.08))',
+          }}
         >
           <CardContent className="space-y-6 p-5 sm:p-6">
-            <div className="space-y-3">
-              <Badge variant="secondary">{t('Commercial recharge')}</Badge>
-              <div className="space-y-2">
-                <h2 className="text-[1.8rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                  {t('Recharge options')}
-                </h2>
-                <p className="max-w-[42rem] text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                  {t('Choose the package that restores your workspace runway fastest, or switch to a custom amount when you need tighter control.')}
-                </p>
-              </div>
+            <div>
+              <h2 className="text-[1.8rem] font-semibold tracking-tight text-primary-950 dark:text-primary-50">
+                {t('Recharge options')}
+              </h2>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {sortedOptions.map((option) => {
+            <div
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              data-slot="portal-recharge-options-grid"
+            >
+              {pickerOptions.map((option) => {
                 const isActive =
                   selection?.amountCents === option.amount_cents && selection.mode === 'preset';
 
                 return (
                   <button
-                    className={`group rounded-[30px] border p-5 text-left transition-all ${
+                    className={`group relative overflow-hidden rounded-[30px] border p-5 text-left transition-all ${
                       isActive
-                        ? 'border-zinc-950 bg-zinc-950 text-white shadow-[0_26px_60px_rgba(15,23,42,0.22)] dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950'
+                        ? 'border-primary-400/70 bg-gradient-to-br from-primary-950 to-primary-700 text-white shadow-[0_28px_70px_rgba(15,23,42,0.28)] dark:border-primary-300/50 dark:from-primary-50 dark:to-primary-100 dark:text-primary-950'
                         : option.recommended
-                          ? 'border-zinc-950/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,244,245,0.9))] shadow-[0_18px_48px_rgba(15,23,42,0.08)] hover:border-zinc-950/30 dark:border-zinc-700 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(39,39,42,0.88))]'
-                          : 'border-zinc-200 bg-white shadow-sm hover:border-zinc-300 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-zinc-800 dark:bg-zinc-950'
+                          ? 'border-primary-300/70 bg-gradient-to-b from-primary-200/95 via-primary-100/85 to-primary-50/85 text-primary-950 shadow-[0_18px_48px_rgba(15,23,42,0.08)] hover:border-primary-400/75 hover:shadow-[0_24px_56px_rgba(15,23,42,0.12)] dark:border-primary-700/55 dark:from-primary-950/70 dark:via-primary-950/55 dark:to-zinc-950 dark:text-primary-50'
+                          : 'border-primary-200/65 bg-gradient-to-b from-primary-100/80 via-primary-50/70 to-primary-100/50 text-primary-950 shadow-[0_14px_36px_rgba(15,23,42,0.06)] hover:border-primary-300/70 hover:shadow-[0_20px_44px_rgba(15,23,42,0.1)] dark:border-primary-800/40 dark:from-primary-950/42 dark:via-primary-950/30 dark:to-zinc-950 dark:text-primary-50'
                     }`}
                     key={option.id}
                     onClick={() =>
@@ -375,68 +350,78 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                       })}
                     type="button"
                   >
+                    {isActive ? (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary-300/20 blur-2xl dark:bg-primary-200/25"
+                      />
+                    ) : option.recommended ? (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary-200/30 blur-2xl dark:bg-primary-700/20"
+                      />
+                    ) : null}
                     <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-3">
+                      <div className="relative space-y-4">
                         <div className="flex flex-wrap items-center gap-2">
                           {option.recommended ? (
                             <Badge variant={isActive ? 'secondary' : 'success'}>
                               {t('Recommended')}
                             </Badge>
                           ) : null}
-                          <span className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                            isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
-                          }`}
-                          >
-                            {t('Recharge pack')}
-                          </span>
                         </div>
                         <div className="space-y-1">
                           <strong className="block text-[1.85rem] font-semibold tracking-tight">
                             {option.amount_label}
                           </strong>
-                          <p className={`text-sm leading-6 ${
-                            isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
-                          }`}
-                          >
-                            {option.note}
-                          </p>
                         </div>
                       </div>
-                      {isActive ? (
-                        <Badge variant="secondary">{t('Selected')}</Badge>
-                      ) : null}
+                      <span
+                        aria-hidden="true"
+                        className={`mt-1 h-3.5 w-3.5 rounded-full border transition-colors ${
+                          isActive
+                            ? 'border-primary-200 bg-primary-200 dark:border-primary-950 dark:bg-primary-950'
+                            : 'border-primary-300/70 bg-transparent dark:border-primary-700/70'
+                        }`}
+                      />
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
                       <div className={`rounded-[22px] border px-4 py-4 ${
                         isActive
-                          ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10'
-                          : 'border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/70'
+                          ? 'border-primary-100/15 bg-primary-50/12 dark:border-primary-800/30 dark:bg-primary-950/10'
+                          : 'border-primary-200/50 bg-primary-50/75 dark:border-primary-900/35 dark:bg-primary-950/20'
                       }`}
                       >
                         <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                          isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                          isActive ? 'text-zinc-300 dark:text-primary-700' : 'text-primary-700 dark:text-primary-300'
                         }`}
                         >
                           {t('Granted units')}
                         </span>
-                        <strong className="mt-2 block text-base font-semibold">
+                        <strong className={`mt-2 block text-base font-semibold ${
+                          isActive ? 'text-white dark:text-primary-950' : 'text-primary-950 dark:text-primary-50'
+                        }`}
+                        >
                           {formatUnits(option.granted_units)}
                         </strong>
                       </div>
                       <div className={`rounded-[22px] border px-4 py-4 ${
                         isActive
-                          ? 'border-white/15 bg-white/10 dark:border-zinc-900/10 dark:bg-zinc-900/10'
-                          : 'border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/70'
+                          ? 'border-primary-100/18 bg-primary-50/12 dark:border-primary-800/30 dark:bg-primary-950/10'
+                          : 'border-primary-200/50 bg-primary-50/75 dark:border-primary-900/35 dark:bg-primary-950/20'
                       }`}
                       >
                         <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                          isActive ? 'text-zinc-300 dark:text-zinc-700' : 'text-zinc-500 dark:text-zinc-400'
+                          isActive ? 'text-zinc-300 dark:text-primary-700' : 'text-primary-700 dark:text-primary-300'
                         }`}
                         >
                           {t('Effective ratio')}
                         </span>
-                        <strong className="mt-2 block text-base font-semibold">
+                        <strong className={`mt-2 block text-base font-semibold ${
+                          isActive ? 'text-white dark:text-primary-950' : 'text-primary-950 dark:text-primary-50'
+                        }`}
+                        >
                           {option.effective_ratio_label}
                         </strong>
                       </div>
@@ -444,113 +429,163 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                   </button>
                 );
               })}
+
+              <div data-slot="portal-recharge-custom-tile">
+                <form
+                  className={`group relative h-full overflow-hidden rounded-[30px] border p-5 text-left shadow-sm transition-all ${
+                    isCustomSelected
+                      ? 'border-primary-400/70 bg-gradient-to-br from-primary-950 to-primary-700 text-white shadow-[0_28px_70px_rgba(15,23,42,0.28)] dark:border-primary-300/50 dark:from-primary-50 dark:to-primary-100 dark:text-primary-950'
+                      : 'border-primary-300/55 bg-gradient-to-b from-primary-200/92 via-primary-100/75 to-primary-50/70 text-primary-950 hover:border-primary-400/65 hover:shadow-[0_20px_48px_rgba(15,23,42,0.08)] dark:border-primary-900/35 dark:from-primary-950/45 dark:via-primary-950/30 dark:to-zinc-950 dark:text-primary-50'
+                  }`}
+                  data-slot="portal-recharge-custom-form"
+                  onSubmit={(event) => void handleCustomPreview(event)}
+                >
+                  {isCustomSelected ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary-300/20 blur-2xl dark:bg-primary-200/25"
+                    />
+                  ) : null}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="relative space-y-1">
+                      <h3 className={`text-sm font-semibold ${
+                        isCustomSelected
+                          ? 'text-white dark:text-primary-950'
+                          : 'text-primary-950 dark:text-primary-50'
+                      }`}
+                      >
+                        {t('Custom amount')}
+                      </h3>
+                    </div>
+                    <span
+                      aria-hidden="true"
+                      className={`mt-1 h-3.5 w-3.5 rounded-full border transition-colors ${
+                        isCustomSelected
+                          ? 'border-primary-200 bg-primary-200 dark:border-primary-950 dark:bg-primary-950'
+                          : 'border-primary-300/70 bg-transparent dark:border-primary-700/70'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="relative mt-5 grid gap-3">
+                    <Input
+                      className={isCustomSelected
+                        ? 'border-primary-100/18 bg-primary-50/12 text-white placeholder:text-zinc-300 dark:border-primary-200/45 dark:bg-primary-50/85 dark:text-primary-950 dark:placeholder:text-primary-700'
+                        : 'border-primary-200/60 bg-primary-50/85 text-primary-950 placeholder:text-primary-500 dark:border-primary-800/60 dark:bg-primary-950/30 dark:text-primary-50 dark:placeholder:text-primary-400'}
+                      inputMode="decimal"
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        setCustomAmountInput(event.target.value);
+                        setQuoteStatus(defaultQuoteStatus);
+                      }}
+                      placeholder={t('Enter amount')}
+                      value={customAmountInput}
+                    />
+                    <Button className="h-11 rounded-2xl px-5 shadow-sm" type="submit" variant="secondary">
+                      {t('Preview amount')}
+                    </Button>
+                  </div>
+
+                  {policy ? (
+                    <div className="relative mt-5 grid grid-cols-3 gap-2 text-sm">
+                      <span className={`rounded-2xl border px-3 py-2 text-center ${
+                        isCustomSelected
+                          ? 'border-primary-100/15 bg-primary-50/12 text-zinc-100 dark:border-primary-200/50 dark:bg-primary-50/80 dark:text-primary-900'
+                          : 'border-primary-200/50 bg-primary-50/80 text-primary-700 dark:border-primary-900/35 dark:bg-primary-950/20 dark:text-primary-300'
+                      }`}
+                      >
+                        {t('Min {amount}', { amount: formatRechargeAmountInput(policy.min_amount_cents) })}
+                      </span>
+                      <span className={`rounded-2xl border px-3 py-2 text-center ${
+                        isCustomSelected
+                          ? 'border-primary-100/15 bg-primary-50/12 text-zinc-100 dark:border-primary-200/50 dark:bg-primary-50/80 dark:text-primary-900'
+                          : 'border-primary-200/50 bg-primary-50/80 text-primary-700 dark:border-primary-900/35 dark:bg-primary-950/20 dark:text-primary-300'
+                      }`}
+                      >
+                        {t('Step {amount}', { amount: formatRechargeAmountInput(policy.step_amount_cents) })}
+                      </span>
+                      <span className={`rounded-2xl border px-3 py-2 text-center ${
+                        isCustomSelected
+                          ? 'border-primary-100/15 bg-primary-50/12 text-zinc-100 dark:border-primary-200/50 dark:bg-primary-50/80 dark:text-primary-900'
+                          : 'border-primary-200/50 bg-primary-50/80 text-primary-700 dark:border-primary-900/35 dark:bg-primary-950/20 dark:text-primary-300'
+                      }`}
+                      >
+                        {t('Max {amount}', { amount: formatRechargeAmountInput(policy.max_amount_cents) })}
+                      </span>
+                    </div>
+                  ) : null}
+                </form>
+              </div>
             </div>
-
-            <form
-              className="space-y-4 rounded-[30px] border border-dashed border-zinc-300 bg-[linear-gradient(180deg,rgba(250,250,250,0.96),rgba(244,244,245,0.92))] p-5 dark:border-zinc-700 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(39,39,42,0.82))]"
-              data-slot="portal-recharge-custom-form"
-              onSubmit={(event) => void handleCustomPreview(event)}
-            >
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
-                  {t('Custom amount')}
-                </h3>
-                <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                  {t('Need a tailored top-up? Enter a custom amount and the platform will refresh the payment information before you create the order.')}
-                </p>
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                  inputMode="decimal"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    setCustomAmountInput(event.target.value);
-                    setQuoteStatus(defaultQuoteStatus);
-                  }}
-                  placeholder={t('Enter amount')}
-                  value={customAmountInput}
-                />
-                <Button className="h-11 rounded-2xl px-5" type="submit" variant="secondary">
-                  {t('Preview custom amount')}
-                </Button>
-              </div>
-
-              {policy ? (
-                <div className="grid gap-2 text-sm text-zinc-500 dark:text-zinc-400 sm:grid-cols-3">
-                  <span>
-                    {t('Min {amount}', { amount: formatRechargeAmountInput(policy.min_amount_cents) })}
-                  </span>
-                  <span>
-                    {t('Step {amount}', { amount: formatRechargeAmountInput(policy.step_amount_cents) })}
-                  </span>
-                  <span>
-                    {t('Max {amount}', { amount: formatRechargeAmountInput(policy.max_amount_cents) })}
-                  </span>
-                </div>
-              ) : null}
-            </form>
           </CardContent>
         </Card>
 
         <Card
-          className="overflow-hidden border-zinc-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,244,245,0.94))] shadow-[0_26px_90px_rgba(15,23,42,0.09)] dark:border-zinc-800 dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.98),rgba(39,39,42,0.92))]"
+          className="overflow-hidden border-primary-200/70 bg-gradient-to-b from-primary-100/95 via-primary-50/80 to-primary-100/55 xl:sticky xl:top-6 dark:border-primary-900/40 dark:from-primary-950/45 dark:via-primary-950/30 dark:to-zinc-950"
           data-slot="portal-recharge-quote-card"
+          style={{
+            boxShadow: '0 26px 90px color-mix(in srgb, var(--theme-primary-500) 12%, rgba(15,23,42,0.1))',
+          }}
         >
-          <CardContent className="space-y-5 p-5 sm:p-6">
+          <CardContent className="relative space-y-5 p-5 sm:p-6">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute right-0 top-0 h-40 w-40 translate-x-1/3 -translate-y-1/3 rounded-full bg-primary-200/50 blur-3xl dark:bg-primary-600/15"
+            />
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{t('Payment information')}</Badge>
-                {selection?.mode === 'custom' ? (
-                  <Badge variant="warning">{t('Custom amount')}</Badge>
-                ) : selectedPresetOption?.recommended ? (
-                  <Badge variant="success">{t('Recommended')}</Badge>
-                ) : null}
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-[1.55rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                  {t('Payment information')}
-                </h2>
-                <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{quoteStatus}</p>
-              </div>
+              <h2 className="text-[1.55rem] font-semibold tracking-tight text-primary-950 dark:text-primary-50">
+                {t('Payment information')}
+              </h2>
+              <p className="text-sm leading-6 text-primary-700 dark:text-primary-300">{quoteStatus}</p>
             </div>
 
             {quoteSnapshot ? (
               <div className="space-y-4">
-                <div className="rounded-[28px] border border-zinc-200 bg-white/85 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/80">
+                <div
+                  className="relative overflow-hidden rounded-[28px] border border-primary-200/70 bg-gradient-to-br from-primary-100/95 via-primary-50/85 to-primary-100/60 p-5 shadow-sm dark:border-primary-900/35 dark:from-primary-950/50 dark:via-primary-950/35 dark:to-zinc-950"
+                  data-slot="portal-recharge-quote-hero"
+                >
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary-200/45 blur-2xl dark:bg-primary-500/20"
+                  />
                   <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                        {selection?.mode === 'custom' ? t('Custom amount') : t('Selected package')}
-                      </span>
-                      <strong className="block text-[2.2rem] font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                        {quoteSnapshot.amountLabel}
-                      </strong>
-                    </div>
+                    <strong className="relative block text-[2.35rem] font-semibold tracking-tight text-primary-950 dark:text-primary-50">
+                      {quoteSnapshot.amountLabel}
+                    </strong>
                     <Badge variant="secondary">{quoteSnapshot.pricingRuleLabel}</Badge>
                   </div>
                 </div>
 
-                <div className="grid gap-3">
-                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Granted units')}</span>
-                    <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.grantedUnitsLabel}</strong>
+                <div className="grid gap-3 sm:grid-cols-3" data-slot="portal-recharge-quote-metrics">
+                  <div className="rounded-[22px] border border-primary-200/55 bg-primary-50/75 px-4 py-4 dark:border-primary-900/35 dark:bg-primary-950/20">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
+                      {t('Granted units')}
+                    </span>
+                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
+                      {quoteSnapshot.grantedUnitsLabel}
+                    </strong>
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Effective ratio')}</span>
-                    <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.effectiveRatioLabel}</strong>
+                  <div className="rounded-[22px] border border-primary-200/55 bg-primary-50/75 px-4 py-4 dark:border-primary-900/35 dark:bg-primary-950/20">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
+                      {t('Effective ratio')}
+                    </span>
+                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
+                      {quoteSnapshot.effectiveRatioLabel}
+                    </strong>
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Projected balance')}</span>
-                    <strong className="text-zinc-950 dark:text-zinc-50">{quoteSnapshot.projectedBalanceLabel}</strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-[22px] border border-zinc-200 bg-white/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/85">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">{t('Current balance')}</span>
-                    <strong className="text-zinc-950 dark:text-zinc-50">{formatBalance(summary, t)}</strong>
+                  <div className="rounded-[22px] border border-primary-200/55 bg-primary-50/75 px-4 py-4 dark:border-primary-900/35 dark:bg-primary-950/20">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">
+                      {t('Projected balance')}
+                    </span>
+                    <strong className="mt-2 block text-lg font-semibold text-primary-950 dark:text-primary-50">
+                      {quoteSnapshot.projectedBalanceLabel}
+                    </strong>
                   </div>
                 </div>
 
                 <Button
-                  className="h-12 w-full rounded-2xl text-sm font-semibold shadow-sm"
+                  className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,var(--theme-primary-950),var(--theme-primary-600))] text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.25)] hover:opacity-95 dark:bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-500))] dark:text-white"
+                  data-slot="portal-recharge-primary-cta"
                   disabled={quoteLoading || createLoading || !selection?.amountCents}
                   onClick={() => void handleCreateRechargeOrder()}
                 >
@@ -558,28 +593,45 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
                 </Button>
               </div>
             ) : (
-              <EmptyState
-                description={t('Select a package or preview a custom amount to review payment information before you create the order.')}
-                title={quoteLoading ? t('Loading payment information') : t('No package selected')}
-              />
+              <div className="space-y-4">
+                <div
+                  className="grid gap-3 sm:grid-cols-3"
+                  aria-hidden="true"
+                  data-slot="portal-recharge-quote-skeleton"
+                >
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      className="rounded-[22px] border border-primary-200/55 bg-primary-50/70 px-4 py-4 dark:border-primary-900/35 dark:bg-primary-950/20"
+                      key={index}
+                    >
+                      <div className="h-2.5 w-16 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                      <div className="mt-3 h-4 w-20 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,var(--theme-primary-950),var(--theme-primary-600))] text-sm font-semibold text-white opacity-60 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-500))] dark:text-white"
+                  data-slot="portal-recharge-primary-cta"
+                  disabled
+                >
+                  {t('Create recharge order')}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
 
       <Card
-        className="border-zinc-200 bg-white shadow-none dark:border-zinc-800 dark:bg-zinc-950"
+        className="border-primary-200/70 bg-gradient-to-b from-primary-100/88 via-primary-50/74 to-primary-100/45 shadow-sm dark:border-primary-900/35 dark:from-primary-950/30 dark:via-primary-950/20 dark:to-zinc-950"
         data-slot="portal-recharge-history-table"
       >
         <CardContent className="space-y-4 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+            <div>
+              <h2 className="text-lg font-semibold text-primary-950 dark:text-primary-50">
                 {t('Recharge history')}
               </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {t('Recent recharge orders stay visible here so finance operators can confirm payment progress without interrupting the purchase flow above.')}
-              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={pendingPaymentOrders.length ? 'warning' : 'secondary'}>
@@ -631,17 +683,14 @@ export function PortalRechargePage({ onNavigate }: PortalRechargePageProps) {
             ]}
             emptyState={(
               <div className="mx-auto flex max-w-[32rem] flex-col items-center gap-2 text-center">
-                <strong className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                <strong className="text-base font-semibold text-primary-950 dark:text-primary-50">
                   {t('No recharge history yet')}
                 </strong>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {t('Create the first recharge order to start building balance history for this workspace.')}
-                </p>
               </div>
             )}
             footer={(
-              <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+              <div className="flex flex-col gap-3 rounded-2xl border border-primary-200/55 bg-primary-50/80 px-4 py-3 dark:border-primary-900/35 dark:bg-primary-950/25 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
                   {t('Page {page} of {total}', {
                     page: currentPage,
                     total: totalPages,

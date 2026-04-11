@@ -12,9 +12,9 @@
     }
   },
   "dependencies": {
-    "@sdkwork/ui-pc-react": "file:../../../../../sdkwork-ui/sdkwork-ui-pc-react",
-    "@tauri-apps/api": "^2.10.1",
-    "react": "^19.2.4",
+    "@sdkwork/ui-pc-react": "workspace:*",
+    "@tauri-apps/api": "2.10.1",
+    "react": "19.2.4",
     "sdkwork-router-admin-core": "workspace:*",
     "sdkwork-router-admin-types": "workspace:*"
   }

@@ -172,6 +172,441 @@ async fn stateful_responses_route_fails_over_to_backup_provider_and_records_actu
 
 #[serial(extension_env)]
 #[tokio::test]
+async fn stateful_responses_route_fails_over_before_execution_when_primary_lacks_tenant_credential()
+{
+    let tenant_id = "tenant-responses-preflight-missing-credential-json";
+    let project_id = "project-responses-preflight-missing-credential-json";
+    let primary_state = UpstreamCaptureState::default();
+    let backup_state = UpstreamCaptureState::default();
+
+    let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let primary_address = primary_listener.local_addr().unwrap();
+    let primary_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_handler_with_usage))
+        .with_state(primary_state.clone());
+    tokio::spawn(async move {
+        axum::serve(primary_listener, primary_upstream)
+            .await
+            .unwrap();
+    });
+
+    let backup_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backup_address = backup_listener.local_addr().unwrap();
+    let backup_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_handler_with_usage))
+        .with_state(backup_state.clone());
+    tokio::spawn(async move {
+        axum::serve(backup_listener, backup_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    create_openai_channel(&admin_app, &admin_token).await;
+    create_stateful_openai_provider_for_responses_optional_credential(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-preflight-primary",
+        &format!("http://{primary_address}"),
+        "Responses Preflight Primary",
+        None,
+        None,
+    )
+    .await;
+    create_stateful_openai_provider_for_responses_optional_credential(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-preflight-backup",
+        &format!("http://{backup_address}"),
+        "Responses Preflight Backup",
+        Some("cred-responses-preflight-backup"),
+        Some("sk-responses-preflight-backup"),
+    )
+    .await;
+    create_responses_routing_policy(
+        &admin_app,
+        &admin_token,
+        "route-responses-preflight-missing-credential-json",
+        vec![
+            "provider-responses-preflight-primary",
+            "provider-responses-preflight-backup",
+        ],
+    )
+    .await;
+
+    let response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"responses preflight fail over please\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["id"], "resp_upstream");
+    assert_eq!(primary_state.request_count.load(Ordering::SeqCst), 0);
+    assert_eq!(backup_state.request_count.load(Ordering::SeqCst), 1);
+    assert!(primary_state.authorization.lock().unwrap().is_none());
+    assert_eq!(
+        backup_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-responses-preflight-backup")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(
+        usage_json[0]["provider"],
+        "provider-responses-preflight-backup"
+    );
+
+    let logs = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-responses-preflight-backup"
+    );
+    assert_eq!(
+        logs_json[0]["fallback_reason"],
+        "gateway_execution_failover"
+    );
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateful_responses_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
+{
+    let tenant_id = "tenant-responses-preflight-incompatible-standard-json";
+    let project_id = "project-responses-preflight-incompatible-standard-json";
+    let primary_state = UpstreamCaptureState::default();
+    let backup_state = UpstreamCaptureState::default();
+
+    let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let primary_address = primary_listener.local_addr().unwrap();
+    let primary_upstream = Router::new()
+        .route("/v1/messages", post(upstream_responses_handler_with_usage))
+        .with_state(primary_state.clone());
+    tokio::spawn(async move {
+        axum::serve(primary_listener, primary_upstream)
+            .await
+            .unwrap();
+    });
+
+    let backup_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backup_address = backup_listener.local_addr().unwrap();
+    let backup_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_handler_with_usage))
+        .with_state(backup_state.clone());
+    tokio::spawn(async move {
+        axum::serve(backup_listener, backup_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    create_openai_channel(&admin_app, &admin_token).await;
+
+    let primary_provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-responses-preflight-incompatible-primary\",\"channel_id\":\"openai\",\"adapter_kind\":\"anthropic\",\"base_url\":\"http://{primary_address}\",\"display_name\":\"Responses Preflight Incompatible Primary\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_provider.status(), StatusCode::CREATED);
+
+    let primary_credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"provider-responses-preflight-incompatible-primary\",\"key_reference\":\"cred-responses-preflight-incompatible-primary\",\"secret_value\":\"sk-responses-preflight-incompatible-primary\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_credential.status(), StatusCode::CREATED);
+
+    let primary_model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-responses-preflight-incompatible-primary\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_model.status(), StatusCode::CREATED);
+
+    create_stateful_openai_provider_for_responses(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-preflight-incompatible-backup",
+        &format!("http://{backup_address}"),
+        "Responses Preflight Incompatible Backup",
+        "cred-responses-preflight-incompatible-backup",
+        "sk-responses-preflight-incompatible-backup",
+    )
+    .await;
+    create_responses_routing_policy(
+        &admin_app,
+        &admin_token,
+        "route-responses-preflight-incompatible-standard-json",
+        vec![
+            "provider-responses-preflight-incompatible-primary",
+            "provider-responses-preflight-incompatible-backup",
+        ],
+    )
+    .await;
+
+    let response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"use the compatible backup for responses\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["id"], "resp_upstream");
+    assert_eq!(primary_state.request_count.load(Ordering::SeqCst), 0);
+    assert_eq!(backup_state.request_count.load(Ordering::SeqCst), 1);
+    assert!(primary_state.authorization.lock().unwrap().is_none());
+    assert_eq!(
+        backup_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-responses-preflight-incompatible-backup")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(
+        usage_json[0]["provider"],
+        "provider-responses-preflight-incompatible-backup"
+    );
+
+    let logs = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-responses-preflight-incompatible-backup"
+    );
+    assert_eq!(
+        logs_json[0]["fallback_reason"],
+        "gateway_execution_failover"
+    );
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateful_responses_route_fails_over_before_execution_when_primary_provider_is_missing() {
+    let tenant_id = "tenant-responses-preflight-missing-provider-json";
+    let project_id = "project-responses-preflight-missing-provider-json";
+    let backup_state = UpstreamCaptureState::default();
+
+    let backup_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backup_address = backup_listener.local_addr().unwrap();
+    let backup_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_handler_with_usage))
+        .with_state(backup_state.clone());
+    tokio::spawn(async move {
+        axum::serve(backup_listener, backup_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    create_openai_channel(&admin_app, &admin_token).await;
+    create_stateful_openai_provider_for_responses_optional_credential(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-preflight-backup-missing-primary",
+        &format!("http://{backup_address}"),
+        "Responses Preflight Backup Missing Primary",
+        Some("cred-responses-preflight-backup-missing-primary"),
+        Some("sk-responses-preflight-backup-missing-primary"),
+    )
+    .await;
+    create_responses_routing_policy(
+        &admin_app,
+        &admin_token,
+        "route-responses-preflight-missing-provider-json",
+        vec![
+            "provider-responses-preflight-primary-missing",
+            "provider-responses-preflight-backup-missing-primary",
+        ],
+    )
+    .await;
+
+    let response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"responses missing provider fail over please\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["id"], "resp_upstream");
+    assert_eq!(backup_state.request_count.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        backup_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-responses-preflight-backup-missing-primary")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(
+        usage_json[0]["provider"],
+        "provider-responses-preflight-backup-missing-primary"
+    );
+
+    let logs = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-responses-preflight-backup-missing-primary"
+    );
+    assert_eq!(
+        logs_json[0]["fallback_reason"],
+        "policy_candidate_unavailable"
+    );
+}
+
+#[serial(extension_env)]
+#[tokio::test]
 async fn stateful_responses_route_does_not_fail_over_when_policy_disables_execution_failover() {
     let tenant_id = "tenant-responses-failover-disabled-json";
     let project_id = "project-responses-failover-disabled-json";
@@ -288,6 +723,333 @@ async fn stateful_responses_route_does_not_fail_over_when_policy_disables_execut
     assert!(!metrics_text.contains(
         "sdkwork_gateway_failovers_total{service=\"gateway\",capability=\"responses\",from_provider=\"provider-responses-failover-disabled-primary\",to_provider=\"provider-responses-failover-disabled-backup\",outcome=\"success\"}"
     ));
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential()
+{
+    let tenant_id = "tenant-responses-preflight-missing-credential-stream";
+    let project_id = "project-responses-preflight-missing-credential-stream";
+    let primary_state = UpstreamCaptureState::default();
+    let backup_state = UpstreamCaptureState::default();
+
+    let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let primary_address = primary_listener.local_addr().unwrap();
+    let primary_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_stream_handler))
+        .with_state(primary_state.clone());
+    tokio::spawn(async move {
+        axum::serve(primary_listener, primary_upstream)
+            .await
+            .unwrap();
+    });
+
+    let backup_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backup_address = backup_listener.local_addr().unwrap();
+    let backup_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_stream_handler))
+        .with_state(backup_state.clone());
+    tokio::spawn(async move {
+        axum::serve(backup_listener, backup_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    create_openai_channel(&admin_app, &admin_token).await;
+    create_stateful_openai_provider_for_responses_optional_credential(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-stream-preflight-primary",
+        &format!("http://{primary_address}"),
+        "Responses Stream Preflight Primary",
+        None,
+        None,
+    )
+    .await;
+    create_stateful_openai_provider_for_responses_optional_credential(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-stream-preflight-backup",
+        &format!("http://{backup_address}"),
+        "Responses Stream Preflight Backup",
+        Some("cred-responses-stream-preflight-backup"),
+        Some("sk-responses-stream-preflight-backup"),
+    )
+    .await;
+    create_responses_routing_policy(
+        &admin_app,
+        &admin_token,
+        "route-responses-preflight-missing-credential-stream",
+        vec![
+            "provider-responses-stream-preflight-primary",
+            "provider-responses-stream-preflight-backup",
+        ],
+    )
+    .await;
+
+    let response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"responses preflight stream fail over please\",\"stream\":true}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let stream_body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let stream_text = String::from_utf8(stream_body.to_vec()).unwrap();
+    assert!(stream_text.contains("resp_upstream_stream"));
+    assert_eq!(primary_state.request_count.load(Ordering::SeqCst), 0);
+    assert_eq!(backup_state.request_count.load(Ordering::SeqCst), 1);
+    assert!(primary_state.authorization.lock().unwrap().is_none());
+    assert_eq!(
+        backup_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-responses-stream-preflight-backup")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(
+        usage_json[0]["provider"],
+        "provider-responses-stream-preflight-backup"
+    );
+
+    let logs = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-responses-stream-preflight-backup"
+    );
+    assert_eq!(
+        logs_json[0]["fallback_reason"],
+        "gateway_execution_failover"
+    );
+}
+
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
+{
+    let tenant_id = "tenant-responses-stream-preflight-incompatible-standard";
+    let project_id = "project-responses-stream-preflight-incompatible-standard";
+    let primary_state = UpstreamCaptureState::default();
+    let backup_state = UpstreamCaptureState::default();
+
+    let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let primary_address = primary_listener.local_addr().unwrap();
+    let primary_upstream = Router::new()
+        .route("/v1/messages", post(upstream_responses_stream_handler))
+        .with_state(primary_state.clone());
+    tokio::spawn(async move {
+        axum::serve(primary_listener, primary_upstream)
+            .await
+            .unwrap();
+    });
+
+    let backup_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backup_address = backup_listener.local_addr().unwrap();
+    let backup_upstream = Router::new()
+        .route("/v1/responses", post(upstream_responses_stream_handler))
+        .with_state(backup_state.clone());
+    tokio::spawn(async move {
+        axum::serve(backup_listener, backup_upstream).await.unwrap();
+    });
+
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    create_openai_channel(&admin_app, &admin_token).await;
+
+    let primary_provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-responses-stream-preflight-incompatible-primary\",\"channel_id\":\"openai\",\"adapter_kind\":\"anthropic\",\"base_url\":\"http://{primary_address}\",\"display_name\":\"Responses Stream Preflight Incompatible Primary\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_provider.status(), StatusCode::CREATED);
+
+    let primary_credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"provider-responses-stream-preflight-incompatible-primary\",\"key_reference\":\"cred-responses-stream-preflight-incompatible-primary\",\"secret_value\":\"sk-responses-stream-preflight-incompatible-primary\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_credential.status(), StatusCode::CREATED);
+
+    let primary_model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"external_name\":\"gpt-4.1\",\"provider_id\":\"provider-responses-stream-preflight-incompatible-primary\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(primary_model.status(), StatusCode::CREATED);
+
+    create_stateful_openai_provider_for_responses(
+        &admin_app,
+        &admin_token,
+        tenant_id,
+        "provider-responses-stream-preflight-incompatible-backup",
+        &format!("http://{backup_address}"),
+        "Responses Stream Preflight Incompatible Backup",
+        "cred-responses-stream-preflight-incompatible-backup",
+        "sk-responses-stream-preflight-incompatible-backup",
+    )
+    .await;
+    create_responses_routing_policy(
+        &admin_app,
+        &admin_token,
+        "route-responses-stream-preflight-incompatible-standard",
+        vec![
+            "provider-responses-stream-preflight-incompatible-primary",
+            "provider-responses-stream-preflight-incompatible-backup",
+        ],
+    )
+    .await;
+
+    let response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/responses")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4.1\",\"input\":\"use the compatible stream backup for responses\",\"stream\":true}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let stream_body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let stream_text = String::from_utf8(stream_body.to_vec()).unwrap();
+    assert!(stream_text.contains("resp_upstream_stream"));
+    assert_eq!(primary_state.request_count.load(Ordering::SeqCst), 0);
+    assert_eq!(backup_state.request_count.load(Ordering::SeqCst), 1);
+    assert!(primary_state.authorization.lock().unwrap().is_none());
+    assert_eq!(
+        backup_state.authorization.lock().unwrap().as_deref(),
+        Some("Bearer sk-responses-stream-preflight-incompatible-backup")
+    );
+
+    let usage = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 1);
+    assert_eq!(
+        usage_json[0]["provider"],
+        "provider-responses-stream-preflight-incompatible-backup"
+    );
+
+    let logs = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-responses-stream-preflight-incompatible-backup"
+    );
+    assert_eq!(
+        logs_json[0]["fallback_reason"],
+        "gateway_execution_failover"
+    );
 }
 
 #[serial(extension_env)]
@@ -432,4 +1194,68 @@ async fn stateful_responses_stream_route_fails_over_to_backup_provider_and_recor
         logs_json[0]["fallback_reason"],
         "gateway_execution_failover"
     );
+}
+
+async fn create_stateful_openai_provider_for_responses_optional_credential(
+    admin_app: &Router,
+    admin_token: &str,
+    tenant_id: &str,
+    provider_id: &str,
+    base_url: &str,
+    display_name: &str,
+    credential_ref: Option<&str>,
+    secret_value: Option<&str>,
+) {
+    let provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"{provider_id}\",\"channel_id\":\"openai\",\"adapter_kind\":\"openai\",\"base_url\":\"{base_url}\",\"display_name\":\"{display_name}\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(provider.status(), StatusCode::CREATED);
+
+    if let (Some(credential_ref), Some(secret_value)) = (credential_ref, secret_value) {
+        let credential = admin_app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/credentials")
+                    .header("authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"{provider_id}\",\"key_reference\":\"{credential_ref}\",\"secret_value\":\"{secret_value}\"}}"
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(credential.status(), StatusCode::CREATED);
+    }
+
+    let model = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/models")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"external_name\":\"gpt-4.1\",\"provider_id\":\"{provider_id}\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(model.status(), StatusCode::CREATED);
 }

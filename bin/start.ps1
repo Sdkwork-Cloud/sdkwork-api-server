@@ -55,6 +55,8 @@ $stderrLog = Join-Path $logDirectory 'router-product-service.stderr.log'
 $planFile = Join-Path $runDirectory 'router-product-service.plan.json'
 $defaultAdminSiteDir = Join-Path $runtimeHome 'sites\admin\dist'
 $defaultPortalSiteDir = Join-Path $runtimeHome 'sites\portal\dist'
+$defaultBootstrapDataDir = Join-Path $runtimeHome 'data'
+$repositoryBootstrapDataDir = Join-Path $repoRoot 'data'
 $defaultConfigDirPortable = Convert-ToRouterPortablePath -PathValue $configDirectory
 $defaultDatabaseUrl = "sqlite://$(Convert-ToRouterPortablePath -PathValue $dataDirectory)/sdkwork-api-router.db"
 $defaultAdminSiteDirPortable = Convert-ToRouterPortablePath -PathValue $defaultAdminSiteDir
@@ -75,6 +77,16 @@ if (-not $env:SDKWORK_CONFIG_DIR) {
 }
 if (-not $env:SDKWORK_DATABASE_URL) {
     $env:SDKWORK_DATABASE_URL = $defaultDatabaseUrl
+}
+if (-not $env:SDKWORK_BOOTSTRAP_PROFILE) {
+    $env:SDKWORK_BOOTSTRAP_PROFILE = 'prod'
+}
+if (-not $env:SDKWORK_BOOTSTRAP_DATA_DIR) {
+    if (Test-Path $defaultBootstrapDataDir -PathType Container) {
+        $env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue $defaultBootstrapDataDir
+    } elseif (Test-Path $repositoryBootstrapDataDir -PathType Container) {
+        $env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue $repositoryBootstrapDataDir
+    }
 }
 if (-not $env:SDKWORK_WEB_BIND) {
     $env:SDKWORK_WEB_BIND = '0.0.0.0:9983'

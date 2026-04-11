@@ -170,7 +170,6 @@ export function AppRoutes() {
     handleDeleteApiKeyGroup,
     handleDeleteChannel,
     handleDeleteChannelModel,
-    handleDeleteCoupon,
     handleDeleteCredential,
     handleDeleteModel,
     handleDeleteModelPrice,
@@ -183,7 +182,6 @@ export function AppRoutes() {
     handleReloadRuntimes,
     handleSaveChannel,
     handleSaveChannelModel,
-    handleSaveCoupon,
     handleSaveCredential,
     handleSaveModel,
     handleSaveModelPrice,
@@ -198,7 +196,6 @@ export function AppRoutes() {
     handleSaveProvider,
     handleSaveTenant,
     handleToggleApiKeyGroup,
-    handleToggleCoupon,
     handleToggleOperatorUser,
     handleTogglePortalUser,
     handleUpdateApiKey,
@@ -284,9 +281,6 @@ export function AppRoutes() {
         element={
           <ProtectedPage routeKey={location.pathname}>
             <CouponsPage
-              onDeleteCoupon={handleDeleteCoupon}
-              onSaveCoupon={handleSaveCoupon}
-              onToggleCoupon={handleToggleCoupon}
               onUpdateMarketingCampaignBudgetStatus={handleUpdateMarketingCampaignBudgetStatus}
               onUpdateMarketingCampaignStatus={handleUpdateMarketingCampaignStatus}
               onUpdateMarketingCouponCodeStatus={handleUpdateMarketingCouponCodeStatus}

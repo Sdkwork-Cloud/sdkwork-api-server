@@ -8,6 +8,8 @@ mod paths_assistants_threads;
 mod paths_files_batches;
 #[path = "gateway_openapi_paths_vector_compat.rs"]
 mod paths_vector_compat;
+#[path = "gateway_openapi_paths_market_commercial.rs"]
+mod paths_market_commercial;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -36,6 +38,9 @@ mod paths_vector_compat;
         (name = "threads", description = "Assistant thread and message management routes."),
         (name = "runs", description = "Assistant run orchestration and run step routes."),
         (name = "realtime", description = "Realtime session bootstrap routes."),
+        (name = "market", description = "Public API product catalog and quote routes."),
+        (name = "marketing", description = "Coupon-first marketing validation and redemption routes."),
+        (name = "commercial", description = "Commercial account and benefit-lot visibility routes."),
         (name = "compatibility", description = "Anthropic and Gemini compatibility routes.")
     )
 )]
@@ -65,6 +70,7 @@ impl Modify for GatewayApiDocModifier {
 mod openapi_paths {
     pub(super) use super::paths_assistants_threads::*;
     pub(super) use super::paths_files_batches::*;
+    pub(super) use super::paths_market_commercial::*;
     pub(super) use super::paths_media::*;
     pub(super) use super::paths_models_chat::*;
     pub(super) use super::paths_vector_compat::*;
@@ -73,6 +79,15 @@ mod openapi_paths {
 fn gateway_openapi() -> utoipa::openapi::OpenApi {
     OpenApiRouter::<()>::with_openapi(GatewayApiDoc::openapi())
         .routes(routes!(openapi_paths::health))
+        .routes(routes!(openapi_paths::market_products))
+        .routes(routes!(openapi_paths::market_offers))
+        .routes(routes!(openapi_paths::market_quotes))
+        .routes(routes!(openapi_paths::marketing_coupon_validate))
+        .routes(routes!(openapi_paths::marketing_coupon_reserve))
+        .routes(routes!(openapi_paths::marketing_coupon_confirm))
+        .routes(routes!(openapi_paths::marketing_coupon_rollback))
+        .routes(routes!(openapi_paths::commercial_account))
+        .routes(routes!(openapi_paths::commercial_account_benefit_lots))
         .routes(routes!(openapi_paths::list_models))
         .routes(routes!(openapi_paths::get_model))
         .routes(routes!(openapi_paths::chat_completions))

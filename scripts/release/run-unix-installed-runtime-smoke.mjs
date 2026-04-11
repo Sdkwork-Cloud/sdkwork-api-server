@@ -130,6 +130,20 @@ function buildFailureContext(plan) {
   return contexts.length > 0 ? `\n${contexts.join('\n\n')}` : '';
 }
 
+function assertPackagedBootstrapData(runtimeHome) {
+  const requiredFiles = [
+    path.join(runtimeHome, 'data', 'channels', 'default.json'),
+    path.join(runtimeHome, 'data', 'providers', 'default.json'),
+    path.join(runtimeHome, 'data', 'routing', 'default.json'),
+  ];
+
+  for (const filePath of requiredFiles) {
+    if (!existsSync(filePath)) {
+      throw new Error(`installed runtime is missing packaged bootstrap data: ${filePath}`);
+    }
+  }
+}
+
 function buildCommandFailure(label, result, plan) {
   const fragments = [];
 
@@ -475,6 +489,7 @@ export async function runUnixInstalledRuntimeSmoke({
     applyInstallPlan(plan.installPlan, {
       force: true,
     });
+    assertPackagedBootstrapData(plan.runtimeHome);
     writeFileSync(plan.routerEnvPath, plan.routerEnvContents, 'utf8');
 
     runScriptCommand(plan.startCommand.command, plan.startCommand.args, {

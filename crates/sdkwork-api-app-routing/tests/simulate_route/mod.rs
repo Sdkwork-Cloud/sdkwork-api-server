@@ -15,7 +15,9 @@ use sdkwork_api_app_routing::{
 };
 use sdkwork_api_cache_core::DistributedLockStore;
 use sdkwork_api_cache_memory::MemoryCacheStore;
-use sdkwork_api_domain_catalog::{Channel, ModelCatalogEntry, ProxyProvider};
+use sdkwork_api_domain_catalog::{
+    Channel, ModelCatalogEntry, ProviderChannelBinding, ProxyProvider,
+};
 use sdkwork_api_domain_identity::ApiKeyGroupRecord;
 use sdkwork_api_domain_routing::{
     ProjectRoutingPreferences, ProviderHealthSnapshot, RoutingDecisionSource, RoutingPolicy,

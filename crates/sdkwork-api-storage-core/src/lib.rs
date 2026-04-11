@@ -7,7 +7,8 @@ use sdkwork_api_domain_billing::{
     QuotaPolicy, RequestSettlementRecord,
 };
 use sdkwork_api_domain_catalog::{
-    Channel, ChannelModelRecord, ModelCatalogEntry, ModelPriceRecord, ProxyProvider,
+    CatalogPublicationLifecycleAuditRecord, Channel, ChannelModelRecord, ModelCatalogEntry,
+    ModelPriceRecord, ProviderAccountRecord, ProviderModelRecord, ProxyProvider,
 };
 use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, CommercePaymentAttemptRecord, CommercePaymentEventRecord,
@@ -15,8 +16,7 @@ use sdkwork_api_domain_commerce::{
     CommerceWebhookDeliveryAttemptRecord, CommerceWebhookInboxRecord,
     PaymentMethodCredentialBindingRecord, PaymentMethodRecord, ProjectMembershipRecord,
 };
-use sdkwork_api_domain_coupon::CouponCampaign;
-use sdkwork_api_domain_credential::UpstreamCredential;
+use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_domain_identity::{
     AdminUserRecord, ApiKeyGroupRecord, CanonicalApiKeyRecord, GatewayApiKeyRecord,
     IdentityBindingRecord, IdentityUserRecord, PortalUserRecord,
@@ -25,9 +25,10 @@ use sdkwork_api_domain_jobs::{
     AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobCallbackRecord, AsyncJobRecord,
 };
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CouponCodeRecord, CouponRedemptionRecord, CouponReservationRecord,
-    CouponRollbackRecord, CouponRollbackStatus, CouponTemplateRecord, MarketingCampaignRecord,
-    MarketingOutboxEventRecord,
+    CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord, CouponCodeLifecycleAuditRecord,
+    CouponCodeRecord, CouponRedemptionRecord, CouponReservationRecord, CouponRollbackRecord,
+    CouponRollbackStatus, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
+    MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord, MarketingOutboxEventRecord,
 };
 use sdkwork_api_domain_rate_limit::{
     RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,

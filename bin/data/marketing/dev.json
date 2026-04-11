@@ -1,0 +1,150 @@
+{
+  "coupons": [
+    {
+      "id": "coupon-dev-sandbox-50",
+      "code": "DEV50",
+      "discount_label": "$50 developer sandbox credit",
+      "audience": "developer_onboarding",
+      "remaining": 2000,
+      "active": true,
+      "note": "Developer bootstrap credit for local and staging workspaces.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710001000000
+    },
+    {
+      "id": "coupon-partner-sandbox-30",
+      "code": "PARTNER30",
+      "discount_label": "30% partner sandbox discount",
+      "audience": "partner_sandbox",
+      "remaining": 500,
+      "active": true,
+      "note": "Partner sandbox promotion for channel onboarding.",
+      "expires_on": "2027-12-31",
+      "created_at_ms": 1710001000000
+    }
+  ],
+  "coupon_templates": [
+    {
+      "coupon_template_id": "template-dev-sandbox-50",
+      "template_key": "dev-sandbox-credit-50",
+      "display_name": "Developer Sandbox Credit 50",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "fixed_amount_off",
+        "discount_percent": null,
+        "discount_amount_minor": 5000,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 5000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 0,
+        "first_order_only": true,
+        "new_customer_only": true,
+        "exclusive_group": "dev-onboarding",
+        "stacking_policy": "exclusive",
+        "max_redemptions_per_subject": 1,
+        "eligible_target_kinds": ["subscription_plan", "recharge_pack"]
+      },
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "coupon_template_id": "template-partner-sandbox-30",
+      "template_key": "partner-sandbox-30",
+      "display_name": "Partner Sandbox 30 Percent",
+      "status": "active",
+      "distribution_kind": "shared_code",
+      "benefit": {
+        "benefit_kind": "percentage_off",
+        "discount_percent": 30,
+        "discount_amount_minor": null,
+        "grant_units": null,
+        "currency_code": "USD",
+        "max_discount_minor": 30000
+      },
+      "restriction": {
+        "subject_scope": "project",
+        "min_order_amount_minor": 0,
+        "first_order_only": false,
+        "new_customer_only": false,
+        "exclusive_group": "partner-sandbox",
+        "stacking_policy": "best_of_group",
+        "max_redemptions_per_subject": 3,
+        "eligible_target_kinds": ["subscription_plan", "recharge_pack", "enterprise_contract"]
+      },
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ],
+  "marketing_campaigns": [
+    {
+      "marketing_campaign_id": "campaign-dev-onboarding",
+      "coupon_template_id": "template-dev-sandbox-50",
+      "display_name": "Developer Onboarding",
+      "status": "active",
+      "start_at_ms": 1710001000000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "marketing_campaign_id": "campaign-partner-sandbox",
+      "coupon_template_id": "template-partner-sandbox-30",
+      "display_name": "Partner Sandbox Launch",
+      "status": "active",
+      "start_at_ms": 1710001000000,
+      "end_at_ms": 1767225600000,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ],
+  "campaign_budgets": [
+    {
+      "campaign_budget_id": "budget-dev-onboarding",
+      "marketing_campaign_id": "campaign-dev-onboarding",
+      "status": "active",
+      "total_budget_minor": 1000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "campaign_budget_id": "budget-partner-sandbox",
+      "marketing_campaign_id": "campaign-partner-sandbox",
+      "status": "active",
+      "total_budget_minor": 2000000,
+      "reserved_budget_minor": 0,
+      "consumed_budget_minor": 0,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ],
+  "coupon_codes": [
+    {
+      "coupon_code_id": "coupon-code-dev-sandbox-50",
+      "coupon_template_id": "template-dev-sandbox-50",
+      "code_value": "DEV50-SANDBOX",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    },
+    {
+      "coupon_code_id": "coupon-code-partner-sandbox-30",
+      "coupon_template_id": "template-partner-sandbox-30",
+      "code_value": "PARTNER30-SANDBOX",
+      "status": "available",
+      "claimed_subject_scope": null,
+      "claimed_subject_id": null,
+      "expires_at_ms": 1767225600000,
+      "created_at_ms": 1710001000000,
+      "updated_at_ms": 1710001000000
+    }
+  ]
+}

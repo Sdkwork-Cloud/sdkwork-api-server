@@ -103,6 +103,7 @@ function normalizeSnapshot(snapshot: Partial<AdminWorkspaceSnapshot>): AdminWork
     credentials: safeArray(snapshot.credentials),
     models: safeArray(snapshot.models),
     channelModels: safeArray(snapshot.channelModels),
+    providerModels: safeArray(snapshot.providerModels),
     modelPrices: safeArray(snapshot.modelPrices),
     usageRecords: safeArray(snapshot.usageRecords),
     usageSummary: normalizeUsageSummary(snapshot.usageSummary),

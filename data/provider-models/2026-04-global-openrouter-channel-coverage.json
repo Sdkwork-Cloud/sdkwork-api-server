@@ -1,0 +1,56 @@
+[
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "xai",
+    "model_id": "grok-4",
+    "provider_model_id": "x-ai/grok-4",
+    "provider_model_family": "grok",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 256000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "moonshot",
+    "model_id": "kimi-k2.5",
+    "provider_model_id": "moonshotai/kimi-k2.5",
+    "provider_model_family": "moonshot",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": true,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  },
+  {
+    "proxy_provider_id": "provider-openrouter-main",
+    "channel_id": "mistral",
+    "model_id": "mistral-large-latest",
+    "provider_model_id": "mistralai/mistral-large",
+    "provider_model_family": "mistral",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "supports_prompt_caching": false,
+    "supports_reasoning_usage": false,
+    "supports_tool_usage_metrics": true,
+    "is_default_route": true,
+    "is_active": true
+  }
+]

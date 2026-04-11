@@ -1,0 +1,42 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI"
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic Claude"
+  },
+  {
+    "id": "gemini",
+    "name": "Google Gemini"
+  },
+  {
+    "id": "xai",
+    "name": "xAI Grok"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek"
+  },
+  {
+    "id": "qwen",
+    "name": "Alibaba Qwen"
+  },
+  {
+    "id": "doubao",
+    "name": "Doubao"
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter"
+  },
+  {
+    "id": "siliconflow",
+    "name": "SiliconFlow"
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama"
+  }
+]

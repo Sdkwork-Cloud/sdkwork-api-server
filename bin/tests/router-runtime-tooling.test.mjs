@@ -546,6 +546,7 @@ test('createInstallPlan copies product assets, runtime scripts, and service desc
   });
 
   assert.equal(plan.directories.includes(path.join(installRoot, 'bin')), true);
+  assert.equal(plan.directories.includes(path.join(installRoot, 'data')), true);
   assert.equal(plan.directories.includes(path.join(installRoot, 'sites', 'admin')), true);
   assert.equal(plan.directories.includes(path.join(installRoot, 'sites', 'portal')), true);
   assert.equal(plan.directories.includes(path.join(installRoot, 'var', 'log')), true);
@@ -560,6 +561,13 @@ test('createInstallPlan copies product assets, runtime scripts, and service desc
   assert.equal(plan.files.some((file) => file.targetPath.endsWith(path.join('service', 'launchd', 'uninstall-service.sh'))), true);
   assert.equal(plan.files.some((file) => file.targetPath.endsWith(path.join('service', 'windows-task', 'install-service.ps1'))), true);
   assert.equal(plan.files.some((file) => file.targetPath.endsWith(path.join('service', 'windows-task', 'uninstall-service.ps1'))), true);
+  assert.equal(
+    plan.files.some((file) =>
+      file.type === 'directory'
+      && file.sourcePath === path.join(repoRoot, 'data')
+      && file.targetPath === path.join(installRoot, 'data')),
+    true,
+  );
   assert.equal(plan.files.some((file) => file.targetPath.endsWith(path.join('sites', 'admin', 'dist'))), true);
   assert.equal(plan.files.some((file) => file.targetPath.endsWith(path.join('sites', 'portal', 'dist'))), true);
 });
@@ -580,6 +588,29 @@ test('createInstallPlan reads release binaries from the managed short Windows ta
 
   const binaryCopy = plan.files.find((file) => file.targetPath.endsWith(path.join('bin', 'router-product-service.exe')));
   assert.ok(binaryCopy, 'expected router-product-service.exe copy entry');
+  assert.equal(
+    binaryCopy.sourcePath,
+    path.join(repoRoot, 'bin', '.sdkwork-target-vs2022', 'x86_64-pc-windows-msvc', 'release', 'router-product-service.exe'),
+  );
+});
+
+test('createInstallPlan treats normalized windows platform ids as Windows executable layouts', async () => {
+  const module = await loadModule();
+  const installRoot = path.join(repoRoot, 'artifacts', 'install', 'sdkwork-api-router', 'current');
+
+  const plan = module.createInstallPlan({
+    repoRoot,
+    installRoot,
+    platform: 'windows',
+    arch: 'x64',
+    env: {
+      USERPROFILE: 'C:/Users/admin',
+      TEMP: 'C:/Temp',
+    },
+  });
+
+  const binaryCopy = plan.files.find((file) => file.targetPath.endsWith(path.join('bin', 'router-product-service.exe')));
+  assert.ok(binaryCopy, 'expected router-product-service.exe copy entry for normalized windows platform ids');
   assert.equal(
     binaryCopy.sourcePath,
     path.join(repoRoot, 'bin', '.sdkwork-target-vs2022', 'x86_64-pc-windows-msvc', 'release', 'router-product-service.exe'),
@@ -1068,8 +1099,29 @@ test('start-dev.ps1 defaults the managed dev entrypoint to preview mode and supp
 
   assert.match(script, /\[switch\]\$Browser/);
   assert.match(script, /elseif \(-not \$Preview\) \{\s*\$Preview = \$true\s*\}/);
-  assert.match(script, /if \(\$Browser\) \{\s*\$Preview = \$false\s*\$Tauri = \$false\s*\}/);
+  assert.match(script, /if \(\$Browser\) \{\s*\$Preview = \$false\s*\$ProxyDev = \$false\s*\$Tauri = \$false\s*\}/);
   assert.match(script, /if \(\$Preview\) \{ \$startArgs \+= '--preview' \}/);
+});
+
+test('start-dev.ps1 normalizes GNU-style long options before launch mode resolution', () => {
+  const script = readFileSync(path.join(repoRoot, 'bin', 'start-dev.ps1'), 'utf8');
+
+  assert.match(script, /\[CmdletBinding\(PositionalBinding = \$false\)\]/);
+  assert.match(script, /\[Parameter\(ValueFromRemainingArguments = \$true\)\]\s*\[string\[\]\]\$RemainingArgs/);
+  assert.match(script, /switch \(\$optionName\) \{/);
+  assert.match(script, /'--proxy-dev'\s*\{[\s\S]*\$ProxyDev = \$true/);
+  assert.match(script, /'--dry-run'\s*\{[\s\S]*\$DryRun = \$true/);
+  assert.match(script, /'--wait-seconds'\s*\{/);
+  assert.match(script, /unknown option: \$arg/);
+});
+
+test('start-dev.ps1 prefers repository bootstrap data over stale packaged bin data', () => {
+  const script = readFileSync(path.join(repoRoot, 'bin', 'start-dev.ps1'), 'utf8');
+
+  assert.match(
+    script,
+    /if \(-not \$env:SDKWORK_BOOTSTRAP_DATA_DIR\) \{\s*if \(Test-Path \$repositoryBootstrapDataDirectory -PathType Container\) \{\s*\$env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue \$repositoryBootstrapDataDirectory\s*\} elseif \(Test-Path \$packagedBootstrapDataDirectory -PathType Container\) \{\s*\$env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue \$packagedBootstrapDataDirectory\s*\}/s,
+  );
 });
 
 test('PowerShell runtime launchers start background processes without opening a new console window', () => {
@@ -1352,6 +1404,34 @@ test('PowerShell managed state validation rejects stale pid reuse when the store
     assert.match(output, /resolved=\d+/);
     assert.match(output, /mode=development preview/);
     assert.match(output, /stale=0/);
+  } finally {
+    removeTempRuntimeHome(tempRoot);
+  }
+});
+
+test('PowerShell managed state writer persists empty app URLs instead of failing parameter binding', { skip: !canSpawnPowerShellFromNode() }, () => {
+  const tempRoot = createTempDir('managed-state-empty-urls-');
+  const stateFile = path.join(tempRoot, 'runtime.state.env');
+  const commonScript = quoteForPowerShellSingleQuotedString(
+    path.join(repoRoot, 'bin', 'lib', 'runtime-common.ps1'),
+  );
+  const stateFilePs = quoteForPowerShellSingleQuotedString(stateFile);
+
+  try {
+    const result = runPowerShellCommand(
+      [
+        `. '${commonScript}'`,
+        `$stateFile = '${stateFilePs}'`,
+        "Write-RouterManagedStateFile -StateFile $stateFile -ProcessId $PID -ProcessFingerprint '' -Mode 'production release' -WebBind '127.0.0.1:9983' -GatewayBind '127.0.0.1:9980' -AdminBind '127.0.0.1:9981' -PortalBind '127.0.0.1:9982' -UnifiedAccessEnabled $true -AdminAppUrl '' -PortalAppUrl ''",
+        'Get-Content $stateFile',
+      ].join('\n'),
+    );
+    const output = `${result.stdout}${result.stderr}`;
+
+    assert.equal(result.status, 0, output);
+    assert.match(output, /SDKWORK_ROUTER_PROCESS_FINGERPRINT=""/);
+    assert.match(output, /SDKWORK_ROUTER_ADMIN_APP_URL=""/);
+    assert.match(output, /SDKWORK_ROUTER_PORTAL_APP_URL=""/);
   } finally {
     removeTempRuntimeHome(tempRoot);
   }

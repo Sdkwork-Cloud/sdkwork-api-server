@@ -24,6 +24,16 @@ const rechargeCurrencyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 const rechargeUnitsFormatter = new Intl.NumberFormat('en-US');
+const FIXED_RECHARGE_PICKER_AMOUNTS = [
+  1000,
+  5000,
+  10000,
+  20000,
+  50000,
+  100000,
+  200000,
+  500000,
+];
 
 function formatCurrency(amount: number): string {
   return rechargeCurrencyFormatter.format(amount);
@@ -74,6 +84,96 @@ export function buildPortalRechargeHistoryRows(
     .filter((order) => order.target_kind === 'custom_recharge' || order.target_kind === 'recharge_pack')
     .slice()
     .sort((left, right) => right.created_at_ms - left.created_at_ms);
+}
+
+function resolveRechargeRuleSnapshot(
+  amountCents: number,
+  policy: PortalCustomRechargePolicy | null,
+  presets: PortalRechargeOption[],
+) {
+  const matchedRule = policy?.rules.find(
+    (rule) => amountCents >= rule.min_amount_cents && amountCents <= rule.max_amount_cents,
+  );
+
+  if (matchedRule) {
+    return {
+      grantedUnits: Math.round(amountCents * matchedRule.units_per_cent),
+      effectiveRatioLabel: matchedRule.effective_ratio_label || 'n/a',
+    };
+  }
+
+  const nearestPreset = presets
+    .slice()
+    .sort(
+      (left, right) =>
+        Math.abs(left.amount_cents - amountCents) - Math.abs(right.amount_cents - amountCents),
+    )[0];
+
+  if (!nearestPreset || nearestPreset.amount_cents <= 0) {
+    return {
+      grantedUnits: 0,
+      effectiveRatioLabel: 'n/a',
+    };
+  }
+
+  return {
+    grantedUnits: Math.round(
+      amountCents * (nearestPreset.granted_units / nearestPreset.amount_cents),
+    ),
+    effectiveRatioLabel: nearestPreset.effective_ratio_label,
+  };
+}
+
+function resolveRecommendedPickerAmount(
+  presets: PortalRechargeOption[],
+  policy: PortalCustomRechargePolicy | null,
+) {
+  const suggestedAmount = policy?.suggested_amount_cents ?? null;
+  if (suggestedAmount) {
+    return FIXED_RECHARGE_PICKER_AMOUNTS.slice().sort(
+      (left, right) => Math.abs(left - suggestedAmount) - Math.abs(right - suggestedAmount),
+    )[0] ?? 50000;
+  }
+
+  const presetRecommendedAmount = presets.find((option) => option.recommended)?.amount_cents;
+  if (presetRecommendedAmount && FIXED_RECHARGE_PICKER_AMOUNTS.includes(presetRecommendedAmount)) {
+    return presetRecommendedAmount;
+  }
+
+  return 50000;
+}
+
+export function buildPortalRechargePickerOptions(
+  options: PortalRechargeOption[] | null | undefined,
+  policy: PortalCustomRechargePolicy | null,
+): PortalRechargeOption[] {
+  const presets = (options ?? [])
+    .slice()
+    .sort((left, right) => left.amount_cents - right.amount_cents);
+  const recommendedAmount = resolveRecommendedPickerAmount(presets, policy);
+
+  return FIXED_RECHARGE_PICKER_AMOUNTS.map((amountCents) => {
+    const preset = presets.find((option) => option.amount_cents === amountCents);
+    if (preset) {
+      return {
+        ...preset,
+        recommended: amountCents === recommendedAmount,
+      };
+    }
+
+    const derived = resolveRechargeRuleSnapshot(amountCents, policy, presets);
+    return {
+      id: `derived-${amountCents}`,
+      label: formatCurrency(amountCents / 100),
+      amount_cents: amountCents,
+      amount_label: formatCurrency(amountCents / 100),
+      granted_units: derived.grantedUnits,
+      effective_ratio_label: derived.effectiveRatioLabel,
+      note: '',
+      recommended: amountCents === recommendedAmount,
+      source: policy?.source ?? presets[0]?.source ?? 'live',
+    };
+  });
 }
 
 export function validatePortalRechargeAmount(

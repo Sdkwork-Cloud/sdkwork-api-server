@@ -1,0 +1,10 @@
+[
+  {
+    "id": "tenant_local_demo",
+    "name": "Local Demo Workspace"
+  },
+  {
+    "id": "tenant_partner_demo",
+    "name": "Partner Sandbox Workspace"
+  }
+]

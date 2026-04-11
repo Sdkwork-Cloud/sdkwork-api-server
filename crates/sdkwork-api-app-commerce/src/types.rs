@@ -77,7 +77,54 @@ pub struct PortalCommerceCoupon {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct PortalApiProduct {
+    pub product_id: String,
+    pub product_kind: String,
+    pub target_id: String,
+    pub display_name: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct PortalProductOffer {
+    pub offer_id: String,
+    pub product_id: String,
+    pub product_kind: String,
+    pub display_name: String,
+    pub quote_kind: String,
+    pub quote_target_kind: String,
+    pub quote_target_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_revision_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_source_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_effective_from_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_rate_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_metric_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub price_label: Option<String>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct PortalCommerceCatalog {
+    pub products: Vec<PortalApiProduct>,
+    pub offers: Vec<PortalProductOffer>,
     pub plans: Vec<PortalSubscriptionPlan>,
     pub packs: Vec<PortalRechargePack>,
     pub recharge_options: Vec<PortalRechargeOption>,
@@ -109,11 +156,62 @@ pub struct PortalAppliedCoupon {
     pub bonus_units: u64,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct PortalCommerceCatalogBinding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offer_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_revision_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_source_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_effective_from_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_rate_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_metric_code: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct PortalCommerceQuote {
     pub target_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_kind: Option<String>,
+    pub quote_kind: String,
     pub target_id: String,
     pub target_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offer_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_revision_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_source_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_effective_from_ms: Option<u64>,
     pub list_price_cents: u64,
     pub payable_price_cents: u64,
     pub list_price_label: String,
@@ -124,6 +222,14 @@ pub struct PortalCommerceQuote {
     pub amount_cents: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projected_remaining_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_plan_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_rate_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_metric_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub applied_coupon: Option<PortalAppliedCoupon>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

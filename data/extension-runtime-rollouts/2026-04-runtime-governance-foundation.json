@@ -1,0 +1,84 @@
+{
+  "rollouts": [
+    {
+      "rollout_id": "rollout-global-openrouter-instance-refresh",
+      "scope": "instance",
+      "requested_extension_id": null,
+      "requested_instance_id": "provider-openrouter-main",
+      "resolved_extension_id": "sdkwork.provider.openrouter",
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711004000000,
+      "deadline_at_ms": 1711004600000
+    },
+    {
+      "rollout_id": "rollout-global-gemini-extension-reconcile",
+      "scope": "extension",
+      "requested_extension_id": "sdkwork.provider.gemini",
+      "requested_instance_id": null,
+      "resolved_extension_id": "sdkwork.provider.gemini",
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711005000000,
+      "deadline_at_ms": 1711005600000
+    },
+    {
+      "rollout_id": "rollout-global-platform-resync",
+      "scope": "all",
+      "requested_extension_id": null,
+      "requested_instance_id": null,
+      "resolved_extension_id": null,
+      "created_by": "bootstrap-system",
+      "created_at_ms": 1711006000000,
+      "deadline_at_ms": 1711006600000
+    }
+  ],
+  "participants": [
+    {
+      "rollout_id": "rollout-global-openrouter-instance-refresh",
+      "node_id": "node-global-gateway-sg-01",
+      "service_kind": "gateway",
+      "status": "succeeded",
+      "message": "Gateway routing workers already refreshed provider-openrouter-main during bootstrap.",
+      "updated_at_ms": 1711004065000
+    },
+    {
+      "rollout_id": "rollout-global-openrouter-instance-refresh",
+      "node_id": "node-global-admin-us-01",
+      "service_kind": "admin",
+      "status": "pending",
+      "message": "Admin rollout observer will publish the new provider-openrouter-main contract on first supervision pass.",
+      "updated_at_ms": 1711004025000
+    },
+    {
+      "rollout_id": "rollout-global-gemini-extension-reconcile",
+      "node_id": "node-global-gateway-sg-01",
+      "service_kind": "gateway",
+      "status": "succeeded",
+      "message": "Gateway extension discovery completed for sdkwork.provider.gemini.",
+      "updated_at_ms": 1711005065000
+    },
+    {
+      "rollout_id": "rollout-global-gemini-extension-reconcile",
+      "node_id": "node-global-admin-us-01",
+      "service_kind": "admin",
+      "status": "succeeded",
+      "message": "Admin control plane synced sdkwork.provider.gemini extension metadata.",
+      "updated_at_ms": 1711005075000
+    },
+    {
+      "rollout_id": "rollout-global-platform-resync",
+      "node_id": "node-global-gateway-sg-01",
+      "service_kind": "gateway",
+      "status": "succeeded",
+      "message": "Gateway runtime completed the full extension resync pass.",
+      "updated_at_ms": 1711006060000
+    },
+    {
+      "rollout_id": "rollout-global-platform-resync",
+      "node_id": "node-global-admin-us-01",
+      "service_kind": "admin",
+      "status": "pending",
+      "message": "Admin runtime queued the final reconciliation pass for all extension hosts.",
+      "updated_at_ms": 1711006030000
+    }
+  ]
+}

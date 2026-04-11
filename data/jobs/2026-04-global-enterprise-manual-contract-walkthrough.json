@@ -1,0 +1,70 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-global-enterprise-sow-draft",
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "user_id": 3001,
+      "account_id": 7001001,
+      "request_id": 5008,
+      "provider_id": "provider-anthropic-official",
+      "model_code": "claude-3-7-sonnet",
+      "capability_code": "responses",
+      "modality": "text",
+      "operation_kind": "contract_sow_draft",
+      "status": "succeeded",
+      "external_job_id": "anthropic-job-global-enterprise-sow-draft",
+      "idempotency_key": "job:global:enterprise-sow-draft",
+      "callback_url": "https://portal.sdkwork.ai/api/jobs/callbacks/enterprise-contract",
+      "input_summary": "Draft a statement of work for the bootstrap global enterprise annual contract workflow.",
+      "progress_percent": 100,
+      "error_code": null,
+      "error_message": null,
+      "created_at_ms": 1710000500100,
+      "updated_at_ms": 1710000500700,
+      "started_at_ms": 1710000500200,
+      "completed_at_ms": 1710000500700
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": 9816,
+      "job_id": "job-global-enterprise-sow-draft",
+      "attempt_number": 1,
+      "status": "succeeded",
+      "runtime_kind": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "external_job_id": "anthropic-job-global-enterprise-sow-draft",
+      "claimed_at_ms": 1710000500220,
+      "finished_at_ms": 1710000500680,
+      "error_message": null,
+      "created_at_ms": 1710000500100,
+      "updated_at_ms": 1710000500680
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset-global-enterprise-sow-draft-md",
+      "job_id": "job-global-enterprise-sow-draft",
+      "asset_kind": "markdown",
+      "storage_key": "tenant-1001/jobs/job-global-enterprise-sow-draft/sow.md",
+      "download_url": "https://cdn.sdkwork.ai/jobs/job-global-enterprise-sow-draft/sow.md",
+      "mime_type": "text/markdown",
+      "size_bytes": 6144,
+      "checksum_sha256": "46635f2369759f01a97fdc07cc34ef0db0dd65bc13d076b4e6a9c9458dcb6861",
+      "created_at_ms": 1710000500710
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_id": 10816,
+      "job_id": "job-global-enterprise-sow-draft",
+      "event_type": "job.completed",
+      "dedupe_key": "anthropic:anthropic-job-global-enterprise-sow-draft:completed",
+      "payload_json": "{\"job_id\":\"job-global-enterprise-sow-draft\",\"status\":\"succeeded\",\"provider\":\"anthropic\"}",
+      "status": "processed",
+      "received_at_ms": 1710000500730,
+      "processed_at_ms": 1710000500760
+    }
+  ]
+}

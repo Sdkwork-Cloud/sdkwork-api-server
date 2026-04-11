@@ -1,5 +1,18 @@
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PricingPlanOwnershipScope {
+    Workspace,
+    PlatformShared,
+}
+
+impl Default for PricingPlanOwnershipScope {
+    fn default() -> Self {
+        Self::Workspace
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PricingPlanRecord {
     pub pricing_plan_id: PricingPlanId,
@@ -11,6 +24,8 @@ pub struct PricingPlanRecord {
     pub currency_code: String,
     pub credit_unit_code: String,
     pub status: String,
+    #[serde(default)]
+    pub ownership_scope: PricingPlanOwnershipScope,
     pub effective_from_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective_to_ms: Option<u64>,
@@ -36,6 +51,7 @@ impl PricingPlanRecord {
             currency_code: "USD".to_owned(),
             credit_unit_code: "credit".to_owned(),
             status: "draft".to_owned(),
+            ownership_scope: PricingPlanOwnershipScope::default(),
             effective_from_ms: 0,
             effective_to_ms: None,
             created_at_ms: 0,
@@ -63,6 +79,11 @@ impl PricingPlanRecord {
         self
     }
 
+    pub fn with_ownership_scope(mut self, ownership_scope: PricingPlanOwnershipScope) -> Self {
+        self.ownership_scope = ownership_scope;
+        self
+    }
+
     pub fn with_effective_from_ms(mut self, effective_from_ms: u64) -> Self {
         self.effective_from_ms = effective_from_ms;
         self
@@ -81,6 +102,10 @@ impl PricingPlanRecord {
     pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
         self.updated_at_ms = updated_at_ms;
         self
+    }
+
+    pub fn is_platform_shared(&self) -> bool {
+        self.ownership_scope == PricingPlanOwnershipScope::PlatformShared
     }
 }
 

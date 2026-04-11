@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -30,8 +31,24 @@ pub enum MarketingSubjectScope {
 #[serde(rename_all = "snake_case")]
 pub enum CouponTemplateStatus {
     Draft,
+    Scheduled,
     Active,
     Archived,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponTemplateApprovalState {
+    Draft,
+    InReview,
+    Approved,
+    Rejected,
+}
+
+impl Default for CouponTemplateApprovalState {
+    fn default() -> Self {
+        Self::Approved
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -55,11 +72,478 @@ pub enum MarketingCampaignStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum MarketingCampaignApprovalState {
+    Draft,
+    InReview,
+    Approved,
+    Rejected,
+}
+
+impl Default for MarketingCampaignApprovalState {
+    fn default() -> Self {
+        Self::Approved
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponTemplateLifecycleAction {
+    Clone,
+    SubmitForApproval,
+    Approve,
+    Reject,
+    Publish,
+    Schedule,
+    Retire,
+}
+
+impl CouponTemplateLifecycleAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clone => "clone",
+            Self::SubmitForApproval => "submit_for_approval",
+            Self::Approve => "approve",
+            Self::Reject => "reject",
+            Self::Publish => "publish",
+            Self::Schedule => "schedule",
+            Self::Retire => "retire",
+        }
+    }
+}
+
+impl FromStr for CouponTemplateLifecycleAction {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "clone" => Ok(Self::Clone),
+            "submit_for_approval" => Ok(Self::SubmitForApproval),
+            "approve" => Ok(Self::Approve),
+            "reject" => Ok(Self::Reject),
+            "publish" => Ok(Self::Publish),
+            "schedule" => Ok(Self::Schedule),
+            "retire" => Ok(Self::Retire),
+            _ => Err(anyhow::anyhow!(
+                "unsupported coupon template lifecycle action {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponTemplateLifecycleAuditOutcome {
+    Applied,
+    Rejected,
+}
+
+impl CouponTemplateLifecycleAuditOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+        }
+    }
+}
+
+impl FromStr for CouponTemplateLifecycleAuditOutcome {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "applied" => Ok(Self::Applied),
+            "rejected" => Ok(Self::Rejected),
+            _ => Err(anyhow::anyhow!(
+                "unsupported coupon template lifecycle audit outcome {value}"
+            )),
+        }
+    }
+}
+
+fn default_coupon_template_revision() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CouponTemplateLifecycleAuditRecord {
+    pub audit_id: String,
+    pub coupon_template_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_coupon_template_id: Option<String>,
+    pub action: CouponTemplateLifecycleAction,
+    pub outcome: CouponTemplateLifecycleAuditOutcome,
+    pub previous_status: CouponTemplateStatus,
+    pub resulting_status: CouponTemplateStatus,
+    #[serde(default)]
+    pub previous_approval_state: CouponTemplateApprovalState,
+    #[serde(default)]
+    pub resulting_approval_state: CouponTemplateApprovalState,
+    #[serde(default = "default_coupon_template_revision")]
+    pub previous_revision: u32,
+    #[serde(default = "default_coupon_template_revision")]
+    pub resulting_revision: u32,
+    pub operator_id: String,
+    pub request_id: String,
+    pub reason: String,
+    #[serde(default)]
+    pub decision_reasons: Vec<String>,
+    pub requested_at_ms: u64,
+}
+
+impl CouponTemplateLifecycleAuditRecord {
+    pub fn new(
+        audit_id: impl Into<String>,
+        coupon_template_id: impl Into<String>,
+        action: CouponTemplateLifecycleAction,
+        outcome: CouponTemplateLifecycleAuditOutcome,
+        previous_status: CouponTemplateStatus,
+        resulting_status: CouponTemplateStatus,
+        operator_id: impl Into<String>,
+        request_id: impl Into<String>,
+        reason: impl Into<String>,
+        requested_at_ms: u64,
+    ) -> Self {
+        Self {
+            audit_id: audit_id.into(),
+            coupon_template_id: coupon_template_id.into(),
+            source_coupon_template_id: None,
+            action,
+            outcome,
+            previous_status,
+            resulting_status,
+            previous_approval_state: CouponTemplateApprovalState::default(),
+            resulting_approval_state: CouponTemplateApprovalState::default(),
+            previous_revision: default_coupon_template_revision(),
+            resulting_revision: default_coupon_template_revision(),
+            operator_id: operator_id.into(),
+            request_id: request_id.into(),
+            reason: reason.into(),
+            decision_reasons: Vec::new(),
+            requested_at_ms,
+        }
+    }
+
+    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
+        self.decision_reasons = decision_reasons;
+        self
+    }
+
+    pub fn with_source_coupon_template_id(
+        mut self,
+        source_coupon_template_id: Option<String>,
+    ) -> Self {
+        self.source_coupon_template_id = source_coupon_template_id;
+        self
+    }
+
+    pub fn with_approval_states(
+        mut self,
+        previous_approval_state: CouponTemplateApprovalState,
+        resulting_approval_state: CouponTemplateApprovalState,
+    ) -> Self {
+        self.previous_approval_state = previous_approval_state;
+        self.resulting_approval_state = resulting_approval_state;
+        self
+    }
+
+    pub fn with_revisions(mut self, previous_revision: u32, resulting_revision: u32) -> Self {
+        self.previous_revision = previous_revision;
+        self.resulting_revision = resulting_revision;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MarketingCampaignLifecycleAction {
+    Clone,
+    SubmitForApproval,
+    Approve,
+    Reject,
+    Publish,
+    Schedule,
+    Retire,
+}
+
+impl MarketingCampaignLifecycleAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clone => "clone",
+            Self::SubmitForApproval => "submit_for_approval",
+            Self::Approve => "approve",
+            Self::Reject => "reject",
+            Self::Publish => "publish",
+            Self::Schedule => "schedule",
+            Self::Retire => "retire",
+        }
+    }
+}
+
+impl FromStr for MarketingCampaignLifecycleAction {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "clone" => Ok(Self::Clone),
+            "submit_for_approval" => Ok(Self::SubmitForApproval),
+            "approve" => Ok(Self::Approve),
+            "reject" => Ok(Self::Reject),
+            "publish" => Ok(Self::Publish),
+            "schedule" => Ok(Self::Schedule),
+            "retire" => Ok(Self::Retire),
+            _ => Err(anyhow::anyhow!(
+                "unsupported marketing campaign lifecycle action {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MarketingCampaignLifecycleAuditOutcome {
+    Applied,
+    Rejected,
+}
+
+impl MarketingCampaignLifecycleAuditOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+        }
+    }
+}
+
+impl FromStr for MarketingCampaignLifecycleAuditOutcome {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "applied" => Ok(Self::Applied),
+            "rejected" => Ok(Self::Rejected),
+            _ => Err(anyhow::anyhow!(
+                "unsupported marketing campaign lifecycle audit outcome {value}"
+            )),
+        }
+    }
+}
+
+fn default_marketing_campaign_revision() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MarketingCampaignLifecycleAuditRecord {
+    pub audit_id: String,
+    pub marketing_campaign_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_marketing_campaign_id: Option<String>,
+    pub coupon_template_id: String,
+    pub action: MarketingCampaignLifecycleAction,
+    pub outcome: MarketingCampaignLifecycleAuditOutcome,
+    pub previous_status: MarketingCampaignStatus,
+    pub resulting_status: MarketingCampaignStatus,
+    #[serde(default)]
+    pub previous_approval_state: MarketingCampaignApprovalState,
+    #[serde(default)]
+    pub resulting_approval_state: MarketingCampaignApprovalState,
+    #[serde(default = "default_marketing_campaign_revision")]
+    pub previous_revision: u32,
+    #[serde(default = "default_marketing_campaign_revision")]
+    pub resulting_revision: u32,
+    pub operator_id: String,
+    pub request_id: String,
+    pub reason: String,
+    #[serde(default)]
+    pub decision_reasons: Vec<String>,
+    pub requested_at_ms: u64,
+}
+
+impl MarketingCampaignLifecycleAuditRecord {
+    pub fn new(
+        audit_id: impl Into<String>,
+        marketing_campaign_id: impl Into<String>,
+        coupon_template_id: impl Into<String>,
+        action: MarketingCampaignLifecycleAction,
+        outcome: MarketingCampaignLifecycleAuditOutcome,
+        previous_status: MarketingCampaignStatus,
+        resulting_status: MarketingCampaignStatus,
+        operator_id: impl Into<String>,
+        request_id: impl Into<String>,
+        reason: impl Into<String>,
+        requested_at_ms: u64,
+    ) -> Self {
+        Self {
+            audit_id: audit_id.into(),
+            marketing_campaign_id: marketing_campaign_id.into(),
+            source_marketing_campaign_id: None,
+            coupon_template_id: coupon_template_id.into(),
+            action,
+            outcome,
+            previous_status,
+            resulting_status,
+            previous_approval_state: MarketingCampaignApprovalState::default(),
+            resulting_approval_state: MarketingCampaignApprovalState::default(),
+            previous_revision: default_marketing_campaign_revision(),
+            resulting_revision: default_marketing_campaign_revision(),
+            operator_id: operator_id.into(),
+            request_id: request_id.into(),
+            reason: reason.into(),
+            decision_reasons: Vec::new(),
+            requested_at_ms,
+        }
+    }
+
+    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
+        self.decision_reasons = decision_reasons;
+        self
+    }
+
+    pub fn with_source_marketing_campaign_id(
+        mut self,
+        source_marketing_campaign_id: Option<String>,
+    ) -> Self {
+        self.source_marketing_campaign_id = source_marketing_campaign_id;
+        self
+    }
+
+    pub fn with_approval_states(
+        mut self,
+        previous_approval_state: MarketingCampaignApprovalState,
+        resulting_approval_state: MarketingCampaignApprovalState,
+    ) -> Self {
+        self.previous_approval_state = previous_approval_state;
+        self.resulting_approval_state = resulting_approval_state;
+        self
+    }
+
+    pub fn with_revisions(mut self, previous_revision: u32, resulting_revision: u32) -> Self {
+        self.previous_revision = previous_revision;
+        self.resulting_revision = resulting_revision;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum CampaignBudgetStatus {
     Draft,
     Active,
     Exhausted,
     Closed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CampaignBudgetLifecycleAction {
+    Activate,
+    Close,
+}
+
+impl CampaignBudgetLifecycleAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Activate => "activate",
+            Self::Close => "close",
+        }
+    }
+}
+
+impl FromStr for CampaignBudgetLifecycleAction {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "activate" => Ok(Self::Activate),
+            "close" => Ok(Self::Close),
+            _ => Err(anyhow::anyhow!(
+                "unsupported campaign budget lifecycle action {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CampaignBudgetLifecycleAuditOutcome {
+    Applied,
+    Rejected,
+}
+
+impl CampaignBudgetLifecycleAuditOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+        }
+    }
+}
+
+impl FromStr for CampaignBudgetLifecycleAuditOutcome {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "applied" => Ok(Self::Applied),
+            "rejected" => Ok(Self::Rejected),
+            _ => Err(anyhow::anyhow!(
+                "unsupported campaign budget lifecycle audit outcome {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CampaignBudgetLifecycleAuditRecord {
+    pub audit_id: String,
+    pub campaign_budget_id: String,
+    pub marketing_campaign_id: String,
+    pub action: CampaignBudgetLifecycleAction,
+    pub outcome: CampaignBudgetLifecycleAuditOutcome,
+    pub previous_status: CampaignBudgetStatus,
+    pub resulting_status: CampaignBudgetStatus,
+    pub operator_id: String,
+    pub request_id: String,
+    pub reason: String,
+    #[serde(default)]
+    pub decision_reasons: Vec<String>,
+    pub requested_at_ms: u64,
+}
+
+impl CampaignBudgetLifecycleAuditRecord {
+    pub fn new(
+        audit_id: impl Into<String>,
+        campaign_budget_id: impl Into<String>,
+        marketing_campaign_id: impl Into<String>,
+        action: CampaignBudgetLifecycleAction,
+        outcome: CampaignBudgetLifecycleAuditOutcome,
+        previous_status: CampaignBudgetStatus,
+        resulting_status: CampaignBudgetStatus,
+        operator_id: impl Into<String>,
+        request_id: impl Into<String>,
+        reason: impl Into<String>,
+        requested_at_ms: u64,
+    ) -> Self {
+        Self {
+            audit_id: audit_id.into(),
+            campaign_budget_id: campaign_budget_id.into(),
+            marketing_campaign_id: marketing_campaign_id.into(),
+            action,
+            outcome,
+            previous_status,
+            resulting_status,
+            operator_id: operator_id.into(),
+            request_id: request_id.into(),
+            reason: reason.into(),
+            decision_reasons: Vec::new(),
+            requested_at_ms,
+        }
+    }
+
+    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
+        self.decision_reasons = decision_reasons;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -70,6 +554,119 @@ pub enum CouponCodeStatus {
     Redeemed,
     Expired,
     Disabled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponCodeLifecycleAction {
+    Disable,
+    Restore,
+}
+
+impl CouponCodeLifecycleAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Disable => "disable",
+            Self::Restore => "restore",
+        }
+    }
+}
+
+impl FromStr for CouponCodeLifecycleAction {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "disable" => Ok(Self::Disable),
+            "restore" => Ok(Self::Restore),
+            _ => Err(anyhow::anyhow!(
+                "unsupported coupon code lifecycle action {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponCodeLifecycleAuditOutcome {
+    Applied,
+    Rejected,
+}
+
+impl CouponCodeLifecycleAuditOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+        }
+    }
+}
+
+impl FromStr for CouponCodeLifecycleAuditOutcome {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "applied" => Ok(Self::Applied),
+            "rejected" => Ok(Self::Rejected),
+            _ => Err(anyhow::anyhow!(
+                "unsupported coupon code lifecycle audit outcome {value}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CouponCodeLifecycleAuditRecord {
+    pub audit_id: String,
+    pub coupon_code_id: String,
+    pub coupon_template_id: String,
+    pub action: CouponCodeLifecycleAction,
+    pub outcome: CouponCodeLifecycleAuditOutcome,
+    pub previous_status: CouponCodeStatus,
+    pub resulting_status: CouponCodeStatus,
+    pub operator_id: String,
+    pub request_id: String,
+    pub reason: String,
+    #[serde(default)]
+    pub decision_reasons: Vec<String>,
+    pub requested_at_ms: u64,
+}
+
+impl CouponCodeLifecycleAuditRecord {
+    pub fn new(
+        audit_id: impl Into<String>,
+        coupon_code_id: impl Into<String>,
+        coupon_template_id: impl Into<String>,
+        action: CouponCodeLifecycleAction,
+        outcome: CouponCodeLifecycleAuditOutcome,
+        previous_status: CouponCodeStatus,
+        resulting_status: CouponCodeStatus,
+        operator_id: impl Into<String>,
+        request_id: impl Into<String>,
+        reason: impl Into<String>,
+        requested_at_ms: u64,
+    ) -> Self {
+        Self {
+            audit_id: audit_id.into(),
+            coupon_code_id: coupon_code_id.into(),
+            coupon_template_id: coupon_template_id.into(),
+            action,
+            outcome,
+            previous_status,
+            resulting_status,
+            operator_id: operator_id.into(),
+            request_id: request_id.into(),
+            reason: reason.into(),
+            decision_reasons: Vec::new(),
+            requested_at_ms,
+        }
+    }
+
+    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
+        self.decision_reasons = decision_reasons;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -246,9 +843,19 @@ pub struct CouponTemplateRecord {
     pub template_key: String,
     pub display_name: String,
     pub status: CouponTemplateStatus,
+    #[serde(default)]
+    pub approval_state: CouponTemplateApprovalState,
+    #[serde(default = "default_coupon_template_revision")]
+    pub revision: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_coupon_template_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_coupon_template_id: Option<String>,
     pub distribution_kind: CouponDistributionKind,
     pub benefit: CouponBenefitSpec,
     pub restriction: CouponRestrictionSpec,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activation_at_ms: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -264,9 +871,14 @@ impl CouponTemplateRecord {
             template_key: template_key.into(),
             display_name: String::new(),
             status: CouponTemplateStatus::Draft,
+            approval_state: CouponTemplateApprovalState::default(),
+            revision: default_coupon_template_revision(),
+            root_coupon_template_id: None,
+            parent_coupon_template_id: None,
             distribution_kind: CouponDistributionKind::SharedCode,
             benefit: CouponBenefitSpec::new(benefit_kind),
             restriction: CouponRestrictionSpec::new(MarketingSubjectScope::Project),
+            activation_at_ms: None,
             created_at_ms: 0,
             updated_at_ms: 0,
         }
@@ -282,6 +894,32 @@ impl CouponTemplateRecord {
         self
     }
 
+    pub fn with_approval_state(mut self, approval_state: CouponTemplateApprovalState) -> Self {
+        self.approval_state = approval_state;
+        self
+    }
+
+    pub fn with_revision(mut self, revision: u32) -> Self {
+        self.revision = revision.max(default_coupon_template_revision());
+        self
+    }
+
+    pub fn with_root_coupon_template_id(
+        mut self,
+        root_coupon_template_id: Option<String>,
+    ) -> Self {
+        self.root_coupon_template_id = root_coupon_template_id;
+        self
+    }
+
+    pub fn with_parent_coupon_template_id(
+        mut self,
+        parent_coupon_template_id: Option<String>,
+    ) -> Self {
+        self.parent_coupon_template_id = parent_coupon_template_id;
+        self
+    }
+
     pub fn with_distribution_kind(mut self, distribution_kind: CouponDistributionKind) -> Self {
         self.distribution_kind = distribution_kind;
         self
@@ -294,6 +932,11 @@ impl CouponTemplateRecord {
 
     pub fn with_restriction(mut self, restriction: CouponRestrictionSpec) -> Self {
         self.restriction = restriction;
+        self
+    }
+
+    pub fn with_activation_at_ms(mut self, activation_at_ms: Option<u64>) -> Self {
+        self.activation_at_ms = activation_at_ms;
         self
     }
 
@@ -314,6 +957,14 @@ pub struct MarketingCampaignRecord {
     pub coupon_template_id: String,
     pub display_name: String,
     pub status: MarketingCampaignStatus,
+    #[serde(default)]
+    pub approval_state: MarketingCampaignApprovalState,
+    #[serde(default = "default_marketing_campaign_revision")]
+    pub revision: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_marketing_campaign_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_marketing_campaign_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_at_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -332,6 +983,10 @@ impl MarketingCampaignRecord {
             coupon_template_id: coupon_template_id.into(),
             display_name: String::new(),
             status: MarketingCampaignStatus::Draft,
+            approval_state: MarketingCampaignApprovalState::default(),
+            revision: default_marketing_campaign_revision(),
+            root_marketing_campaign_id: None,
+            parent_marketing_campaign_id: None,
             start_at_ms: None,
             end_at_ms: None,
             created_at_ms: 0,
@@ -346,6 +1001,35 @@ impl MarketingCampaignRecord {
 
     pub fn with_status(mut self, status: MarketingCampaignStatus) -> Self {
         self.status = status;
+        self
+    }
+
+    pub fn with_approval_state(
+        mut self,
+        approval_state: MarketingCampaignApprovalState,
+    ) -> Self {
+        self.approval_state = approval_state;
+        self
+    }
+
+    pub fn with_revision(mut self, revision: u32) -> Self {
+        self.revision = revision.max(default_marketing_campaign_revision());
+        self
+    }
+
+    pub fn with_root_marketing_campaign_id(
+        mut self,
+        root_marketing_campaign_id: Option<String>,
+    ) -> Self {
+        self.root_marketing_campaign_id = root_marketing_campaign_id;
+        self
+    }
+
+    pub fn with_parent_marketing_campaign_id(
+        mut self,
+        parent_marketing_campaign_id: Option<String>,
+    ) -> Self {
+        self.parent_marketing_campaign_id = parent_marketing_campaign_id;
         self
     }
 

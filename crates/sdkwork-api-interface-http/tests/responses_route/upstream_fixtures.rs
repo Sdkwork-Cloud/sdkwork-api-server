@@ -11,7 +11,7 @@ fn capture_upstream_request(
     state.request_count.fetch_add(1, Ordering::SeqCst) + 1
 }
 
-async fn upstream_responses_handler(
+pub(super) async fn upstream_responses_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -28,7 +28,7 @@ async fn upstream_responses_handler(
     )
 }
 
-async fn upstream_responses_handler_with_usage(
+pub(super) async fn upstream_responses_handler_with_usage(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -50,7 +50,7 @@ async fn upstream_responses_handler_with_usage(
     )
 }
 
-async fn upstream_responses_handler_failure(
+pub(super) async fn upstream_responses_handler_failure(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -68,7 +68,7 @@ async fn upstream_responses_handler_failure(
     )
 }
 
-async fn upstream_responses_stream_handler(
+pub(super) async fn upstream_responses_stream_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -81,7 +81,7 @@ async fn upstream_responses_stream_handler(
         .into_response()
 }
 
-async fn upstream_responses_handler_retryable_once_then_success(
+pub(super) async fn upstream_responses_handler_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -111,7 +111,7 @@ async fn upstream_responses_handler_retryable_once_then_success(
     )
 }
 
-async fn upstream_responses_handler_retry_after_once_then_success(
+pub(super) async fn upstream_responses_handler_retry_after_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -150,7 +150,7 @@ async fn upstream_responses_handler_retry_after_once_then_success(
         .unwrap()
 }
 
-async fn upstream_responses_handler_http_date_retry_after_once_then_success(
+pub(super) async fn upstream_responses_handler_http_date_retry_after_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -189,7 +189,7 @@ async fn upstream_responses_handler_http_date_retry_after_once_then_success(
         .unwrap()
 }
 
-async fn upstream_responses_handler_non_retryable_once_then_success(
+pub(super) async fn upstream_responses_handler_non_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -219,7 +219,7 @@ async fn upstream_responses_handler_non_retryable_once_then_success(
     )
 }
 
-async fn upstream_responses_stream_handler_retryable_once_then_success(
+pub(super) async fn upstream_responses_stream_handler_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -251,7 +251,7 @@ async fn upstream_responses_stream_handler_retryable_once_then_success(
         .unwrap()
 }
 
-async fn upstream_response_retrieve_handler(
+pub(super) async fn upstream_response_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -271,7 +271,7 @@ async fn upstream_response_retrieve_handler(
     )
 }
 
-async fn upstream_response_input_items_handler(
+pub(super) async fn upstream_response_input_items_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -293,7 +293,7 @@ async fn upstream_response_input_items_handler(
     )
 }
 
-async fn upstream_response_delete_handler(
+pub(super) async fn upstream_response_delete_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -312,7 +312,7 @@ async fn upstream_response_delete_handler(
     )
 }
 
-async fn upstream_response_input_tokens_handler(
+pub(super) async fn upstream_response_input_tokens_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -330,7 +330,7 @@ async fn upstream_response_input_tokens_handler(
     )
 }
 
-async fn upstream_response_cancel_handler(
+pub(super) async fn upstream_response_cancel_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -351,7 +351,7 @@ async fn upstream_response_cancel_handler(
     )
 }
 
-async fn upstream_response_compact_handler(
+pub(super) async fn upstream_response_compact_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {

@@ -1,0 +1,98 @@
+{
+  "entries": [
+    {
+      "ledger_entry_id": 8201024,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": null,
+      "hold_id": null,
+      "entry_type": "grant_issue",
+      "benefit_type": "cash_credit",
+      "quantity": 1500000.0,
+      "amount": 0.0,
+      "created_at_ms": 1710000490000
+    },
+    {
+      "ledger_entry_id": 8201025,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610019,
+      "hold_id": 8101019,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -32400.0,
+      "amount": -0.0324,
+      "created_at_ms": 1710000494000
+    },
+    {
+      "ledger_entry_id": 8201026,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610020,
+      "hold_id": 8101020,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -7100.0,
+      "amount": -0.0071,
+      "created_at_ms": 1710000495000
+    },
+    {
+      "ledger_entry_id": 8201027,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "account_id": 7001001,
+      "user_id": 3001,
+      "request_id": 610021,
+      "hold_id": 8101021,
+      "entry_type": "settlement_capture",
+      "benefit_type": "cash_credit",
+      "quantity": -14800.0,
+      "amount": -0.0148,
+      "created_at_ms": 1710000496000
+    }
+  ],
+  "allocations": [
+    {
+      "ledger_allocation_id": 8501024,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201024,
+      "lot_id": 8001006,
+      "quantity_delta": 1500000.0,
+      "created_at_ms": 1710000490000
+    },
+    {
+      "ledger_allocation_id": 8501025,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201025,
+      "lot_id": 8001006,
+      "quantity_delta": -32400.0,
+      "created_at_ms": 1710000494000
+    },
+    {
+      "ledger_allocation_id": 8501026,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201026,
+      "lot_id": 8001006,
+      "quantity_delta": -7100.0,
+      "created_at_ms": 1710000495000
+    },
+    {
+      "ledger_allocation_id": 8501027,
+      "tenant_id": 1001,
+      "organization_id": 2001,
+      "ledger_entry_id": 8201027,
+      "lot_id": 8001006,
+      "quantity_delta": -14800.0,
+      "created_at_ms": 1710000496000
+    }
+  ]
+}

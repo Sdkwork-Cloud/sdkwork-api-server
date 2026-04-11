@@ -1,4 +1,6 @@
-﻿use super::*;
+use super::*;
+use sdkwork_api_app_catalog::create_provider_with_default_plugin_family_and_bindings;
+use sdkwork_api_domain_catalog::ProviderChannelBinding;
 
 #[test]
 fn route_simulation_prefers_healthy_low_cost_provider() {
@@ -9,7 +11,7 @@ fn route_simulation_prefers_healthy_low_cost_provider() {
 #[tokio::test]
 async fn route_simulation_uses_catalog_model_candidates() {
     let store = create_store_with_openai_channel().await;
-    insert_openai_provider(
+    insert_openrouter_provider(
         &store,
         "provider-openrouter",
         "https://openrouter.ai/api/v1",
@@ -34,6 +36,18 @@ async fn route_simulation_uses_catalog_model_candidates() {
         ))
         .await
         .unwrap();
+    let openrouter_provider = store
+        .find_provider("provider-openrouter")
+        .await
+        .unwrap()
+        .expect("openrouter provider");
+
+    assert_eq!(openrouter_provider.adapter_kind, "openrouter");
+    assert_eq!(openrouter_provider.protocol_kind(), "openai");
+    assert_eq!(
+        openrouter_provider.extension_id,
+        "sdkwork.provider.openrouter"
+    );
 
     let decision = simulate_route_with_store(&store, "chat_completion", "gpt-4.1")
         .await
@@ -46,7 +60,7 @@ async fn route_simulation_uses_catalog_model_candidates() {
 #[tokio::test]
 async fn route_simulation_prefers_policy_provider_order_over_lexicographic_sort() {
     let store = create_store_with_openai_channel().await;
-    insert_openai_provider(
+    insert_openrouter_provider(
         &store,
         "provider-openrouter",
         "https://openrouter.ai/api/v1",
@@ -99,6 +113,48 @@ async fn route_simulation_prefers_policy_provider_order_over_lexicographic_sort(
 }
 
 #[tokio::test]
+async fn route_simulation_marks_fallback_when_policy_candidate_is_unavailable() {
+    let store = create_store_with_openai_channel().await;
+    insert_openai_provider(
+        &store,
+        "provider-openai-backup",
+        "https://api.openai.com/v1",
+        "OpenAI Backup",
+    )
+    .await;
+    store
+        .insert_model(&ModelCatalogEntry::new("gpt-4.1", "provider-openai-backup"))
+        .await
+        .unwrap();
+
+    let policy = RoutingPolicy::new("policy-missing-primary", "chat_completion", "gpt-4.1")
+        .with_priority(100)
+        .with_ordered_provider_ids(vec![
+            "provider-openai-primary-missing".to_owned(),
+            "provider-openai-backup".to_owned(),
+        ]);
+    persist_routing_policy(&store, &policy).await.unwrap();
+
+    let decision = simulate_route_with_store(&store, "chat_completion", "gpt-4.1")
+        .await
+        .unwrap();
+
+    assert_eq!(decision.selected_provider_id, "provider-openai-backup");
+    assert_eq!(
+        decision.candidate_ids,
+        vec!["provider-openai-backup".to_owned()]
+    );
+    assert_eq!(
+        decision.matched_policy_id.as_deref(),
+        Some("policy-missing-primary")
+    );
+    assert_eq!(
+        decision.fallback_reason.as_deref(),
+        Some("policy_candidate_unavailable")
+    );
+}
+
+#[tokio::test]
 async fn route_simulation_can_use_policy_without_catalog_model_candidates() {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     let store = SqliteAdminStore::new(pool);
@@ -108,13 +164,21 @@ async fn route_simulation_can_use_policy_without_catalog_model_candidates() {
         .await
         .unwrap();
     store
-        .insert_provider(&ProxyProvider::new(
-            "provider-openrouter",
-            "openai",
-            "openai",
-            "https://openrouter.ai/api/v1",
-            "OpenRouter",
-        ))
+        .insert_channel(&Channel::new("openrouter", "OpenRouter"))
+        .await
+        .unwrap();
+    store
+        .insert_provider(
+            &create_provider_with_default_plugin_family_and_bindings(
+                "provider-openrouter",
+                "openrouter",
+                "openrouter",
+                "https://openrouter.ai/api/v1",
+                "OpenRouter",
+                &[ProviderChannelBinding::new("provider-openrouter", "openai")],
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
 

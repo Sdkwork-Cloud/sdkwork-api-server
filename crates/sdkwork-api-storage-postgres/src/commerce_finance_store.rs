@@ -10,33 +10,7 @@ impl PostgresAdminStore {
             .await?
             .is_some()
         {
-            sqlx::query(
-                "UPDATE ai_commerce_webhook_inbox
-                 SET provider = $1, payment_method_id = $2, provider_event_id = $3,
-                     dedupe_key = $4, signature_header = $5, payload_json = $6,
-                     processing_status = $7, retry_count = $8, max_retry_count = $9,
-                     last_error_message = $10, next_retry_at_ms = $11,
-                     first_received_at_ms = $12, last_received_at_ms = $13,
-                     processed_at_ms = $14
-                 WHERE webhook_inbox_id = $15",
-            )
-            .bind(&record.provider)
-            .bind(&record.payment_method_id)
-            .bind(&record.provider_event_id)
-            .bind(&record.dedupe_key)
-            .bind(&record.signature_header)
-            .bind(&record.payload_json)
-            .bind(&record.processing_status)
-            .bind(i64::from(record.retry_count))
-            .bind(i64::from(record.max_retry_count))
-            .bind(&record.last_error_message)
-            .bind(record.next_retry_at_ms.map(i64::try_from).transpose()?)
-            .bind(i64::try_from(record.first_received_at_ms)?)
-            .bind(i64::try_from(record.last_received_at_ms)?)
-            .bind(record.processed_at_ms.map(i64::try_from).transpose()?)
-            .bind(&record.webhook_inbox_id)
-            .execute(&self.pool)
-            .await?;
+            self.update_commerce_webhook_inbox_row(record).await?;
             return Ok(record.clone());
         }
 
@@ -83,37 +57,11 @@ impl PostgresAdminStore {
                 last_received_at_ms: existing.last_received_at_ms.max(record.last_received_at_ms),
                 processed_at_ms: existing.processed_at_ms,
             };
-            sqlx::query(
-                "UPDATE ai_commerce_webhook_inbox
-                 SET provider = $1, payment_method_id = $2, provider_event_id = $3,
-                     dedupe_key = $4, signature_header = $5, payload_json = $6,
-                     processing_status = $7, retry_count = $8, max_retry_count = $9,
-                     last_error_message = $10, next_retry_at_ms = $11,
-                     first_received_at_ms = $12, last_received_at_ms = $13,
-                     processed_at_ms = $14
-                 WHERE webhook_inbox_id = $15",
-            )
-            .bind(&merged.provider)
-            .bind(&merged.payment_method_id)
-            .bind(&merged.provider_event_id)
-            .bind(&merged.dedupe_key)
-            .bind(&merged.signature_header)
-            .bind(&merged.payload_json)
-            .bind(&merged.processing_status)
-            .bind(i64::from(merged.retry_count))
-            .bind(i64::from(merged.max_retry_count))
-            .bind(&merged.last_error_message)
-            .bind(merged.next_retry_at_ms.map(i64::try_from).transpose()?)
-            .bind(i64::try_from(merged.first_received_at_ms)?)
-            .bind(i64::try_from(merged.last_received_at_ms)?)
-            .bind(merged.processed_at_ms.map(i64::try_from).transpose()?)
-            .bind(&merged.webhook_inbox_id)
-            .execute(&self.pool)
-            .await?;
+            self.update_commerce_webhook_inbox_row(&merged).await?;
             return Ok(merged);
         }
 
-        sqlx::query(
+        let insert_result = sqlx::query(
             "INSERT INTO ai_commerce_webhook_inbox (
                 webhook_inbox_id,
                 provider,
@@ -151,8 +99,138 @@ impl PostgresAdminStore {
         .bind(i64::try_from(record.last_received_at_ms)?)
         .bind(record.processed_at_ms.map(i64::try_from).transpose()?)
         .execute(&self.pool)
+        .await;
+
+        match insert_result {
+            Ok(_) => Ok(record.clone()),
+            Err(error) if postgres_webhook_error_is_unique_violation(&error) => {
+                if self
+                    .find_commerce_webhook_inbox(&record.webhook_inbox_id)
+                    .await?
+                    .is_some()
+                {
+                    self.update_commerce_webhook_inbox_row(record).await?;
+                    return Ok(record.clone());
+                }
+
+                if let Some(existing) = self
+                    .find_commerce_webhook_inbox_by_dedupe_key(&record.dedupe_key)
+                    .await?
+                {
+                    if existing.provider != record.provider {
+                        return Err(anyhow!(
+                            "webhook dedupe key {} already belongs to another provider",
+                            record.dedupe_key
+                        ));
+                    }
+
+                    let merged = CommerceWebhookInboxRecord {
+                        webhook_inbox_id: existing.webhook_inbox_id.clone(),
+                        provider: existing.provider.clone(),
+                        payment_method_id: record
+                            .payment_method_id
+                            .clone()
+                            .or(existing.payment_method_id.clone()),
+                        provider_event_id: record
+                            .provider_event_id
+                            .clone()
+                            .or(existing.provider_event_id.clone()),
+                        dedupe_key: existing.dedupe_key.clone(),
+                        signature_header: record
+                            .signature_header
+                            .clone()
+                            .or(existing.signature_header.clone()),
+                        payload_json: if record.payload_json.trim().is_empty()
+                            || record.payload_json.trim() == "{}"
+                        {
+                            existing.payload_json.clone()
+                        } else {
+                            record.payload_json.clone()
+                        },
+                        processing_status: existing.processing_status.clone(),
+                        retry_count: existing.retry_count,
+                        max_retry_count: existing.max_retry_count.max(record.max_retry_count),
+                        last_error_message: existing.last_error_message.clone(),
+                        next_retry_at_ms: existing.next_retry_at_ms,
+                        first_received_at_ms: existing.first_received_at_ms,
+                        last_received_at_ms: existing
+                            .last_received_at_ms
+                            .max(record.last_received_at_ms),
+                        processed_at_ms: existing.processed_at_ms,
+                    };
+                    self.update_commerce_webhook_inbox_row(&merged).await?;
+                    return Ok(merged);
+                }
+
+                Err(error.into())
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    async fn update_commerce_webhook_inbox_row(
+        &self,
+        record: &CommerceWebhookInboxRecord,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE ai_commerce_webhook_inbox
+             SET provider = $1, payment_method_id = $2, provider_event_id = $3,
+                 dedupe_key = $4, signature_header = $5, payload_json = $6,
+                 processing_status = $7, retry_count = $8, max_retry_count = $9,
+                 last_error_message = $10, next_retry_at_ms = $11,
+                 first_received_at_ms = $12, last_received_at_ms = $13,
+                 processed_at_ms = $14
+             WHERE webhook_inbox_id = $15",
+        )
+        .bind(&record.provider)
+        .bind(&record.payment_method_id)
+        .bind(&record.provider_event_id)
+        .bind(&record.dedupe_key)
+        .bind(&record.signature_header)
+        .bind(&record.payload_json)
+        .bind(&record.processing_status)
+        .bind(i64::from(record.retry_count))
+        .bind(i64::from(record.max_retry_count))
+        .bind(&record.last_error_message)
+        .bind(record.next_retry_at_ms.map(i64::try_from).transpose()?)
+        .bind(i64::try_from(record.first_received_at_ms)?)
+        .bind(i64::try_from(record.last_received_at_ms)?)
+        .bind(record.processed_at_ms.map(i64::try_from).transpose()?)
+        .bind(&record.webhook_inbox_id)
+        .execute(&self.pool)
         .await?;
-        Ok(record.clone())
+        Ok(())
+    }
+
+    async fn update_commerce_refund_row(&self, refund: &CommerceRefundRecord) -> Result<()> {
+        sqlx::query(
+            "UPDATE ai_commerce_refunds
+             SET order_id = $1, payment_attempt_id = $2, payment_method_id = $3,
+                 provider = $4, provider_refund_id = $5, idempotency_key = $6,
+                 reason = $7, status = $8, amount_minor = $9, currency_code = $10,
+                 request_payload_json = $11, response_payload_json = $12,
+                 created_at_ms = $13, updated_at_ms = $14, completed_at_ms = $15
+             WHERE refund_id = $16",
+        )
+        .bind(&refund.order_id)
+        .bind(&refund.payment_attempt_id)
+        .bind(&refund.payment_method_id)
+        .bind(&refund.provider)
+        .bind(&refund.provider_refund_id)
+        .bind(&refund.idempotency_key)
+        .bind(&refund.reason)
+        .bind(&refund.status)
+        .bind(i64::try_from(refund.amount_minor)?)
+        .bind(&refund.currency_code)
+        .bind(&refund.request_payload_json)
+        .bind(&refund.response_payload_json)
+        .bind(i64::try_from(refund.created_at_ms)?)
+        .bind(i64::try_from(refund.updated_at_ms)?)
+        .bind(refund.completed_at_ms.map(i64::try_from).transpose()?)
+        .bind(&refund.refund_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn list_commerce_webhook_inbox_records(
@@ -266,33 +344,7 @@ impl PostgresAdminStore {
             .await?
             .is_some()
         {
-            sqlx::query(
-                "UPDATE ai_commerce_refunds
-                 SET order_id = $1, payment_attempt_id = $2, payment_method_id = $3,
-                     provider = $4, provider_refund_id = $5, idempotency_key = $6,
-                     reason = $7, status = $8, amount_minor = $9, currency_code = $10,
-                     request_payload_json = $11, response_payload_json = $12,
-                     created_at_ms = $13, updated_at_ms = $14, completed_at_ms = $15
-                 WHERE refund_id = $16",
-            )
-            .bind(&refund.order_id)
-            .bind(&refund.payment_attempt_id)
-            .bind(&refund.payment_method_id)
-            .bind(&refund.provider)
-            .bind(&refund.provider_refund_id)
-            .bind(&refund.idempotency_key)
-            .bind(&refund.reason)
-            .bind(&refund.status)
-            .bind(i64::try_from(refund.amount_minor)?)
-            .bind(&refund.currency_code)
-            .bind(&refund.request_payload_json)
-            .bind(&refund.response_payload_json)
-            .bind(i64::try_from(refund.created_at_ms)?)
-            .bind(i64::try_from(refund.updated_at_ms)?)
-            .bind(refund.completed_at_ms.map(i64::try_from).transpose()?)
-            .bind(&refund.refund_id)
-            .execute(&self.pool)
-            .await?;
+            self.update_commerce_refund_row(refund).await?;
             return Ok(refund.clone());
         }
 
@@ -309,7 +361,7 @@ impl PostgresAdminStore {
             ));
         }
 
-        sqlx::query(
+        let insert_result = sqlx::query(
             "INSERT INTO ai_commerce_refunds (
                 refund_id,
                 order_id,
@@ -349,8 +401,33 @@ impl PostgresAdminStore {
         .bind(i64::try_from(refund.updated_at_ms)?)
         .bind(refund.completed_at_ms.map(i64::try_from).transpose()?)
         .execute(&self.pool)
-        .await?;
-        Ok(refund.clone())
+        .await;
+
+        match insert_result {
+            Ok(_) => Ok(refund.clone()),
+            Err(error) if postgres_webhook_error_is_unique_violation(&error) => {
+                if self.find_commerce_refund(&refund.refund_id).await?.is_some() {
+                    self.update_commerce_refund_row(refund).await?;
+                    return Ok(refund.clone());
+                }
+
+                if let Some(existing) = self
+                    .find_commerce_refund_by_idempotency_key(&refund.idempotency_key)
+                    .await?
+                {
+                    if existing.order_id == refund.order_id && existing.provider == refund.provider {
+                        return Ok(existing);
+                    }
+                    return Err(anyhow!(
+                        "refund idempotency key {} already belongs to another order or provider",
+                        refund.idempotency_key
+                    ));
+                }
+
+                Err(error.into())
+            }
+            Err(error) => Err(error.into()),
+        }
     }
 
     pub async fn list_commerce_refunds(&self) -> Result<Vec<CommerceRefundRecord>> {
@@ -558,4 +635,8 @@ impl PostgresAdminStore {
             .map(Self::map_postgres_commerce_reconciliation_item_row)
             .collect()
     }
+}
+
+fn postgres_webhook_error_is_unique_violation(error: &sqlx::Error) -> bool {
+    matches!(error, sqlx::Error::Database(database_error) if database_error.is_unique_violation())
 }

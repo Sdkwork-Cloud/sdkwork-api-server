@@ -1,12 +1,5 @@
 import type { ReactNode } from 'react';
 import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Label,
   Select,
   SelectContent,
@@ -24,19 +17,6 @@ export type CouponStatusFilter = 'all' | 'active' | 'at_risk' | 'archived';
 
 const EXPIRING_SOON_WINDOW_DAYS = 14;
 const LOW_QUOTA_THRESHOLD = 25;
-
-export function createEmptyCouponDraft(): CouponRecord {
-  return {
-    id: '',
-    code: '',
-    discount_label: '10% off first bill',
-    audience: 'new_signup',
-    remaining: 100,
-    active: true,
-    note: 'Launch campaign',
-    expires_on: '2026-12-31',
-  };
-}
 
 export function daysUntilExpiry(expiresOn: string): number | null {
   const expiryValue = Date.parse(expiresOn);
@@ -157,30 +137,6 @@ export function formatNumber(value: number) {
   return formatAdminNumber(value);
 }
 
-export function DialogField({
-  children,
-  description,
-  htmlFor,
-  label,
-}: {
-  children: ReactNode;
-  description?: ReactNode;
-  htmlFor?: string;
-  label: ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {description ? (
-        <div className="text-xs text-[var(--sdk-color-text-secondary)]">
-          {description}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function SelectField<T extends string>({
   label,
   labelVisibility = 'visible',
@@ -214,40 +170,5 @@ export function SelectField<T extends string>({
         </SelectContent>
       </Select>
     </div>
-  );
-}
-
-export function ConfirmActionDialog({
-  confirmLabel = translateAdminText('Confirm'),
-  description,
-  onConfirm,
-  onOpenChange,
-  open,
-  title,
-}: {
-  confirmLabel?: string;
-  description: ReactNode;
-  onConfirm: () => void | Promise<void>;
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  title: ReactNode;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(92vw,28rem)]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
-            {translateAdminText('Cancel')}
-          </Button>
-          <Button onClick={() => void onConfirm()} type="button" variant="danger">
-            {confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

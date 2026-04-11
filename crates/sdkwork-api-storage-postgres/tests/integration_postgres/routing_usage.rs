@@ -165,6 +165,7 @@ async fn postgres_store_replaces_provider_health_snapshot_for_same_provider_runt
     assert_eq!(snapshots, vec![replacement]);
 }
 
+#[tokio::test]
 async fn postgres_store_persists_quota_policies_when_url_is_provided() {
     let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
         return;

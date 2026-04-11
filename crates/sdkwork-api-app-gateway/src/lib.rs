@@ -1,9 +1,18 @@
-use anyhow::{Context, Result, bail};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-use sdkwork_api_app_credential::{CredentialSecretManager, resolve_provider_secret_with_manager};
-use sdkwork_api_app_routing::{RouteSelectionContext, select_route_with_store_context};
+use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use sdkwork_api_app_credential::{
+    official_provider_secret_configured, resolve_credential_secret_with_manager,
+    resolve_official_provider_secret_with_manager,
+    resolve_provider_secret_with_fallback_and_manager,
+    resolve_provider_secret_with_fallback_and_manager as resolve_provider_secret_with_manager,
+    CredentialSecretManager,
+};
+use sdkwork_api_app_routing::{
+    select_route_with_store_context, simulate_route_with_store_selection_context,
+    RouteSelectionContext,
+};
 use sdkwork_api_cache_core::{
-    CacheStore, CacheTag, DistributedLockStore, cache_get_or_insert_with,
+    cache_get_or_insert_with, CacheStore, CacheTag, DistributedLockStore,
 };
 use sdkwork_api_cache_memory::MemoryCacheStore;
 use sdkwork_api_contract_openai::assistants::{
@@ -104,11 +113,11 @@ use sdkwork_api_extension_core::{
     ExtensionKind, ExtensionManifest, ExtensionModality, ExtensionProtocol, ExtensionRuntime,
 };
 use sdkwork_api_extension_host::{
-    BuiltinProviderExtensionFactory, DiscoveredExtensionPackage, ExtensionDiscoveryPolicy,
-    ExtensionHost, discover_extension_packages, ensure_connector_runtime_started,
-    shutdown_all_connector_runtimes, shutdown_all_native_dynamic_runtimes,
-    shutdown_connector_runtime, shutdown_connector_runtimes_for_extension,
-    shutdown_native_dynamic_runtimes_for_extension, verify_discovered_extension_package_trust,
+    discover_extension_packages, ensure_connector_runtime_started, shutdown_all_connector_runtimes,
+    shutdown_all_native_dynamic_runtimes, shutdown_connector_runtime,
+    shutdown_connector_runtimes_for_extension, shutdown_native_dynamic_runtimes_for_extension,
+    verify_discovered_extension_package_trust, BuiltinProviderExtensionFactory,
+    DiscoveredExtensionPackage, ExtensionDiscoveryPolicy, ExtensionHost, ExtensionHostError,
 };
 use sdkwork_api_observability::HttpMetricsRegistry;
 use sdkwork_api_provider_core::{
@@ -169,31 +178,44 @@ mod request_context;
 mod tests;
 
 pub(crate) use gateway_cache::{
-    CAPABILITY_CATALOG_CACHE_TAG_ALL_MODELS, CAPABILITY_CATALOG_CACHE_TTL_MS,
-    CachedCapabilityCatalogList, CachedCapabilityCatalogModel, cache_routing_decision,
-    capability_catalog_cache_store, capability_catalog_list_cache_key,
+    cache_routing_decision, capability_catalog_cache_store, capability_catalog_list_cache_key,
     capability_catalog_model_cache_key, gateway_provider_in_flight_counter,
     gateway_provider_max_in_flight_limit, routing_recovery_probe_lock_store,
-    take_cached_routing_decision,
+    take_cached_routing_decision, CachedCapabilityCatalogList, CachedCapabilityCatalogModel,
+    CAPABILITY_CATALOG_CACHE_TAG_ALL_MODELS, CAPABILITY_CATALOG_CACHE_TTL_MS,
 };
 pub(crate) use gateway_execution_context::*;
-pub(crate) use gateway_extension_host::{configured_extension_host, provider_runtime_key};
-pub(crate) use gateway_provider_resolution::*;
+pub(crate) use gateway_extension_host::{
+    configured_extension_host, preferred_provider_runtime_key,
+};
+pub(crate) use gateway_provider_resolution::{
+    build_extension_host_from_store, provider_execution_descriptor_for_provider,
+    provider_execution_descriptor_for_provider_account_context,
+    provider_execution_target_for_provider, resolve_non_model_provider,
+    ProviderExecutionDescriptor, ProviderExecutionTarget,
+};
 pub(crate) use gateway_routing::{
     gateway_execution_failover_fallback_reason, gateway_execution_observed_at_ms,
     gateway_usage_context_for_decision_provider, persist_gateway_execution_failover_decision_log,
-    persist_gateway_execution_health_snapshot, select_gateway_route,
+    persist_gateway_execution_health_snapshot, resolve_store_relay_provider_for_decision,
+    select_gateway_route,
 };
 pub(crate) use gateway_runtime_execution::{
+    execute_json_provider_request_for_descriptor_with_options,
     execute_json_provider_request, execute_json_provider_request_for_provider,
-    execute_json_provider_request_for_provider_with_options,
+    execute_stream_provider_request_for_descriptor_with_options,
     execute_stream_provider_request_for_provider,
-    execute_stream_provider_request_for_provider_with_options, fallback_speech_bytes,
+    fallback_speech_bytes,
     normalize_local_speech_format, record_gateway_execution_failover,
-    record_gateway_provider_health, record_gateway_provider_health_persist_failure,
+    provider_execution_descriptor_from_planned_context, record_gateway_provider_health,
+    record_gateway_provider_health_persist_failure,
     record_gateway_recovery_probe_from_decision,
 };
 
+pub use gateway_provider_resolution::{
+    inspect_provider_execution_views, ProviderExecutionView, ProviderRouteExecutionMode,
+    ProviderRouteExecutionView, ProviderRouteReadinessView,
+};
 pub use gateway_types::*;
 pub use model_catalog::*;
 pub use relay_assistants_realtime_webhooks::*;
@@ -270,6 +292,60 @@ pub async fn planned_execution_usage_context_for_route(
 ) -> Result<PlannedExecutionUsageContext> {
     gateway_routing::planned_execution_usage_context_for_route(
         store, tenant_id, project_id, capability, route_key,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_without_log(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        selection_seed,
+    )
+    .await
+}
+
+pub async fn persist_planned_execution_decision_log(
+    store: &dyn AdminStore,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    decision: &RoutingDecision,
+) -> Result<()> {
+    gateway_routing::persist_planned_execution_decision_log(
+        store, tenant_id, project_id, capability, route_key, decision,
     )
     .await
 }
@@ -381,6 +457,93 @@ pub async fn execute_stream_provider_request_with_runtime_and_options(
         base_url,
         api_key,
         request,
+        options,
+    )
+    .await
+}
+
+pub fn execute_raw_json_provider_operation_with_runtime(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    operation: &str,
+    path_params: Vec<String>,
+    body: Value,
+    headers: HashMap<String, String>,
+) -> Result<Option<Value>> {
+    gateway_runtime_execution::execute_raw_json_provider_operation_with_runtime(
+        runtime_key,
+        base_url,
+        api_key,
+        operation,
+        path_params,
+        body,
+        headers,
+    )
+}
+
+pub async fn execute_raw_stream_provider_operation_with_runtime(
+    runtime_key: &str,
+    base_url: impl Into<String>,
+    api_key: &str,
+    operation: &str,
+    path_params: Vec<String>,
+    body: Value,
+    headers: HashMap<String, String>,
+) -> Result<Option<ProviderStreamOutput>> {
+    gateway_runtime_execution::execute_raw_stream_provider_operation_with_runtime(
+        runtime_key,
+        base_url,
+        api_key,
+        operation,
+        path_params,
+        body,
+        headers,
+    )
+    .await
+}
+
+pub async fn execute_raw_json_provider_operation_from_planned_execution_context_with_options(
+    store: &dyn AdminStore,
+    planned: &PlannedExecutionProviderContext,
+    capability: &str,
+    operation: &str,
+    path_params: Vec<String>,
+    body: Value,
+    headers: HashMap<String, String>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<Value>> {
+    gateway_runtime_execution::execute_raw_json_provider_operation_from_planned_execution_context_with_options(
+        store,
+        planned,
+        capability,
+        operation,
+        path_params,
+        body,
+        headers,
+        options,
+    )
+    .await
+}
+
+pub async fn execute_raw_stream_provider_operation_from_planned_execution_context_with_options(
+    store: &dyn AdminStore,
+    planned: &PlannedExecutionProviderContext,
+    capability: &str,
+    operation: &str,
+    path_params: Vec<String>,
+    body: Value,
+    headers: HashMap<String, String>,
+    options: &ProviderRequestOptions,
+) -> Result<Option<ProviderStreamOutput>> {
+    gateway_runtime_execution::execute_raw_stream_provider_operation_from_planned_execution_context_with_options(
+        store,
+        planned,
+        capability,
+        operation,
+        path_params,
+        body,
+        headers,
         options,
     )
     .await

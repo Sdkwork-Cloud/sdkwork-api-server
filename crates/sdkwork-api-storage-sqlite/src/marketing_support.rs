@@ -7,6 +7,7 @@ pub(crate) fn normalize_coupon_code_value(code_value: &str) -> String {
 pub(crate) fn coupon_template_status_as_str(status: CouponTemplateStatus) -> &'static str {
     match status {
         CouponTemplateStatus::Draft => "draft",
+        CouponTemplateStatus::Scheduled => "scheduled",
         CouponTemplateStatus::Active => "active",
         CouponTemplateStatus::Archived => "archived",
     }

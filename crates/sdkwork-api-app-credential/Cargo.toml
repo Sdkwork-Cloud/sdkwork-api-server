@@ -7,12 +7,14 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+serde.workspace = true
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }
 sdkwork-api-secret-keyring = { path = "../sdkwork-api-secret-keyring" }
 sdkwork-api-secret-local = { path = "../sdkwork-api-secret-local" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+utoipa.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

@@ -1,0 +1,21 @@
+{
+  "update_id": "2026-04-global-enterprise-manual-contract-walkthrough",
+  "release_version": "2026.04.22",
+  "description": "Add an install-ready enterprise contract and manual finance review walkthrough so production and development environments ship a richer pending-approval commercial storyline.",
+  "depends_on": [
+    "2026-04-global-pricing-posture-commerce-walkthrough",
+    "2026-04-global-pricing-posture-operations-linkage"
+  ],
+  "marketing": [
+    "marketing/2026-04-global-enterprise-manual-contract-walkthrough.json"
+  ],
+  "commerce": [
+    "commerce/2026-04-global-enterprise-manual-contract-walkthrough.json"
+  ],
+  "jobs": [
+    "jobs/2026-04-global-enterprise-manual-contract-walkthrough.json"
+  ],
+  "account_reconciliation": [
+    "account-reconciliation/2026-04-global-enterprise-manual-contract-walkthrough.json"
+  ]
+}

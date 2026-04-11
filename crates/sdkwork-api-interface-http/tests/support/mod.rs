@@ -129,6 +129,31 @@ pub async fn assert_no_usage_records(admin_app: Router, admin_token: &str) {
 }
 
 #[allow(dead_code)]
+pub async fn assert_single_decision_log(
+    admin_app: Router,
+    admin_token: &str,
+    expected_route_key: &str,
+    expected_provider: &str,
+) {
+    let logs = admin_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/routing/decision-logs")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logs.status(), StatusCode::OK);
+    let logs_json = read_json(logs).await;
+    assert_eq!(logs_json.as_array().unwrap().len(), 1);
+    assert_eq!(logs_json[0]["route_key"], expected_route_key);
+    assert_eq!(logs_json[0]["selected_provider_id"], expected_provider);
+}
+
+#[allow(dead_code)]
 pub struct NativeDynamicMockPackage {
     pub extension_root: PathBuf,
     pub library_path: PathBuf,
@@ -176,6 +201,53 @@ pub fn prepare_native_dynamic_mock_package(suffix: &str) -> NativeDynamicMockPac
     }
 }
 
+#[allow(dead_code)]
+pub struct ConnectorMockPackage {
+    pub extension_root: PathBuf,
+    pub extension_id: String,
+    _guard: ExtensionEnvGuard,
+}
+
+impl Drop for ConnectorMockPackage {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.extension_root);
+    }
+}
+
+#[allow(dead_code)]
+pub fn prepare_connector_mock_package(suffix: &str, extension_id: &str) -> ConnectorMockPackage {
+    let extension_root = temp_extension_root(suffix);
+    let package_dir = extension_root.join("sdkwork-provider-custom-openai");
+    fs::create_dir_all(&package_dir).unwrap();
+    fs::write(
+        package_dir.join("sdkwork-extension.toml"),
+        connector_manifest(extension_id),
+    )
+    .unwrap();
+    let guard = connector_env_guard(&extension_root);
+
+    ConnectorMockPackage {
+        extension_root,
+        extension_id: extension_id.to_owned(),
+        _guard: guard,
+    }
+}
+
+#[allow(dead_code)]
+pub async fn wait_for_http_health(base_url: &str) {
+    let health_url = format!("{}/health", base_url.trim_end_matches('/'));
+    for _ in 0..40 {
+        if let Ok(response) = reqwest::get(&health_url).await {
+            if response.status().is_success() {
+                return;
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+
+    panic!("health endpoint did not become ready: {health_url}");
+}
+
 fn temp_extension_root(suffix: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let millis = SystemTime::now()
@@ -212,6 +284,40 @@ fn native_dynamic_env_guard(path: &Path, public_key: &str) -> ExtensionEnvGuard 
         "SDKWORK_EXTENSION_TRUSTED_SIGNERS",
         format!("sdkwork={public_key}"),
     );
+
+    ExtensionEnvGuard {
+        previous_paths,
+        previous_connector,
+        previous_native,
+        previous_connector_signature,
+        previous_native_signature,
+        previous_trusted_signers,
+    }
+}
+
+fn connector_env_guard(path: &Path) -> ExtensionEnvGuard {
+    let previous_paths = std::env::var("SDKWORK_EXTENSION_PATHS").ok();
+    let previous_connector = std::env::var("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS").ok();
+    let previous_native = std::env::var("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS").ok();
+    let previous_connector_signature =
+        std::env::var("SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS").ok();
+    let previous_native_signature =
+        std::env::var("SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS").ok();
+    let previous_trusted_signers = std::env::var("SDKWORK_EXTENSION_TRUSTED_SIGNERS").ok();
+
+    let joined_paths = std::env::join_paths([path]).unwrap();
+    std::env::set_var("SDKWORK_EXTENSION_PATHS", joined_paths);
+    std::env::set_var("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS", "true");
+    std::env::set_var("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS", "false");
+    std::env::set_var(
+        "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
+        "false",
+    );
+    std::env::set_var(
+        "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS",
+        "false",
+    );
+    std::env::remove_var("SDKWORK_EXTENSION_TRUSTED_SIGNERS");
 
     ExtensionEnvGuard {
         previous_paths,
@@ -327,6 +433,26 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
     .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.create",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.stream_generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
         "audio.speech.create",
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
@@ -338,6 +464,35 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
         "videos.content",
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
+}
+
+fn connector_manifest(extension_id: &str) -> String {
+    format!(
+        r#"
+api_version = "sdkwork.extension/v1"
+id = "{extension_id}"
+kind = "provider"
+version = "0.1.0"
+display_name = "Custom OpenAI Connector"
+runtime = "connector"
+protocol = "openai"
+entrypoint = "bin/sdkwork-provider-custom-openai"
+channel_bindings = ["sdkwork.channel.openai"]
+permissions = ["network_outbound", "spawn_process"]
+
+[health]
+path = "/health"
+interval_secs = 30
+
+[[capabilities]]
+operation = "chat.completions.create"
+compatibility = "relay"
+
+[[capabilities]]
+operation = "chat.completions.stream"
+compatibility = "relay"
+"#
+    )
 }
 
 fn sign_native_dynamic_package(

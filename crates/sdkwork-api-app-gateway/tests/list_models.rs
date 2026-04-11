@@ -2,8 +2,7 @@ use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::{
     clear_capability_catalog_cache_store, configure_capability_catalog_cache_store, delete_model,
     delete_model_from_store, get_model, get_model_from_store, invalidate_capability_catalog_cache,
-    list_models,
-    list_models_from_store,
+    list_models, list_models_from_store,
 };
 use sdkwork_api_cache_core::CacheStore;
 use sdkwork_api_cache_memory::MemoryCacheStore;

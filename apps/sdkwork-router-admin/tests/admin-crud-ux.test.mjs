@@ -13,7 +13,7 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-const sharedUiPackagePath = 'file:../../../../../sdkwork-ui/sdkwork-ui-pc-react';
+const sharedUiPackagePath = 'workspace:*';
 
 test('overview uses shared management workbench and shared stat primitives', () => {
   const overview = read('packages/sdkwork-router-admin-overview/src/index.tsx');
@@ -42,6 +42,8 @@ test('users, tenants, coupons, and gateway CRUD pages all use the shared ui pack
       source: read('packages/sdkwork-router-admin-coupons/src/index.tsx'),
       packageJson: readJson('packages/sdkwork-router-admin-coupons/package.json'),
     },
+  ];
+  const gatewayWorkbenchCoverage = [
     {
       source: read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx'),
       packageJson: readJson('packages/sdkwork-router-admin-apirouter/package.json'),
@@ -81,6 +83,19 @@ test('users, tenants, coupons, and gateway CRUD pages all use the shared ui pack
   assert.equal(tenants.packageJson.dependencies['sdkwork-router-admin-commons'], undefined);
 
   for (const { source, packageJson } of workbenchCoverage) {
+    assert.match(source, /@sdkwork\/ui-pc-react/);
+    assert.match(source, /Drawer/);
+    assert.match(source, /Input/);
+    assert.match(source, /Canonical marketing derived/);
+    assert.match(source, /Template governance/);
+    assert.doesNotMatch(source, /CrudWorkbench|ManagementWorkbench/);
+    assert.doesNotMatch(source, /adminx-/);
+    assert.doesNotMatch(source, /sdkwork-router-admin-commons/);
+    assert.equal(packageJson.dependencies['@sdkwork/ui-pc-react'], sharedUiPackagePath);
+    assert.equal(packageJson.dependencies['sdkwork-router-admin-commons'], undefined);
+  }
+
+  for (const { source, packageJson } of gatewayWorkbenchCoverage) {
     assert.match(source, /@sdkwork\/ui-pc-react/);
     assert.match(source, /Drawer|Dialog/);
     assert.match(source, /Input/);
@@ -155,7 +170,9 @@ test('coupons adopts admin-table workflow with a top query form, paginated regis
 
   assert.match(coupons, /<form/);
   assert.match(coupons, /Search campaigns/);
-  assert.match(coupons, /New coupon/);
+  assert.match(coupons, /Canonical marketing derived/);
+  assert.match(coupons, /Template governance/);
+  assert.doesNotMatch(coupons, /New coupon/);
   assert.doesNotMatch(coupons, /CouponsManagementWorkbench/);
   assert.doesNotMatch(coupons, /FilterBar/);
   assert.doesNotMatch(coupons, /title="Coupons"/);

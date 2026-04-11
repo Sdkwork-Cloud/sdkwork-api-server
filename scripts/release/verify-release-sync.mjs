@@ -247,6 +247,30 @@ function normalizePathForCompare(value) {
   return path.resolve(String(value ?? '')).replaceAll('\\', '/').toLowerCase();
 }
 
+function normalizeGitHubRemoteUrlForCompare(value = '') {
+  const normalized = String(value ?? '').trim();
+  if (normalized.length === 0) {
+    return '';
+  }
+
+  const httpsMatch = normalized.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/iu);
+  if (httpsMatch) {
+    return `github.com/${httpsMatch[1].toLowerCase()}/${httpsMatch[2].toLowerCase()}`;
+  }
+
+  const sshMatch = normalized.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/iu);
+  if (sshMatch) {
+    return `github.com/${sshMatch[1].toLowerCase()}/${sshMatch[2].toLowerCase()}`;
+  }
+
+  const sshUrlMatch = normalized.match(/^ssh:\/\/git@github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/iu);
+  if (sshUrlMatch) {
+    return `github.com/${sshUrlMatch[1].toLowerCase()}/${sshUrlMatch[2].toLowerCase()}`;
+  }
+
+  return normalized;
+}
+
 export function parseGitStatusBranchSummary(statusText = '') {
   const lines = String(statusText ?? '')
     .split(/\r?\n/u)
@@ -348,7 +372,11 @@ export function evaluateReleaseSyncRepositoryAudit({
     reasons.push('branch-not-synced');
   }
 
-  if (remoteUrl && spec.expectedRemoteUrl && remoteUrl.trim() !== spec.expectedRemoteUrl) {
+  if (
+    remoteUrl
+    && spec.expectedRemoteUrl
+    && normalizeGitHubRemoteUrlForCompare(remoteUrl) !== normalizeGitHubRemoteUrlForCompare(spec.expectedRemoteUrl)
+  ) {
     reasons.push('remote-url-mismatch');
   }
 

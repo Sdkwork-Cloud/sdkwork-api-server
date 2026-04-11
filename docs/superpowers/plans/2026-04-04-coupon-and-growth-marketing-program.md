@@ -1,5 +1,7 @@
 # Coupon And Growth Marketing System Implementation Plan
 
+> Status: historical implementation program. It was superseded by the coupon-first marketing architecture and the 2026-04-10 full legacy coupon exit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** upgrade `sdkwork-api-router` from a single-code coupon campaign model to a production-grade coupon and growth marketing system with template, batch, code pool, claim, redemption, referral, attribution, and admin or portal operations support.
@@ -13,15 +15,15 @@
 ### Task 1: Freeze the current coupon model as a compatibility layer
 
 **Files:**
-- Modify: `crates/sdkwork-api-domain-coupon/src/lib.rs`
-- Modify: `crates/sdkwork-api-app-coupon/src/lib.rs`
+- Modify: historical legacy coupon domain compatibility layer
+- Modify: historical legacy coupon app compatibility layer
 - Modify: `docs/superpowers/specs/2026-04-04-coupon-and-growth-marketing-system-design.md`
 - Modify: `docs/superpowers/specs/2026-04-04-global-commercial-system-design.md`
 
 - [ ] Mark the current `CouponCampaign` shape as compatibility-era and stop treating it as the long-term source of truth.
 - [ ] Preserve existing list and basic CRUD behavior only as a migration shim.
 - [ ] Add tests that lock down compatibility behavior while new marketing kernels are introduced.
-- [ ] Run: `cargo test -p sdkwork-api-app-coupon -- --nocapture`
+- [ ] Run: historical legacy coupon compatibility package tests
 - [ ] Checkpoint commit: `git commit -m "docs: freeze coupon compatibility layer"`
 
 ### Task 2: Introduce canonical marketing domain records

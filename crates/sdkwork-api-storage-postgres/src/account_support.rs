@@ -212,6 +212,25 @@ pub(crate) fn parse_request_settlement_status(value: &str) -> Result<RequestSett
     }
 }
 
+pub(crate) fn pricing_plan_ownership_scope_as_str(
+    value: PricingPlanOwnershipScope,
+) -> &'static str {
+    match value {
+        PricingPlanOwnershipScope::Workspace => "workspace",
+        PricingPlanOwnershipScope::PlatformShared => "platform_shared",
+    }
+}
+
+pub(crate) fn parse_pricing_plan_ownership_scope(
+    value: &str,
+) -> Result<PricingPlanOwnershipScope> {
+    match value {
+        "workspace" => Ok(PricingPlanOwnershipScope::Workspace),
+        "platform_shared" => Ok(PricingPlanOwnershipScope::PlatformShared),
+        other => Err(anyhow!("unsupported pricing plan ownership scope: {other}")),
+    }
+}
+
 pub(crate) fn decode_account_record_row(row: PgRow) -> Result<AccountRecord> {
     Ok(AccountRecord::new(
         u64::try_from(row.try_get::<i64, _>("account_id")?)?,
@@ -472,6 +491,9 @@ pub(crate) fn decode_pricing_plan_row(row: PgRow) -> Result<PricingPlanRecord> {
     .with_currency_code(row.try_get::<String, _>("currency_code")?)
     .with_credit_unit_code(row.try_get::<String, _>("credit_unit_code")?)
     .with_status(row.try_get::<String, _>("status")?)
+    .with_ownership_scope(parse_pricing_plan_ownership_scope(
+        &row.try_get::<String, _>("ownership_scope")?,
+    )?)
     .with_effective_from_ms(u64::try_from(row.try_get::<i64, _>("effective_from_ms")?)?)
     .with_effective_to_ms(
         row.try_get::<Option<i64>, _>("effective_to_ms")?

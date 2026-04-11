@@ -55,6 +55,11 @@ async fn portal_commerce_subscription_checkout_requires_settlement_before_member
     assert_eq!(subscription_json["target_name"], "Growth");
     assert_eq!(subscription_json["payable_price_label"], "$79.00");
     assert_eq!(subscription_json["status"], "pending_payment");
+    assert_eq!(
+        subscription_json["pricing_plan_id"],
+        "pricing_plan:subscription_plan:growth"
+    );
+    assert_eq!(subscription_json["pricing_plan_version"], 1);
 
     let billing_response = app
         .clone()

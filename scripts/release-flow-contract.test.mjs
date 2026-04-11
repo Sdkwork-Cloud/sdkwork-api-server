@@ -158,6 +158,7 @@ test('release target helpers and desktop release runner resolve explicit target 
   assert.equal(typeof packager.resolveNativeBuildRootCandidates, 'function');
   assert.equal(typeof packager.listNativeServiceBinaryNames, 'function');
   assert.equal(typeof packager.listNativeDesktopAppIds, 'function');
+  assert.equal(typeof packager.listNativeProductServerBootstrapDataRoots, 'function');
   assert.equal(typeof packager.buildNativeProductServerArchiveBaseName, 'function');
   assert.equal(typeof packager.createTarCommandPlan, 'function');
   assert.equal(typeof workspaceTargetDir.resolveWorkspaceTargetDir, 'function');
@@ -332,6 +333,12 @@ test('release target helpers and desktop release runner resolve explicit target 
     /router-product-service/,
   );
   assert.deepEqual(packager.listNativeDesktopAppIds(), ['admin', 'portal']);
+  assert.deepEqual(
+    packager.listNativeProductServerBootstrapDataRoots(),
+    {
+      data: path.join(rootDir, 'data'),
+    },
+  );
   assert.equal(
     packager.buildNativeProductServerArchiveBaseName({
       platformId: 'linux',

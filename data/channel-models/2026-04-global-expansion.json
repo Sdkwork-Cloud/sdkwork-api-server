@@ -1,0 +1,48 @@
+[
+  {
+    "channel_id": "ernie",
+    "model_id": "ernie-4.5-turbo",
+    "model_display_name": "ERNIE 4.5 Turbo",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 128000,
+    "description": "Baidu ERNIE flagship commercial default."
+  },
+  {
+    "channel_id": "ernie",
+    "model_id": "ernie-embedding-v1",
+    "model_display_name": "ERNIE Embedding V1",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "ERNIE semantic search default."
+  },
+  {
+    "channel_id": "minimax",
+    "model_id": "minimax-m1",
+    "model_display_name": "MiniMax M1",
+    "capabilities": [
+      "responses",
+      "chat_completions"
+    ],
+    "streaming": true,
+    "context_window": 1000000,
+    "description": "MiniMax frontier reasoning default."
+  },
+  {
+    "channel_id": "minimax",
+    "model_id": "minimax-embedding",
+    "model_display_name": "MiniMax Embedding",
+    "capabilities": [
+      "embeddings"
+    ],
+    "streaming": false,
+    "context_window": 8192,
+    "description": "MiniMax retrieval default."
+  }
+]

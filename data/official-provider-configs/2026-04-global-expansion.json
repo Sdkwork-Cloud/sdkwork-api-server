@@ -1,0 +1,18 @@
+[
+  {
+    "provider_id": "provider-ernie-official",
+    "key_reference": "ernie-default",
+    "base_url": "https://qianfan.baidubce.com/v2",
+    "enabled": false,
+    "created_at_ms": 1710000400000,
+    "updated_at_ms": 1710000400000
+  },
+  {
+    "provider_id": "provider-minimax-official",
+    "key_reference": "minimax-default",
+    "base_url": "https://api.minimax.chat/v1",
+    "enabled": false,
+    "created_at_ms": 1710000400000,
+    "updated_at_ms": 1710000400000
+  }
+]

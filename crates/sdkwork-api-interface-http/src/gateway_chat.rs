@@ -355,7 +355,88 @@ async fn anthropic_messages_handler(
         Ok(request) => request,
         Err(error) => return anthropic_invalid_request_response(error.to_string()),
     };
+    if request.model.trim().is_empty() {
+        return anthropic_invalid_request_response("Chat completion model is required.");
+    }
     let options = anthropic_request_options(&headers);
+
+    if request.stream.unwrap_or(false) {
+        match relay_standard_protocol_stream_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "/v1/messages",
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(StandardProtocolStreamRelayOutcome::Stream(response))) => {
+                return upstream_passthrough_response(response);
+            }
+            Ok(Some(StandardProtocolStreamRelayOutcome::Error(response))) => return response,
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+
+        match relay_raw_protocol_stream_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "anthropic.messages.create",
+            Vec::new(),
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(response)) => return upstream_passthrough_response(response),
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+    } else {
+        match relay_standard_protocol_json_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "/v1/messages",
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(StandardProtocolJsonRelayOutcome::Json(response))) => {
+                return Json(response).into_response();
+            }
+            Ok(Some(StandardProtocolJsonRelayOutcome::Error(response))) => return response,
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response("failed to relay upstream anthropic message");
+            }
+        }
+
+        match relay_raw_protocol_json_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "anthropic.messages.create",
+            Vec::new(),
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(response)) => return Json(response).into_response(),
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response("failed to relay upstream anthropic message");
+            }
+        }
+    }
 
     if request.stream.unwrap_or(false) {
         match relay_stateless_stream_request_with_options(
@@ -407,12 +488,56 @@ async fn anthropic_messages_handler(
 
 async fn anthropic_count_tokens_handler(
     request_context: StatelessGatewayRequest,
+    headers: HeaderMap,
     ExtractJson(payload): ExtractJson<Value>,
 ) -> Response {
     let request = match anthropic_count_tokens_request(&payload) {
         Ok(request) => request,
         Err(error) => return anthropic_invalid_request_response(error.to_string()),
     };
+    if request.model.trim().is_empty() {
+        return anthropic_invalid_request_response("Response model is required.");
+    }
+
+    match relay_standard_protocol_json_request_stateless(
+        &request_context,
+        StandardProtocolKind::Anthropic,
+        "/v1/messages/count_tokens",
+        &headers,
+        &payload,
+    )
+    .await
+    {
+        Ok(Some(StandardProtocolJsonRelayOutcome::Json(response))) => {
+            return Json(response).into_response();
+        }
+        Ok(Some(StandardProtocolJsonRelayOutcome::Error(response))) => return response,
+        Ok(None) => {}
+        Err(_) => {
+            return anthropic_bad_gateway_response(
+                "failed to relay upstream anthropic count tokens request",
+            );
+        }
+    }
+
+    match relay_raw_protocol_json_request_stateless(
+        &request_context,
+        StandardProtocolKind::Anthropic,
+        "anthropic.messages.count_tokens",
+        Vec::new(),
+        &headers,
+        &payload,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return anthropic_bad_gateway_response(
+                "failed to relay upstream anthropic count tokens request",
+            );
+        }
+    }
 
     match relay_stateless_json_request(
         &request_context,

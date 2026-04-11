@@ -5,9 +5,17 @@ import type {
   ChannelModelRecord,
   CredentialRecord,
   ModelPriceRecord,
-  ProxyProviderRecord,
+  ModelPriceTier,
+  ProviderCatalogRecord,
+  SaveProviderInput,
 } from 'sdkwork-router-admin-types';
-import { translateAdminText } from 'sdkwork-router-admin-core';
+import {
+  buildProviderSaveInput,
+  describeProviderIntegration,
+  providerSupportedModelKey,
+  recommendedModelPriceSourceKind,
+  translateAdminText,
+} from 'sdkwork-router-admin-core';
 
 import {
   channelModelDraftFromRecord,
@@ -18,6 +26,7 @@ import {
   emptyProviderDraft,
   modelPriceDraftFromRecord,
   parseOptionalNumber,
+  parsePricingTiersJson,
   parseRequiredNumber,
   providerChannelIds,
   providerDraftFromRecord,
@@ -34,15 +43,7 @@ import {
 
 export type CatalogWorkspaceActions = {
   onSaveChannel: (input: { id: string; name: string }) => Promise<void>;
-  onSaveProvider: (input: {
-    id: string;
-    channel_id: string;
-    extension_id?: string;
-    adapter_kind: string;
-    base_url: string;
-    display_name: string;
-    channel_bindings: Array<{ channel_id: string; is_primary: boolean }>;
-  }) => Promise<void>;
+  onSaveProvider: (input: SaveProviderInput) => Promise<void>;
   onSaveCredential: (input: {
     tenant_id: string;
     provider_id: string;
@@ -69,6 +70,9 @@ export type CatalogWorkspaceActions = {
     cache_read_price: number;
     cache_write_price: number;
     request_price: number;
+    price_source_kind: string;
+    billing_notes?: string | null;
+    pricing_tiers: ModelPriceTier[];
     is_active: boolean;
   }) => Promise<void>;
   onDeleteChannel: (channelId: string) => Promise<void>;
@@ -179,15 +183,22 @@ export function useCatalogWorkspaceState({
             provider.display_name,
             provider.channel_id,
             provider.adapter_kind,
+            provider.protocol_kind,
             provider.base_url,
             provider.extension_id ?? '',
+            provider.integration.default_plugin_family ?? '',
+            describeProviderIntegration(provider),
             providerChannelIds(provider).join(' '),
+            snapshot.providerModels
+              .filter((record) => record.proxy_provider_id === provider.id)
+              .map((record) => providerSupportedModelKey(record))
+              .join(' '),
           ]
             .join(' ')
             .toLowerCase()
             .includes(deferredSearch),
       ),
-    [deferredSearch, snapshot.providers],
+    [deferredSearch, snapshot.providerModels, snapshot.providers],
   );
   const filteredCredentials = useMemo(
     () =>
@@ -247,6 +258,12 @@ export function useCatalogWorkspaceState({
     ?? null;
   const selectedChannelModels = snapshot.channelModels.filter(
     (model) => model.channel_id === (selectedChannel?.id ?? defaultChannelId),
+  );
+  const selectedProviderModels = snapshot.providerModels.filter(
+    (record) => record.proxy_provider_id === selectedProvider?.id,
+  );
+  const selectedProviderModelPrices = snapshot.modelPrices.filter(
+    (record) => record.proxy_provider_id === selectedProvider?.id,
   );
   const selectedPublication =
     selectedChannelModels.find(
@@ -361,9 +378,9 @@ export function useCatalogWorkspaceState({
     setIsProviderDialogOpen(true);
   }
 
-  function openEditProviderDialog(provider: ProxyProviderRecord) {
+  function openEditProviderDialog(provider: ProviderCatalogRecord) {
     setEditingProviderId(provider.id);
-    setProviderDraft(providerDraftFromRecord(provider));
+    setProviderDraft(providerDraftFromRecord(provider, snapshot.providerModels));
     setIsProviderDialogOpen(true);
   }
 
@@ -402,13 +419,29 @@ export function useCatalogWorkspaceState({
     setIsChannelModelEditorOpen(true);
   }
 
-  function openNewModelPriceDialog(publication = selectedPublication) {
+  function openNewModelPriceDialog(
+    publication = selectedPublication,
+    options: {
+      proxyProviderId?: string;
+      priceSourceKind?: string;
+    } = {},
+  ) {
     if (!publication) {
       return;
     }
 
+    const provider = options.proxyProviderId
+      ? snapshot.providers.find((entry) => entry.id === options.proxyProviderId) ?? null
+      : null;
     setEditingModelPriceKey(null);
-    setModelPriceDraft(emptyModelPriceDraft(publication.channel_id, publication.model_id));
+    setModelPriceDraft(
+      emptyModelPriceDraft(
+        publication.channel_id,
+        publication.model_id,
+        options.proxyProviderId ?? '',
+        options.priceSourceKind ?? recommendedModelPriceSourceKind(provider),
+      ),
+    );
     setSelectedPublicationKey(`${publication.channel_id}:${publication.model_id}`);
     setIsModelPriceEditorOpen(true);
   }
@@ -418,6 +451,7 @@ export function useCatalogWorkspaceState({
       `${record.channel_id}:${record.model_id}:${record.proxy_provider_id}`,
     );
     setModelPriceDraft(modelPriceDraftFromRecord(record));
+    setSelectedPublicationKey(`${record.channel_id}:${record.model_id}`);
     setIsModelPriceEditorOpen(true);
   }
 
@@ -449,25 +483,7 @@ export function useCatalogWorkspaceState({
 
   async function handleProviderSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const bindingIds = Array.from(
-      new Set(
-        [providerDraft.primary_channel_id, ...providerDraft.bound_channel_ids]
-          .map((value) => value.trim())
-          .filter(Boolean),
-      ),
-    );
-    await onSaveProvider({
-      id: providerDraft.id.trim(),
-      channel_id: providerDraft.primary_channel_id.trim(),
-      extension_id: providerDraft.extension_id.trim() || undefined,
-      adapter_kind: providerDraft.adapter_kind.trim(),
-      base_url: providerDraft.base_url.trim(),
-      display_name: providerDraft.display_name.trim(),
-      channel_bindings: bindingIds.map((channelId) => ({
-        channel_id: channelId,
-        is_primary: channelId === providerDraft.primary_channel_id,
-      })),
-    });
+    await onSaveProvider(buildProviderSaveInput(providerDraft));
     setIsProviderDialogOpen(false);
   }
 
@@ -510,6 +526,9 @@ export function useCatalogWorkspaceState({
       cache_read_price: parseRequiredNumber(modelPriceDraft.cache_read_price),
       cache_write_price: parseRequiredNumber(modelPriceDraft.cache_write_price),
       request_price: parseRequiredNumber(modelPriceDraft.request_price),
+      price_source_kind: modelPriceDraft.price_source_kind.trim(),
+      billing_notes: modelPriceDraft.billing_notes.trim() || null,
+      pricing_tiers: parsePricingTiersJson(modelPriceDraft.pricing_tiers_json),
       is_active: modelPriceDraft.is_active,
     });
     setIsModelPriceEditorOpen(false);
@@ -585,6 +604,8 @@ export function useCatalogWorkspaceState({
     selectedChannelProviderCount,
     selectedCredential,
     selectedCredentialKey,
+    selectedProviderModels,
+    selectedProviderModelPrices,
     selectedModelPrices,
     selectedPublication,
     selectedProvider,

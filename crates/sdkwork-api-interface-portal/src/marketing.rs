@@ -19,7 +19,6 @@ struct MarketingCouponContext {
     campaign: MarketingCampaignRecord,
     budget: CampaignBudgetRecord,
     code: CouponCodeRecord,
-    compatibility_source: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +26,12 @@ struct PortalMarketingSubjectSet {
     user_id: String,
     project_id: String,
     workspace_id: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PortalCouponAccountArrivalContext {
+    account_id: Option<u64>,
+    lots_by_order_id: HashMap<String, Vec<AccountBenefitLotRecord>>,
 }
 
 impl PortalMarketingSubjectSet {
@@ -53,6 +58,26 @@ impl PortalMarketingSubjectSet {
             MarketingSubjectScope::Project => self.project_id == subject_id,
             MarketingSubjectScope::Workspace => self.workspace_id == subject_id,
             MarketingSubjectScope::Account => false,
+        }
+    }
+}
+
+impl PortalCouponAccountArrivalContext {
+    fn from_account_lots(account_id: u64, lots: Vec<AccountBenefitLotRecord>) -> Self {
+        let mut lots_by_order_id = HashMap::<String, Vec<AccountBenefitLotRecord>>::new();
+        for lot in lots {
+            if lot.source_type != sdkwork_api_domain_billing::AccountBenefitSourceType::Order {
+                continue;
+            }
+            let Some(order_id) = parse_scope_order_id(lot.scope_json.as_deref()) else {
+                continue;
+            };
+            lots_by_order_id.entry(order_id).or_default().push(lot);
+        }
+
+        Self {
+            account_id: Some(account_id),
+            lots_by_order_id,
         }
     }
 }
@@ -100,22 +125,7 @@ async fn load_marketing_coupon_context_by_value(
         }
     }
 
-    Ok(store
-        .list_active_coupons()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .find(|coupon| normalize_coupon_code(&coupon.code) == normalized)
-        .map(|coupon| {
-            let (template, campaign, budget, code) = project_legacy_coupon_campaign(&coupon);
-            MarketingCouponContext {
-                template,
-                campaign,
-                budget,
-                code,
-                compatibility_source: true,
-            }
-        }))
+    Ok(None)
 }
 
 async fn load_marketing_coupon_context_from_code_record(
@@ -155,7 +165,6 @@ async fn load_marketing_coupon_context_from_code_record(
         campaign,
         budget,
         code,
-        compatibility_source: false,
     }))
 }
 
@@ -175,6 +184,20 @@ async fn load_marketing_coupon_context_for_code_id(
     load_marketing_coupon_context_from_code_record(store, code, now_ms)
         .await?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn load_marketing_coupon_context_for_portal_code(
+    store: &dyn AdminStore,
+    code: &CouponCodeRecord,
+    now_ms: u64,
+) -> Result<Option<MarketingCouponContext>, StatusCode> {
+    if let Some(context) =
+        load_marketing_coupon_context_from_code_record(store, code.clone(), now_ms).await?
+    {
+        return Ok(Some(context));
+    }
+
+    load_marketing_coupon_context_by_value(store, &code.code_value, now_ms).await
 }
 
 async fn find_coupon_rollback_record(
@@ -272,6 +295,7 @@ async fn load_marketing_code_items(
     store: &dyn AdminStore,
     subjects: &PortalMarketingSubjectSet,
 ) -> Result<Vec<PortalMarketingCodeItem>, StatusCode> {
+    let now_ms = current_time_millis();
     let reservations = store
         .list_coupon_reservation_records()
         .await
@@ -339,27 +363,54 @@ async fn load_marketing_code_items(
                     .zip(code.claimed_subject_scope)
                     .is_some_and(|(subject_id, scope)| subjects.matches(scope, subject_id))
         })
-        .map(|code| PortalMarketingCodeItem {
-            latest_reservation: latest_reservations.get(&code.coupon_code_id).cloned(),
-            latest_redemption: latest_redemptions.get(&code.coupon_code_id).cloned(),
-            code,
+        .filter_map(|code| {
+            let latest_reservation = latest_reservations.get(&code.coupon_code_id).cloned();
+            let latest_redemption = latest_redemptions.get(&code.coupon_code_id).cloned();
+            Some((code, latest_reservation, latest_redemption))
         })
         .collect::<Vec<_>>();
 
-    items.sort_by(|left, right| {
+    let mut enriched_items = Vec::with_capacity(items.len());
+    for (code, latest_reservation, latest_redemption) in items.drain(..) {
+        let Some(context) =
+            load_marketing_coupon_context_for_portal_code(store, &code, now_ms).await?
+        else {
+            continue;
+        };
+
+        enriched_items.push(PortalMarketingCodeItem {
+            code: code.clone(),
+            template: context.template.clone(),
+            campaign: context.campaign.clone(),
+            applicability: portal_coupon_applicability_summary(&context.template),
+            effect: portal_coupon_effect_summary(&context.template),
+            ownership: portal_coupon_ownership_summary(
+                subjects,
+                &code,
+                latest_reservation.as_ref(),
+                latest_redemption.as_ref(),
+            ),
+            latest_reservation,
+            latest_redemption,
+        });
+    }
+
+    enriched_items.sort_by(|left, right| {
         right
             .code
             .updated_at_ms
             .cmp(&left.code.updated_at_ms)
             .then_with(|| right.code.coupon_code_id.cmp(&left.code.coupon_code_id))
     });
-    Ok(items)
+    Ok(enriched_items)
 }
 
 async fn load_marketing_reward_history_items(
     store: &dyn AdminStore,
     subjects: &PortalMarketingSubjectSet,
+    account_arrival: Option<&PortalCouponAccountArrivalContext>,
 ) -> Result<Vec<PortalMarketingRewardHistoryItem>, StatusCode> {
+    let now_ms = current_time_millis();
     let redemptions = load_marketing_redemptions_for_subject(store, subjects, None).await?;
     let codes = store
         .list_coupon_code_records()
@@ -380,27 +431,41 @@ async fn load_marketing_reward_history_items(
             .push(rollback);
     }
 
-    let mut items = redemptions
-        .into_iter()
-        .filter_map(|redemption| {
-            codes.get(&redemption.coupon_code_id).cloned().map(|code| {
-                let mut rollbacks = rollbacks_by_redemption
-                    .remove(&redemption.coupon_redemption_id)
-                    .unwrap_or_default();
-                rollbacks.sort_by(|left, right| {
-                    right
-                        .created_at_ms
-                        .cmp(&left.created_at_ms)
-                        .then_with(|| right.coupon_rollback_id.cmp(&left.coupon_rollback_id))
-                });
-                PortalMarketingRewardHistoryItem {
-                    redemption,
-                    code,
-                    rollbacks,
-                }
-            })
-        })
-        .collect::<Vec<_>>();
+    let mut items = Vec::new();
+    for redemption in redemptions {
+        let Some(code) = codes.get(&redemption.coupon_code_id).cloned() else {
+            continue;
+        };
+        let Some(context) =
+            load_marketing_coupon_context_for_portal_code(store, &code, now_ms).await?
+        else {
+            continue;
+        };
+        let mut rollbacks = rollbacks_by_redemption
+            .remove(&redemption.coupon_redemption_id)
+            .unwrap_or_default();
+        rollbacks.sort_by(|left, right| {
+            right
+                .created_at_ms
+                .cmp(&left.created_at_ms)
+                .then_with(|| right.coupon_rollback_id.cmp(&left.coupon_rollback_id))
+        });
+        let ownership =
+            portal_coupon_ownership_summary(subjects, &code, None, Some(&redemption));
+        let account_arrival_summary =
+            portal_coupon_account_arrival_summary(&redemption, account_arrival);
+        items.push(PortalMarketingRewardHistoryItem {
+            redemption,
+            code: code.clone(),
+            template: context.template.clone(),
+            campaign: context.campaign.clone(),
+            applicability: portal_coupon_applicability_summary(&context.template),
+            effect: portal_coupon_effect_summary(&context.template),
+            ownership,
+            account_arrival: account_arrival_summary,
+            rollbacks,
+        });
+    }
 
     items.sort_by(|left, right| {
         right
@@ -451,6 +516,119 @@ fn summarize_marketing_code_items(items: &[PortalMarketingCodeItem]) -> PortalMa
         }
     }
     summary
+}
+
+fn portal_coupon_applicability_summary(
+    template: &CouponTemplateRecord,
+) -> PortalCouponApplicabilitySummary {
+    PortalCouponApplicabilitySummary {
+        target_kinds: template.restriction.eligible_target_kinds.clone(),
+        all_target_kinds_eligible: template.restriction.eligible_target_kinds.is_empty(),
+    }
+}
+
+fn portal_coupon_effect_summary(template: &CouponTemplateRecord) -> PortalCouponEffectSummary {
+    PortalCouponEffectSummary {
+        effect_kind: if template.benefit.grant_units.is_some() {
+            PortalCouponEffectKind::AccountEntitlement
+        } else {
+            PortalCouponEffectKind::CheckoutDiscount
+        },
+        discount_percent: template.benefit.discount_percent,
+        discount_amount_minor: template.benefit.discount_amount_minor,
+        grant_units: template.benefit.grant_units,
+    }
+}
+
+fn portal_coupon_ownership_summary(
+    subjects: &PortalMarketingSubjectSet,
+    code: &CouponCodeRecord,
+    latest_reservation: Option<&CouponReservationRecord>,
+    latest_redemption: Option<&CouponRedemptionRecord>,
+) -> PortalCouponOwnershipSummary {
+    let claimed_to_current_subject = code
+        .claimed_subject_id
+        .as_deref()
+        .zip(code.claimed_subject_scope)
+        .is_some_and(|(subject_id, scope)| subjects.matches(scope, subject_id));
+
+    PortalCouponOwnershipSummary {
+        owned_by_current_subject: claimed_to_current_subject
+            || latest_reservation.is_some()
+            || latest_redemption.is_some(),
+        claimed_to_current_subject,
+        claimed_subject_scope: code.claimed_subject_scope,
+        claimed_subject_id: code.claimed_subject_id.clone(),
+    }
+}
+
+fn portal_coupon_account_arrival_summary(
+    redemption: &CouponRedemptionRecord,
+    context: Option<&PortalCouponAccountArrivalContext>,
+) -> PortalCouponAccountArrivalSummary {
+    let order_id = redemption
+        .order_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let mut lots = order_id
+        .as_deref()
+        .and_then(|value| context.and_then(|ctx| ctx.lots_by_order_id.get(value)))
+        .cloned()
+        .unwrap_or_default();
+    lots.sort_by(|left, right| {
+        right
+            .issued_at_ms
+            .cmp(&left.issued_at_ms)
+            .then_with(|| left.lot_id.cmp(&right.lot_id))
+    });
+
+    let credited_quantity = lots.iter().map(|lot| lot.original_quantity).sum::<f64>();
+    let benefit_lots = lots
+        .iter()
+        .map(portal_coupon_account_arrival_lot_item)
+        .collect::<Vec<_>>();
+
+    PortalCouponAccountArrivalSummary {
+        order_id,
+        account_id: context.and_then(|ctx| ctx.account_id),
+        benefit_lot_count: benefit_lots.len(),
+        credited_quantity,
+        benefit_lots,
+    }
+}
+
+fn portal_coupon_account_arrival_lot_item(
+    lot: &AccountBenefitLotRecord,
+) -> PortalCouponAccountArrivalLotItem {
+    PortalCouponAccountArrivalLotItem {
+        lot_id: lot.lot_id,
+        benefit_type: lot.benefit_type,
+        source_type: lot.source_type,
+        source_id: lot.source_id,
+        status: lot.status,
+        original_quantity: lot.original_quantity,
+        remaining_quantity: lot.remaining_quantity,
+        issued_at_ms: lot.issued_at_ms,
+        expires_at_ms: lot.expires_at_ms,
+        scope_order_id: parse_scope_order_id(lot.scope_json.as_deref()),
+    }
+}
+
+fn parse_scope_order_id(scope_json: Option<&str>) -> Option<String> {
+    let scope_json = scope_json?.trim();
+    if scope_json.is_empty() {
+        return None;
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(scope_json).ok()?;
+    let order_id = parsed.get("order_id")?.as_str()?.trim();
+    if order_id.is_empty() {
+        None
+    } else {
+        Some(order_id.to_owned())
+    }
 }
 
 fn select_effective_marketing_campaign(

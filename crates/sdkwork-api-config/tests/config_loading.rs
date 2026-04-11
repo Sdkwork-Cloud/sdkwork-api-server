@@ -148,6 +148,30 @@ fn parses_http_exposure_controls_from_pairs_and_reexports_them() {
 }
 
 #[test]
+fn parses_bootstrap_data_settings_from_pairs_and_reexports_them() {
+    let config = StandaloneConfig::from_pairs([
+        ("SDKWORK_BOOTSTRAP_DATA_DIR", "D:/sdkwork/bootstrap"),
+        ("SDKWORK_BOOTSTRAP_PROFILE", "dev"),
+    ])
+    .unwrap();
+    let values = config
+        .resolved_env_pairs()
+        .into_iter()
+        .collect::<std::collections::HashMap<_, _>>();
+
+    assert_eq!(
+        config.bootstrap_data_dir.as_deref(),
+        Some("D:/sdkwork/bootstrap")
+    );
+    assert_eq!(config.bootstrap_profile, "dev");
+    assert_eq!(
+        values["SDKWORK_BOOTSTRAP_DATA_DIR"],
+        "D:/sdkwork/bootstrap"
+    );
+    assert_eq!(values["SDKWORK_BOOTSTRAP_PROFILE"], "dev");
+}
+
+#[test]
 fn non_reloadable_changed_fields_include_insecure_dev_override() {
     let current = StandaloneConfig::default();
     let next = StandaloneConfig {
@@ -173,6 +197,21 @@ fn non_reloadable_changed_fields_include_http_exposure_controls() {
 
     assert!(changed.contains(&"metrics_bearer_token"));
     assert!(changed.contains(&"browser_allowed_origins"));
+}
+
+#[test]
+fn non_reloadable_changed_fields_include_bootstrap_settings() {
+    let current = StandaloneConfig::default();
+    let next = StandaloneConfig {
+        bootstrap_data_dir: Some("D:/sdkwork/bootstrap".to_owned()),
+        bootstrap_profile: "dev".to_owned(),
+        ..current.clone()
+    };
+
+    let changed = current.non_reloadable_changed_fields(&next);
+
+    assert!(changed.contains(&"bootstrap_data_dir"));
+    assert!(changed.contains(&"bootstrap_profile"));
 }
 
 #[test]
@@ -459,6 +498,34 @@ browser_allowed_origins:
             "https://portal.example.com".to_owned()
         ]
     );
+}
+
+#[test]
+fn loads_bootstrap_settings_from_config_file_and_allows_env_override() {
+    let root = temp_config_root("bootstrap-settings");
+    fs::write(
+        root.join("config.yaml"),
+        r#"
+bootstrap_data_dir: "bootstrap-data"
+bootstrap_profile: "prod"
+"#,
+    )
+    .unwrap();
+
+    let config = StandaloneConfig::from_local_root_and_pairs(
+        &root,
+        [
+            ("SDKWORK_BOOTSTRAP_DATA_DIR", "D:/sdkwork/bootstrap"),
+            ("SDKWORK_BOOTSTRAP_PROFILE", "dev"),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(
+        config.bootstrap_data_dir.as_deref(),
+        Some("D:/sdkwork/bootstrap")
+    );
+    assert_eq!(config.bootstrap_profile, "dev");
 }
 
 #[test]

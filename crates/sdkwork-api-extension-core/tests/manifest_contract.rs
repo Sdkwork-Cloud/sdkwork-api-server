@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use sdkwork_api_extension_core::{
     CapabilityDescriptor, CompatibilityLevel, ExtensionKind, ExtensionManifest, ExtensionModality,
-    ExtensionRuntime,
+    ExtensionProtocol, ExtensionRuntime,
 };
 
 #[test]
@@ -52,4 +54,74 @@ fn manifest_tracks_runtime_contract_versions_and_supported_modalities() {
             ExtensionModality::Audio,
         ]
     );
+}
+
+#[test]
+fn manifest_normalizes_protocol_capabilities() {
+    assert_eq!(
+        ExtensionProtocol::from_str("openai")
+            .unwrap()
+            .capability_key(),
+        "openai"
+    );
+    assert_eq!(
+        ExtensionProtocol::from_str("anthropic")
+            .unwrap()
+            .capability_key(),
+        "anthropic"
+    );
+    assert_eq!(
+        ExtensionProtocol::from_str("gemini")
+            .unwrap()
+            .capability_key(),
+        "gemini"
+    );
+    assert_eq!(
+        ExtensionProtocol::from_str("custom")
+            .unwrap()
+            .capability_key(),
+        "custom"
+    );
+    assert_eq!(
+        ExtensionProtocol::from_str("openrouter")
+            .unwrap()
+            .capability_key(),
+        "openai"
+    );
+    assert_eq!(
+        ExtensionProtocol::from_str("ollama")
+            .unwrap()
+            .capability_key(),
+        "custom"
+    );
+}
+
+#[test]
+fn manifest_reports_canonical_protocol_capability() {
+    let manifest = ExtensionManifest::new(
+        "sdkwork.provider.custom-openrouter",
+        ExtensionKind::Provider,
+        "0.1.0",
+        ExtensionRuntime::Connector,
+    )
+    .with_protocol(ExtensionProtocol::from_str("openrouter").unwrap());
+
+    assert_eq!(
+        manifest
+            .protocol_capability()
+            .map(|protocol| protocol.capability_key()),
+        Some("openai")
+    );
+}
+
+#[test]
+fn runtime_capability_helpers_keep_connector_off_raw_plugin_surface() {
+    assert!(ExtensionRuntime::NativeDynamic.supports_raw_provider_execution());
+    assert!(ExtensionRuntime::NativeDynamic.supports_structured_retry_hints());
+
+    assert!(!ExtensionRuntime::Connector.supports_raw_provider_execution());
+    assert!(!ExtensionRuntime::Connector.supports_structured_retry_hints());
+
+    assert!(!ExtensionRuntime::Builtin.supports_raw_provider_execution());
+    assert!(!ExtensionRuntime::Builtin.supports_structured_retry_hints());
 }

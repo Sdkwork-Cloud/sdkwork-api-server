@@ -1,0 +1,18 @@
+{
+  "update_id": "2026-04-global-asia-official-operations",
+  "release_version": "2026.04.16",
+  "description": "Add dedicated official live groups and operational evidence for ERNIE and MiniMax so APAC official channels have the same install-time readiness as other official providers.",
+  "depends_on": [
+    "2026-04-global-catalog-expansion",
+    "2026-04-global-provider-operations-readiness"
+  ],
+  "api_key_groups": [
+    "api-key-groups/2026-04-global-asia-official-operations.json"
+  ],
+  "observability": [
+    "observability/2026-04-global-asia-official-operations.json"
+  ],
+  "billing": [
+    "billing/2026-04-global-asia-official-operations.json"
+  ]
+}

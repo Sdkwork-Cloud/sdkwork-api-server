@@ -17,6 +17,7 @@ sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde_json.workspace = true
 
 [dev-dependencies]
+sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-cache-memory = { path = "../sdkwork-api-cache-memory" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }

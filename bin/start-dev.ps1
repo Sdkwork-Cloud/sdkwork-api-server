@@ -1,3 +1,4 @@
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$Foreground,
     [switch]$DryRun,
@@ -5,18 +6,126 @@ param(
     [switch]$Install,
     [switch]$Browser,
     [switch]$Preview,
+    [switch]$ProxyDev,
     [switch]$Tauri,
     [string]$DatabaseUrl = '',
     [string]$GatewayBind = '',
     [string]$AdminBind = '',
     [string]$PortalBind = '',
-    [string]$WebBind = ''
+    [string]$WebBind = '',
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArgs = @()
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path (Split-Path -Parent $PSCommandPath) 'lib\runtime-common.ps1')
+
+function Read-RouterRemainingOptionValue {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Args,
+        [Parameter(Mandatory = $true)][ref]$Index,
+        [Parameter(Mandatory = $true)][string]$Arg,
+        [Parameter(Mandatory = $true)][string]$OptionName,
+        [string]$InlineValue = $null
+    )
+
+    if ($null -ne $InlineValue) {
+        return $InlineValue
+    }
+
+    if (($Index.Value + 1) -ge $Args.Count) {
+        Throw-RouterError "$OptionName requires a value"
+    }
+
+    $Index.Value += 1
+    return $Args[$Index.Value]
+}
+
+if ($RemainingArgs.Count -gt 0) {
+    for ($index = 0; $index -lt $RemainingArgs.Count; $index++) {
+        $arg = $RemainingArgs[$index]
+        $optionName = $arg
+        $inlineValue = $null
+
+        if ($arg.StartsWith('--') -and $arg.Contains('=')) {
+            $parts = $arg.Split('=', 2)
+            $optionName = $parts[0]
+            $inlineValue = $parts[1]
+        }
+
+        switch ($optionName) {
+            '--foreground' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $Foreground = $true
+                break
+            }
+            '--dry-run' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $DryRun = $true
+                break
+            }
+            '--install' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $Install = $true
+                break
+            }
+            '--browser' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $Browser = $true
+                break
+            }
+            '--preview' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $Preview = $true
+                break
+            }
+            '--proxy-dev' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $ProxyDev = $true
+                break
+            }
+            '--tauri' {
+                if ($null -ne $inlineValue) { Throw-RouterError "$optionName does not accept a value" }
+                $Tauri = $true
+                break
+            }
+            '--wait-seconds' {
+                $waitSecondsValue = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                try {
+                    $WaitSeconds = [int]$waitSecondsValue
+                } catch {
+                    Throw-RouterError "invalid value for --wait-seconds: $waitSecondsValue"
+                }
+                break
+            }
+            '--database-url' {
+                $DatabaseUrl = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                break
+            }
+            '--gateway-bind' {
+                $GatewayBind = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                break
+            }
+            '--admin-bind' {
+                $AdminBind = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                break
+            }
+            '--portal-bind' {
+                $PortalBind = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                break
+            }
+            '--web-bind' {
+                $WebBind = Read-RouterRemainingOptionValue -Args $RemainingArgs -Index ([ref]$index) -Arg $arg -OptionName $optionName -InlineValue $inlineValue
+                break
+            }
+            default {
+                Throw-RouterError "unknown option: $arg"
+            }
+        }
+    }
+}
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Get-RouterRepoRoot -ScriptDirectory $scriptDir
@@ -40,8 +149,20 @@ Ensure-RouterDirectory -DirectoryPath $runDirectory
 
 Import-RouterEnvFile -EnvFile $envFile
 
+$packagedBootstrapDataDirectory = Join-Path $scriptDir 'data'
+$repositoryBootstrapDataDirectory = Join-Path $repoRoot 'data'
 if (-not $env:SDKWORK_DATABASE_URL) {
     $env:SDKWORK_DATABASE_URL = "sqlite://$(Convert-ToRouterPortablePath -PathValue $dataDirectory)/sdkwork-api-router-dev.db"
+}
+if (-not $env:SDKWORK_BOOTSTRAP_PROFILE) {
+    $env:SDKWORK_BOOTSTRAP_PROFILE = 'dev'
+}
+if (-not $env:SDKWORK_BOOTSTRAP_DATA_DIR) {
+    if (Test-Path $repositoryBootstrapDataDirectory -PathType Container) {
+        $env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue $repositoryBootstrapDataDirectory
+    } elseif (Test-Path $packagedBootstrapDataDirectory -PathType Container) {
+        $env:SDKWORK_BOOTSTRAP_DATA_DIR = Convert-ToRouterPortablePath -PathValue $packagedBootstrapDataDirectory
+    }
 }
 if (-not $env:SDKWORK_GATEWAY_BIND) {
     $env:SDKWORK_GATEWAY_BIND = '127.0.0.1:9980'
@@ -64,9 +185,14 @@ if ($WebBind) { $env:SDKWORK_WEB_BIND = $WebBind }
 
 if ($Browser) {
     $Preview = $false
+    $ProxyDev = $false
     $Tauri = $false
 } elseif ($Tauri) {
     $Preview = $false
+    $ProxyDev = $false
+} elseif ($ProxyDev) {
+    $Preview = $false
+    $Tauri = $false
 } elseif (-not $Preview) {
     $Preview = $true
 }
@@ -76,7 +202,28 @@ Assert-RouterFileExists -Label 'workspace launcher' -FilePath $workspaceLauncher
 
 $adminNodeModules = Join-Path $repoRoot 'apps\sdkwork-router-admin\node_modules'
 $portalNodeModules = Join-Path $repoRoot 'apps\sdkwork-router-portal\node_modules'
-if ($Install -or -not (Test-Path $adminNodeModules) -or -not (Test-Path $portalNodeModules)) {
+$adminNodeModulesHealthy = Test-RouterPnpmNodeModulesHealthy -NodeModulesPath $adminNodeModules
+$portalNodeModulesHealthy = Test-RouterPnpmNodeModulesHealthy -NodeModulesPath $portalNodeModules
+$portalFrontendLinksUsable = Test-RouterPortalFrontendDependencyLinksUsable -RepoRoot $repoRoot
+
+if ((-not $portalNodeModulesHealthy) -and (-not $portalFrontendLinksUsable)) {
+    Write-RouterInfo 'portal frontend node_modules are missing or were transplanted from another workspace; attempting local repair'
+    if (Repair-RouterPortalFrontendNodeModules -RepoRoot $repoRoot) {
+        $portalFrontendLinksUsable = Test-RouterPortalFrontendDependencyLinksUsable -RepoRoot $repoRoot
+        if ($portalFrontendLinksUsable) {
+            Write-RouterInfo 'portal frontend dependency links repaired from local workspace packages'
+        }
+    }
+}
+
+if (-not $adminNodeModulesHealthy) {
+    Write-RouterInfo 'admin frontend node_modules are missing or stale; forcing --install'
+}
+if ((-not $portalNodeModulesHealthy) -and (-not $portalFrontendLinksUsable)) {
+    Write-RouterInfo 'portal frontend dependency links are still incomplete after local repair; forcing --install'
+}
+
+if ($Install -or -not $adminNodeModulesHealthy -or ((-not $portalNodeModulesHealthy) -and (-not $portalFrontendLinksUsable))) {
     $Install = $true
 }
 
@@ -92,6 +239,7 @@ $startArgs = @(
 
 if ($Install) { $startArgs += '--install' }
 if ($Preview) { $startArgs += '--preview' }
+if ($ProxyDev) { $startArgs += '--proxy-dev' }
 if ($Tauri) { $startArgs += '--tauri' }
 
 $planArgs = @($startArgs + '--dry-run')
@@ -106,10 +254,10 @@ try {
     $browserAdminUrl = 'http://127.0.0.1:5173/admin/'
     $browserPortalUrl = 'http://127.0.0.1:5174/portal/'
 
-    if ($Preview -or $Tauri) {
+    if ($Preview -or $Tauri -or $ProxyDev) {
         $primaryAdminSurfaceUrl = $previewAdminUrl
         $primaryPortalSurfaceUrl = $previewPortalUrl
-        $primaryMode = if ($Tauri) { 'development tauri' } else { 'development preview' }
+        $primaryMode = if ($Tauri) { 'development tauri' } elseif ($ProxyDev) { 'development proxy hot reload' } else { 'development preview' }
         $primaryUnifiedAccessEnabled = $true
         $secondaryAdminSurfaceUrl = $browserAdminUrl
         $secondaryPortalSurfaceUrl = $browserPortalUrl
@@ -227,6 +375,12 @@ try {
     )
     if ($Preview -or $Tauri) {
         $preflightBindAddresses += $env:SDKWORK_WEB_BIND
+    } elseif ($ProxyDev) {
+        $preflightBindAddresses += @(
+            $env:SDKWORK_WEB_BIND,
+            '127.0.0.1:5173',
+            '127.0.0.1:5174'
+        )
     } else {
         $preflightBindAddresses += @('127.0.0.1:5173', '127.0.0.1:5174')
     }

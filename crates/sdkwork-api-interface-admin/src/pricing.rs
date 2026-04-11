@@ -1,4 +1,5 @@
 use super::*;
+use sdkwork_api_app_catalog::normalize_commercial_pricing_plan_code;
 
 pub(crate) async fn synchronize_canonical_pricing_lifecycle_handler(
     _claims: AuthenticatedAdminClaims,
@@ -36,6 +37,9 @@ fn build_canonical_pricing_plan_record(
     updated_at_ms: u64,
 ) -> Result<PricingPlanRecord, (StatusCode, Json<ErrorResponse>)> {
     let plan_code = request.plan_code.trim();
+    let plan_code = normalize_commercial_pricing_plan_code(plan_code)
+        .map_err(|error| error_response(StatusCode::BAD_REQUEST, error.to_string()))?
+        .unwrap_or_else(|| plan_code.to_owned());
     let display_name = request.display_name.trim();
     let status = request.status.trim();
 
@@ -63,7 +67,7 @@ fn build_canonical_pricing_plan_record(
         pricing_plan_id,
         request.tenant_id,
         request.organization_id,
-        plan_code.to_owned(),
+        plan_code,
         request.plan_version,
     )
     .with_display_name(display_name.to_owned())
@@ -137,7 +141,7 @@ fn resolve_cloned_pricing_plan_display_name(
     })
 }
 
-fn build_pricing_plan_with_status(
+pub(crate) fn build_pricing_plan_with_status(
     plan: &PricingPlanRecord,
     status: &str,
     updated_at_ms: u64,
@@ -159,7 +163,7 @@ fn build_pricing_plan_with_status(
     .with_updated_at_ms(updated_at_ms)
 }
 
-fn build_pricing_rate_with_status(
+pub(crate) fn build_pricing_rate_with_status(
     rate: &PricingRateRecord,
     status: &str,
     updated_at_ms: u64,

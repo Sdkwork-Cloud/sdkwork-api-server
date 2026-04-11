@@ -18,7 +18,7 @@ pub use constants::*;
 pub use coupon_catalog::reclaim_expired_coupon_reservations_for_code_if_needed;
 use coupon_catalog::*;
 use coupon_state::*;
-pub use error::{CommerceError, CommerceResult, commerce_atomic_coupon_error};
+pub use error::{commerce_atomic_coupon_error, CommerceError, CommerceResult};
 pub use order::{
     apply_portal_commerce_payment_event, cancel_portal_commerce_order,
     list_project_commerce_orders, load_portal_commerce_catalog,
@@ -40,8 +40,7 @@ pub use payment_event::{
 use payment_method::build_checkout_session;
 pub use payment_method::{
     delete_admin_payment_method, list_admin_payment_method_credential_bindings,
-    list_admin_payment_methods, list_portal_commerce_payment_methods,
-    persist_admin_payment_method,
+    list_admin_payment_methods, list_portal_commerce_payment_methods, persist_admin_payment_method,
     replace_admin_payment_method_credential_bindings,
 };
 pub use reconciliation::{
@@ -53,14 +52,17 @@ pub use refund::{create_admin_commerce_refund, list_admin_commerce_refunds_for_o
 use sdkwork_api_app_billing::{
     CommercialBillingAdminKernel, IssueCommerceOrderCreditsInput, RefundCommerceOrderCreditsInput,
 };
-use sdkwork_api_app_coupon::list_active_coupons;
+use sdkwork_api_app_catalog::{
+    build_canonical_commercial_catalog_with_pricing_plans, CanonicalCommercialCatalog,
+    CommercialApiProductKind, CommercialCatalogSeedProduct,
+};
 use sdkwork_api_app_identity::GatewayRequestContext;
 use sdkwork_api_app_marketing::{
-    CouponValidationDecision, confirm_coupon_redemption, project_legacy_coupon_campaign,
-    reserve_coupon_redemption, rollback_coupon_redemption, validate_coupon_stack,
+    confirm_coupon_redemption, reserve_coupon_redemption, rollback_coupon_redemption,
+    validate_coupon_stack, CouponValidationDecision,
 };
 use sdkwork_api_domain_billing::{
-    AccountCommerceReconciliationStateRecord, AccountRecord, QuotaPolicy,
+    AccountCommerceReconciliationStateRecord, AccountRecord, PricingPlanRecord, QuotaPolicy,
 };
 pub use sdkwork_api_domain_commerce::{
     CommerceOrderRecord as PortalCommerceOrderRecord, CommercePaymentAttemptRecord,
@@ -90,12 +92,12 @@ use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 pub use types::{
     AdminCommerceReconciliationRunCreateRequest, AdminCommerceRefundCreateRequest,
-    PortalAppliedCoupon, PortalCommerceCatalog, PortalCommerceCheckoutSession,
-    PortalCommerceCheckoutSessionMethod, PortalCommerceCoupon,
+    PortalApiProduct, PortalAppliedCoupon, PortalCommerceCatalog, PortalCommerceCatalogBinding,
+    PortalCommerceCheckoutSession, PortalCommerceCheckoutSessionMethod, PortalCommerceCoupon,
     PortalCommercePaymentAttemptCreateRequest, PortalCommercePaymentEventRequest,
     PortalCommerceQuote, PortalCommerceQuoteRequest, PortalCommerceWebhookAck,
-    PortalCustomRechargePolicy, PortalCustomRechargeRule, PortalRechargeOption, PortalRechargePack,
-    PortalSubscriptionPlan,
+    PortalCustomRechargePolicy, PortalCustomRechargeRule, PortalProductOffer, PortalRechargeOption,
+    PortalRechargePack, PortalSubscriptionPlan,
 };
 pub use webhook::process_portal_stripe_webhook;
 
@@ -148,6 +150,181 @@ struct CouponRollbackCompensationSnapshot {
     applied_code: CouponCodeRecord,
     applied_redemption: CouponRedemptionRecord,
     applied_rollback: CouponRollbackRecord,
+}
+
+impl PortalCommerceCatalogBinding {
+    fn from_quote(quote: &PortalCommerceQuote) -> Self {
+        Self {
+            product_id: quote.product_id.clone(),
+            offer_id: quote.offer_id.clone(),
+            publication_id: quote.publication_id.clone(),
+            publication_kind: quote.publication_kind.clone(),
+            publication_status: quote.publication_status.clone(),
+            publication_revision_id: quote.publication_revision_id.clone(),
+            publication_version: quote.publication_version,
+            publication_source_kind: quote.publication_source_kind.clone(),
+            publication_effective_from_ms: quote.publication_effective_from_ms,
+            pricing_plan_id: quote.pricing_plan_id.clone(),
+            pricing_plan_version: quote.pricing_plan_version,
+            pricing_rate_id: quote.pricing_rate_id.clone(),
+            pricing_metric_code: quote.pricing_metric_code.clone(),
+        }
+    }
+
+    fn from_order(order: &CommerceOrderRecord) -> Self {
+        let snapshot_value =
+            serde_json::from_str::<serde_json::Value>(&order.pricing_snapshot_json).ok();
+        let catalog_binding = snapshot_value
+            .as_ref()
+            .and_then(|snapshot| snapshot.get("catalog_binding"));
+        let pricing_binding = snapshot_value
+            .as_ref()
+            .and_then(|snapshot| snapshot.get("pricing_binding"));
+        let quote_binding = snapshot_value
+            .as_ref()
+            .and_then(|snapshot| snapshot.get("quote"));
+        let live_binding =
+            current_quote_target_catalog_binding(&order.target_kind, &order.target_id);
+
+        Self {
+            product_id: catalog_binding
+                .and_then(|binding| binding.get("product_id"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("product_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.product_id),
+            offer_id: catalog_binding
+                .and_then(|binding| binding.get("offer_id"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("offer_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.offer_id),
+            publication_id: catalog_binding
+                .and_then(|binding| binding.get("publication_id"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.publication_id),
+            publication_kind: catalog_binding
+                .and_then(|binding| binding.get("publication_kind"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_kind"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.publication_kind),
+            publication_status: catalog_binding
+                .and_then(|binding| binding.get("publication_status"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_status"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.publication_status),
+            publication_revision_id: catalog_binding
+                .and_then(|binding| binding.get("publication_revision_id"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_revision_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.publication_revision_id),
+            publication_version: catalog_binding
+                .and_then(|binding| binding.get("publication_version"))
+                .and_then(serde_json::Value::as_u64)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_version"))
+                        .and_then(serde_json::Value::as_u64)
+                })
+                .or(live_binding.publication_version),
+            publication_source_kind: catalog_binding
+                .and_then(|binding| binding.get("publication_source_kind"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_source_kind"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or(live_binding.publication_source_kind),
+            publication_effective_from_ms: catalog_binding
+                .and_then(|binding| binding.get("publication_effective_from_ms"))
+                .and_then(serde_json::Value::as_u64)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("publication_effective_from_ms"))
+                        .and_then(serde_json::Value::as_u64)
+                })
+                .or(live_binding.publication_effective_from_ms),
+            pricing_plan_id: order
+                .pricing_plan_id
+                .clone()
+                .or_else(|| {
+                    pricing_binding
+                        .and_then(|binding| binding.get("pricing_plan_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("pricing_plan_id"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                }),
+            pricing_plan_version: order
+                .pricing_plan_version
+                .or_else(|| {
+                    pricing_binding
+                        .and_then(|binding| binding.get("pricing_plan_version"))
+                        .and_then(serde_json::Value::as_u64)
+                })
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("pricing_plan_version"))
+                        .and_then(serde_json::Value::as_u64)
+                }),
+            pricing_rate_id: pricing_binding
+                .and_then(|binding| binding.get("pricing_rate_id"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+            pricing_metric_code: pricing_binding
+                .and_then(|binding| binding.get("pricing_metric_code"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    quote_binding
+                        .and_then(|binding| binding.get("pricing_metric_code"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -281,6 +458,206 @@ fn build_custom_recharge_policy() -> PortalCustomRechargePolicy {
     }
 }
 
+fn commercial_catalog_seed_products(
+    plans: &[PortalSubscriptionPlan],
+    packs: &[PortalRechargePack],
+    custom_recharge_policy: Option<&PortalCustomRechargePolicy>,
+) -> Vec<CommercialCatalogSeedProduct> {
+    let mut seed_products = Vec::with_capacity(
+        plans.len() + packs.len() + usize::from(custom_recharge_policy.is_some()),
+    );
+
+    seed_products.extend(plans.iter().map(|plan| {
+        CommercialCatalogSeedProduct::new(
+            CommercialApiProductKind::SubscriptionPlan,
+            plan.id.clone(),
+            plan.name.clone(),
+            plan.source.clone(),
+        )
+        .with_price_label_option(Some(plan.price_label.clone()))
+    }));
+    seed_products.extend(packs.iter().map(|pack| {
+        CommercialCatalogSeedProduct::new(
+            CommercialApiProductKind::RechargePack,
+            pack.id.clone(),
+            pack.label.clone(),
+            pack.source.clone(),
+        )
+        .with_price_label_option(Some(pack.price_label.clone()))
+    }));
+
+    if let Some(policy) = custom_recharge_policy {
+        seed_products.push(CommercialCatalogSeedProduct::new(
+            CommercialApiProductKind::CustomRecharge,
+            "custom_recharge",
+            "Custom recharge",
+            policy.source.clone(),
+        ));
+    }
+
+    seed_products
+}
+
+fn current_canonical_commercial_catalog_with_pricing_plans(
+    pricing_plans: &[PricingPlanRecord],
+) -> CanonicalCommercialCatalog {
+    let plans = subscription_plan_catalog();
+    let packs = recharge_pack_catalog();
+    let custom_recharge_policy = Some(build_custom_recharge_policy());
+    build_canonical_commercial_catalog_with_pricing_plans(
+        &commercial_catalog_seed_products(&plans, &packs, custom_recharge_policy.as_ref()),
+        pricing_plans,
+    )
+}
+
+pub(crate) fn current_canonical_commercial_catalog() -> CanonicalCommercialCatalog {
+    current_canonical_commercial_catalog_with_pricing_plans(&[])
+}
+
+pub async fn current_canonical_commercial_catalog_for_store(
+    store: &dyn AdminStore,
+) -> CommerceResult<CanonicalCommercialCatalog> {
+    let pricing_plans = match store.account_kernel_store() {
+        Some(kernel) => kernel.list_pricing_plan_records().await?,
+        None => Vec::new(),
+    };
+    Ok(current_canonical_commercial_catalog_with_pricing_plans(
+        &pricing_plans,
+    ))
+}
+
+fn project_quote_target_catalog_binding_from_catalog(
+    catalog: &CanonicalCommercialCatalog,
+    target_kind: &str,
+    target_id: &str,
+) -> PortalCommerceCatalogBinding {
+    let offer = catalog.offers.iter().find(|offer| {
+        if offer.quote_target_kind.as_str() != target_kind {
+            return false;
+        }
+
+        if target_kind == "custom_recharge" {
+            return offer.quote_target_id == "custom_recharge";
+        }
+
+        offer.quote_target_id.eq_ignore_ascii_case(target_id)
+    });
+
+    match offer {
+        Some(offer) => {
+            let publication = catalog
+                .publications
+                .iter()
+                .find(|publication| publication.offer_id == offer.offer_id);
+            PortalCommerceCatalogBinding {
+                product_id: Some(offer.product_id.clone()),
+                offer_id: Some(offer.offer_id.clone()),
+                publication_id: publication.map(|item| item.publication_id.clone()),
+                publication_kind: publication.map(|item| item.publication_kind.as_str().to_owned()),
+                publication_status: publication.map(|item| item.status.as_str().to_owned()),
+                publication_revision_id: publication
+                    .map(|item| item.publication_revision_id.clone()),
+                publication_version: publication.map(|item| item.publication_version),
+                publication_source_kind: publication
+                    .map(|item| item.publication_source_kind.clone()),
+                publication_effective_from_ms: publication
+                    .and_then(|item| item.publication_effective_from_ms),
+                pricing_plan_id: offer.pricing_plan_id.clone(),
+                pricing_plan_version: offer.pricing_plan_version,
+                pricing_rate_id: offer.pricing_rate_id.clone(),
+                pricing_metric_code: offer.pricing_metric_code.clone(),
+            }
+        }
+        None => PortalCommerceCatalogBinding::default(),
+    }
+}
+
+pub(crate) fn current_quote_target_catalog_binding(
+    target_kind: &str,
+    target_id: &str,
+) -> PortalCommerceCatalogBinding {
+    project_quote_target_catalog_binding_from_catalog(
+        &current_canonical_commercial_catalog(),
+        target_kind,
+        target_id,
+    )
+}
+
+pub(crate) async fn current_quote_target_catalog_binding_for_store(
+    store: &dyn AdminStore,
+    target_kind: &str,
+    target_id: &str,
+) -> CommerceResult<PortalCommerceCatalogBinding> {
+    let catalog = current_canonical_commercial_catalog_for_store(store).await?;
+    Ok(project_quote_target_catalog_binding_from_catalog(
+        &catalog,
+        target_kind,
+        target_id,
+    ))
+}
+
+pub fn project_portal_commerce_order_catalog_binding(
+    order: &PortalCommerceOrderRecord,
+) -> PortalCommerceCatalogBinding {
+    PortalCommerceCatalogBinding::from_order(order)
+}
+
+fn portal_api_products_from_canonical_catalog(
+    catalog: &CanonicalCommercialCatalog,
+) -> Vec<PortalApiProduct> {
+    catalog
+        .products
+        .iter()
+        .map(|product| PortalApiProduct {
+            product_id: product.product_id.clone(),
+            product_kind: product.product_kind.as_str().to_owned(),
+            target_id: product.target_id.clone(),
+            display_name: product.display_name.clone(),
+            source: product.source.clone(),
+        })
+        .collect()
+}
+
+fn portal_product_offers_from_canonical_catalog(
+    catalog: &CanonicalCommercialCatalog,
+) -> Vec<PortalProductOffer> {
+    catalog
+        .offers
+        .iter()
+        .map(|offer| {
+            let publication = catalog
+                .publications
+                .iter()
+                .find(|publication| publication.offer_id == offer.offer_id);
+            PortalProductOffer {
+                offer_id: offer.offer_id.clone(),
+                product_id: offer.product_id.clone(),
+                product_kind: offer.product_kind.as_str().to_owned(),
+                display_name: offer.display_name.clone(),
+                quote_kind: offer.quote_kind.as_str().to_owned(),
+                quote_target_kind: offer.quote_target_kind.as_str().to_owned(),
+                quote_target_id: offer.quote_target_id.clone(),
+                publication_id: publication.map(|item| item.publication_id.clone()),
+                publication_kind: publication.map(|item| item.publication_kind.as_str().to_owned()),
+                publication_status: publication.map(|item| item.status.as_str().to_owned()),
+                publication_revision_id: publication
+                    .map(|item| item.publication_revision_id.clone()),
+                publication_version: publication.map(|item| item.publication_version),
+                publication_source_kind: publication
+                    .map(|item| item.publication_source_kind.clone()),
+                publication_effective_from_ms: publication
+                    .and_then(|item| item.publication_effective_from_ms),
+                pricing_plan_id: offer.pricing_plan_id.clone(),
+                pricing_plan_version: offer.pricing_plan_version,
+                pricing_rate_id: offer.pricing_rate_id.clone(),
+                pricing_metric_code: offer.pricing_metric_code.clone(),
+                price_label: offer.price_label.clone(),
+                source: offer.source.clone(),
+            }
+        })
+        .collect()
+}
+
 fn build_priced_quote(
     target_kind: &str,
     target_id: &str,
@@ -289,6 +666,7 @@ fn build_priced_quote(
     granted_units: u64,
     source: &str,
     current_remaining_units: Option<u64>,
+    catalog_binding: PortalCommerceCatalogBinding,
     applied_coupon: Option<CommerceCouponDefinition>,
 ) -> PortalCommerceQuote {
     let discount_percent = applied_coupon
@@ -309,8 +687,19 @@ fn build_priced_quote(
 
     PortalCommerceQuote {
         target_kind: target_kind.to_owned(),
+        product_kind: portal_commerce_product_kind(target_kind).map(str::to_owned),
+        quote_kind: portal_commerce_quote_kind(target_kind).to_owned(),
         target_id: target_id.to_owned(),
         target_name: target_name.to_owned(),
+        product_id: catalog_binding.product_id,
+        offer_id: catalog_binding.offer_id,
+        publication_id: catalog_binding.publication_id,
+        publication_kind: catalog_binding.publication_kind,
+        publication_status: catalog_binding.publication_status,
+        publication_revision_id: catalog_binding.publication_revision_id,
+        publication_version: catalog_binding.publication_version,
+        publication_source_kind: catalog_binding.publication_source_kind,
+        publication_effective_from_ms: catalog_binding.publication_effective_from_ms,
         list_price_cents,
         payable_price_cents: payable_cents,
         list_price_label: format_quote_price_label(list_price_cents),
@@ -319,6 +708,10 @@ fn build_priced_quote(
         bonus_units,
         amount_cents: None,
         projected_remaining_units,
+        pricing_plan_id: catalog_binding.pricing_plan_id,
+        pricing_plan_version: catalog_binding.pricing_plan_version,
+        pricing_rate_id: catalog_binding.pricing_rate_id,
+        pricing_metric_code: catalog_binding.pricing_metric_code,
         applied_coupon: applied_coupon.map(|coupon| PortalAppliedCoupon {
             code: coupon.coupon.code,
             discount_label: coupon.coupon.discount_label,
@@ -335,6 +728,7 @@ fn build_priced_quote(
 fn build_custom_recharge_quote(
     amount_cents: u64,
     current_remaining_units: Option<u64>,
+    catalog_binding: PortalCommerceCatalogBinding,
     applied_coupon: Option<CommerceCouponDefinition>,
 ) -> CommerceResult<PortalCommerceQuote> {
     let rule = resolve_custom_recharge_rule(amount_cents)?;
@@ -346,6 +740,7 @@ fn build_custom_recharge_quote(
         amount_cents.saturating_mul(rule.units_per_cent),
         "workspace_seed",
         current_remaining_units,
+        catalog_binding,
         applied_coupon,
     );
     quote.amount_cents = Some(amount_cents);
@@ -357,6 +752,7 @@ fn build_custom_recharge_quote(
 fn build_redemption_quote(
     coupon: CommerceCouponDefinition,
     current_remaining_units: Option<u64>,
+    catalog_binding: PortalCommerceCatalogBinding,
 ) -> PortalCommerceQuote {
     let source = coupon.coupon.source.clone();
     let projected_remaining_units =
@@ -364,8 +760,19 @@ fn build_redemption_quote(
 
     PortalCommerceQuote {
         target_kind: "coupon_redemption".to_owned(),
+        product_kind: None,
+        quote_kind: portal_commerce_quote_kind("coupon_redemption").to_owned(),
         target_id: coupon.coupon.code.clone(),
         target_name: coupon.coupon.code.clone(),
+        product_id: catalog_binding.product_id,
+        offer_id: catalog_binding.offer_id,
+        publication_id: catalog_binding.publication_id,
+        publication_kind: catalog_binding.publication_kind,
+        publication_status: catalog_binding.publication_status,
+        publication_revision_id: catalog_binding.publication_revision_id,
+        publication_version: catalog_binding.publication_version,
+        publication_source_kind: catalog_binding.publication_source_kind,
+        publication_effective_from_ms: catalog_binding.publication_effective_from_ms,
         list_price_cents: 0,
         payable_price_cents: 0,
         list_price_label: "$0.00".to_owned(),
@@ -374,6 +781,10 @@ fn build_redemption_quote(
         bonus_units: coupon.benefit.bonus_units,
         amount_cents: None,
         projected_remaining_units,
+        pricing_plan_id: catalog_binding.pricing_plan_id,
+        pricing_plan_version: catalog_binding.pricing_plan_version,
+        pricing_rate_id: catalog_binding.pricing_rate_id,
+        pricing_metric_code: catalog_binding.pricing_metric_code,
         applied_coupon: Some(PortalAppliedCoupon {
             code: coupon.coupon.code,
             discount_label: coupon.coupon.discount_label,
@@ -387,18 +798,26 @@ fn build_redemption_quote(
     }
 }
 
-fn merge_coupon_benefit(
-    current: CommerceCouponBenefit,
-    previous: Option<CommerceCouponBenefit>,
-) -> CommerceCouponBenefit {
-    let fallback = previous.unwrap_or_default();
-    CommerceCouponBenefit {
-        discount_percent: current.discount_percent.or(fallback.discount_percent),
-        bonus_units: if current.bonus_units > 0 {
-            current.bonus_units
-        } else {
-            fallback.bonus_units
-        },
+pub fn portal_commerce_product_kind(target_kind: &str) -> Option<&'static str> {
+    match target_kind {
+        "subscription_plan" => Some("subscription_plan"),
+        "recharge_pack" => Some("recharge_pack"),
+        "custom_recharge" => Some("custom_recharge"),
+        _ => None,
+    }
+}
+
+pub fn portal_commerce_quote_kind(target_kind: &str) -> &'static str {
+    match target_kind {
+        "coupon_redemption" => "coupon_redemption",
+        _ => "product_purchase",
+    }
+}
+
+pub fn portal_commerce_transaction_kind(target_kind: &str) -> &'static str {
+    match target_kind {
+        "coupon_redemption" => "coupon_redemption",
+        _ => "product_purchase",
     }
 }
 
@@ -522,24 +941,6 @@ fn resolve_custom_recharge_rule(amount_cents: u64) -> CommerceResult<CustomRecha
         })
 }
 
-fn parse_discount_percent(label: &str) -> Option<u8> {
-    let percent_index = label.find('%')?;
-    let digits = label[..percent_index]
-        .chars()
-        .rev()
-        .take_while(|character| character.is_ascii_digit())
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect::<String>();
-    if digits.is_empty() {
-        return None;
-    }
-
-    let value = digits.parse::<u8>().ok()?;
-    Some(value.min(100))
-}
-
 fn subscription_plan_seeds() -> Vec<SubscriptionPlanSeed> {
     vec![
         SubscriptionPlanSeed {
@@ -658,7 +1059,8 @@ fn custom_recharge_rule_seeds() -> Vec<CustomRechargeRuleSeed> {
             min_amount_cents: 1_000,
             max_amount_cents: 4_500,
             units_per_cent: 25,
-            note: "Entry custom recharges restore balance quickly while preserving the starter ratio.",
+            note:
+                "Entry custom recharges restore balance quickly while preserving the starter ratio.",
         },
         CustomRechargeRuleSeed {
             id: "tier-growth",
@@ -794,13 +1196,6 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use std::sync::Mutex;
-
-    #[test]
-    fn parses_percent_discount_suffixes() {
-        assert_eq!(parse_discount_percent("20% launch discount"), Some(20));
-        assert_eq!(parse_discount_percent("10% off Growth"), Some(10));
-        assert_eq!(parse_discount_percent("Free staging credits"), None);
-    }
 
     #[test]
     fn priced_quote_applies_discount_and_bonus_units() {

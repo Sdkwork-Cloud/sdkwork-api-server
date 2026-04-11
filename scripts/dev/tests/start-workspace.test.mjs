@@ -21,13 +21,14 @@ test('parseWorkspaceArgs returns browser-mode defaults', () => {
     webBind: '0.0.0.0:9983',
     install: false,
     preview: false,
+    proxyDev: false,
     tauri: false,
     dryRun: false,
     help: false,
   });
 });
 
-test('parseWorkspaceArgs forwards install, preview, tauri, and bind overrides', () => {
+test('parseWorkspaceArgs forwards install, preview, proxy-dev, tauri, and bind overrides', () => {
   const settings = parseWorkspaceArgs([
     '--database-url',
     'postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_server',
@@ -43,6 +44,7 @@ test('parseWorkspaceArgs forwards install, preview, tauri, and bind overrides', 
     '0.0.0.0:13001',
     '--install',
     '--preview',
+    '--proxy-dev',
     '--tauri',
     '--dry-run',
   ]);
@@ -58,6 +60,7 @@ test('parseWorkspaceArgs forwards install, preview, tauri, and bind overrides', 
   assert.equal(settings.webBind, '0.0.0.0:13001');
   assert.equal(settings.install, true);
   assert.equal(settings.preview, true);
+  assert.equal(settings.proxyDev, true);
   assert.equal(settings.tauri, true);
   assert.equal(settings.dryRun, true);
 });
@@ -71,6 +74,7 @@ test('buildWorkspaceCommandPlan keeps local config defaults when database overri
     webBind: '0.0.0.0:9983',
     install: false,
     preview: false,
+    proxyDev: false,
     tauri: false,
     dryRun: true,
     help: false,
@@ -98,6 +102,7 @@ test('buildWorkspaceCommandPlan forwards backend and console flags to child scri
     webBind: '0.0.0.0:13001',
     install: true,
     preview: false,
+    proxyDev: false,
     tauri: true,
     dryRun: true,
     help: false,
@@ -151,6 +156,7 @@ test('buildWorkspaceCommandPlan forwards backend binds to preview web host', () 
     webBind: '127.0.0.1:13001',
     install: false,
     preview: true,
+    proxyDev: false,
     tauri: false,
     dryRun: true,
     help: false,
@@ -171,6 +177,42 @@ test('buildWorkspaceCommandPlan forwards backend binds to preview web host', () 
   ]);
 });
 
+test('buildWorkspaceCommandPlan can proxy admin and portal dev servers through the unified web host without building static assets', () => {
+  const plan = buildWorkspaceCommandPlan({
+    databaseUrl: null,
+    gatewayBind: '127.0.0.1:9980',
+    adminBind: '127.0.0.1:9981',
+    portalBind: '127.0.0.1:9982',
+    webBind: '127.0.0.1:9983',
+    install: false,
+    preview: false,
+    proxyDev: true,
+    tauri: false,
+    dryRun: true,
+    help: false,
+  });
+
+  assert.deepEqual(plan.admin.args, ['scripts/dev/start-admin.mjs', '--dry-run']);
+  assert.deepEqual(plan.portal.args, ['scripts/dev/start-portal.mjs', '--dry-run']);
+  assert.deepEqual(plan.web.args, [
+    'scripts/dev/start-web.mjs',
+    '--bind',
+    '127.0.0.1:9983',
+    '--admin-target',
+    '127.0.0.1:9981',
+    '--portal-target',
+    '127.0.0.1:9982',
+    '--gateway-target',
+    '127.0.0.1:9980',
+    '--admin-site-target',
+    '127.0.0.1:5173',
+    '--portal-site-target',
+    '127.0.0.1:5174',
+    '--proxy-dev',
+    '--dry-run',
+  ]);
+});
+
 test('buildWorkspaceCommandPlan keeps browser mode on standalone admin and portal apps', () => {
   const plan = buildWorkspaceCommandPlan({
     databaseUrl: null,
@@ -180,6 +222,7 @@ test('buildWorkspaceCommandPlan keeps browser mode on standalone admin and porta
     webBind: '0.0.0.0:9983',
     install: false,
     preview: false,
+    proxyDev: false,
     tauri: false,
     dryRun: true,
     help: false,
@@ -200,6 +243,7 @@ test('workspaceAccessLines describe unified access, direct service links, and se
     webBind: '127.0.0.1:9983',
     install: false,
     preview: true,
+    proxyDev: false,
     tauri: false,
     dryRun: false,
     help: false,
@@ -223,6 +267,7 @@ test('workspaceAccessLines describe unified access, direct service links, and se
     webBind: '127.0.0.1:9983',
     install: false,
     preview: false,
+    proxyDev: false,
     tauri: false,
     dryRun: false,
     help: false,
@@ -231,6 +276,25 @@ test('workspaceAccessLines describe unified access, direct service links, and se
   assert.match(browserLines, /Frontend Access/);
   assert.match(browserLines, /http:\/\/127\.0\.0\.1:5173\/admin\//);
   assert.match(browserLines, /http:\/\/127\.0\.0\.1:5174\/portal\//);
+
+  const proxyDevLines = workspaceAccessLines({
+    databaseUrl: null,
+    gatewayBind: '127.0.0.1:9980',
+    adminBind: '127.0.0.1:9981',
+    portalBind: '127.0.0.1:9982',
+    webBind: '127.0.0.1:9983',
+    install: false,
+    preview: false,
+    proxyDev: true,
+    tauri: false,
+    dryRun: false,
+    help: false,
+  }).join('\n');
+
+  assert.match(proxyDevLines, /Unified Access/);
+  assert.match(proxyDevLines, /proxy hot reload/i);
+  assert.match(proxyDevLines, /http:\/\/127\.0\.0\.1:9983\/admin\//);
+  assert.match(proxyDevLines, /http:\/\/127\.0\.0\.1:9983\/portal\//);
 });
 
 test('parseWorkspaceArgs rejects missing values and unknown flags', () => {

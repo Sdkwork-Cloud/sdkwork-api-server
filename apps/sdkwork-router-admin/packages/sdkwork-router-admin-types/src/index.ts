@@ -154,8 +154,28 @@ export interface CouponRecord {
 export type MarketingBenefitKind = 'percentage_off' | 'fixed_amount_off' | 'grant_units';
 export type MarketingStackingPolicy = 'exclusive' | 'stackable' | 'best_of_group';
 export type MarketingSubjectScope = 'user' | 'project' | 'workspace' | 'account';
-export type CouponTemplateStatus = 'draft' | 'active' | 'archived';
+export type CouponTemplateStatus = 'draft' | 'scheduled' | 'active' | 'archived';
+export type CouponTemplateApprovalState = 'draft' | 'in_review' | 'approved' | 'rejected';
 export type CouponDistributionKind = 'shared_code' | 'unique_code' | 'auto_claim';
+export type CouponTemplateLifecycleAction =
+  | 'clone'
+  | 'submit_for_approval'
+  | 'approve'
+  | 'reject'
+  | 'publish'
+  | 'schedule'
+  | 'retire';
+export type CouponTemplateLifecycleAuditOutcome = 'applied' | 'rejected';
+export type MarketingCampaignApprovalState = 'draft' | 'in_review' | 'approved' | 'rejected';
+export type MarketingCampaignLifecycleAction =
+  | 'clone'
+  | 'submit_for_approval'
+  | 'approve'
+  | 'reject'
+  | 'publish'
+  | 'schedule'
+  | 'retire';
+export type MarketingCampaignLifecycleAuditOutcome = 'applied' | 'rejected';
 export type MarketingCampaignStatus =
   | 'draft'
   | 'scheduled'
@@ -164,7 +184,11 @@ export type MarketingCampaignStatus =
   | 'ended'
   | 'archived';
 export type CampaignBudgetStatus = 'draft' | 'active' | 'exhausted' | 'closed';
+export type CampaignBudgetLifecycleAction = 'activate' | 'close';
+export type CampaignBudgetLifecycleAuditOutcome = 'applied' | 'rejected';
 export type CouponCodeStatus = 'available' | 'reserved' | 'redeemed' | 'expired' | 'disabled';
+export type CouponCodeLifecycleAction = 'disable' | 'restore';
+export type CouponCodeLifecycleAuditOutcome = 'applied' | 'rejected';
 export type CouponReservationStatus = 'reserved' | 'released' | 'confirmed' | 'expired';
 export type CouponRedemptionStatus =
   | 'pending'
@@ -199,11 +223,73 @@ export interface CouponTemplateRecord {
   template_key: string;
   display_name: string;
   status: CouponTemplateStatus;
+  approval_state: CouponTemplateApprovalState;
+  revision: number;
+  root_coupon_template_id?: string | null;
+  parent_coupon_template_id?: string | null;
   distribution_kind: CouponDistributionKind;
   benefit: CouponBenefitSpec;
   restriction: CouponRestrictionSpec;
+  activation_at_ms?: number | null;
   created_at_ms: number;
   updated_at_ms: number;
+}
+
+export interface CouponTemplateLifecycleAuditRecord {
+  audit_id: string;
+  coupon_template_id: string;
+  source_coupon_template_id?: string | null;
+  action: CouponTemplateLifecycleAction;
+  outcome: CouponTemplateLifecycleAuditOutcome;
+  previous_status: CouponTemplateStatus;
+  resulting_status: CouponTemplateStatus;
+  previous_approval_state: CouponTemplateApprovalState;
+  resulting_approval_state: CouponTemplateApprovalState;
+  previous_revision: number;
+  resulting_revision: number;
+  operator_id: string;
+  request_id: string;
+  reason: string;
+  decision_reasons: string[];
+  requested_at_ms: number;
+}
+
+export interface CouponTemplateActionDecision {
+  allowed: boolean;
+  reasons: string[];
+}
+
+export interface CouponTemplateActionability {
+  clone: CouponTemplateActionDecision;
+  submit_for_approval: CouponTemplateActionDecision;
+  approve: CouponTemplateActionDecision;
+  reject: CouponTemplateActionDecision;
+  publish: CouponTemplateActionDecision;
+  schedule: CouponTemplateActionDecision;
+  retire: CouponTemplateActionDecision;
+}
+
+export interface CouponTemplateDetail {
+  coupon_template: CouponTemplateRecord;
+  actionability: CouponTemplateActionability;
+}
+
+export interface CouponTemplateMutationResult {
+  detail: CouponTemplateDetail;
+  audit: CouponTemplateLifecycleAuditRecord;
+}
+
+export interface CouponTemplateComparisonFieldChange {
+  field: string;
+  source_value: string;
+  target_value: string;
+}
+
+export interface CouponTemplateComparisonResult {
+  source_coupon_template: CouponTemplateRecord;
+  target_coupon_template: CouponTemplateRecord;
+  same_lineage: boolean;
+  field_changes: CouponTemplateComparisonFieldChange[];
 }
 
 export interface MarketingCampaignRecord {
@@ -211,10 +297,109 @@ export interface MarketingCampaignRecord {
   coupon_template_id: string;
   display_name: string;
   status: MarketingCampaignStatus;
+  approval_state: MarketingCampaignApprovalState;
+  revision: number;
+  root_marketing_campaign_id?: string | null;
+  parent_marketing_campaign_id?: string | null;
   start_at_ms?: number | null;
   end_at_ms?: number | null;
   created_at_ms: number;
   updated_at_ms: number;
+}
+
+export interface MarketingCampaignLifecycleAuditRecord {
+  audit_id: string;
+  marketing_campaign_id: string;
+  source_marketing_campaign_id?: string | null;
+  coupon_template_id: string;
+  action: MarketingCampaignLifecycleAction;
+  outcome: MarketingCampaignLifecycleAuditOutcome;
+  previous_status: MarketingCampaignStatus;
+  resulting_status: MarketingCampaignStatus;
+  previous_approval_state: MarketingCampaignApprovalState;
+  resulting_approval_state: MarketingCampaignApprovalState;
+  previous_revision: number;
+  resulting_revision: number;
+  operator_id: string;
+  request_id: string;
+  reason: string;
+  decision_reasons: string[];
+  requested_at_ms: number;
+}
+
+export interface MarketingCampaignActionDecision {
+  allowed: boolean;
+  reasons: string[];
+}
+
+export interface MarketingCampaignActionability {
+  clone: MarketingCampaignActionDecision;
+  submit_for_approval: MarketingCampaignActionDecision;
+  approve: MarketingCampaignActionDecision;
+  reject: MarketingCampaignActionDecision;
+  publish: MarketingCampaignActionDecision;
+  schedule: MarketingCampaignActionDecision;
+  retire: MarketingCampaignActionDecision;
+}
+
+export interface MarketingCampaignComparisonFieldChange {
+  field: string;
+  source_value: string;
+  target_value: string;
+}
+
+export interface MarketingCampaignComparisonResult {
+  source_marketing_campaign: MarketingCampaignRecord;
+  target_marketing_campaign: MarketingCampaignRecord;
+  same_lineage: boolean;
+  field_changes: MarketingCampaignComparisonFieldChange[];
+}
+
+export interface MarketingCampaignDetail {
+  campaign: MarketingCampaignRecord;
+  coupon_template: CouponTemplateRecord;
+  actionability: MarketingCampaignActionability;
+}
+
+export interface MarketingCampaignMutationResult {
+  detail: MarketingCampaignDetail;
+  audit: MarketingCampaignLifecycleAuditRecord;
+}
+
+export interface CampaignBudgetLifecycleAuditRecord {
+  audit_id: string;
+  campaign_budget_id: string;
+  marketing_campaign_id: string;
+  action: CampaignBudgetLifecycleAction;
+  outcome: CampaignBudgetLifecycleAuditOutcome;
+  previous_status: CampaignBudgetStatus;
+  resulting_status: CampaignBudgetStatus;
+  operator_id: string;
+  request_id: string;
+  reason: string;
+  decision_reasons: string[];
+  requested_at_ms: number;
+}
+
+export interface CampaignBudgetActionDecision {
+  allowed: boolean;
+  reasons: string[];
+}
+
+export interface CampaignBudgetActionability {
+  activate: CampaignBudgetActionDecision;
+  close: CampaignBudgetActionDecision;
+}
+
+export interface CampaignBudgetDetail {
+  budget: CampaignBudgetRecord;
+  campaign: MarketingCampaignRecord;
+  actionability: CampaignBudgetActionability;
+}
+
+export interface CampaignBudgetMutationResult {
+  detail: CampaignBudgetDetail;
+  audit: CampaignBudgetLifecycleAuditRecord;
 }
 
 export interface CampaignBudgetRecord {
@@ -226,6 +411,42 @@ export interface CampaignBudgetRecord {
   consumed_budget_minor: number;
   created_at_ms: number;
   updated_at_ms: number;
+}
+
+export interface CouponCodeLifecycleAuditRecord {
+  audit_id: string;
+  coupon_code_id: string;
+  coupon_template_id: string;
+  action: CouponCodeLifecycleAction;
+  outcome: CouponCodeLifecycleAuditOutcome;
+  previous_status: CouponCodeStatus;
+  resulting_status: CouponCodeStatus;
+  operator_id: string;
+  request_id: string;
+  reason: string;
+  decision_reasons: string[];
+  requested_at_ms: number;
+}
+
+export interface CouponCodeActionDecision {
+  allowed: boolean;
+  reasons: string[];
+}
+
+export interface CouponCodeActionability {
+  disable: CouponCodeActionDecision;
+  restore: CouponCodeActionDecision;
+}
+
+export interface CouponCodeDetail {
+  coupon_code: CouponCodeRecord;
+  coupon_template: CouponTemplateRecord;
+  actionability: CouponCodeActionability;
+}
+
+export interface CouponCodeMutationResult {
+  detail: CouponCodeDetail;
+  audit: CouponCodeLifecycleAuditRecord;
 }
 
 export interface CouponCodeRecord {
@@ -840,9 +1061,88 @@ export interface ProxyProviderRecord {
   channel_id: string;
   extension_id?: string | null;
   adapter_kind: string;
+  protocol_kind: string;
   base_url: string;
   display_name: string;
   channel_bindings: ProviderChannelBinding[];
+}
+
+export type ProviderIntegrationMode =
+  | 'standard_passthrough'
+  | 'default_plugin'
+  | 'custom_plugin';
+
+export interface ProviderIntegrationRecord {
+  mode: ProviderIntegrationMode;
+  default_plugin_family?: string | null;
+}
+
+export interface ProviderRouteExecutionRecord {
+  executable: boolean;
+  supported: boolean;
+}
+
+export interface ProviderRouteReadinessRecord {
+  openai: ProviderRouteExecutionRecord;
+  anthropic: ProviderRouteExecutionRecord;
+  gemini: ProviderRouteExecutionRecord;
+}
+
+export interface ProviderExecutionRecord {
+  binding_kind: string;
+  runtime: string;
+  runtime_key: string;
+  passthrough_protocol?: string | null;
+  supports_provider_adapter: boolean;
+  supports_raw_plugin: boolean;
+  fail_closed: boolean;
+  route_readiness: ProviderRouteReadinessRecord;
+  reason?: string | null;
+}
+
+export type ProviderCredentialReadinessState = 'ready' | 'missing';
+
+export interface ProviderCredentialReadinessRecord {
+  ready: boolean;
+  state: ProviderCredentialReadinessState;
+}
+
+export interface ProviderRecordWithIntegration extends ProxyProviderRecord {
+  integration: ProviderIntegrationRecord;
+}
+
+export interface ProviderCatalogRecord extends ProviderRecordWithIntegration {
+  execution: ProviderExecutionRecord;
+  credential_readiness?: ProviderCredentialReadinessRecord | null;
+}
+
+export interface SaveProviderSupportedModelInput {
+  channel_id: string;
+  model_id: string;
+  provider_model_id?: string | null;
+  provider_model_family?: string | null;
+  capabilities: string[];
+  streaming?: boolean | null;
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+  supports_prompt_caching?: boolean;
+  supports_reasoning_usage?: boolean;
+  supports_tool_usage_metrics?: boolean;
+  is_default_route?: boolean;
+  is_active?: boolean;
+}
+
+export interface SaveProviderInput {
+  id: string;
+  channel_id: string;
+  adapter_kind?: string;
+  protocol_kind?: string;
+  extension_id?: string;
+  default_plugin_family?: string;
+  base_url: string;
+  display_name: string;
+  channel_bindings: ProviderChannelBinding[];
+  supported_models?: SaveProviderSupportedModelInput[];
 }
 
 export interface ModelCatalogRecord {
@@ -863,6 +1163,41 @@ export interface ChannelModelRecord {
   description?: string | null;
 }
 
+export interface ProviderModelRecord {
+  proxy_provider_id: string;
+  channel_id: string;
+  model_id: string;
+  provider_model_id: string;
+  provider_model_family?: string | null;
+  capabilities: string[];
+  streaming: boolean;
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+  supports_prompt_caching: boolean;
+  supports_reasoning_usage: boolean;
+  supports_tool_usage_metrics: boolean;
+  is_default_route: boolean;
+  is_active: boolean;
+}
+
+export interface ModelPriceTier {
+  tier_id: string;
+  display_name: string;
+  condition_kind: string;
+  min_input_tokens?: number | null;
+  max_input_tokens?: number | null;
+  modality?: string | null;
+  cache_ttl?: string | null;
+  notes?: string | null;
+  currency_code: string;
+  price_unit: string;
+  input_price: number;
+  output_price: number;
+  cache_read_price: number;
+  cache_write_price: number;
+  request_price: number;
+}
+
 export interface ModelPriceRecord {
   channel_id: string;
   model_id: string;
@@ -874,6 +1209,9 @@ export interface ModelPriceRecord {
   cache_read_price: number;
   cache_write_price: number;
   request_price: number;
+  price_source_kind: string;
+  billing_notes?: string | null;
+  pricing_tiers: ModelPriceTier[];
   is_active: boolean;
 }
 
@@ -1116,10 +1454,11 @@ export interface AdminWorkspaceSnapshot {
   rateLimitPolicies: RateLimitPolicyRecord[];
   rateLimitWindows: RateLimitWindowRecord[];
   channels: ChannelRecord[];
-  providers: ProxyProviderRecord[];
+  providers: ProviderCatalogRecord[];
   credentials: CredentialRecord[];
   models: ModelCatalogRecord[];
   channelModels: ChannelModelRecord[];
+  providerModels: ProviderModelRecord[];
   modelPrices: ModelPriceRecord[];
   usageRecords: UsageRecord[];
   usageSummary: UsageSummary;

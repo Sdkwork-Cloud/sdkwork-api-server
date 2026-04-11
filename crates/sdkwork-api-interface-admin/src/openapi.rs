@@ -11,6 +11,7 @@ use super::*;
     tags(
         (name = "system", description = "Admin health and system-facing routes."),
         (name = "auth", description = "Admin authentication and session management routes."),
+        (name = "catalog", description = "Provider and model catalog administration routes."),
         (name = "marketing", description = "Coupon template, campaign, budget, and redemption administration routes."),
         (name = "tenants", description = "Tenant and project administration routes."),
         (name = "users", description = "Operator and portal user administration routes."),
@@ -43,6 +44,11 @@ impl Modify for AdminApiDocModifier {
 
 mod openapi_paths {
     use super::*;
+    use crate::marketing::{
+        CampaignBudgetMutationResult, CouponCodeMutationResult, CouponTemplateComparisonResult,
+        CouponTemplateMutationResult, MarketingCampaignComparisonResult,
+        MarketingCampaignMutationResult,
+    };
 
     #[utoipa::path(
         get,
@@ -109,6 +115,22 @@ mod openapi_paths {
 
     #[utoipa::path(
         get,
+        path = "/admin/tenants/{tenant_id}/providers/readiness",
+        tag = "catalog",
+        security(("bearerAuth" = [])),
+        params(
+            ("tenant_id" = String, Path, description = "Tenant identifier whose provider credential-readiness overlay should be listed.")
+        ),
+        responses(
+            (status = 200, description = "Tenant-scoped provider readiness inventory. This endpoint focuses on tenant overlay state and keeps global execution truth on `/admin/providers`.", body = [TenantProviderReadinessResponse]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load tenant-scoped provider readiness.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn tenant_provider_readiness_list() {}
+
+    #[utoipa::path(
+        get,
         path = "/admin/projects",
         tag = "tenants",
         security(("bearerAuth" = [])),
@@ -133,6 +155,37 @@ mod openapi_paths {
         )
     )]
     pub(super) async fn projects_create() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/providers",
+        tag = "catalog",
+        security(("bearerAuth" = [])),
+        params(
+            ("tenant_id" = Option<String>, Query, description = "Optional tenant scope. When present, each provider entry adds tenant-specific `credential_readiness` without changing the global catalog semantics of `integration` and `execution`.")
+        ),
+        responses(
+            (status = 200, description = "Visible provider catalog. `credential_readiness` is returned only when `tenant_id` is requested.", body = [ProviderCatalogResponse]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load providers.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn providers_list() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/providers",
+        tag = "catalog",
+        request_body = CreateProviderRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 201, description = "Created provider with normalized integration metadata.", body = ProviderCreateResponse),
+            (status = 400, description = "Invalid provider payload.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to create provider.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn providers_create() {}
 
     #[utoipa::path(
         get,
@@ -266,6 +319,156 @@ mod openapi_paths {
     pub(super) async fn marketing_coupon_templates_status_update() {}
 
     #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/clone",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Source coupon template id")),
+        request_body = CloneCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 201, description = "Cloned the selected canonical coupon template into a governed draft revision.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template clone request is invalid.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to clone canonical coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_clone() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/compare",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Source coupon template id")),
+        request_body = CompareCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Compared two coupon template revisions.", body = CouponTemplateComparisonResult),
+            (status = 400, description = "Coupon template compare request is invalid.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to compare canonical coupon templates.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_compare() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/submit-for-approval",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = SubmitCouponTemplateForApprovalRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Submitted the selected coupon template revision for approval.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot enter approval from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to submit coupon template for approval.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_submit_for_approval() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/approve",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = ApproveCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Approved the selected coupon template revision.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot be approved from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to approve coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_approve() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/reject",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = RejectCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Rejected the selected coupon template revision.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot be rejected from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to reject coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_reject() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/publish",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = PublishCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Published the selected canonical coupon template with semantic lifecycle evidence.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot be published from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to publish canonical coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_publish() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/schedule",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = ScheduleCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Scheduled the selected canonical coupon template with semantic lifecycle evidence.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot be scheduled from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to schedule canonical coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_schedule() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/retire",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        request_body = RetireCouponTemplateRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Retired the selected canonical coupon template with semantic lifecycle evidence.", body = CouponTemplateMutationResult),
+            (status = 400, description = "Coupon template cannot be retired from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon template not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to retire canonical coupon template.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_templates_retire() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/marketing/coupon-templates/{coupon_template_id}/lifecycle-audits",
+        tag = "marketing",
+        params(("coupon_template_id" = String, Path, description = "Coupon template id")),
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Lifecycle audit trail for the selected canonical coupon template.", body = [CouponTemplateLifecycleAuditRecord]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load coupon template lifecycle audit trail.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_coupon_template_lifecycle_audits_list() {}
+
+    #[utoipa::path(
         get,
         path = "/admin/marketing/campaigns",
         tag = "marketing",
@@ -307,6 +510,156 @@ mod openapi_paths {
         )
     )]
     pub(super) async fn marketing_campaigns_status_update() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/clone",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Source marketing campaign id")),
+        request_body = CloneMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 201, description = "Cloned the selected canonical coupon campaign into a governed draft revision.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign clone request is invalid.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to clone canonical marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_clone() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/compare",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Source marketing campaign id")),
+        request_body = CompareMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Compared two coupon campaign revisions.", body = MarketingCampaignComparisonResult),
+            (status = 400, description = "Campaign compare request is invalid.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to compare canonical marketing campaigns.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_compare() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/submit-for-approval",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = SubmitMarketingCampaignForApprovalRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Submitted the selected coupon campaign revision for approval.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot enter approval from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to submit marketing campaign for approval.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_submit_for_approval() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/approve",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = ApproveMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Approved the selected coupon campaign revision.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot be approved from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to approve marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_approve() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/reject",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = RejectMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Rejected the selected coupon campaign revision.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot be rejected from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to reject marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_reject() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/publish",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = PublishMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Published the selected canonical coupon campaign with semantic lifecycle evidence.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot be published from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to publish canonical marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_publish() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/schedule",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = ScheduleMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Scheduled the selected canonical coupon campaign with semantic lifecycle evidence.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot be scheduled from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to schedule canonical marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_schedule() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/retire",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        request_body = RetireMarketingCampaignRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Retired the selected canonical coupon campaign with semantic lifecycle evidence.", body = MarketingCampaignMutationResult),
+            (status = 400, description = "Campaign cannot be retired from the current coupon lifecycle state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical marketing campaign not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to retire canonical marketing campaign.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaigns_retire() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/marketing/campaigns/{marketing_campaign_id}/lifecycle-audits",
+        tag = "marketing",
+        params(("marketing_campaign_id" = String, Path, description = "Marketing campaign id")),
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Lifecycle audit trail for the selected canonical coupon campaign.", body = [MarketingCampaignLifecycleAuditRecord]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load marketing campaign lifecycle audit trail.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_campaign_lifecycle_audits_list() {}
 
     #[utoipa::path(
         get,
@@ -352,6 +705,54 @@ mod openapi_paths {
     pub(super) async fn marketing_budgets_status_update() {}
 
     #[utoipa::path(
+        post,
+        path = "/admin/marketing/budgets/{campaign_budget_id}/activate",
+        tag = "marketing",
+        params(("campaign_budget_id" = String, Path, description = "Campaign budget id")),
+        request_body = ActivateCampaignBudgetRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Activated the selected canonical campaign budget with semantic lifecycle evidence.", body = CampaignBudgetMutationResult),
+            (status = 400, description = "Campaign budget cannot be activated from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical campaign budget not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to activate canonical campaign budget.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_budgets_activate() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/budgets/{campaign_budget_id}/close",
+        tag = "marketing",
+        params(("campaign_budget_id" = String, Path, description = "Campaign budget id")),
+        request_body = CloseCampaignBudgetRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Closed the selected canonical campaign budget with semantic lifecycle evidence.", body = CampaignBudgetMutationResult),
+            (status = 400, description = "Campaign budget cannot be closed from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical campaign budget not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to close canonical campaign budget.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_budgets_close() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/marketing/budgets/{campaign_budget_id}/lifecycle-audits",
+        tag = "marketing",
+        params(("campaign_budget_id" = String, Path, description = "Campaign budget id")),
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Lifecycle audit trail for the selected canonical campaign budget.", body = [CampaignBudgetLifecycleAuditRecord]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load campaign budget lifecycle audit trail.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_budget_lifecycle_audits_list() {}
+
+    #[utoipa::path(
         get,
         path = "/admin/marketing/codes",
         tag = "marketing",
@@ -393,6 +794,54 @@ mod openapi_paths {
         )
     )]
     pub(super) async fn marketing_codes_status_update() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/codes/{coupon_code_id}/disable",
+        tag = "marketing",
+        params(("coupon_code_id" = String, Path, description = "Coupon code id")),
+        request_body = DisableCouponCodeRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Disabled the selected canonical coupon code with semantic lifecycle evidence.", body = CouponCodeMutationResult),
+            (status = 400, description = "Coupon code cannot be disabled from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon code not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to disable canonical coupon code.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_codes_disable() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/marketing/codes/{coupon_code_id}/restore",
+        tag = "marketing",
+        params(("coupon_code_id" = String, Path, description = "Coupon code id")),
+        request_body = RestoreCouponCodeRequest,
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Restored the selected canonical coupon code with semantic lifecycle evidence.", body = CouponCodeMutationResult),
+            (status = 400, description = "Coupon code cannot be restored from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Canonical coupon code not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to restore canonical coupon code.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_codes_restore() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/marketing/codes/{coupon_code_id}/lifecycle-audits",
+        tag = "marketing",
+        params(("coupon_code_id" = String, Path, description = "Coupon code id")),
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Lifecycle audit trail for the selected canonical coupon code.", body = [CouponCodeLifecycleAuditRecord]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load coupon code lifecycle audit trail.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn marketing_code_lifecycle_audits_list() {}
 
     #[utoipa::path(
         get,
@@ -622,6 +1071,85 @@ mod openapi_paths {
 
     #[utoipa::path(
         get,
+        path = "/admin/commerce/catalog-publications",
+        tag = "commerce",
+        security(("bearerAuth" = [])),
+        responses(
+            (status = 200, description = "Canonical commercial publication projections derived from the current product, offer, and pricing governance truth.", body = [CommercialCatalogPublicationProjection]),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 500, description = "Failed to load canonical commercial publication projections.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn commerce_catalog_publications_list() {}
+
+    #[utoipa::path(
+        get,
+        path = "/admin/commerce/catalog-publications/{publication_id}",
+        tag = "commerce",
+        security(("bearerAuth" = [])),
+        params(("publication_id" = String, Path, description = "Canonical commercial publication identifier.")),
+        responses(
+            (status = 200, description = "Canonical commercial publication detail with resolved governed pricing context.", body = CommercialCatalogPublicationDetail),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Publication not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to load canonical commercial publication detail.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn commerce_catalog_publication_detail() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/commerce/catalog-publications/{publication_id}/publish",
+        tag = "commerce",
+        request_body = PublishCommercialCatalogPublicationRequest,
+        security(("bearerAuth" = [])),
+        params(("publication_id" = String, Path, description = "Canonical commercial publication identifier.")),
+        responses(
+            (status = 200, description = "Published the selected canonical commercial publication and recorded lifecycle audit evidence.", body = CommercialCatalogPublicationMutationResult),
+            (status = 400, description = "Publication cannot be published from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Publication not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to publish canonical commercial publication.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn commerce_catalog_publication_publish() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/commerce/catalog-publications/{publication_id}/schedule",
+        tag = "commerce",
+        request_body = ScheduleCommercialCatalogPublicationRequest,
+        security(("bearerAuth" = [])),
+        params(("publication_id" = String, Path, description = "Canonical commercial publication identifier.")),
+        responses(
+            (status = 200, description = "Scheduled the selected canonical commercial publication and recorded lifecycle audit evidence.", body = CommercialCatalogPublicationMutationResult),
+            (status = 400, description = "Publication cannot be scheduled from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Publication not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to schedule canonical commercial publication.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn commerce_catalog_publication_schedule() {}
+
+    #[utoipa::path(
+        post,
+        path = "/admin/commerce/catalog-publications/{publication_id}/retire",
+        tag = "commerce",
+        request_body = RetireCommercialCatalogPublicationRequest,
+        security(("bearerAuth" = [])),
+        params(("publication_id" = String, Path, description = "Canonical commercial publication identifier.")),
+        responses(
+            (status = 200, description = "Retired the selected canonical commercial publication and recorded lifecycle audit evidence.", body = CommercialCatalogPublicationMutationResult),
+            (status = 400, description = "Publication cannot be retired from the current governance state.", body = ErrorResponse),
+            (status = 401, description = "Missing or invalid admin bearer token."),
+            (status = 404, description = "Publication not found.", body = ErrorResponse),
+            (status = 500, description = "Failed to retire canonical commercial publication.", body = ErrorResponse)
+        )
+    )]
+    pub(super) async fn commerce_catalog_publication_retire() {}
+
+    #[utoipa::path(
+        get,
         path = "/admin/commerce/payment-methods",
         tag = "commerce",
         security(("bearerAuth" = [])),
@@ -845,8 +1373,11 @@ fn admin_openapi() -> utoipa::openapi::OpenApi {
         .routes(routes!(openapi_paths::auth_change_password))
         .routes(routes!(openapi_paths::tenants_list))
         .routes(routes!(openapi_paths::tenants_create))
+        .routes(routes!(openapi_paths::tenant_provider_readiness_list))
         .routes(routes!(openapi_paths::projects_list))
         .routes(routes!(openapi_paths::projects_create))
+        .routes(routes!(openapi_paths::providers_list))
+        .routes(routes!(openapi_paths::providers_create))
         .routes(routes!(openapi_paths::operator_users_list))
         .routes(routes!(openapi_paths::operator_users_upsert))
         .routes(routes!(openapi_paths::operator_user_status_update))
@@ -858,15 +1389,49 @@ fn admin_openapi() -> utoipa::openapi::OpenApi {
         .routes(routes!(
             openapi_paths::marketing_coupon_templates_status_update
         ))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_clone))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_compare))
+        .routes(routes!(
+            openapi_paths::marketing_coupon_templates_submit_for_approval
+        ))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_approve))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_reject))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_publish))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_schedule))
+        .routes(routes!(openapi_paths::marketing_coupon_templates_retire))
+        .routes(routes!(
+            openapi_paths::marketing_coupon_template_lifecycle_audits_list
+        ))
         .routes(routes!(openapi_paths::marketing_campaigns_list))
         .routes(routes!(openapi_paths::marketing_campaigns_create))
         .routes(routes!(openapi_paths::marketing_campaigns_status_update))
+        .routes(routes!(openapi_paths::marketing_campaigns_clone))
+        .routes(routes!(openapi_paths::marketing_campaigns_compare))
+        .routes(routes!(
+            openapi_paths::marketing_campaigns_submit_for_approval
+        ))
+        .routes(routes!(openapi_paths::marketing_campaigns_approve))
+        .routes(routes!(openapi_paths::marketing_campaigns_reject))
+        .routes(routes!(openapi_paths::marketing_campaigns_publish))
+        .routes(routes!(openapi_paths::marketing_campaigns_schedule))
+        .routes(routes!(openapi_paths::marketing_campaigns_retire))
+        .routes(routes!(
+            openapi_paths::marketing_campaign_lifecycle_audits_list
+        ))
         .routes(routes!(openapi_paths::marketing_budgets_list))
         .routes(routes!(openapi_paths::marketing_budgets_create))
         .routes(routes!(openapi_paths::marketing_budgets_status_update))
+        .routes(routes!(openapi_paths::marketing_budgets_activate))
+        .routes(routes!(openapi_paths::marketing_budgets_close))
+        .routes(routes!(
+            openapi_paths::marketing_budget_lifecycle_audits_list
+        ))
         .routes(routes!(openapi_paths::marketing_codes_list))
         .routes(routes!(openapi_paths::marketing_codes_create))
         .routes(routes!(openapi_paths::marketing_codes_status_update))
+        .routes(routes!(openapi_paths::marketing_codes_disable))
+        .routes(routes!(openapi_paths::marketing_codes_restore))
+        .routes(routes!(openapi_paths::marketing_code_lifecycle_audits_list))
         .routes(routes!(openapi_paths::marketing_reservations_list))
         .routes(routes!(openapi_paths::marketing_redemptions_list))
         .routes(routes!(openapi_paths::marketing_rollbacks_list))
@@ -885,6 +1450,11 @@ fn admin_openapi() -> utoipa::openapi::OpenApi {
         ))
         .routes(routes!(openapi_paths::billing_account_ledger))
         .routes(routes!(openapi_paths::commerce_orders_recent))
+        .routes(routes!(openapi_paths::commerce_catalog_publications_list))
+        .routes(routes!(openapi_paths::commerce_catalog_publication_detail))
+        .routes(routes!(openapi_paths::commerce_catalog_publication_publish))
+        .routes(routes!(openapi_paths::commerce_catalog_publication_schedule))
+        .routes(routes!(openapi_paths::commerce_catalog_publication_retire))
         .routes(routes!(openapi_paths::commerce_payment_methods_list))
         .routes(routes!(openapi_paths::commerce_payment_method_put))
         .routes(routes!(openapi_paths::commerce_payment_method_delete))

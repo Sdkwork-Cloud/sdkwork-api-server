@@ -12,7 +12,7 @@ fn capture_upstream_request(
 }
 
 
-async fn upstream_chat_handler(
+pub(super) async fn upstream_chat_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -29,7 +29,7 @@ async fn upstream_chat_handler(
     )
 }
 
-async fn upstream_chat_handler_with_usage(
+pub(super) async fn upstream_chat_handler_with_usage(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -51,7 +51,7 @@ async fn upstream_chat_handler_with_usage(
     )
 }
 
-async fn upstream_chat_handler_failure(
+pub(super) async fn upstream_chat_handler_failure(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -69,7 +69,7 @@ async fn upstream_chat_handler_failure(
     )
 }
 
-async fn upstream_chat_handler_retryable_once_then_success(
+pub(super) async fn upstream_chat_handler_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -104,7 +104,7 @@ async fn upstream_chat_handler_retryable_once_then_success(
     )
 }
 
-async fn upstream_chat_handler_retry_after_once_then_success(
+pub(super) async fn upstream_chat_handler_retry_after_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -148,7 +148,7 @@ async fn upstream_chat_handler_retry_after_once_then_success(
         .unwrap()
 }
 
-async fn upstream_chat_handler_non_retryable_once_then_success(
+pub(super) async fn upstream_chat_handler_non_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -178,7 +178,7 @@ async fn upstream_chat_handler_non_retryable_once_then_success(
     )
 }
 
-async fn upstream_chat_handler_backup_with_usage(
+pub(super) async fn upstream_chat_handler_backup_with_usage(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -200,7 +200,7 @@ async fn upstream_chat_handler_backup_with_usage(
     )
 }
 
-async fn upstream_chat_stream_handler_success(
+pub(super) async fn upstream_chat_stream_handler_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -215,7 +215,7 @@ async fn upstream_chat_stream_handler_success(
         .unwrap()
 }
 
-async fn upstream_chat_stream_handler_retryable_once_then_success(
+pub(super) async fn upstream_chat_stream_handler_retryable_once_then_success(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> axum::response::Response {
@@ -247,7 +247,7 @@ async fn upstream_chat_stream_handler_retryable_once_then_success(
         .unwrap()
 }
 
-async fn upstream_chat_list_handler(
+pub(super) async fn upstream_chat_list_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -267,7 +267,7 @@ async fn upstream_chat_list_handler(
     )
 }
 
-async fn upstream_chat_retrieve_handler(
+pub(super) async fn upstream_chat_retrieve_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -284,7 +284,7 @@ async fn upstream_chat_retrieve_handler(
     )
 }
 
-async fn upstream_chat_update_handler(
+pub(super) async fn upstream_chat_update_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -302,7 +302,7 @@ async fn upstream_chat_update_handler(
     )
 }
 
-async fn upstream_chat_delete_handler(
+pub(super) async fn upstream_chat_delete_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
@@ -318,7 +318,7 @@ async fn upstream_chat_delete_handler(
     )
 }
 
-async fn upstream_chat_messages_handler(
+pub(super) async fn upstream_chat_messages_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {

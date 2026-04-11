@@ -13,7 +13,7 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-const sharedUiPackagePath = 'file:../../../../../sdkwork-ui/sdkwork-ui-pc-react';
+const sharedUiPackagePath = 'workspace:*';
 
 test('auth uses sdkwork shared form primitives instead of legacy admin auth classes', () => {
   const auth = read('packages/sdkwork-router-admin-auth/src/index.tsx');
