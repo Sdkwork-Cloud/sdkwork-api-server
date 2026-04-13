@@ -28,6 +28,7 @@ pub(crate) async fn ensure_default_admin_user(
         DEFAULT_ADMIN_DISPLAY_NAME,
         password_salt,
         password_hash,
+        AdminUserRole::SuperAdmin,
         true,
         created_at_ms,
     );
@@ -119,7 +120,7 @@ pub(crate) fn admin_session_from_user(
     user: &AdminUserRecord,
     signing_secret: &str,
 ) -> AdminResult<AdminAuthSession> {
-    let token = issue_jwt(&user.id, signing_secret).map_err(AdminIdentityError::from)?;
+    let token = issue_jwt(&user.id, user.role, signing_secret).map_err(AdminIdentityError::from)?;
     Ok(AdminAuthSession {
         token,
         user: AdminUserProfile::from(user),

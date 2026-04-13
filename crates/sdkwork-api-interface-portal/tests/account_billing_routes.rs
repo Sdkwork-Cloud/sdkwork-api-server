@@ -70,6 +70,10 @@ fn workspace_request_context(workspace: &Value) -> GatewayRequestContext {
         environment: "portal".to_owned(),
         api_key_hash: "portal_workspace_scope".to_owned(),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     }
 }
 

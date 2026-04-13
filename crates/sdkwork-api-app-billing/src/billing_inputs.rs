@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub fn service_name() -> &'static str {
     "billing-service"
@@ -181,4 +181,3 @@ pub struct RefundCommerceOrderCreditsResult {
     pub ledger_entry: AccountLedgerEntryRecord,
     pub ledger_allocations: Vec<AccountLedgerAllocationRecord>,
 }
-

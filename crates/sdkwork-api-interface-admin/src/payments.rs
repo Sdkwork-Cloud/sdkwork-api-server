@@ -227,10 +227,14 @@ pub(crate) async fn cancel_refund_order_handler(
     Json(request): Json<CancelRefundOrderRequest>,
 ) -> Result<Json<RefundOrderRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    cancel_refund_order_request(payment_store.as_ref(), &refund_order_id, request.canceled_at_ms)
-        .await
-        .map(Json)
-        .map_err(map_refund_request_action_error)
+    cancel_refund_order_request(
+        payment_store.as_ref(),
+        &refund_order_id,
+        request.canceled_at_ms,
+    )
+    .await
+    .map(Json)
+    .map_err(map_refund_request_action_error)
 }
 
 pub(crate) async fn start_refund_order_handler(
@@ -240,10 +244,14 @@ pub(crate) async fn start_refund_order_handler(
     Json(request): Json<StartRefundOrderRequest>,
 ) -> Result<Json<RefundOrderRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    start_refund_order_execution(payment_store.as_ref(), &refund_order_id, request.started_at_ms)
-        .await
-        .map(Json)
-        .map_err(map_refund_request_action_error)
+    start_refund_order_execution(
+        payment_store.as_ref(),
+        &refund_order_id,
+        request.started_at_ms,
+    )
+    .await
+    .map(Json)
+    .map_err(map_refund_request_action_error)
 }
 
 pub(crate) async fn list_payment_gateway_accounts_handler(
@@ -291,8 +299,8 @@ pub(crate) async fn upsert_payment_channel_policy_handler(
     Json(request): Json<UpsertPaymentChannelPolicyRequest>,
 ) -> Result<(StatusCode, Json<PaymentChannelPolicyRecord>), StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    let record = payment_channel_policy_record_from_request(request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let record =
+        payment_channel_policy_record_from_request(request).map_err(|_| StatusCode::BAD_REQUEST)?;
     let record = payment_store
         .insert_payment_channel_policy_record(&record)
         .await
@@ -599,7 +607,9 @@ async fn load_admin_payment_reconciliation_lines(
     store: &dyn PaymentKernelStore,
     lifecycle: PaymentReconciliationLifecycle,
 ) -> anyhow::Result<Vec<ReconciliationMatchSummaryRecord>> {
-    let mut lines = store.list_all_reconciliation_match_summary_records().await?;
+    let mut lines = store
+        .list_all_reconciliation_match_summary_records()
+        .await?;
     apply_payment_reconciliation_queue_view(&mut lines, lifecycle);
     Ok(lines)
 }

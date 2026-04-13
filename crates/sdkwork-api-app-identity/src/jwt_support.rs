@@ -125,11 +125,12 @@ pub fn hash_gateway_api_key(value: &str) -> String {
     encoded
 }
 
-pub fn issue_jwt(subject: &str, signing_secret: &str) -> Result<String> {
+pub fn issue_jwt(subject: &str, role: AdminUserRole, signing_secret: &str) -> Result<String> {
     ensure_jsonwebtoken_provider();
     let issued_at = now_epoch_secs()?;
     let claims = Claims {
         sub: subject.to_owned(),
+        role,
         iss: ADMIN_JWT_ISSUER.to_owned(),
         aud: ADMIN_JWT_AUDIENCE.to_owned(),
         exp: (issued_at + ADMIN_JWT_TTL_SECS) as usize,

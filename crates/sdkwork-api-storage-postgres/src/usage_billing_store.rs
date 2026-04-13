@@ -61,7 +61,7 @@ impl PostgresAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(
                 |(
@@ -97,7 +97,7 @@ impl PostgresAdminStore {
                     })
                 },
             )
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn list_usage_records_for_project(
@@ -130,7 +130,7 @@ impl PostgresAdminStore {
         .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(
                 |(
@@ -166,7 +166,7 @@ impl PostgresAdminStore {
                     })
                 },
             )
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn find_latest_usage_record_for_project(

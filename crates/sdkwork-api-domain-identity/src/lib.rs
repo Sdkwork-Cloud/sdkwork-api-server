@@ -1,5 +1,52 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use utoipa::ToSchema;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AdminUserRole {
+    SuperAdmin,
+    PlatformOperator,
+    FinanceOperator,
+    ReadOnlyOperator,
+}
+
+impl AdminUserRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SuperAdmin => "super_admin",
+            Self::PlatformOperator => "platform_operator",
+            Self::FinanceOperator => "finance_operator",
+            Self::ReadOnlyOperator => "read_only_operator",
+        }
+    }
+}
+
+impl Default for AdminUserRole {
+    fn default() -> Self {
+        Self::PlatformOperator
+    }
+}
+
+impl std::fmt::Display for AdminUserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for AdminUserRole {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "super_admin" => Ok(Self::SuperAdmin),
+            "platform_operator" => Ok(Self::PlatformOperator),
+            "finance_operator" => Ok(Self::FinanceOperator),
+            "read_only_operator" => Ok(Self::ReadOnlyOperator),
+            _ => Err("role must be one of: super_admin, platform_operator, finance_operator, read_only_operator".to_owned()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GatewayApiKey {
@@ -322,6 +369,7 @@ pub struct AdminUserRecord {
     pub display_name: String,
     pub password_salt: String,
     pub password_hash: String,
+    pub role: AdminUserRole,
     pub active: bool,
     pub created_at_ms: u64,
 }
@@ -334,6 +382,7 @@ impl AdminUserRecord {
         display_name: impl Into<String>,
         password_salt: impl Into<String>,
         password_hash: impl Into<String>,
+        role: AdminUserRole,
         active: bool,
         created_at_ms: u64,
     ) -> Self {
@@ -343,6 +392,7 @@ impl AdminUserRecord {
             display_name: display_name.into(),
             password_salt: password_salt.into(),
             password_hash: password_hash.into(),
+            role,
             active,
             created_at_ms,
         }
@@ -379,6 +429,7 @@ pub struct AdminUserProfile {
     pub id: String,
     pub email: String,
     pub display_name: String,
+    pub role: AdminUserRole,
     pub active: bool,
     pub created_at_ms: u64,
 }
@@ -389,8 +440,49 @@ impl From<&AdminUserRecord> for AdminUserProfile {
             id: value.id.clone(),
             email: value.email.clone(),
             display_name: value.display_name.clone(),
+            role: value.role,
             active: value.active,
             created_at_ms: value.created_at_ms,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AdminAuditEventRecord {
+    pub event_id: String,
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: String,
+    pub approval_scope: String,
+    pub actor_user_id: String,
+    pub actor_email: String,
+    pub actor_role: AdminUserRole,
+    pub recorded_at_ms: u64,
+}
+
+impl AdminAuditEventRecord {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        event_id: impl Into<String>,
+        action: impl Into<String>,
+        resource_type: impl Into<String>,
+        resource_id: impl Into<String>,
+        approval_scope: impl Into<String>,
+        actor_user_id: impl Into<String>,
+        actor_email: impl Into<String>,
+        actor_role: AdminUserRole,
+        recorded_at_ms: u64,
+    ) -> Self {
+        Self {
+            event_id: event_id.into(),
+            action: action.into(),
+            resource_type: resource_type.into(),
+            resource_id: resource_id.into(),
+            approval_scope: approval_scope.into(),
+            actor_user_id: actor_user_id.into(),
+            actor_email: actor_email.into(),
+            actor_role,
+            recorded_at_ms,
         }
     }
 }

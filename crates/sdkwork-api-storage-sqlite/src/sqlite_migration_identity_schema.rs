@@ -77,6 +77,7 @@ pub(crate) async fn apply_sqlite_identity_schema(pool: &SqlitePool) -> Result<()
             display_name TEXT NOT NULL DEFAULT '',
             password_salt TEXT NOT NULL DEFAULT '',
             password_hash TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'super_admin',
             active INTEGER NOT NULL DEFAULT 1,
             created_at_ms INTEGER NOT NULL DEFAULT 0
         )",
@@ -107,6 +108,13 @@ pub(crate) async fn apply_sqlite_identity_schema(pool: &SqlitePool) -> Result<()
     ensure_sqlite_column(
         pool,
         "ai_admin_users",
+        "role",
+        "role TEXT NOT NULL DEFAULT 'super_admin'",
+    )
+    .await?;
+    ensure_sqlite_column(
+        pool,
+        "ai_admin_users",
         "active",
         "active INTEGER NOT NULL DEFAULT 1",
     )
@@ -120,6 +128,27 @@ pub(crate) async fn apply_sqlite_identity_schema(pool: &SqlitePool) -> Result<()
     .await?;
     sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_admin_audit_events (
+            event_id TEXT PRIMARY KEY NOT NULL,
+            action TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            approval_scope TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            actor_email TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            recorded_at_ms INTEGER NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_admin_audit_events_recorded
+         ON ai_admin_audit_events (recorded_at_ms DESC, event_id DESC)",
     )
     .execute(pool)
     .await?;

@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub fn summarize_billing_snapshot(
     entries: &[LedgerEntry],
@@ -307,4 +307,3 @@ pub async fn summarize_billing_events_from_store(
     let events = list_billing_events(store).await?;
     Ok(summarize_billing_events(&events))
 }
-

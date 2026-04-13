@@ -319,10 +319,7 @@ async fn portal_routing_preferences_preview_and_logs_are_project_scoped() {
     );
     let openai_option = find_provider_option(&summary_json, "provider-openai-official");
     assert_eq!(openai_option["protocol_kind"], "openai");
-    assert_eq!(
-        openai_option["integration"]["mode"],
-        "standard_passthrough"
-    );
+    assert_eq!(openai_option["integration"]["mode"], "standard_passthrough");
     assert!(openai_option["integration"]["default_plugin_family"].is_null());
     assert_eq!(openai_option["credential_readiness"]["ready"], false);
     assert_eq!(openai_option["credential_readiness"]["state"], "missing");

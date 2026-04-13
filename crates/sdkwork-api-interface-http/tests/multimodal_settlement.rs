@@ -2,7 +2,9 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use axum::routing::{get, post};
 use axum::{extract::State, Json, Router};
-use sdkwork_api_app_identity::persist_gateway_api_key_with_metadata;
+use sdkwork_api_app_identity::{
+    persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput,
+};
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountHoldStatus,
     AccountRecord, AccountType, RequestSettlementStatus,
@@ -334,14 +336,16 @@ async fn seed_dual_scoped_gateway_account(
     let store = SqliteAdminStore::new(pool.clone());
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Dual scoped canonical key",
-        None,
-        None,
-        None,
-        None,
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Dual scoped canonical key",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: None,
+        },
     )
     .await
     .unwrap();

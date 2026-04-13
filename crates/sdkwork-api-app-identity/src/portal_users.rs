@@ -108,22 +108,26 @@ pub async fn list_portal_user_profiles(
         .map_err(PortalIdentityError::from)
 }
 
+pub struct UpsertPortalUserInput<'a> {
+    pub user_id: Option<&'a str>,
+    pub email: &'a str,
+    pub display_name: &'a str,
+    pub password: Option<&'a str>,
+    pub workspace_tenant_id: &'a str,
+    pub workspace_project_id: &'a str,
+    pub active: bool,
+}
+
 pub async fn upsert_portal_user(
     store: &dyn AdminStore,
-    user_id: Option<&str>,
-    email: &str,
-    display_name: &str,
-    password: Option<&str>,
-    workspace_tenant_id: &str,
-    workspace_project_id: &str,
-    active: bool,
+    input: UpsertPortalUserInput<'_>,
 ) -> PortalResult<PortalUserProfile> {
-    validate_identity_profile_input(email, display_name)
+    validate_identity_profile_input(input.email, input.display_name)
         .map_err(PortalIdentityError::InvalidInput)?;
-    validate_workspace_scope(store, workspace_tenant_id, workspace_project_id).await?;
+    validate_workspace_scope(store, input.workspace_tenant_id, input.workspace_project_id).await?;
 
-    let normalized_email = normalize_email(email);
-    let requested_id = normalize_optional_value(user_id);
+    let normalized_email = normalize_email(input.email);
+    let requested_id = normalize_optional_value(input.user_id);
     let existing_by_id = match requested_id {
         Some(id) => store
             .find_portal_user_by_id(id)
@@ -157,7 +161,7 @@ pub async fn upsert_portal_user(
     };
 
     let (password_salt, password_hash) =
-        match password.map(str::trim).filter(|value| !value.is_empty()) {
+        match input.password.map(str::trim).filter(|value| !value.is_empty()) {
             Some(next_password) => {
                 validate_password_strength(next_password)
                     .map_err(PortalIdentityError::InvalidInput)?;
@@ -184,12 +188,12 @@ pub async fn upsert_portal_user(
     let record = PortalUserRecord::new(
         target_id,
         normalized_email,
-        display_name.trim(),
+        input.display_name.trim(),
         password_salt,
         password_hash,
-        workspace_tenant_id.trim(),
-        workspace_project_id.trim(),
-        active,
+        input.workspace_tenant_id.trim(),
+        input.workspace_project_id.trim(),
+        input.active,
         created_at_ms,
     );
     let saved = store

@@ -177,13 +177,15 @@ pub(crate) async fn create_api_key_handler(
 ) -> Result<(StatusCode, Json<CreatedGatewayApiKey>), (StatusCode, Json<ErrorResponse>)> {
     create_portal_api_key_with_metadata(
         state.store.as_ref(),
-        &claims.claims().sub,
-        &request.environment,
-        &request.label,
-        request.expires_at_ms,
-        request.api_key.as_deref(),
-        request.notes.as_deref(),
-        request.api_key_group_id.as_deref(),
+        sdkwork_api_app_identity::CreatePortalApiKeyInput {
+            user_id: &claims.claims().sub,
+            environment: &request.environment,
+            label: &request.label,
+            expires_at_ms: request.expires_at_ms,
+            plaintext_key: request.api_key.as_deref(),
+            notes: request.notes.as_deref(),
+            api_key_group_id: request.api_key_group_id.as_deref(),
+        },
     )
     .await
     .map(|created| (StatusCode::CREATED, Json(created)))

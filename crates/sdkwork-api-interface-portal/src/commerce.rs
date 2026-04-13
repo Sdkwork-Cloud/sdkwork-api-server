@@ -74,15 +74,6 @@ pub(crate) struct PortalCommerceReconciliationSummary {
     pub(crate) healthy: bool,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct PortalCommerceOrderCenterResponse {
-    project_id: String,
-    payment_simulation_enabled: bool,
-    membership: Option<PortalProjectMembershipRecord>,
-    reconciliation: Option<PortalCommerceReconciliationSummary>,
-    orders: Vec<PortalOrderCenterEntry>,
-}
-
 pub(crate) async fn commerce_catalog_handler(
     claims: AuthenticatedPortalClaims,
     State(state): State<PortalApiState>,
@@ -175,74 +166,6 @@ pub(crate) async fn get_commerce_order_handler(
     .map(PortalCommerceOrderView::from)
     .map(Json)
     .map_err(portal_commerce_error_response)
-}
-
-pub(crate) async fn commerce_order_center_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<PortalCommerceOrderCenterResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
-        .await
-        .map_err(|status| {
-            (
-                status,
-                Json(ErrorResponse {
-                    error: ErrorBody {
-                        message: "portal workspace is unavailable".to_owned(),
-                    },
-                }),
-            )
-        })?;
-
-    let orders = list_project_commerce_orders(state.store.as_ref(), &workspace.project.id)
-        .await
-        .map_err(portal_commerce_error_response)?;
-    let membership = load_project_membership(state.store.as_ref(), &workspace.project.id)
-        .await
-        .map_err(portal_commerce_error_response)?;
-
-    let mut order_center_entries = Vec::with_capacity(orders.len());
-    for order in orders {
-        let mut payment_events = state
-            .store
-            .list_commerce_payment_events_for_order(&order.order_id)
-            .await
-            .map_err(CommerceError::from)
-            .map_err(portal_commerce_error_response)?;
-        payment_events.sort_by(|left, right| {
-            right
-                .received_at_ms
-                .cmp(&left.received_at_ms)
-                .then_with(|| right.payment_event_id.cmp(&left.payment_event_id))
-        });
-        let latest_payment_event = payment_events.first().cloned();
-        let checkout_session = load_portal_commerce_checkout_session_with_policy(
-            state.store.as_ref(),
-            &claims.claims().sub,
-            &workspace.project.id,
-            &order.order_id,
-            state.payment_simulation_enabled,
-        )
-        .await
-        .map_err(portal_commerce_error_response)?;
-        order_center_entries.push(PortalOrderCenterEntry {
-            order: PortalCommerceOrderView::from(order),
-            payment_events,
-            latest_payment_event,
-            checkout_session,
-        });
-    }
-    let reconciliation =
-        load_portal_commerce_reconciliation_summary(&state, &workspace, &order_center_entries)
-            .await?;
-
-    Ok(Json(PortalCommerceOrderCenterResponse {
-        project_id: workspace.project.id,
-        payment_simulation_enabled: state.payment_simulation_enabled,
-        membership,
-        reconciliation,
-        orders: order_center_entries,
-    }))
 }
 
 pub(crate) async fn create_commerce_order_handler(

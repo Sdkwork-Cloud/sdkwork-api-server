@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 fn pricing_status_is(value: &str, expected: &str) -> bool {
     value.trim().eq_ignore_ascii_case(expected)
@@ -227,4 +227,3 @@ where
             .changed,
     )
 }
-

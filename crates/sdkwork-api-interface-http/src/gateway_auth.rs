@@ -1,5 +1,20 @@
 struct AuthenticatedGatewayRequest(IdentityGatewayRequestContext);
 
+async fn resolve_authenticated_gateway_request_context(
+    state: &GatewayApiState,
+    token: &str,
+) -> anyhow::Result<Option<IdentityGatewayRequestContext>> {
+    if let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token).await? {
+        return Ok(Some(context));
+    }
+
+    let Some(identity_store) = state.identity_store.as_ref() else {
+        return Ok(None);
+    };
+
+    resolve_canonical_gateway_request_context_from_api_key(identity_store.as_ref(), token).await
+}
+
 impl AuthenticatedGatewayRequest {
     fn tenant_id(&self) -> &str {
         self.0.tenant_id()
@@ -41,7 +56,7 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
 
-            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token)
+            let Some(context) = resolve_authenticated_gateway_request_context(state, token)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
             else {
@@ -89,7 +104,7 @@ impl FromRequestParts<GatewayApiState> for CompatAuthenticatedGatewayRequest {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
 
-            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), &token)
+            let Some(context) = resolve_authenticated_gateway_request_context(state, &token)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
             else {
@@ -288,7 +303,7 @@ async fn apply_gateway_request_context(
         return next.run(request).await;
     };
 
-    let Ok(Some(context)) = resolve_gateway_request_context(state.store.as_ref(), &token).await
+    let Ok(Some(context)) = resolve_authenticated_gateway_request_context(&state, &token).await
     else {
         return next.run(request).await;
     };

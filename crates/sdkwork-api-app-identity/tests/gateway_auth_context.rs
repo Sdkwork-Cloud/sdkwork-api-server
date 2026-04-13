@@ -11,6 +11,10 @@ fn request_context(
         environment: "live".to_owned(),
         api_key_hash: api_key_hash.to_owned(),
         api_key_group_id: Some("group-live".to_owned()),
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     }
 }
 

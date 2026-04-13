@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub async fn summarize_account_balance<S>(
     store: &S,
@@ -193,4 +193,3 @@ where
     let subject = gateway_auth_subject_from_request_context(context);
     resolve_payable_account_for_gateway_subject(store, &subject).await
 }
-

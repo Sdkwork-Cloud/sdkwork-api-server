@@ -1,5 +1,7 @@
 use super::*;
 
+use sdkwork_api_domain_identity::AdminAuditEventRecord;
+
 #[async_trait]
 impl AdminStore for SqliteAdminStore {
     fn dialect(&self) -> StorageDialect {
@@ -918,6 +920,15 @@ impl AdminStore for SqliteAdminStore {
     }
     async fn delete_admin_user(&self, user_id: &str) -> Result<bool> {
         SqliteAdminStore::delete_admin_user(self, user_id).await
+    }
+    async fn insert_admin_audit_event(
+        &self,
+        record: &AdminAuditEventRecord,
+    ) -> Result<AdminAuditEventRecord> {
+        SqliteAdminStore::insert_admin_audit_event(self, record).await
+    }
+    async fn list_admin_audit_events(&self) -> Result<Vec<AdminAuditEventRecord>> {
+        SqliteAdminStore::list_admin_audit_events(self).await
     }
     async fn insert_gateway_api_key(
         &self,

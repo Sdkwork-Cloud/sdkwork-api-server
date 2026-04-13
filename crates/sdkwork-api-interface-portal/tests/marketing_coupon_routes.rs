@@ -9,8 +9,8 @@ use sdkwork_api_domain_marketing::{
     CampaignBudgetRecord, CampaignBudgetStatus, CouponBenefitSpec, CouponCodeRecord,
     CouponCodeStatus, CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
     CouponReservationRecord, CouponReservationStatus, CouponRestrictionSpec, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord,
-    MarketingCampaignStatus, MarketingSubjectScope,
+    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord, MarketingCampaignStatus,
+    MarketingSubjectScope,
 };
 use sdkwork_api_domain_rate_limit::RateLimitPolicy;
 use sdkwork_api_storage_core::{AccountKernelStore, AdminStore};
@@ -83,6 +83,10 @@ fn workspace_request_context(workspace: &Value) -> GatewayRequestContext {
         environment: "portal".to_owned(),
         api_key_hash: "portal_workspace_scope".to_owned(),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     }
 }
 
@@ -144,33 +148,31 @@ async fn seed_marketing_records_with_benefit_and_targets(
     eligible_target_kinds: &[&str],
 ) {
     let benefit = match benefit_kind {
-        MarketingBenefitKind::PercentageOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_percent(Some(20)),
-        MarketingBenefitKind::FixedAmountOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_amount_minor(Some(2_000)),
+        MarketingBenefitKind::PercentageOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_percent(Some(20))
+        }
+        MarketingBenefitKind::FixedAmountOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_amount_minor(Some(2_000))
+        }
         MarketingBenefitKind::GrantUnits => {
             CouponBenefitSpec::new(benefit_kind).with_grant_units(Some(300))
         }
     };
-    let template = CouponTemplateRecord::new(
-        "template_launch20",
-        "launch20",
-        benefit_kind,
-    )
-    .with_display_name("Launch 20")
-    .with_status(CouponTemplateStatus::Active)
-    .with_distribution_kind(CouponDistributionKind::UniqueCode)
-    .with_restriction(
-        CouponRestrictionSpec::new(MarketingSubjectScope::Project).with_eligible_target_kinds(
-            eligible_target_kinds
-                .iter()
-                .map(|kind| (*kind).to_owned())
-                .collect(),
-        ),
-    )
-    .with_benefit(benefit)
-    .with_created_at_ms(1_710_000_000_000)
-    .with_updated_at_ms(1_710_000_000_000);
+    let template = CouponTemplateRecord::new("template_launch20", "launch20", benefit_kind)
+        .with_display_name("Launch 20")
+        .with_status(CouponTemplateStatus::Active)
+        .with_distribution_kind(CouponDistributionKind::UniqueCode)
+        .with_restriction(
+            CouponRestrictionSpec::new(MarketingSubjectScope::Project).with_eligible_target_kinds(
+                eligible_target_kinds
+                    .iter()
+                    .map(|kind| (*kind).to_owned())
+                    .collect(),
+            ),
+        )
+        .with_benefit(benefit)
+        .with_created_at_ms(1_710_000_000_000)
+        .with_updated_at_ms(1_710_000_000_000);
     store
         .insert_coupon_template_record(&template)
         .await
@@ -337,8 +339,14 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
     assert_eq!(my_coupons_json["summary"]["available_count"], 0);
     assert_eq!(my_coupons_json["summary"]["reserved_count"], 1);
     assert_eq!(my_coupons_json["items"].as_array().unwrap().len(), 1);
-    assert_eq!(my_coupons_json["items"][0]["code"]["code_value"], "LAUNCH20");
-    assert_eq!(my_coupons_json["items"][0]["template"]["template_key"], "launch20");
+    assert_eq!(
+        my_coupons_json["items"][0]["code"]["code_value"],
+        "LAUNCH20"
+    );
+    assert_eq!(
+        my_coupons_json["items"][0]["template"]["template_key"],
+        "launch20"
+    );
     assert_eq!(
         my_coupons_json["items"][0]["campaign"]["marketing_campaign_id"],
         "campaign_launch20"
@@ -351,7 +359,10 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
         my_coupons_json["items"][0]["effect"]["effect_kind"],
         "checkout_discount"
     );
-    assert_eq!(my_coupons_json["items"][0]["effect"]["discount_percent"], 20);
+    assert_eq!(
+        my_coupons_json["items"][0]["effect"]["discount_percent"],
+        20
+    );
     assert_eq!(
         my_coupons_json["items"][0]["ownership"]["owned_by_current_subject"],
         true
@@ -437,7 +448,10 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
         reward_history_json[0]["redemption"]["coupon_redemption_id"],
         redemption_id
     );
-    assert_eq!(reward_history_json[0]["template"]["template_key"], "launch20");
+    assert_eq!(
+        reward_history_json[0]["template"]["template_key"],
+        "launch20"
+    );
     assert_eq!(
         reward_history_json[0]["campaign"]["marketing_campaign_id"],
         "campaign_launch20"
@@ -462,6 +476,96 @@ async fn portal_marketing_routes_validate_reserve_confirm_rollback_and_list_asse
         reward_history_json[0]["rollbacks"][0]["rollback_type"],
         "refund"
     );
+}
+
+#[tokio::test]
+async fn portal_marketing_redemptions_and_codes_routes_filter_by_status() {
+    let pool = memory_pool().await;
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_records(&store).await;
+
+    let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+    let token = portal_token(app.clone()).await;
+
+    let reserved = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/marketing/coupon-reservations")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"coupon_code\":\"LAUNCH20\",\"subject_scope\":\"project\",\"target_kind\":\"recharge_pack\",\"reserve_amount_minor\":1200,\"ttl_ms\":300000}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(reserved.status(), StatusCode::CREATED);
+    let reserved_json = read_json(reserved).await;
+    let reservation_id = reserved_json["reservation"]["coupon_reservation_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let confirmed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/marketing/coupon-redemptions/confirm")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"coupon_reservation_id\":\"{reservation_id}\",\"subsidy_amount_minor\":1200,\"order_id\":\"order_launch20\",\"payment_event_id\":\"payment_launch20\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(confirmed.status(), StatusCode::OK);
+
+    let redemptions = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/portal/marketing/redemptions?status=redeemed")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(redemptions.status(), StatusCode::OK);
+    let redemptions_json = read_json(redemptions).await;
+    assert_eq!(redemptions_json["summary"]["total_count"], 1);
+    assert_eq!(redemptions_json["summary"]["redeemed_count"], 1);
+    assert_eq!(redemptions_json["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        redemptions_json["items"][0]["redemption_status"],
+        "redeemed"
+    );
+
+    let codes = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/portal/marketing/codes?status=redeemed")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(codes.status(), StatusCode::OK);
+    let codes_json = read_json(codes).await;
+    assert_eq!(codes_json["summary"]["total_count"], 1);
+    assert_eq!(codes_json["summary"]["redeemed_count"], 1);
+    assert_eq!(codes_json["items"].as_array().unwrap().len(), 1);
+    assert_eq!(codes_json["items"][0]["code"]["code_value"], "LAUNCH20");
+    assert_eq!(codes_json["items"][0]["code"]["status"], "redeemed");
 }
 
 #[tokio::test]
@@ -1207,7 +1311,10 @@ async fn portal_marketing_my_coupons_exposes_account_entitlement_coupon_semantic
         .clone()
         .with_claimed_subject(Some(MarketingSubjectScope::Project), Some(project_id))
         .with_updated_at_ms(1_710_000_000_500);
-    store.insert_coupon_code_record(&claimed_code).await.unwrap();
+    store
+        .insert_coupon_code_record(&claimed_code)
+        .await
+        .unwrap();
 
     let my_coupons = app
         .oneshot(
@@ -1290,7 +1397,10 @@ async fn portal_marketing_reward_history_exposes_account_arrival_evidence_for_en
     .with_status(CouponRedemptionStatus::Redeemed)
     .with_order_id(Some("order_reward_arrival".to_owned()))
     .with_updated_at_ms(1_710_000_000_300);
-    store.insert_coupon_redemption_record(&redemption).await.unwrap();
+    store
+        .insert_coupon_redemption_record(&redemption)
+        .await
+        .unwrap();
 
     let benefit_lot = AccountBenefitLotRecord::new(
         8001,

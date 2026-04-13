@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub async fn create_account_hold<S>(
     store: &S,
@@ -656,4 +656,3 @@ where
         })
         .await
 }
-

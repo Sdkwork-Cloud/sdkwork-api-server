@@ -2,7 +2,9 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::post;
 use axum::{Json, Router};
-use sdkwork_api_app_identity::{hash_gateway_api_key, persist_gateway_api_key_with_metadata};
+use sdkwork_api_app_identity::{
+    hash_gateway_api_key, persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput,
+};
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountHoldStatus,
     AccountRecord, AccountType,
@@ -10,7 +12,6 @@ use sdkwork_api_domain_billing::{
 use sdkwork_api_domain_identity::{
     ApiKeyGroupRecord, CanonicalApiKeyRecord, IdentityUserRecord,
 };
-use sdkwork_api_domain_usage::{RequestStatus, UsageCaptureStatus};
 use sdkwork_api_storage_core::{AccountKernelStore, IdentityKernelStore};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -47,14 +48,16 @@ async fn stateful_gateway_requires_api_key_and_uses_request_context() {
     store.insert_api_key_group(&group).await.unwrap();
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-live",
-        "project-live",
-        "live",
-        "Production request key",
-        None,
-        None,
-        None,
-        Some(&group.group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-live",
+            project_id: "project-live",
+            environment: "live",
+            label: "Production request key",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: Some(&group.group_id),
+        },
     )
     .await
     .unwrap();
@@ -273,19 +276,26 @@ async fn stateful_gateway_accepts_canonical_only_api_key_and_resolves_payable_ac
 
     let holds = store.list_account_holds().await.unwrap();
     assert_eq!(holds.len(), 1);
-    assert_eq!(holds[0].status, AccountHoldStatus::PartiallyReleased);
+    assert_eq!(holds[0].account_id, 7001);
+    assert_eq!(holds[0].status, AccountHoldStatus::Captured);
 
-    let facts = store.list_request_meter_facts().await.unwrap();
-    assert_eq!(facts.len(), 1);
-    assert_eq!(facts[0].request_status, RequestStatus::Succeeded);
-    assert_eq!(facts[0].usage_capture_status, UsageCaptureStatus::Captured);
-    assert_eq!(facts[0].account_id, 7001);
-    assert_eq!(facts[0].api_key_id, Some(778899));
-    assert_eq!(facts[0].api_key_hash.as_deref(), Some(hashed.as_str()));
-    assert_eq!(
-        facts[0].gateway_request_ref.as_deref(),
-        Some("req-canonical-only-auth")
-    );
+    let usage_records = store.list_usage_records().await.unwrap();
+    assert_eq!(usage_records.len(), 1);
+    assert_eq!(usage_records[0].project_id, "project-canonical-1001");
+    assert_eq!(usage_records[0].api_key_hash.as_deref(), Some(hashed.as_str()));
+
+    let billing_events = store.list_billing_events().await.unwrap();
+    assert_eq!(billing_events.len(), 1);
+    assert_eq!(billing_events[0].project_id, "project-canonical-1001");
+    assert_eq!(billing_events[0].api_key_hash.as_deref(), Some(hashed.as_str()));
+
+    let canonical_key = store
+        .find_canonical_api_key_record_by_hash(&hashed)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(canonical_key.api_key_id, 778899);
+    assert!(canonical_key.last_used_at_ms.is_some());
 
     let routing_logs = admin_app
         .oneshot(

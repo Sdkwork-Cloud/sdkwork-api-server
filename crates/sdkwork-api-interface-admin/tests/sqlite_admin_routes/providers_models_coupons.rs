@@ -358,7 +358,9 @@ async fn create_provider_accepts_default_plugin_family_for_openrouter() {
                 .uri("/admin/channels")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .body(Body::from("{\"id\":\"openrouter\",\"name\":\"OpenRouter\"}"))
+                .body(Body::from(
+                    "{\"id\":\"openrouter\",\"name\":\"OpenRouter\"}",
+                ))
                 .unwrap(),
         )
         .await
@@ -457,7 +459,10 @@ async fn create_provider_accepts_default_plugin_family_for_ollama() {
     assert_eq!(created_json["protocol_kind"], "custom");
     assert_eq!(created_json["extension_id"], "sdkwork.provider.ollama");
     assert_eq!(created_json["integration"]["mode"], "default_plugin");
-    assert_eq!(created_json["integration"]["default_plugin_family"], "ollama");
+    assert_eq!(
+        created_json["integration"]["default_plugin_family"],
+        "ollama"
+    );
 
     let list_providers = app
         .oneshot(
@@ -492,7 +497,9 @@ async fn create_provider_rejects_conflicting_default_plugin_family_and_adapter_k
                 .uri("/admin/channels")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .body(Body::from("{\"id\":\"openrouter\",\"name\":\"OpenRouter\"}"))
+                .body(Body::from(
+                    "{\"id\":\"openrouter\",\"name\":\"OpenRouter\"}",
+                ))
                 .unwrap(),
         )
         .await
@@ -557,7 +564,10 @@ async fn list_providers_exposes_implicit_standard_passthrough_execution_view() {
     assert_eq!(provider["execution"]["supports_provider_adapter"], true);
     assert_eq!(provider["execution"]["supports_raw_plugin"], false);
     assert_eq!(provider["execution"]["fail_closed"], false);
-    assert_eq!(provider["execution"]["route_readiness"]["openai"]["ready"], true);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["openai"]["ready"],
+        true
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["openai"]["mode"],
         "provider_adapter"
@@ -570,7 +580,10 @@ async fn list_providers_exposes_implicit_standard_passthrough_execution_view() {
         provider["execution"]["route_readiness"]["anthropic"]["mode"],
         "provider_adapter"
     );
-    assert_eq!(provider["execution"]["route_readiness"]["gemini"]["ready"], true);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["gemini"]["ready"],
+        true
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["gemini"]["mode"],
         "provider_adapter"
@@ -652,8 +665,14 @@ async fn list_providers_exposes_tenant_scoped_credential_readiness_only_when_req
 
     assert_eq!(unscoped_list.status(), StatusCode::OK);
     let unscoped_json = read_json(unscoped_list).await;
-    assert!(provider_json_by_id(&unscoped_json, "provider-openai-official")["credential_readiness"].is_null());
-    assert!(provider_json_by_id(&unscoped_json, "provider-openrouter-main")["credential_readiness"].is_null());
+    assert!(
+        provider_json_by_id(&unscoped_json, "provider-openai-official")["credential_readiness"]
+            .is_null()
+    );
+    assert!(
+        provider_json_by_id(&unscoped_json, "provider-openrouter-main")["credential_readiness"]
+            .is_null()
+    );
 
     let scoped_list = app
         .oneshot(
@@ -760,7 +779,10 @@ async fn list_tenant_provider_readiness_exposes_focused_tenant_overlay_inventory
     let openai_provider = provider_json_by_id(&readiness_json, "provider-openai-official");
     assert_eq!(openai_provider["display_name"], "OpenAI Official");
     assert_eq!(openai_provider["protocol_kind"], "openai");
-    assert_eq!(openai_provider["integration"]["mode"], "standard_passthrough");
+    assert_eq!(
+        openai_provider["integration"]["mode"],
+        "standard_passthrough"
+    );
     assert_eq!(openai_provider["credential_readiness"]["ready"], false);
     assert_eq!(openai_provider["credential_readiness"]["state"], "missing");
     assert!(openai_provider["execution"].is_null());
@@ -860,7 +882,10 @@ async fn list_providers_exposes_native_dynamic_raw_plugin_execution_view() {
     assert_eq!(provider["execution"]["supports_provider_adapter"], true);
     assert_eq!(provider["execution"]["supports_raw_plugin"], true);
     assert_eq!(provider["execution"]["fail_closed"], false);
-    assert_eq!(provider["execution"]["route_readiness"]["openai"]["ready"], true);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["openai"]["ready"],
+        true
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["openai"]["mode"],
         "provider_adapter"
@@ -873,7 +898,10 @@ async fn list_providers_exposes_native_dynamic_raw_plugin_execution_view() {
         provider["execution"]["route_readiness"]["anthropic"]["mode"],
         "standard_passthrough"
     );
-    assert_eq!(provider["execution"]["route_readiness"]["gemini"]["ready"], true);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["gemini"]["ready"],
+        true
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["gemini"]["mode"],
         "raw_plugin"
@@ -946,7 +974,10 @@ async fn list_providers_exposes_fail_closed_execution_view_for_broken_explicit_b
         provider["execution"]["reason"],
         "explicit runtime binding is not currently loadable, so gateway execution would fail closed instead of silently downgrading"
     );
-    assert_eq!(provider["execution"]["route_readiness"]["openai"]["ready"], false);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["openai"]["ready"],
+        false
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["openai"]["mode"],
         "fail_closed"
@@ -959,7 +990,10 @@ async fn list_providers_exposes_fail_closed_execution_view_for_broken_explicit_b
         provider["execution"]["route_readiness"]["anthropic"]["mode"],
         "standard_passthrough"
     );
-    assert_eq!(provider["execution"]["route_readiness"]["gemini"]["ready"], false);
+    assert_eq!(
+        provider["execution"]["route_readiness"]["gemini"]["ready"],
+        false
+    );
     assert_eq!(
         provider["execution"]["route_readiness"]["gemini"]["mode"],
         "fail_closed"
@@ -1177,7 +1211,10 @@ async fn create_model_price_requires_provider_model_support() {
         .await
         .unwrap();
 
-    assert_eq!(create_price_without_provider_model.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        create_price_without_provider_model.status(),
+        StatusCode::BAD_REQUEST
+    );
 
     let create_provider_model = app
         .clone()

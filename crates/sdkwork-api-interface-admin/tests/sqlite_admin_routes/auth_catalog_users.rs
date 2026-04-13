@@ -213,7 +213,9 @@ async fn builtin_channels_channel_models_and_model_prices_are_exposed_through_ad
             && item["proxy_provider_id"] == "provider-openai-official"
             && item["price_source_kind"] == "official"
             && item["billing_notes"] == "Published from official OpenAI pricing."
-            && item["pricing_tiers"].as_array().is_some_and(|tiers| tiers.len() == 1)
+            && item["pricing_tiers"]
+                .as_array()
+                .is_some_and(|tiers| tiers.len() == 1)
     }));
 }
 

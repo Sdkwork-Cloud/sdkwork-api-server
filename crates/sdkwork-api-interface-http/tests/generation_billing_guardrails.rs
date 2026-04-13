@@ -3,7 +3,9 @@ use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::routing::post;
 use axum::{Json, Router};
-use sdkwork_api_app_identity::persist_gateway_api_key_with_metadata;
+use sdkwork_api_app_identity::{
+    persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput,
+};
 use serde_json::Value;
 use sqlx::SqlitePool;
 use std::sync::{Arc, Mutex};
@@ -348,14 +350,16 @@ async fn stateful_completions_route_inherits_api_key_group_accounting_mode_for_b
     let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
     let api_key = persist_gateway_api_key_with_metadata(
         &store,
-        tenant_id,
-        project_id,
-        "live",
-        "BYOK test key",
-        None,
-        None,
-        None,
-        Some(&group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id,
+            project_id,
+            environment: "live",
+            label: "BYOK test key",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: Some(&group_id),
+        },
     )
     .await
     .unwrap()

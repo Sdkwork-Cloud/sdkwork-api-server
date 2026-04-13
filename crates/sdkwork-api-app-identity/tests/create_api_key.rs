@@ -1,12 +1,15 @@
 use sdkwork_api_app_identity::CreateGatewayApiKey;
 use sdkwork_api_app_identity::{
     hash_gateway_api_key, list_gateway_api_keys, persist_gateway_api_key_with_metadata,
+    resolve_canonical_gateway_request_context_from_api_key,
     resolve_gateway_auth_subject_from_api_key, resolve_gateway_request_context,
+    PersistGatewayApiKeyInput,
 };
 use sdkwork_api_domain_identity::{
     ApiKeyGroupRecord, CanonicalApiKeyRecord, GatewayApiKeyRecord, GatewayAuthType,
     IdentityUserRecord,
 };
+use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_core::IdentityKernelStore;
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
@@ -33,14 +36,16 @@ async fn persisted_gateway_api_keys_can_be_listed_with_governance_metadata() {
 
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        Some(1_900_000_000_000),
-        None,
-        Some("Gateway launch credential"),
-        None,
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: Some(1_900_000_000_000),
+            plaintext_key: None,
+            notes: Some("Gateway launch credential"),
+            api_key_group_id: None,
+        },
     )
     .await
     .unwrap();
@@ -64,14 +69,16 @@ async fn persisted_gateway_api_keys_do_not_retain_plaintext_after_create() {
 
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        Some(1_900_000_000_000),
-        None,
-        Some("Gateway launch credential"),
-        None,
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: Some(1_900_000_000_000),
+            plaintext_key: None,
+            notes: Some("Gateway launch credential"),
+            api_key_group_id: None,
+        },
     )
     .await
     .unwrap();
@@ -96,14 +103,16 @@ async fn resolving_gateway_context_updates_last_used_and_rejects_expired_keys() 
 
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        None,
-        None,
-        None,
-        None,
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: None,
+        },
     )
     .await
     .unwrap();
@@ -189,14 +198,16 @@ async fn persisted_gateway_api_key_can_be_bound_to_an_api_key_group() {
 
     let created = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        Some(1_900_000_000_000),
-        None,
-        Some("Gateway launch credential"),
-        Some(&group.group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: Some(1_900_000_000_000),
+            plaintext_key: None,
+            notes: Some("Gateway launch credential"),
+            api_key_group_id: Some(&group.group_id),
+        },
     )
     .await
     .unwrap();
@@ -239,14 +250,16 @@ async fn persisted_gateway_api_key_rejects_api_key_group_with_mismatched_environ
 
     let error = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        None,
-        None,
-        None,
-        Some(&group.group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: Some(&group.group_id),
+        },
     )
     .await
     .unwrap_err();
@@ -301,4 +314,58 @@ async fn resolving_gateway_auth_subject_uses_canonical_api_key_scope() {
         .unwrap()
         .unwrap();
     assert!(persisted.last_used_at_ms.is_some());
+}
+
+#[tokio::test]
+async fn canonical_api_key_can_resolve_gateway_request_context_when_tenant_has_single_project() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let plaintext = "sk-canonical-only-live";
+    let hashed_key = hash_gateway_api_key(plaintext);
+
+    store
+        .insert_tenant(&Tenant::new("1001", "Canonical Tenant"))
+        .await
+        .unwrap();
+    store
+        .insert_project(&Project::new(
+            "1001",
+            "project-canonical-1001",
+            "Canonical Project",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_identity_user_record(
+            &IdentityUserRecord::new(9001, 1001, 2002)
+                .with_display_name(Some("Canonical User".to_owned()))
+                .with_created_at_ms(10)
+                .with_updated_at_ms(10),
+        )
+        .await
+        .unwrap();
+    store
+        .insert_canonical_api_key_record(
+            &CanonicalApiKeyRecord::new(778899, 1001, 2002, 9001, &hashed_key)
+                .with_key_prefix("skw_live")
+                .with_display_name("Canonical key")
+                .with_created_at_ms(20)
+                .with_updated_at_ms(20),
+        )
+        .await
+        .unwrap();
+
+    let context = resolve_canonical_gateway_request_context_from_api_key(&store, plaintext)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(context.tenant_id, "1001");
+    assert_eq!(context.project_id, "project-canonical-1001");
+    assert_eq!(context.environment, "live");
+    assert_eq!(context.api_key_hash, hashed_key);
+    assert_eq!(context.canonical_tenant_id, Some(1001));
+    assert_eq!(context.canonical_organization_id, Some(2002));
+    assert_eq!(context.canonical_user_id, Some(9001));
+    assert_eq!(context.canonical_api_key_id, Some(778899));
 }

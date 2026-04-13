@@ -12,8 +12,8 @@ use jsonwebtoken::{
 };
 use sdkwork_api_domain_billing::BillingAccountingMode;
 use sdkwork_api_domain_identity::{
-    AdminUserProfile, AdminUserRecord, ApiKeyGroupRecord, GatewayApiKeyRecord, GatewayAuthSubject,
-    PortalUserProfile, PortalUserRecord,
+    AdminUserProfile, AdminUserRecord, AdminUserRole, ApiKeyGroupRecord, GatewayApiKeyRecord,
+    GatewayAuthSubject, PortalUserProfile, PortalUserRecord,
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_core::{AdminStore, IdentityKernelStore};

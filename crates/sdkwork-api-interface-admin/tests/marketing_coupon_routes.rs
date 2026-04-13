@@ -152,8 +152,8 @@ async fn approve_marketing_campaign(
 }
 
 #[tokio::test]
-async fn admin_marketing_routes_create_and_list_canonical_coupon_records_without_legacy_coupon_route()
-{
+async fn admin_marketing_routes_create_and_list_canonical_coupon_records_without_legacy_coupon_route(
+) {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
@@ -629,8 +629,14 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
         published_json["audit"]["reason"],
         "publish canonical coupon campaign"
     );
-    assert_eq!(published_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(published_json["audit"]["request_id"], "sdkw-test-campaign-publish-1");
+    assert_eq!(
+        published_json["audit"]["operator_id"],
+        "admin_local_default"
+    );
+    assert_eq!(
+        published_json["audit"]["request_id"],
+        "sdkw-test-campaign-publish-1"
+    );
 
     let scheduled = app
         .clone()
@@ -676,7 +682,10 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
     assert_eq!(retired_json["audit"]["action"], "retire");
     assert_eq!(retired_json["audit"]["outcome"], "applied");
     assert_eq!(retired_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(retired_json["audit"]["request_id"], "sdkw-test-campaign-retire-1");
+    assert_eq!(
+        retired_json["audit"]["request_id"],
+        "sdkw-test-campaign-retire-1"
+    );
 
     let publish_audits = app
         .clone()
@@ -695,7 +704,10 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
     assert_eq!(publish_audits_json.as_array().unwrap().len(), 4);
     assert_eq!(publish_audits_json[0]["action"], "retire");
     assert_eq!(publish_audits_json[0]["outcome"], "applied");
-    assert_eq!(publish_audits_json[0]["request_id"], "sdkw-test-campaign-retire-1");
+    assert_eq!(
+        publish_audits_json[0]["request_id"],
+        "sdkw-test-campaign-retire-1"
+    );
     assert_eq!(publish_audits_json[1]["action"], "publish");
     assert_eq!(publish_audits_json[1]["outcome"], "applied");
     assert_eq!(
@@ -835,12 +847,10 @@ async fn admin_marketing_campaign_publish_rejects_future_coupon_campaign() {
         .await
         .unwrap();
     assert_eq!(published.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        read_json(published).await["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("future start_at_ms")
-    );
+    assert!(read_json(published).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("future start_at_ms"));
 
     let audits = app
         .oneshot(
@@ -876,7 +886,8 @@ async fn admin_marketing_campaign_publish_rejects_future_coupon_campaign() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|reason| reason == "campaign has future start_at_ms and must be scheduled before publish"));
+        .any(|reason| reason
+            == "campaign has future start_at_ms and must be scheduled before publish"));
 }
 
 #[tokio::test]
@@ -975,10 +986,7 @@ async fn admin_marketing_campaign_revision_governance_routes_clone_compare_rejec
         "campaign_revision_clone"
     );
     assert_eq!(cloned_json["detail"]["campaign"]["status"], "draft");
-    assert_eq!(
-        cloned_json["detail"]["campaign"]["approval_state"],
-        "draft"
-    );
+    assert_eq!(cloned_json["detail"]["campaign"]["approval_state"], "draft");
     assert_eq!(cloned_json["detail"]["campaign"]["revision"], 2);
     assert_eq!(
         cloned_json["detail"]["campaign"]["parent_marketing_campaign_id"],
@@ -1037,7 +1045,10 @@ async fn admin_marketing_campaign_revision_governance_routes_clone_compare_rejec
                 .uri("/admin/marketing/campaigns/campaign_revision_clone/publish")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .header("x-request-id", "sdkw-test-campaign-clone-publish-rejected-1")
+                .header(
+                    "x-request-id",
+                    "sdkw-test-campaign-clone-publish-rejected-1",
+                )
                 .body(Body::from(
                     r#"{"reason":"attempt publish before approval"}"#,
                 ))
@@ -1413,8 +1424,14 @@ async fn admin_marketing_budget_lifecycle_routes_apply_coupon_semantic_actions()
         activated_json["audit"]["reason"],
         "activate canonical campaign budget"
     );
-    assert_eq!(activated_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(activated_json["audit"]["request_id"], "sdkw-test-budget-activate-1");
+    assert_eq!(
+        activated_json["audit"]["operator_id"],
+        "admin_local_default"
+    );
+    assert_eq!(
+        activated_json["audit"]["request_id"],
+        "sdkw-test-budget-activate-1"
+    );
 
     let closed = app
         .clone()
@@ -1440,7 +1457,10 @@ async fn admin_marketing_budget_lifecycle_routes_apply_coupon_semantic_actions()
     assert_eq!(closed_json["audit"]["previous_status"], "active");
     assert_eq!(closed_json["audit"]["resulting_status"], "closed");
     assert_eq!(closed_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(closed_json["audit"]["request_id"], "sdkw-test-budget-close-1");
+    assert_eq!(
+        closed_json["audit"]["request_id"],
+        "sdkw-test-budget-close-1"
+    );
 
     let audits = app
         .oneshot(
@@ -1562,12 +1582,10 @@ async fn admin_marketing_budget_activate_rejects_budget_without_headroom() {
         .await
         .unwrap();
     assert_eq!(activated.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        read_json(activated).await["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("available headroom")
-    );
+    assert!(read_json(activated).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("available headroom"));
 
     let audits = app
         .oneshot(
@@ -1682,7 +1700,10 @@ async fn admin_marketing_coupon_code_lifecycle_routes_apply_coupon_semantic_acti
     assert_eq!(disabled_json["audit"]["previous_status"], "available");
     assert_eq!(disabled_json["audit"]["resulting_status"], "disabled");
     assert_eq!(disabled_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(disabled_json["audit"]["request_id"], "sdkw-test-code-disable-1");
+    assert_eq!(
+        disabled_json["audit"]["request_id"],
+        "sdkw-test-code-disable-1"
+    );
 
     let restored = app
         .clone()
@@ -1700,13 +1721,19 @@ async fn admin_marketing_coupon_code_lifecycle_routes_apply_coupon_semantic_acti
         .unwrap();
     assert_eq!(restored.status(), StatusCode::OK);
     let restored_json = read_json(restored).await;
-    assert_eq!(restored_json["detail"]["coupon_code"]["status"], "available");
+    assert_eq!(
+        restored_json["detail"]["coupon_code"]["status"],
+        "available"
+    );
     assert_eq!(restored_json["audit"]["action"], "restore");
     assert_eq!(restored_json["audit"]["outcome"], "applied");
     assert_eq!(restored_json["audit"]["previous_status"], "disabled");
     assert_eq!(restored_json["audit"]["resulting_status"], "available");
     assert_eq!(restored_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(restored_json["audit"]["request_id"], "sdkw-test-code-restore-1");
+    assert_eq!(
+        restored_json["audit"]["request_id"],
+        "sdkw-test-code-restore-1"
+    );
 
     let audits = app
         .oneshot(
@@ -1805,12 +1832,10 @@ async fn admin_marketing_coupon_code_restore_rejects_expired_coupon_code() {
         .await
         .unwrap();
     assert_eq!(restored.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        read_json(restored).await["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("expired")
-    );
+    assert!(read_json(restored).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("expired"));
 
     let audits = app
         .oneshot(
@@ -1934,7 +1959,10 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         .unwrap();
     assert_eq!(published.status(), StatusCode::OK);
     let published_json = read_json(published).await;
-    assert_eq!(published_json["detail"]["coupon_template"]["status"], "active");
+    assert_eq!(
+        published_json["detail"]["coupon_template"]["status"],
+        "active"
+    );
     assert_eq!(published_json["audit"]["action"], "publish");
     assert_eq!(published_json["audit"]["previous_status"], "draft");
     assert_eq!(published_json["audit"]["resulting_status"], "active");
@@ -1942,8 +1970,14 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         published_json["audit"]["reason"],
         "publish canonical coupon template"
     );
-    assert_eq!(published_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(published_json["audit"]["request_id"], "sdkw-test-template-publish-1");
+    assert_eq!(
+        published_json["audit"]["operator_id"],
+        "admin_local_default"
+    );
+    assert_eq!(
+        published_json["audit"]["request_id"],
+        "sdkw-test-template-publish-1"
+    );
 
     let scheduled = app
         .clone()
@@ -1963,7 +1997,10 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         .unwrap();
     assert_eq!(scheduled.status(), StatusCode::OK);
     let scheduled_json = read_json(scheduled).await;
-    assert_eq!(scheduled_json["detail"]["coupon_template"]["status"], "scheduled");
+    assert_eq!(
+        scheduled_json["detail"]["coupon_template"]["status"],
+        "scheduled"
+    );
     assert_eq!(scheduled_json["audit"]["action"], "schedule");
     assert_eq!(scheduled_json["audit"]["previous_status"], "draft");
     assert_eq!(scheduled_json["audit"]["resulting_status"], "scheduled");
@@ -1987,20 +2024,28 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         .unwrap();
     assert_eq!(retired.status(), StatusCode::OK);
     let retired_json = read_json(retired).await;
-    assert_eq!(retired_json["detail"]["coupon_template"]["status"], "archived");
+    assert_eq!(
+        retired_json["detail"]["coupon_template"]["status"],
+        "archived"
+    );
     assert_eq!(retired_json["audit"]["action"], "retire");
     assert_eq!(retired_json["audit"]["previous_status"], "active");
     assert_eq!(retired_json["audit"]["resulting_status"], "archived");
     assert_eq!(retired_json["audit"]["outcome"], "applied");
     assert_eq!(retired_json["audit"]["operator_id"], "admin_local_default");
-    assert_eq!(retired_json["audit"]["request_id"], "sdkw-test-template-retire-1");
+    assert_eq!(
+        retired_json["audit"]["request_id"],
+        "sdkw-test-template-retire-1"
+    );
 
     let publish_audits = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/admin/marketing/coupon-templates/template_lifecycle_publish/lifecycle-audits")
+                .uri(
+                    "/admin/marketing/coupon-templates/template_lifecycle_publish/lifecycle-audits",
+                )
                 .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
@@ -2011,7 +2056,10 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
     let publish_audits_json = read_json(publish_audits).await;
     assert_eq!(publish_audits_json.as_array().unwrap().len(), 4);
     assert_eq!(publish_audits_json[0]["action"], "retire");
-    assert_eq!(publish_audits_json[0]["request_id"], "sdkw-test-template-retire-1");
+    assert_eq!(
+        publish_audits_json[0]["request_id"],
+        "sdkw-test-template-retire-1"
+    );
     assert_eq!(publish_audits_json[1]["action"], "publish");
     assert_eq!(
         publish_audits_json[1]["request_id"],
@@ -2109,9 +2157,7 @@ async fn admin_marketing_coupon_template_publish_rejects_future_activation() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(
-                    "/admin/marketing/coupon-templates/template_publish_future_activation/publish",
-                )
+                .uri("/admin/marketing/coupon-templates/template_publish_future_activation/publish")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .header("x-request-id", "sdkw-test-template-publish-rejected-1")
@@ -2123,12 +2169,10 @@ async fn admin_marketing_coupon_template_publish_rejects_future_activation() {
         .await
         .unwrap();
     assert_eq!(published.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        read_json(published).await["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("future activation_at_ms")
-    );
+    assert!(read_json(published).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("future activation_at_ms"));
 
     let audits = app
         .oneshot(
@@ -2296,7 +2340,10 @@ async fn admin_marketing_coupon_template_revision_governance_routes_clone_compar
                 .uri("/admin/marketing/coupon-templates/template_revision_clone/publish")
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .header("x-request-id", "sdkw-test-template-clone-publish-rejected-1")
+                .header(
+                    "x-request-id",
+                    "sdkw-test-template-clone-publish-rejected-1",
+                )
                 .body(Body::from(
                     r#"{"reason":"attempt publish before approval"}"#,
                 ))
@@ -2345,9 +2392,7 @@ async fn admin_marketing_coupon_template_revision_governance_routes_clone_compar
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .header("x-request-id", "sdkw-test-template-approve-1")
-                .body(Body::from(
-                    r#"{"reason":"approve governed revision"}"#,
-                ))
+                .body(Body::from(r#"{"reason":"approve governed revision"}"#))
                 .unwrap(),
         )
         .await
@@ -2378,7 +2423,10 @@ async fn admin_marketing_coupon_template_revision_governance_routes_clone_compar
         .unwrap();
     assert_eq!(published.status(), StatusCode::OK);
     let published_json = read_json(published).await;
-    assert_eq!(published_json["detail"]["coupon_template"]["status"], "active");
+    assert_eq!(
+        published_json["detail"]["coupon_template"]["status"],
+        "active"
+    );
     assert_eq!(
         published_json["detail"]["coupon_template"]["approval_state"],
         "approved"

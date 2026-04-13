@@ -1,6 +1,7 @@
 use sdkwork_api_app_identity::{
     change_admin_password, load_admin_user_profile, login_admin_user, verify_jwt,
 };
+use sdkwork_api_domain_identity::AdminUserRole;
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
@@ -24,17 +25,20 @@ async fn default_admin_login_bootstraps_profile_and_jwt() {
 
     assert_eq!(session.user.email, "admin@sdkwork.local");
     assert_eq!(session.user.display_name, "Admin Operator");
+    assert_eq!(session.user.role, AdminUserRole::SuperAdmin);
     assert!(session.user.active);
     assert!(session.token.len() > 10);
 
     let claims = verify_jwt(&session.token, "admin-test-secret").unwrap();
     assert_eq!(claims.sub, session.user.id);
+    assert_eq!(claims.role, AdminUserRole::SuperAdmin);
 
     let user = load_admin_user_profile(&store, &session.user.id)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(user.email, "admin@sdkwork.local");
+    assert_eq!(user.role, AdminUserRole::SuperAdmin);
 }
 
 #[tokio::test]

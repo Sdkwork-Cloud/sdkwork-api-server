@@ -319,8 +319,14 @@ async fn portal_stripe_webhook_processes_configured_payment_method_and_is_idempo
     let first_json = read_json(first_response).await;
     assert_eq!(first_json["processing_status"], "processed");
     assert_eq!(first_json["order_id"], order_id);
-    assert_eq!(first_json["payment_attempt_id"], "payatt_stripe_webhook_001");
-    assert_eq!(first_json["provider_event_id"], "evt_test_checkout_completed");
+    assert_eq!(
+        first_json["payment_attempt_id"],
+        "payatt_stripe_webhook_001"
+    );
+    assert_eq!(
+        first_json["provider_event_id"],
+        "evt_test_checkout_completed"
+    );
 
     let order_response = app
         .clone()

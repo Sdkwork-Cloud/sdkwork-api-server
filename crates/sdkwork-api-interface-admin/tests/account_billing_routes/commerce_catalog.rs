@@ -171,11 +171,14 @@ async fn admin_commerce_catalog_publication_detail_exposes_governed_pricing_cont
         .iter()
         .any(|rate| rate["pricing_rate_id"] == 9203));
     assert_eq!(json["actionability"]["publish"]["allowed"], false);
-    assert!(json["actionability"]["publish"]["reasons"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|reason| reason == "publication effective_from_ms is in the future; schedule instead"));
+    assert!(
+        json["actionability"]["publish"]["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|reason| reason
+                == "publication effective_from_ms is in the future; schedule instead")
+    );
     assert_eq!(json["actionability"]["schedule"]["allowed"], true);
     assert!(json["actionability"]["schedule"]["reasons"]
         .as_array()
@@ -306,7 +309,10 @@ async fn admin_commerce_catalog_publication_publish_mutation_updates_governed_pu
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    assert_eq!(json["detail"]["projection"]["publication"]["status"], "published");
+    assert_eq!(
+        json["detail"]["projection"]["publication"]["status"],
+        "published"
+    );
     assert_eq!(json["detail"]["governed_pricing_plan"]["status"], "active");
     assert_eq!(json["detail"]["actionability"]["publish"]["allowed"], false);
     assert_eq!(json["detail"]["actionability"]["retire"]["allowed"], true);
@@ -333,7 +339,10 @@ async fn admin_commerce_catalog_publication_publish_mutation_updates_governed_pu
     assert_eq!(audit_records.len(), 1);
     assert_eq!(audit_records[0].action.as_str(), "publish");
     assert_eq!(audit_records[0].outcome.as_str(), "applied");
-    assert_eq!(audit_records[0].request_id, "sdkw-test-publication-publish-1");
+    assert_eq!(
+        audit_records[0].request_id,
+        "sdkw-test-publication-publish-1"
+    );
 }
 
 #[tokio::test]
@@ -388,10 +397,16 @@ async fn admin_commerce_catalog_publication_schedule_mutation_marks_publication_
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    assert_eq!(json["detail"]["projection"]["publication"]["status"], "draft");
+    assert_eq!(
+        json["detail"]["projection"]["publication"]["status"],
+        "draft"
+    );
     assert_eq!(json["detail"]["governed_pricing_plan"]["status"], "planned");
     assert_eq!(json["detail"]["actionability"]["publish"]["allowed"], false);
-    assert_eq!(json["detail"]["actionability"]["schedule"]["allowed"], false);
+    assert_eq!(
+        json["detail"]["actionability"]["schedule"]["allowed"],
+        false
+    );
     assert!(json["detail"]["actionability"]["schedule"]["reasons"]
         .as_array()
         .unwrap()
@@ -406,8 +421,8 @@ async fn admin_commerce_catalog_publication_schedule_mutation_marks_publication_
 }
 
 #[tokio::test]
-async fn admin_commerce_catalog_publication_retire_mutation_archives_publication_and_records_audit(
-) {
+async fn admin_commerce_catalog_publication_retire_mutation_archives_publication_and_records_audit()
+{
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool.clone());
 
@@ -457,8 +472,14 @@ async fn admin_commerce_catalog_publication_retire_mutation_archives_publication
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    assert_eq!(json["detail"]["projection"]["publication"]["status"], "archived");
-    assert_eq!(json["detail"]["governed_pricing_plan"]["status"], "archived");
+    assert_eq!(
+        json["detail"]["projection"]["publication"]["status"],
+        "archived"
+    );
+    assert_eq!(
+        json["detail"]["governed_pricing_plan"]["status"],
+        "archived"
+    );
     assert_eq!(json["detail"]["actionability"]["retire"]["allowed"], false);
     assert_eq!(json["audit"]["action"], "retire");
     assert_eq!(json["audit"]["outcome"], "applied");

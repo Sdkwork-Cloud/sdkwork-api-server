@@ -644,8 +644,8 @@ impl PostgresAdminStore {
         .bind(&config.key_reference)
         .bind(&config.base_url)
         .bind(config.enabled)
-        .bind(i64::try_from(now)?)
-        .bind(i64::try_from(now)?)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
 
@@ -1164,8 +1164,8 @@ impl PostgresAdminStore {
         .bind(record.supports_tool_usage_metrics)
         .bind(record.is_default_route)
         .bind(record.is_active)
-        .bind(i64::try_from(now)?)
-        .bind(i64::try_from(now)?)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(record.clone())

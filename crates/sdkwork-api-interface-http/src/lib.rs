@@ -245,7 +245,8 @@ use sdkwork_api_app_gateway::{
     relay_webhook_from_store, with_request_api_key_group_id, with_request_routing_region,
 };
 use sdkwork_api_app_identity::{
-    GatewayRequestContext as IdentityGatewayRequestContext, resolve_gateway_request_context,
+    GatewayRequestContext as IdentityGatewayRequestContext,
+    resolve_canonical_gateway_request_context_from_api_key, resolve_gateway_request_context,
 };
 use sdkwork_api_app_rate_limit::check_rate_limit;
 use sdkwork_api_app_usage::persist_usage_record_with_tokens_and_facts;
@@ -340,7 +341,7 @@ use sdkwork_api_policy_billing::{
     builtin_billing_policy_registry,
 };
 use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions, ProviderStreamOutput};
-use sdkwork_api_storage_core::{AdminStore, CommercialKernelStore, Reloadable};
+use sdkwork_api_storage_core::{AdminStore, CommercialKernelStore, IdentityKernelStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

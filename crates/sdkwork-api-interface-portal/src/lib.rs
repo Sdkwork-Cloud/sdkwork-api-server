@@ -37,17 +37,16 @@ use sdkwork_api_app_billing::{
     CommercialBillingAdminKernel,
 };
 use sdkwork_api_app_commerce::{
-    apply_portal_commerce_payment_event, apply_portal_commerce_payment_event_with_billing,
-    cancel_portal_commerce_order, create_portal_commerce_payment_attempt,
-    list_portal_commerce_payment_attempts, list_portal_commerce_payment_methods,
-    list_project_commerce_orders, load_portal_commerce_catalog,
-    load_portal_commerce_checkout_session, load_portal_commerce_checkout_session_with_policy,
+    apply_portal_commerce_payment_event_with_billing, cancel_portal_commerce_order,
+    create_portal_commerce_payment_attempt, list_portal_commerce_payment_attempts,
+    list_portal_commerce_payment_methods, list_project_commerce_orders,
+    load_portal_commerce_catalog, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_portal_commerce_payment_attempt, load_project_membership,
     portal_commerce_product_kind, portal_commerce_transaction_kind, preview_portal_commerce_quote,
     process_portal_stripe_webhook, reclaim_expired_coupon_reservations_for_code_if_needed,
-    settle_portal_commerce_order, settle_portal_commerce_order_with_billing,
-    submit_portal_commerce_order, CommerceError, CommercePaymentAttemptRecord, PaymentMethodRecord,
-    PortalCommerceCatalog, PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
+    settle_portal_commerce_order_with_billing, submit_portal_commerce_order, CommerceError,
+    CommercePaymentAttemptRecord, PaymentMethodRecord, PortalCommerceCatalog,
+    PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
     PortalCommercePaymentAttemptCreateRequest, PortalCommercePaymentEventRecord,
     PortalCommercePaymentEventRequest, PortalCommerceQuote, PortalCommerceQuoteRequest,
     PortalCommerceWebhookAck, PortalProjectMembershipRecord,
@@ -119,7 +118,6 @@ use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
-use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Debug, Deserialize)]
 struct CreateCommerceOrderRefundRequest {
@@ -780,80 +778,6 @@ fn identity_store_kernel(
     })
 }
 
-fn browser_cors_layer() -> CorsLayer {
-    CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any)
-}
-
-async fn register_handler(
-    State(state): State<PortalApiState>,
-    Json(request): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<PortalAuthSession>), (StatusCode, Json<ErrorResponse>)> {
-    register_portal_user(
-        state.store.as_ref(),
-        &request.email,
-        &request.password,
-        &request.display_name,
-        &state.jwt_signing_secret,
-    )
-    .await
-    .map(|session| (StatusCode::CREATED, Json(session)))
-    .map_err(portal_error_response)
-}
-
-async fn login_handler(
-    State(state): State<PortalApiState>,
-    Json(request): Json<LoginRequest>,
-) -> Result<Json<PortalAuthSession>, (StatusCode, Json<ErrorResponse>)> {
-    login_portal_user(
-        state.store.as_ref(),
-        &request.email,
-        &request.password,
-        &state.jwt_signing_secret,
-    )
-    .await
-    .map(Json)
-    .map_err(portal_error_response)
-}
-
-async fn me_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<PortalUserProfile>, StatusCode> {
-    load_portal_user_profile(state.store.as_ref(), &claims.claims().sub)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .map(Json)
-        .ok_or(StatusCode::UNAUTHORIZED)
-}
-
-async fn change_password_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-    Json(request): Json<ChangePasswordRequest>,
-) -> Result<Json<PortalUserProfile>, (StatusCode, Json<ErrorResponse>)> {
-    change_portal_password(
-        state.store.as_ref(),
-        &claims.claims().sub,
-        &request.current_password,
-        &request.new_password,
-    )
-    .await
-    .map(Json)
-    .map_err(portal_error_response)
-}
-
-async fn workspace_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<PortalWorkspaceSummary>, StatusCode> {
-    load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
-        .await
-        .map(Json)
-}
-
 async fn list_commerce_order_center_handler(
     claims: AuthenticatedPortalClaims,
     State(state): State<PortalApiState>,
@@ -1013,36 +937,6 @@ async fn list_commerce_payment_events_handler(
     .await
     .map(Json)
     .map_err(portal_payment_error_response)
-}
-
-async fn list_usage_records_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<Vec<UsageRecord>>, StatusCode> {
-    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
-    load_project_usage_records(state.store.as_ref(), &workspace.project.id)
-        .await
-        .map(Json)
-}
-
-async fn usage_summary_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<UsageSummary>, StatusCode> {
-    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
-    let usage_records =
-        load_project_usage_records(state.store.as_ref(), &workspace.project.id).await?;
-    Ok(Json(summarize_usage_records(&usage_records)))
-}
-
-async fn billing_summary_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<ProjectBillingSummary>, StatusCode> {
-    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
-    load_project_billing_summary(state.store.as_ref(), &workspace.project.id)
-        .await
-        .map(Json)
 }
 
 async fn account_history_handler(
@@ -1538,6 +1432,10 @@ fn portal_workspace_request_context(workspace: &PortalWorkspaceSummary) -> Gatew
         environment: "portal".to_owned(),
         api_key_hash: "portal_workspace_scope".to_owned(),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     }
 }
 

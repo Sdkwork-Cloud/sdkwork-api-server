@@ -6,6 +6,7 @@ pub(crate) type PortalResult<T> = std::result::Result<T, PortalIdentityError>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Claims {
     pub sub: String,
+    pub role: AdminUserRole,
     pub iss: String,
     pub aud: String,
     pub exp: usize,
@@ -31,6 +32,14 @@ pub struct GatewayRequestContext {
     pub environment: String,
     pub api_key_hash: String,
     pub api_key_group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_tenant_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_organization_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_user_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_api_key_id: Option<u64>,
 }
 
 impl GatewayRequestContext {
@@ -48,6 +57,20 @@ impl GatewayRequestContext {
 
     pub fn api_key_group_id(&self) -> Option<&str> {
         self.api_key_group_id.as_deref()
+    }
+
+    pub fn with_canonical_subject(
+        mut self,
+        tenant_id: u64,
+        organization_id: u64,
+        user_id: u64,
+        api_key_id: Option<u64>,
+    ) -> Self {
+        self.canonical_tenant_id = Some(tenant_id);
+        self.canonical_organization_id = Some(organization_id);
+        self.canonical_user_id = Some(user_id);
+        self.canonical_api_key_id = api_key_id;
+        self
     }
 }
 

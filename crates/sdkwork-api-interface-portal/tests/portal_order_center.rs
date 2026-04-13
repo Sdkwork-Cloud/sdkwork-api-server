@@ -443,7 +443,10 @@ async fn portal_paid_order_prepares_canonical_payment_artifacts() {
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(order_center_entries(&json).len(), 1);
-    assert_eq!(order_center_entries(&json)[0]["order"]["order_id"], order_id);
+    assert_eq!(
+        order_center_entries(&json)[0]["order"]["order_id"],
+        order_id
+    );
     assert_eq!(
         order_center_entries(&json)[0]["payment_order"]["commerce_order_id"],
         order_id
@@ -460,7 +463,10 @@ async fn portal_paid_order_prepares_canonical_payment_artifacts() {
         0
     );
     assert_eq!(
-        order_center_entries(&json)[0]["refunds"].as_array().unwrap().len(),
+        order_center_entries(&json)[0]["refunds"]
+            .as_array()
+            .unwrap()
+            .len(),
         0
     );
     assert_eq!(order_center_entries(&json)[0]["refundable_amount_minor"], 0);
@@ -548,7 +554,10 @@ async fn portal_order_center_repairs_missing_checkout_artifacts_for_payable_orde
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(order_center_entries(&json).len(), 1);
-    assert_eq!(order_center_entries(&json)[0]["order"]["order_id"], order_id);
+    assert_eq!(
+        order_center_entries(&json)[0]["order"]["order_id"],
+        order_id
+    );
     assert_eq!(
         order_center_entries(&json)[0]["payment_order"]["commerce_order_id"],
         order_id
@@ -619,7 +628,10 @@ async fn portal_order_center_includes_payment_and_refund_state() {
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
     assert_eq!(order_center_entries(&json).len(), 1);
-    assert_eq!(order_center_entries(&json)[0]["order"]["order_id"], order_id);
+    assert_eq!(
+        order_center_entries(&json)[0]["order"]["order_id"],
+        order_id
+    );
     assert_eq!(
         order_center_entries(&json)[0]["payment_order"]["payment_order_id"],
         payment_order.payment_order_id
@@ -763,7 +775,10 @@ async fn portal_order_center_uses_captured_amount_for_partial_capture_refunds() 
         order_center_entries(&json)[0]["payment_transactions"][0]["amount_minor"],
         1000
     );
-    assert_eq!(order_center_entries(&json)[0]["refundable_amount_minor"], 1000);
+    assert_eq!(
+        order_center_entries(&json)[0]["refundable_amount_minor"],
+        1000
+    );
 }
 
 #[tokio::test]
@@ -837,7 +852,10 @@ async fn portal_order_center_lists_multiple_capture_transactions_with_aggregated
             .len(),
         2
     );
-    assert_eq!(order_center_entries(&json)[0]["refundable_amount_minor"], 2500);
+    assert_eq!(
+        order_center_entries(&json)[0]["refundable_amount_minor"],
+        2500
+    );
 }
 
 #[tokio::test]
@@ -902,7 +920,10 @@ async fn portal_order_center_caps_refundable_amount_after_overcapture() {
         order_center_entries(&json)[0]["payment_transactions"][0]["amount_minor"],
         4000
     );
-    assert_eq!(order_center_entries(&json)[0]["refundable_amount_minor"], 4000);
+    assert_eq!(
+        order_center_entries(&json)[0]["refundable_amount_minor"],
+        4000
+    );
 }
 
 #[tokio::test]
@@ -1191,8 +1212,9 @@ async fn portal_order_center_exposes_failover_attempts_and_active_retry_session(
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    let entry = json
-        ["orders"].as_array().unwrap()
+    let entry = json["orders"]
+        .as_array()
+        .unwrap()
         .iter()
         .find(|entry| entry["order"]["order_id"] == order_id)
         .unwrap();

@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 #[async_trait]
 pub trait GatewayCommercialBillingKernel: Send + Sync {
@@ -245,4 +245,3 @@ where
             .await
     }
 }
-

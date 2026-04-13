@@ -1,9 +1,10 @@
 use super::*;
 
 pub(crate) async fn list_usage_records_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<UsageRecord>>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     list_usage_records(state.store.as_ref())
         .await
         .map(Json)
@@ -11,9 +12,10 @@ pub(crate) async fn list_usage_records_handler(
 }
 
 pub(crate) async fn usage_summary_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<UsageSummary>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     summarize_usage_records_from_store(state.store.as_ref())
         .await
         .map(Json)
@@ -21,9 +23,10 @@ pub(crate) async fn usage_summary_handler(
 }
 
 pub(crate) async fn list_ledger_entries_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<LedgerEntry>>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     list_ledger_entries(state.store.as_ref())
         .await
         .map(Json)
@@ -31,9 +34,10 @@ pub(crate) async fn list_ledger_entries_handler(
 }
 
 pub(crate) async fn list_billing_events_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<BillingEventRecord>>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     list_billing_events(state.store.as_ref())
         .await
         .map(Json)
@@ -41,9 +45,10 @@ pub(crate) async fn list_billing_events_handler(
 }
 
 pub(crate) async fn billing_events_summary_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<BillingEventSummary>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     summarize_billing_events_from_store(state.store.as_ref())
         .await
         .map(Json)
@@ -51,9 +56,10 @@ pub(crate) async fn billing_events_summary_handler(
 }
 
 pub(crate) async fn billing_summary_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<BillingSummary>, StatusCode> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)?;
     summarize_billing_from_store(state.store.as_ref())
         .await
         .map(Json)
@@ -61,9 +67,11 @@ pub(crate) async fn billing_summary_handler(
 }
 
 pub(crate) async fn list_canonical_accounts_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<CommercialAccountSummaryResponse>>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     let now_ms = unix_timestamp_ms();
     let mut accounts = commercial_billing
@@ -87,10 +95,12 @@ pub(crate) async fn list_canonical_accounts_handler(
 }
 
 pub(crate) async fn get_canonical_account_balance_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(account_id): Path<u64>,
     State(state): State<AdminApiState>,
 ) -> Result<Json<AccountBalanceSnapshot>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     let balance = commercial_billing
         .summarize_account_balance(account_id, unix_timestamp_ms())
@@ -100,10 +110,12 @@ pub(crate) async fn get_canonical_account_balance_handler(
 }
 
 pub(crate) async fn list_canonical_account_benefit_lots_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(account_id): Path<u64>,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<AccountBenefitLotRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     commercial_billing
         .find_account_record(account_id)
@@ -128,10 +140,12 @@ pub(crate) async fn list_canonical_account_benefit_lots_handler(
 }
 
 pub(crate) async fn list_canonical_account_ledger_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(account_id): Path<u64>,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<AccountLedgerHistoryEntry>>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     let history = commercial_billing
         .list_account_ledger_history(account_id)
@@ -141,9 +155,11 @@ pub(crate) async fn list_canonical_account_ledger_handler(
 }
 
 pub(crate) async fn list_canonical_account_holds_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<AccountHoldRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     let mut holds = commercial_billing
         .list_account_holds()
@@ -154,9 +170,11 @@ pub(crate) async fn list_canonical_account_holds_handler(
 }
 
 pub(crate) async fn list_canonical_request_settlements_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
 ) -> Result<Json<Vec<RequestSettlementRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    require_admin_privilege(&claims, AdminPrivilege::BillingRead)
+        .map_err(|_| admin_forbidden_response())?;
     let commercial_billing = commercial_billing_kernel(&state)?.clone();
     let mut settlements = commercial_billing
         .list_request_settlement_records()

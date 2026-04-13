@@ -34,6 +34,10 @@ async fn seed_platform_credit_account(
         environment: "live".to_owned(),
         api_key_hash: hash_gateway_api_key(&api_key),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     };
     let subject = gateway_auth_subject_from_request_context(&request_context);
 

@@ -107,7 +107,7 @@ impl SqliteAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(
                 |(
@@ -143,7 +143,7 @@ impl SqliteAdminStore {
                     })
                 },
             )
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn list_usage_records_for_project(
@@ -176,7 +176,7 @@ impl SqliteAdminStore {
         .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(
                 |(
@@ -212,7 +212,7 @@ impl SqliteAdminStore {
                     })
                 },
             )
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn find_latest_usage_record_for_project(

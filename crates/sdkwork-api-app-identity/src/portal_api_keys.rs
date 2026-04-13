@@ -213,49 +213,58 @@ pub async fn create_portal_api_key(
     user_id: &str,
     environment: &str,
 ) -> PortalResult<CreatedGatewayApiKey> {
+    let default_label = default_gateway_api_key_label(environment);
     create_portal_api_key_with_metadata(
         store,
-        user_id,
-        environment,
-        &default_gateway_api_key_label(environment),
-        None,
-        None,
-        None,
-        None,
+        CreatePortalApiKeyInput {
+            user_id,
+            environment,
+            label: &default_label,
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: None,
+        },
     )
     .await
 }
 
+pub struct CreatePortalApiKeyInput<'a> {
+    pub user_id: &'a str,
+    pub environment: &'a str,
+    pub label: &'a str,
+    pub expires_at_ms: Option<u64>,
+    pub plaintext_key: Option<&'a str>,
+    pub notes: Option<&'a str>,
+    pub api_key_group_id: Option<&'a str>,
+}
+
 pub async fn create_portal_api_key_with_metadata(
     store: &dyn AdminStore,
-    user_id: &str,
-    environment: &str,
-    label: &str,
-    expires_at_ms: Option<u64>,
-    plaintext_key: Option<&str>,
-    notes: Option<&str>,
-    api_key_group_id: Option<&str>,
+    input: CreatePortalApiKeyInput<'_>,
 ) -> PortalResult<CreatedGatewayApiKey> {
-    let environment = environment.trim();
+    let environment = input.environment.trim();
     if environment.is_empty() {
         return Err(PortalIdentityError::InvalidInput(
             "environment is required".to_owned(),
         ));
     }
-    validate_gateway_api_key_metadata(label, notes, expires_at_ms)
+    validate_gateway_api_key_metadata(input.label, input.notes, input.expires_at_ms)
         .map_err(PortalIdentityError::InvalidInput)?;
-    let user = load_portal_user_record(store, user_id).await?;
+    let user = load_portal_user_record(store, input.user_id).await?;
 
     persist_gateway_api_key_with_metadata(
         store,
-        &user.workspace_tenant_id,
-        &user.workspace_project_id,
-        environment,
-        label,
-        expires_at_ms,
-        plaintext_key,
-        notes,
-        api_key_group_id,
+        PersistGatewayApiKeyInput {
+            tenant_id: &user.workspace_tenant_id,
+            project_id: &user.workspace_project_id,
+            environment,
+            label: input.label,
+            expires_at_ms: input.expires_at_ms,
+            plaintext_key: input.plaintext_key,
+            notes: input.notes,
+            api_key_group_id: input.api_key_group_id,
+        },
     )
     .await
     .map_err(PortalIdentityError::from)

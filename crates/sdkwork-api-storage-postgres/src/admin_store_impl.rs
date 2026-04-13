@@ -1,5 +1,7 @@
 use super::*;
 
+use sdkwork_api_domain_identity::AdminAuditEventRecord;
+
 #[async_trait]
 impl AdminStore for PostgresAdminStore {
     fn dialect(&self) -> StorageDialect {
@@ -1079,6 +1081,15 @@ impl AdminStore for PostgresAdminStore {
 
     async fn delete_admin_user(&self, user_id: &str) -> Result<bool> {
         PostgresAdminStore::delete_admin_user(self, user_id).await
+    }
+    async fn insert_admin_audit_event(
+        &self,
+        record: &AdminAuditEventRecord,
+    ) -> Result<AdminAuditEventRecord> {
+        PostgresAdminStore::insert_admin_audit_event(self, record).await
+    }
+    async fn list_admin_audit_events(&self) -> Result<Vec<AdminAuditEventRecord>> {
+        PostgresAdminStore::list_admin_audit_events(self).await
     }
 
     async fn insert_gateway_api_key(

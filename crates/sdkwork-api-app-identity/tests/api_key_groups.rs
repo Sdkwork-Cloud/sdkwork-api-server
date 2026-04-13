@@ -1,7 +1,7 @@
 use sdkwork_api_app_identity::{
     create_api_key_group, delete_api_key_group, list_api_key_groups,
     persist_gateway_api_key_with_metadata, set_api_key_group_active, update_api_key_group,
-    ApiKeyGroupInput,
+    ApiKeyGroupInput, PersistGatewayApiKeyInput,
 };
 use sdkwork_api_domain_routing::{RoutingProfileRecord, RoutingStrategy};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
@@ -140,14 +140,16 @@ async fn inactive_api_key_groups_cannot_receive_new_gateway_keys() {
 
     let error = persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        None,
-        None,
-        None,
-        Some(&group.group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: Some(&group.group_id),
+        },
     )
     .await
     .unwrap_err();
@@ -236,14 +238,16 @@ async fn deleting_api_key_groups_rejects_groups_with_bound_keys() {
 
     persist_gateway_api_key_with_metadata(
         &store,
-        "tenant-1",
-        "project-1",
-        "live",
-        "Production rollout",
-        None,
-        None,
-        None,
-        Some(&group.group_id),
+        PersistGatewayApiKeyInput {
+            tenant_id: "tenant-1",
+            project_id: "project-1",
+            environment: "live",
+            label: "Production rollout",
+            expires_at_ms: None,
+            plaintext_key: None,
+            notes: None,
+            api_key_group_id: Some(&group.group_id),
+        },
     )
     .await
     .unwrap();

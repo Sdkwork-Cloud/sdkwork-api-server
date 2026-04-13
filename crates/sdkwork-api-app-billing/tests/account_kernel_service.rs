@@ -218,6 +218,10 @@ async fn resolves_active_primary_account_for_gateway_request_context_using_gatew
         environment: "live".to_owned(),
         api_key_hash: "hash_live_gateway_project".to_owned(),
         api_key_group_id: Some("group-live".to_owned()),
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     };
     let derived_subject = gateway_auth_subject_from_request_context(&request_context);
 
@@ -251,6 +255,10 @@ async fn payable_account_resolution_from_gateway_request_context_returns_none_wi
         environment: "live".to_owned(),
         api_key_hash: "hash_live_gateway_project".to_owned(),
         api_key_group_id: Some("group-live".to_owned()),
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     };
 
     let resolved = resolve_payable_account_for_gateway_request_context(&store, &request_context)

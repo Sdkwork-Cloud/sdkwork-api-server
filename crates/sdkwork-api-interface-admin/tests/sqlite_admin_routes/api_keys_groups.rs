@@ -299,7 +299,7 @@ async fn delete_gateway_api_key_from_admin_api() {
     assert!(read_json(api_keys).await.as_array().unwrap().is_empty());
 }
 #[tokio::test]
-async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
+async fn gateway_api_keys_do_not_persist_raw_key_in_canonical_ai_app_api_keys_table() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let token = login_token(app.clone()).await;
@@ -345,7 +345,6 @@ async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
 
     assert_eq!(created.status(), StatusCode::CREATED);
     let created_json = read_json(created).await;
-    let plaintext_key = created_json["plaintext"].as_str().unwrap().to_owned();
     let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
 
     let listed = app
@@ -363,19 +362,19 @@ async fn gateway_api_keys_persist_raw_key_in_canonical_ai_app_api_keys_table() {
 
     assert_eq!(listed.status(), StatusCode::OK);
     let listed_json = read_json(listed).await;
-    assert_eq!(listed_json[0]["raw_key"], plaintext_key);
+    assert!(listed_json[0].get("raw_key").is_none());
     assert_eq!(listed_json[0]["label"], "Production App Key");
     assert_eq!(listed_json[0]["notes"], "retained for admin inventory");
     assert_eq!(listed_json[0]["expires_at_ms"], 4102444800000_u64);
 
-    let stored_row: (String, Option<String>, Option<i64>) = sqlx::query_as(
+    let stored_row: (Option<String>, Option<String>, Option<i64>) = sqlx::query_as(
         "SELECT raw_key, notes, expires_at_ms FROM ai_app_api_keys WHERE hashed_key = ?",
     )
     .bind(&hashed_key)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(stored_row.0, plaintext_key);
+    assert_eq!(stored_row.0, None);
     assert_eq!(
         stored_row.1.as_deref(),
         Some("retained for admin inventory")
@@ -432,8 +431,6 @@ async fn update_gateway_api_key_metadata_from_admin_api() {
     assert_eq!(created.status(), StatusCode::CREATED);
     let created_json = read_json(created).await;
     let hashed_key = created_json["hashed"].as_str().unwrap().to_owned();
-    let plaintext_key = created_json["plaintext"].as_str().unwrap().to_owned();
-
     let updated = app
         .clone()
         .oneshot(
@@ -453,7 +450,7 @@ async fn update_gateway_api_key_metadata_from_admin_api() {
     assert_eq!(updated.status(), StatusCode::OK);
     let updated_json = read_json(updated).await;
     assert_eq!(updated_json["hashed_key"], hashed_key);
-    assert_eq!(updated_json["raw_key"], plaintext_key);
+    assert!(updated_json.get("raw_key").is_none());
     assert_eq!(updated_json["label"], "Production Key Updated");
     assert_eq!(updated_json["notes"], "rotated by operator");
     assert_eq!(updated_json["expires_at_ms"], 4105123200000_u64);

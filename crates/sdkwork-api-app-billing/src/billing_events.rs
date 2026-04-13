@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub fn create_quota_policy(
     policy_id: &str,
@@ -200,4 +200,3 @@ where
         requested_units,
     }))
 }
-

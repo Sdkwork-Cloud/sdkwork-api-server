@@ -1244,6 +1244,11 @@ pub trait AdminStore: Send + Sync {
     async fn find_admin_user_by_email(&self, email: &str) -> Result<Option<AdminUserRecord>>;
     async fn find_admin_user_by_id(&self, user_id: &str) -> Result<Option<AdminUserRecord>>;
     async fn delete_admin_user(&self, user_id: &str) -> Result<bool>;
+    async fn insert_admin_audit_event(
+        &self,
+        record: &AdminAuditEventRecord,
+    ) -> Result<AdminAuditEventRecord>;
+    async fn list_admin_audit_events(&self) -> Result<Vec<AdminAuditEventRecord>>;
 
     async fn insert_gateway_api_key(
         &self,

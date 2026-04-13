@@ -112,10 +112,10 @@ impl SqliteAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(Self::map_sqlite_commerce_order_row)
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn list_commerce_orders_for_project(
@@ -131,10 +131,10 @@ impl SqliteAdminStore {
         .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(Self::map_sqlite_commerce_order_row)
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn list_recent_commerce_orders(
@@ -150,10 +150,10 @@ impl SqliteAdminStore {
         .bind(i64::try_from(limit)?)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(Self::map_sqlite_commerce_order_row)
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn list_commerce_orders_for_project_after(
@@ -187,10 +187,10 @@ impl SqliteAdminStore {
         .bind(last_order_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(Self::map_sqlite_commerce_order_row)
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn upsert_commerce_payment_event(
@@ -265,10 +265,10 @@ impl SqliteAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows
+        rows
             .into_iter()
             .map(Self::map_sqlite_commerce_payment_event_row)
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     pub async fn find_commerce_payment_event_by_dedupe_key(

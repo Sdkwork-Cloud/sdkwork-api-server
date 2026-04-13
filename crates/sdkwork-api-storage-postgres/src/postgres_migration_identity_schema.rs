@@ -64,6 +64,7 @@ pub(crate) async fn apply_postgres_identity_schema(pool: &PgPool) -> Result<()> 
             display_name TEXT NOT NULL DEFAULT '',
             password_salt TEXT NOT NULL DEFAULT '',
             password_hash TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'super_admin',
             active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at_ms BIGINT NOT NULL DEFAULT 0
         )",
@@ -86,6 +87,11 @@ pub(crate) async fn apply_postgres_identity_schema(pool: &PgPool) -> Result<()> 
     .execute(&pool)
     .await?;
     sqlx::query(
+        "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'super_admin'",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
         "ALTER TABLE ai_admin_users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
     )
     .execute(&pool)
@@ -97,6 +103,27 @@ pub(crate) async fn apply_postgres_identity_schema(pool: &PgPool) -> Result<()> 
     .await?;
     sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_admin_users_email ON ai_admin_users (email)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS ai_admin_audit_events (
+            event_id TEXT PRIMARY KEY NOT NULL,
+            action TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            approval_scope TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            actor_email TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            recorded_at_ms BIGINT NOT NULL DEFAULT 0
+        )",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_ai_admin_audit_events_recorded
+         ON ai_admin_audit_events (recorded_at_ms DESC, event_id DESC)",
     )
     .execute(&pool)
     .await?;

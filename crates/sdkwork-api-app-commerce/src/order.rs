@@ -702,6 +702,10 @@ where
         environment: "portal".to_owned(),
         api_key_hash: PORTAL_WORKSPACE_SCOPE_KEY_HASH.to_owned(),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     };
     let account = billing
         .resolve_payable_account_for_gateway_request_context(&request_context)

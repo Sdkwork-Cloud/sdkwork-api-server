@@ -550,4 +550,3 @@ async fn create_and_list_quota_policies_from_admin_api() {
     assert_eq!(json[0]["project_id"], "project-1");
     assert_eq!(json[0]["max_units"], 1000);
 }
-

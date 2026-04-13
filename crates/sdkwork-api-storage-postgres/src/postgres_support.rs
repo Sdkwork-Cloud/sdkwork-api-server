@@ -1,4 +1,6 @@
 use super::*;
+use sdkwork_api_domain_identity::{AdminAuditEventRecord, AdminUserRole};
+use std::str::FromStr;
 
 pub(crate) fn provider_channel_bindings(provider: &ProxyProvider) -> Vec<ProviderChannelBinding> {
     if provider.channel_bindings.is_empty() {
@@ -329,7 +331,18 @@ pub(crate) type PortalUserRow = (
     i64,
 );
 
-pub(crate) type AdminUserRow = (String, String, String, String, String, bool, i64);
+pub(crate) type AdminUserRow = (String, String, String, String, String, String, bool, i64);
+pub(crate) type AdminAuditEventRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    i64,
+);
 
 pub(crate) type CredentialRow = (
     String,
@@ -410,15 +423,56 @@ pub(crate) fn decode_portal_user_row(
 
 pub(crate) fn decode_admin_user_row(row: Option<AdminUserRow>) -> Result<Option<AdminUserRecord>> {
     row.map(
-        |(id, email, display_name, password_salt, password_hash, active, created_at_ms)| {
+        |(
+            id,
+            email,
+            display_name,
+            password_salt,
+            password_hash,
+            role,
+            active,
+            created_at_ms,
+        )| {
             Ok(AdminUserRecord {
                 id,
                 email,
                 display_name,
                 password_salt,
                 password_hash,
+                role: AdminUserRole::from_str(&role).map_err(anyhow::Error::msg)?,
                 active,
                 created_at_ms: u64::try_from(created_at_ms)?,
+            })
+        },
+    )
+    .transpose()
+}
+
+pub(crate) fn decode_admin_audit_event_row(
+    row: Option<AdminAuditEventRow>,
+) -> Result<Option<AdminAuditEventRecord>> {
+    row.map(
+        |(
+            event_id,
+            action,
+            resource_type,
+            resource_id,
+            approval_scope,
+            actor_user_id,
+            actor_email,
+            actor_role,
+            recorded_at_ms,
+        )| {
+            Ok(AdminAuditEventRecord {
+                event_id,
+                action,
+                resource_type,
+                resource_id,
+                approval_scope,
+                actor_user_id,
+                actor_email,
+                actor_role: AdminUserRole::from_str(&actor_role).map_err(anyhow::Error::msg)?,
+                recorded_at_ms: u64::try_from(recorded_at_ms)?,
             })
         },
     )

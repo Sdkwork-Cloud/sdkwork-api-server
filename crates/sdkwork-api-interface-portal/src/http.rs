@@ -1,4 +1,5 @@
 use super::*;
+use tower_http::cors::{Any, CorsLayer};
 
 pub(crate) fn http_exposure_config() -> anyhow::Result<HttpExposureConfig> {
     HttpExposureConfig::from_env()

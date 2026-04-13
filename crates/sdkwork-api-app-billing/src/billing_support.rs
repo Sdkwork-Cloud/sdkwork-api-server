@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub(crate) fn eligible_lots_for_hold(
     lots: &[AccountBenefitLotRecord],
@@ -111,7 +111,11 @@ pub(crate) fn commerce_order_refund_ledger_allocation_id(order_id: &str) -> u64 
     stable_commerce_u64("commerce_refund_allocation", order_id)
 }
 
-pub(crate) fn ensure_quantity_matches(actual: f64, expected: f64, field_name: String) -> Result<()> {
+pub(crate) fn ensure_quantity_matches(
+    actual: f64,
+    expected: f64,
+    field_name: String,
+) -> Result<()> {
     ensure!(
         (actual - expected).abs() <= ACCOUNTING_EPSILON,
         "{field_name} mismatch: expected {expected}, found {actual}"
@@ -245,4 +249,3 @@ pub(crate) async fn load_account_ledger_allocations_and_lots(
 
     Ok((allocations, lots))
 }
-

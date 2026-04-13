@@ -18,8 +18,8 @@ use sdkwork_api_domain_commerce::{
 };
 use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_domain_identity::{
-    AdminUserRecord, ApiKeyGroupRecord, CanonicalApiKeyRecord, GatewayApiKeyRecord,
-    IdentityBindingRecord, IdentityUserRecord, PortalUserRecord,
+    AdminAuditEventRecord, AdminUserRecord, ApiKeyGroupRecord, CanonicalApiKeyRecord,
+    GatewayApiKeyRecord, IdentityBindingRecord, IdentityUserRecord, PortalUserRecord,
 };
 use sdkwork_api_domain_jobs::{
     AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobCallbackRecord, AsyncJobRecord,

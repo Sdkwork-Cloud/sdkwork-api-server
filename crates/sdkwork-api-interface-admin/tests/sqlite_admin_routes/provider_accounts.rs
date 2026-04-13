@@ -62,7 +62,10 @@ async fn create_list_and_delete_provider_accounts() {
     let created_json = read_json(created).await;
     assert_eq!(created_json["provider_account_id"], "acct-openai-primary");
     assert_eq!(created_json["provider_id"], "provider-openai-official");
-    assert_eq!(created_json["execution_instance_id"], "instance-openai-primary");
+    assert_eq!(
+        created_json["execution_instance_id"],
+        "instance-openai-primary"
+    );
     assert_eq!(created_json["region"], "us-east");
 
     let listed = app

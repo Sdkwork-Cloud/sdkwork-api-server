@@ -59,6 +59,7 @@ pub async fn upsert_admin_user(
     email: &str,
     display_name: &str,
     password: Option<&str>,
+    role: Option<AdminUserRole>,
     active: bool,
 ) -> AdminResult<AdminUserProfile> {
     validate_identity_profile_input(email, display_name)
@@ -123,12 +124,16 @@ pub async fn upsert_admin_user(
         .as_ref()
         .map(|user| user.created_at_ms)
         .unwrap_or(now_epoch_millis().map_err(AdminIdentityError::from)?);
+    let resolved_role = role
+        .or_else(|| existing_by_id.as_ref().map(|user| user.role))
+        .unwrap_or_default();
     let record = AdminUserRecord::new(
         target_id,
         normalized_email,
         display_name.trim(),
         password_salt,
         password_hash,
+        resolved_role,
         active,
         created_at_ms,
     );
@@ -160,6 +165,7 @@ pub async fn set_admin_user_active(
         user.display_name,
         user.password_salt,
         user.password_hash,
+        user.role,
         active,
         user.created_at_ms,
     );
@@ -195,6 +201,7 @@ pub async fn reset_admin_user_password(
         user.display_name,
         password_salt,
         password_hash,
+        user.role,
         user.active,
         user.created_at_ms,
     );
@@ -242,6 +249,7 @@ pub async fn change_admin_password(
         user.display_name,
         password_salt,
         password_hash,
+        user.role,
         user.active,
         user.created_at_ms,
     );
