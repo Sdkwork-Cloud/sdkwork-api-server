@@ -9,6 +9,7 @@ anyhow.workspace = true
 serde.workspace = true
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
+sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
 sdkwork-api-app-runtime = { path = "../sdkwork-api-app-runtime" }
 sdkwork-api-config = { path = "../sdkwork-api-config" }
 sdkwork-api-interface-admin = { path = "../sdkwork-api-interface-admin" }

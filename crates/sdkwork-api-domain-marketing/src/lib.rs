@@ -1,815 +1,221 @@
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MarketingBenefitKind {
-    PercentageOff,
-    FixedAmountOff,
-    GrantUnits,
+pub enum CouponBenefitKind {
+    PercentageDiscount,
+    FixedAmountDiscount,
+    CreditGrant,
+    TokenGrant,
+    RequestGrant,
+    ImageGrant,
+    AudioGrant,
+    VideoGrant,
+    MusicGrant,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MarketingStackingPolicy {
-    Exclusive,
-    Stackable,
-    BestOfGroup,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MarketingSubjectScope {
-    User,
-    Project,
-    Workspace,
-    Account,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponTemplateStatus {
-    Draft,
-    Scheduled,
-    Active,
-    Archived,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponTemplateApprovalState {
-    Draft,
-    InReview,
-    Approved,
-    Rejected,
-}
-
-impl Default for CouponTemplateApprovalState {
-    fn default() -> Self {
-        Self::Approved
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CouponDistributionKind {
     SharedCode,
     UniqueCode,
-    AutoClaim,
+    InviteCode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponStackingPolicy {
+    Stackable,
+    ExclusiveWithinGroup,
+    ExclusiveGlobal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponTemplateStatus {
+    Draft,
+    Active,
+    Paused,
+    Archived,
+    Expired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarketingCampaignKind {
+    Launch,
+    Lifecycle,
+    Partner,
+    Referral,
+    Retention,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MarketingCampaignStatus {
     Draft,
-    Scheduled,
     Active,
     Paused,
-    Ended,
+    Archived,
+    Completed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponCodeGenerationMode {
+    BulkRandom,
+    Vanity,
+    Import,
+    Invite,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CouponCodeBatchStatus {
+    Draft,
+    Active,
+    Paused,
+    Exhausted,
     Archived,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MarketingCampaignApprovalState {
-    Draft,
-    InReview,
-    Approved,
-    Rejected,
+pub enum CouponCodeKind {
+    Shared,
+    SingleUseUnique,
+    Vanity,
+    Invite,
 }
 
-impl Default for MarketingCampaignApprovalState {
-    fn default() -> Self {
-        Self::Approved
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponTemplateLifecycleAction {
-    Clone,
-    SubmitForApproval,
-    Approve,
-    Reject,
-    Publish,
-    Schedule,
-    Retire,
-}
-
-impl CouponTemplateLifecycleAction {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Clone => "clone",
-            Self::SubmitForApproval => "submit_for_approval",
-            Self::Approve => "approve",
-            Self::Reject => "reject",
-            Self::Publish => "publish",
-            Self::Schedule => "schedule",
-            Self::Retire => "retire",
-        }
-    }
-}
-
-impl FromStr for CouponTemplateLifecycleAction {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "clone" => Ok(Self::Clone),
-            "submit_for_approval" => Ok(Self::SubmitForApproval),
-            "approve" => Ok(Self::Approve),
-            "reject" => Ok(Self::Reject),
-            "publish" => Ok(Self::Publish),
-            "schedule" => Ok(Self::Schedule),
-            "retire" => Ok(Self::Retire),
-            _ => Err(anyhow::anyhow!(
-                "unsupported coupon template lifecycle action {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponTemplateLifecycleAuditOutcome {
-    Applied,
-    Rejected,
-}
-
-impl CouponTemplateLifecycleAuditOutcome {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Applied => "applied",
-            Self::Rejected => "rejected",
-        }
-    }
-}
-
-impl FromStr for CouponTemplateLifecycleAuditOutcome {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "applied" => Ok(Self::Applied),
-            "rejected" => Ok(Self::Rejected),
-            _ => Err(anyhow::anyhow!(
-                "unsupported coupon template lifecycle audit outcome {value}"
-            )),
-        }
-    }
-}
-
-fn default_coupon_template_revision() -> u32 {
-    1
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponTemplateLifecycleAuditRecord {
-    pub audit_id: String,
-    pub coupon_template_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_coupon_template_id: Option<String>,
-    pub action: CouponTemplateLifecycleAction,
-    pub outcome: CouponTemplateLifecycleAuditOutcome,
-    pub previous_status: CouponTemplateStatus,
-    pub resulting_status: CouponTemplateStatus,
-    #[serde(default)]
-    pub previous_approval_state: CouponTemplateApprovalState,
-    #[serde(default)]
-    pub resulting_approval_state: CouponTemplateApprovalState,
-    #[serde(default = "default_coupon_template_revision")]
-    pub previous_revision: u32,
-    #[serde(default = "default_coupon_template_revision")]
-    pub resulting_revision: u32,
-    pub operator_id: String,
-    pub request_id: String,
-    pub reason: String,
-    #[serde(default)]
-    pub decision_reasons: Vec<String>,
-    pub requested_at_ms: u64,
-}
-
-impl CouponTemplateLifecycleAuditRecord {
-    pub fn new(
-        audit_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
-        action: CouponTemplateLifecycleAction,
-        outcome: CouponTemplateLifecycleAuditOutcome,
-        previous_status: CouponTemplateStatus,
-        resulting_status: CouponTemplateStatus,
-        operator_id: impl Into<String>,
-        request_id: impl Into<String>,
-        reason: impl Into<String>,
-        requested_at_ms: u64,
-    ) -> Self {
-        Self {
-            audit_id: audit_id.into(),
-            coupon_template_id: coupon_template_id.into(),
-            source_coupon_template_id: None,
-            action,
-            outcome,
-            previous_status,
-            resulting_status,
-            previous_approval_state: CouponTemplateApprovalState::default(),
-            resulting_approval_state: CouponTemplateApprovalState::default(),
-            previous_revision: default_coupon_template_revision(),
-            resulting_revision: default_coupon_template_revision(),
-            operator_id: operator_id.into(),
-            request_id: request_id.into(),
-            reason: reason.into(),
-            decision_reasons: Vec::new(),
-            requested_at_ms,
-        }
-    }
-
-    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
-        self.decision_reasons = decision_reasons;
-        self
-    }
-
-    pub fn with_source_coupon_template_id(
-        mut self,
-        source_coupon_template_id: Option<String>,
-    ) -> Self {
-        self.source_coupon_template_id = source_coupon_template_id;
-        self
-    }
-
-    pub fn with_approval_states(
-        mut self,
-        previous_approval_state: CouponTemplateApprovalState,
-        resulting_approval_state: CouponTemplateApprovalState,
-    ) -> Self {
-        self.previous_approval_state = previous_approval_state;
-        self.resulting_approval_state = resulting_approval_state;
-        self
-    }
-
-    pub fn with_revisions(mut self, previous_revision: u32, resulting_revision: u32) -> Self {
-        self.previous_revision = previous_revision;
-        self.resulting_revision = resulting_revision;
-        self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MarketingCampaignLifecycleAction {
-    Clone,
-    SubmitForApproval,
-    Approve,
-    Reject,
-    Publish,
-    Schedule,
-    Retire,
-}
-
-impl MarketingCampaignLifecycleAction {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Clone => "clone",
-            Self::SubmitForApproval => "submit_for_approval",
-            Self::Approve => "approve",
-            Self::Reject => "reject",
-            Self::Publish => "publish",
-            Self::Schedule => "schedule",
-            Self::Retire => "retire",
-        }
-    }
-}
-
-impl FromStr for MarketingCampaignLifecycleAction {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "clone" => Ok(Self::Clone),
-            "submit_for_approval" => Ok(Self::SubmitForApproval),
-            "approve" => Ok(Self::Approve),
-            "reject" => Ok(Self::Reject),
-            "publish" => Ok(Self::Publish),
-            "schedule" => Ok(Self::Schedule),
-            "retire" => Ok(Self::Retire),
-            _ => Err(anyhow::anyhow!(
-                "unsupported marketing campaign lifecycle action {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MarketingCampaignLifecycleAuditOutcome {
-    Applied,
-    Rejected,
-}
-
-impl MarketingCampaignLifecycleAuditOutcome {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Applied => "applied",
-            Self::Rejected => "rejected",
-        }
-    }
-}
-
-impl FromStr for MarketingCampaignLifecycleAuditOutcome {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "applied" => Ok(Self::Applied),
-            "rejected" => Ok(Self::Rejected),
-            _ => Err(anyhow::anyhow!(
-                "unsupported marketing campaign lifecycle audit outcome {value}"
-            )),
-        }
-    }
-}
-
-fn default_marketing_campaign_revision() -> u32 {
-    1
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct MarketingCampaignLifecycleAuditRecord {
-    pub audit_id: String,
-    pub marketing_campaign_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_marketing_campaign_id: Option<String>,
-    pub coupon_template_id: String,
-    pub action: MarketingCampaignLifecycleAction,
-    pub outcome: MarketingCampaignLifecycleAuditOutcome,
-    pub previous_status: MarketingCampaignStatus,
-    pub resulting_status: MarketingCampaignStatus,
-    #[serde(default)]
-    pub previous_approval_state: MarketingCampaignApprovalState,
-    #[serde(default)]
-    pub resulting_approval_state: MarketingCampaignApprovalState,
-    #[serde(default = "default_marketing_campaign_revision")]
-    pub previous_revision: u32,
-    #[serde(default = "default_marketing_campaign_revision")]
-    pub resulting_revision: u32,
-    pub operator_id: String,
-    pub request_id: String,
-    pub reason: String,
-    #[serde(default)]
-    pub decision_reasons: Vec<String>,
-    pub requested_at_ms: u64,
-}
-
-impl MarketingCampaignLifecycleAuditRecord {
-    pub fn new(
-        audit_id: impl Into<String>,
-        marketing_campaign_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
-        action: MarketingCampaignLifecycleAction,
-        outcome: MarketingCampaignLifecycleAuditOutcome,
-        previous_status: MarketingCampaignStatus,
-        resulting_status: MarketingCampaignStatus,
-        operator_id: impl Into<String>,
-        request_id: impl Into<String>,
-        reason: impl Into<String>,
-        requested_at_ms: u64,
-    ) -> Self {
-        Self {
-            audit_id: audit_id.into(),
-            marketing_campaign_id: marketing_campaign_id.into(),
-            source_marketing_campaign_id: None,
-            coupon_template_id: coupon_template_id.into(),
-            action,
-            outcome,
-            previous_status,
-            resulting_status,
-            previous_approval_state: MarketingCampaignApprovalState::default(),
-            resulting_approval_state: MarketingCampaignApprovalState::default(),
-            previous_revision: default_marketing_campaign_revision(),
-            resulting_revision: default_marketing_campaign_revision(),
-            operator_id: operator_id.into(),
-            request_id: request_id.into(),
-            reason: reason.into(),
-            decision_reasons: Vec::new(),
-            requested_at_ms,
-        }
-    }
-
-    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
-        self.decision_reasons = decision_reasons;
-        self
-    }
-
-    pub fn with_source_marketing_campaign_id(
-        mut self,
-        source_marketing_campaign_id: Option<String>,
-    ) -> Self {
-        self.source_marketing_campaign_id = source_marketing_campaign_id;
-        self
-    }
-
-    pub fn with_approval_states(
-        mut self,
-        previous_approval_state: MarketingCampaignApprovalState,
-        resulting_approval_state: MarketingCampaignApprovalState,
-    ) -> Self {
-        self.previous_approval_state = previous_approval_state;
-        self.resulting_approval_state = resulting_approval_state;
-        self
-    }
-
-    pub fn with_revisions(mut self, previous_revision: u32, resulting_revision: u32) -> Self {
-        self.previous_revision = previous_revision;
-        self.resulting_revision = resulting_revision;
-        self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CampaignBudgetStatus {
-    Draft,
-    Active,
-    Exhausted,
-    Closed,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CampaignBudgetLifecycleAction {
-    Activate,
-    Close,
-}
-
-impl CampaignBudgetLifecycleAction {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Activate => "activate",
-            Self::Close => "close",
-        }
-    }
-}
-
-impl FromStr for CampaignBudgetLifecycleAction {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "activate" => Ok(Self::Activate),
-            "close" => Ok(Self::Close),
-            _ => Err(anyhow::anyhow!(
-                "unsupported campaign budget lifecycle action {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CampaignBudgetLifecycleAuditOutcome {
-    Applied,
-    Rejected,
-}
-
-impl CampaignBudgetLifecycleAuditOutcome {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Applied => "applied",
-            Self::Rejected => "rejected",
-        }
-    }
-}
-
-impl FromStr for CampaignBudgetLifecycleAuditOutcome {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "applied" => Ok(Self::Applied),
-            "rejected" => Ok(Self::Rejected),
-            _ => Err(anyhow::anyhow!(
-                "unsupported campaign budget lifecycle audit outcome {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CampaignBudgetLifecycleAuditRecord {
-    pub audit_id: String,
-    pub campaign_budget_id: String,
-    pub marketing_campaign_id: String,
-    pub action: CampaignBudgetLifecycleAction,
-    pub outcome: CampaignBudgetLifecycleAuditOutcome,
-    pub previous_status: CampaignBudgetStatus,
-    pub resulting_status: CampaignBudgetStatus,
-    pub operator_id: String,
-    pub request_id: String,
-    pub reason: String,
-    #[serde(default)]
-    pub decision_reasons: Vec<String>,
-    pub requested_at_ms: u64,
-}
-
-impl CampaignBudgetLifecycleAuditRecord {
-    pub fn new(
-        audit_id: impl Into<String>,
-        campaign_budget_id: impl Into<String>,
-        marketing_campaign_id: impl Into<String>,
-        action: CampaignBudgetLifecycleAction,
-        outcome: CampaignBudgetLifecycleAuditOutcome,
-        previous_status: CampaignBudgetStatus,
-        resulting_status: CampaignBudgetStatus,
-        operator_id: impl Into<String>,
-        request_id: impl Into<String>,
-        reason: impl Into<String>,
-        requested_at_ms: u64,
-    ) -> Self {
-        Self {
-            audit_id: audit_id.into(),
-            campaign_budget_id: campaign_budget_id.into(),
-            marketing_campaign_id: marketing_campaign_id.into(),
-            action,
-            outcome,
-            previous_status,
-            resulting_status,
-            operator_id: operator_id.into(),
-            request_id: request_id.into(),
-            reason: reason.into(),
-            decision_reasons: Vec::new(),
-            requested_at_ms,
-        }
-    }
-
-    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
-        self.decision_reasons = decision_reasons;
-        self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CouponCodeStatus {
-    Available,
-    Reserved,
+    Issued,
+    Claimed,
     Redeemed,
+    Voided,
     Expired,
-    Disabled,
+    Blocked,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CouponCodeLifecycleAction {
-    Disable,
-    Restore,
-}
-
-impl CouponCodeLifecycleAction {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Disable => "disable",
-            Self::Restore => "restore",
-        }
-    }
-}
-
-impl FromStr for CouponCodeLifecycleAction {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "disable" => Ok(Self::Disable),
-            "restore" => Ok(Self::Restore),
-            _ => Err(anyhow::anyhow!(
-                "unsupported coupon code lifecycle action {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponCodeLifecycleAuditOutcome {
-    Applied,
+pub enum CouponClaimStatus {
+    Pending,
+    Claimed,
+    Cancelled,
+    Expired,
     Rejected,
 }
 
-impl CouponCodeLifecycleAuditOutcome {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Applied => "applied",
-            Self::Rejected => "rejected",
-        }
-    }
-}
-
-impl FromStr for CouponCodeLifecycleAuditOutcome {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "applied" => Ok(Self::Applied),
-            "rejected" => Ok(Self::Rejected),
-            _ => Err(anyhow::anyhow!(
-                "unsupported coupon code lifecycle audit outcome {value}"
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponCodeLifecycleAuditRecord {
-    pub audit_id: String,
-    pub coupon_code_id: String,
-    pub coupon_template_id: String,
-    pub action: CouponCodeLifecycleAction,
-    pub outcome: CouponCodeLifecycleAuditOutcome,
-    pub previous_status: CouponCodeStatus,
-    pub resulting_status: CouponCodeStatus,
-    pub operator_id: String,
-    pub request_id: String,
-    pub reason: String,
-    #[serde(default)]
-    pub decision_reasons: Vec<String>,
-    pub requested_at_ms: u64,
-}
-
-impl CouponCodeLifecycleAuditRecord {
-    pub fn new(
-        audit_id: impl Into<String>,
-        coupon_code_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
-        action: CouponCodeLifecycleAction,
-        outcome: CouponCodeLifecycleAuditOutcome,
-        previous_status: CouponCodeStatus,
-        resulting_status: CouponCodeStatus,
-        operator_id: impl Into<String>,
-        request_id: impl Into<String>,
-        reason: impl Into<String>,
-        requested_at_ms: u64,
-    ) -> Self {
-        Self {
-            audit_id: audit_id.into(),
-            coupon_code_id: coupon_code_id.into(),
-            coupon_template_id: coupon_template_id.into(),
-            action,
-            outcome,
-            previous_status,
-            resulting_status,
-            operator_id: operator_id.into(),
-            request_id: request_id.into(),
-            reason: reason.into(),
-            decision_reasons: Vec::new(),
-            requested_at_ms,
-        }
-    }
-
-    pub fn with_decision_reasons(mut self, decision_reasons: Vec<String>) -> Self {
-        self.decision_reasons = decision_reasons;
-        self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponReservationStatus {
-    Reserved,
-    Released,
-    Confirmed,
-    Expired,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CouponRedemptionStatus {
     Pending,
-    Redeemed,
-    PartiallyRolledBack,
-    RolledBack,
+    Fulfilled,
+    Voided,
+    Reversed,
     Failed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CouponRollbackType {
-    Cancel,
-    Refund,
-    PartialRefund,
-    Manual,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CouponRollbackStatus {
-    Pending,
+pub enum ReferralProgramStatus {
+    Draft,
+    Active,
+    Paused,
+    Archived,
     Completed,
-    Failed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MarketingOutboxEventStatus {
-    Pending,
-    Delivered,
-    Failed,
+pub enum ReferralInviteStatus {
+    Issued,
+    Accepted,
+    Rewarded,
+    Expired,
+    Revoked,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponBenefitSpec {
-    pub benefit_kind: MarketingBenefitKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub discount_percent: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub discount_amount_minor: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grant_units: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub currency_code: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_discount_minor: Option<u64>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttributionSourceKind {
+    Direct,
+    Campaign,
+    Referral,
+    Partner,
+    Organic,
 }
 
-impl CouponBenefitSpec {
-    pub fn new(benefit_kind: MarketingBenefitKind) -> Self {
-        Self {
-            benefit_kind,
-            discount_percent: None,
-            discount_amount_minor: None,
-            grant_units: None,
-            currency_code: None,
-            max_discount_minor: None,
-        }
-    }
-
-    pub fn with_discount_percent(mut self, discount_percent: Option<u8>) -> Self {
-        self.discount_percent = discount_percent.map(|value| value.min(100));
-        self
-    }
-
-    pub fn with_discount_amount_minor(mut self, discount_amount_minor: Option<u64>) -> Self {
-        self.discount_amount_minor = discount_amount_minor;
-        self
-    }
-
-    pub fn with_grant_units(mut self, grant_units: Option<u64>) -> Self {
-        self.grant_units = grant_units;
-        self
-    }
-
-    pub fn with_currency_code(mut self, currency_code: Option<String>) -> Self {
-        self.currency_code = currency_code;
-        self
-    }
-
-    pub fn with_max_discount_minor(mut self, max_discount_minor: Option<u64>) -> Self {
-        self.max_discount_minor = max_discount_minor;
-        self
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponRestrictionSpec {
-    pub subject_scope: MarketingSubjectScope,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub min_order_amount_minor: Option<u64>,
-    #[serde(default)]
-    pub first_order_only: bool,
-    #[serde(default)]
-    pub new_customer_only: bool,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CouponTemplateRecord {
+    pub coupon_template_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub template_code: String,
+    pub display_name: String,
+    pub benefit_kind: CouponBenefitKind,
+    pub distribution_kind: CouponDistributionKind,
+    pub status: CouponTemplateStatus,
+    pub stacking_policy: CouponStackingPolicy,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exclusive_group: Option<String>,
-    pub stacking_policy: MarketingStackingPolicy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starts_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_total_redemptions: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_redemptions_per_subject: Option<u64>,
-    #[serde(default)]
-    pub eligible_target_kinds: Vec<String>,
+    #[serde(default = "default_claim_required")]
+    pub claim_required: bool,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
 }
 
-impl CouponRestrictionSpec {
-    pub fn new(subject_scope: MarketingSubjectScope) -> Self {
+impl CouponTemplateRecord {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        coupon_template_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        template_code: impl Into<String>,
+        display_name: impl Into<String>,
+        benefit_kind: CouponBenefitKind,
+        distribution_kind: CouponDistributionKind,
+        created_at_ms: u64,
+    ) -> Self {
         Self {
-            subject_scope,
-            min_order_amount_minor: None,
-            first_order_only: false,
-            new_customer_only: false,
+            coupon_template_id,
+            tenant_id,
+            organization_id,
+            template_code: template_code.into(),
+            display_name: display_name.into(),
+            benefit_kind,
+            distribution_kind,
+            status: CouponTemplateStatus::Draft,
+            stacking_policy: CouponStackingPolicy::Stackable,
             exclusive_group: None,
-            stacking_policy: MarketingStackingPolicy::Exclusive,
+            starts_at_ms: None,
+            ends_at_ms: None,
+            max_total_redemptions: None,
             max_redemptions_per_subject: None,
-            eligible_target_kinds: Vec::new(),
+            claim_required: default_claim_required(),
+            created_at_ms,
+            updated_at_ms: created_at_ms,
         }
     }
 
-    pub fn with_min_order_amount_minor(mut self, min_order_amount_minor: Option<u64>) -> Self {
-        self.min_order_amount_minor = min_order_amount_minor;
+    pub fn with_status(mut self, status: CouponTemplateStatus) -> Self {
+        self.status = status;
         self
     }
 
-    pub fn with_first_order_only(mut self, first_order_only: bool) -> Self {
-        self.first_order_only = first_order_only;
-        self
-    }
-
-    pub fn with_new_customer_only(mut self, new_customer_only: bool) -> Self {
-        self.new_customer_only = new_customer_only;
+    pub fn with_stacking_policy(mut self, stacking_policy: CouponStackingPolicy) -> Self {
+        self.stacking_policy = stacking_policy;
         self
     }
 
@@ -818,8 +224,18 @@ impl CouponRestrictionSpec {
         self
     }
 
-    pub fn with_stacking_policy(mut self, stacking_policy: MarketingStackingPolicy) -> Self {
-        self.stacking_policy = stacking_policy;
+    pub fn with_starts_at_ms(mut self, starts_at_ms: Option<u64>) -> Self {
+        self.starts_at_ms = starts_at_ms;
+        self
+    }
+
+    pub fn with_ends_at_ms(mut self, ends_at_ms: Option<u64>) -> Self {
+        self.ends_at_ms = ends_at_ms;
+        self
+    }
+
+    pub fn with_max_total_redemptions(mut self, max_total_redemptions: Option<u64>) -> Self {
+        self.max_total_redemptions = max_total_redemptions;
         self
     }
 
@@ -831,117 +247,8 @@ impl CouponRestrictionSpec {
         self
     }
 
-    pub fn with_eligible_target_kinds(mut self, eligible_target_kinds: Vec<String>) -> Self {
-        self.eligible_target_kinds = eligible_target_kinds;
-        self
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponTemplateRecord {
-    pub coupon_template_id: String,
-    pub template_key: String,
-    pub display_name: String,
-    pub status: CouponTemplateStatus,
-    #[serde(default)]
-    pub approval_state: CouponTemplateApprovalState,
-    #[serde(default = "default_coupon_template_revision")]
-    pub revision: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub root_coupon_template_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_coupon_template_id: Option<String>,
-    pub distribution_kind: CouponDistributionKind,
-    pub benefit: CouponBenefitSpec,
-    pub restriction: CouponRestrictionSpec,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub activation_at_ms: Option<u64>,
-    pub created_at_ms: u64,
-    pub updated_at_ms: u64,
-}
-
-impl CouponTemplateRecord {
-    pub fn new(
-        coupon_template_id: impl Into<String>,
-        template_key: impl Into<String>,
-        benefit_kind: MarketingBenefitKind,
-    ) -> Self {
-        Self {
-            coupon_template_id: coupon_template_id.into(),
-            template_key: template_key.into(),
-            display_name: String::new(),
-            status: CouponTemplateStatus::Draft,
-            approval_state: CouponTemplateApprovalState::default(),
-            revision: default_coupon_template_revision(),
-            root_coupon_template_id: None,
-            parent_coupon_template_id: None,
-            distribution_kind: CouponDistributionKind::SharedCode,
-            benefit: CouponBenefitSpec::new(benefit_kind),
-            restriction: CouponRestrictionSpec::new(MarketingSubjectScope::Project),
-            activation_at_ms: None,
-            created_at_ms: 0,
-            updated_at_ms: 0,
-        }
-    }
-
-    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
-        self.display_name = display_name.into();
-        self
-    }
-
-    pub fn with_status(mut self, status: CouponTemplateStatus) -> Self {
-        self.status = status;
-        self
-    }
-
-    pub fn with_approval_state(mut self, approval_state: CouponTemplateApprovalState) -> Self {
-        self.approval_state = approval_state;
-        self
-    }
-
-    pub fn with_revision(mut self, revision: u32) -> Self {
-        self.revision = revision.max(default_coupon_template_revision());
-        self
-    }
-
-    pub fn with_root_coupon_template_id(
-        mut self,
-        root_coupon_template_id: Option<String>,
-    ) -> Self {
-        self.root_coupon_template_id = root_coupon_template_id;
-        self
-    }
-
-    pub fn with_parent_coupon_template_id(
-        mut self,
-        parent_coupon_template_id: Option<String>,
-    ) -> Self {
-        self.parent_coupon_template_id = parent_coupon_template_id;
-        self
-    }
-
-    pub fn with_distribution_kind(mut self, distribution_kind: CouponDistributionKind) -> Self {
-        self.distribution_kind = distribution_kind;
-        self
-    }
-
-    pub fn with_benefit(mut self, benefit: CouponBenefitSpec) -> Self {
-        self.benefit = benefit;
-        self
-    }
-
-    pub fn with_restriction(mut self, restriction: CouponRestrictionSpec) -> Self {
-        self.restriction = restriction;
-        self
-    }
-
-    pub fn with_activation_at_ms(mut self, activation_at_ms: Option<u64>) -> Self {
-        self.activation_at_ms = activation_at_ms;
-        self
-    }
-
-    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
-        self.created_at_ms = created_at_ms;
+    pub fn with_claim_required(mut self, claim_required: bool) -> Self {
+        self.claim_required = claim_required;
         self
     }
 
@@ -951,52 +258,154 @@ impl CouponTemplateRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CouponBenefitRuleRecord {
+    pub coupon_benefit_rule_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub coupon_template_id: u64,
+    pub benefit_kind: CouponBenefitKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_order_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_product_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub percentage_off: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed_discount_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maximum_subsidy_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grant_quantity: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency_code: Option<String>,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
+impl CouponBenefitRuleRecord {
+    pub fn new(
+        coupon_benefit_rule_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        coupon_template_id: u64,
+        benefit_kind: CouponBenefitKind,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            coupon_benefit_rule_id,
+            tenant_id,
+            organization_id,
+            coupon_template_id,
+            benefit_kind,
+            target_order_kind: None,
+            target_product_id: None,
+            percentage_off: None,
+            fixed_discount_amount: None,
+            maximum_subsidy_amount: None,
+            grant_quantity: None,
+            currency_code: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
+        }
+    }
+
+    pub fn with_target_order_kind(mut self, target_order_kind: Option<String>) -> Self {
+        self.target_order_kind = target_order_kind;
+        self
+    }
+
+    pub fn with_target_product_id(mut self, target_product_id: Option<String>) -> Self {
+        self.target_product_id = target_product_id;
+        self
+    }
+
+    pub fn with_percentage_off(mut self, percentage_off: Option<f64>) -> Self {
+        self.percentage_off = percentage_off;
+        self
+    }
+
+    pub fn with_fixed_discount_amount(mut self, fixed_discount_amount: Option<f64>) -> Self {
+        self.fixed_discount_amount = fixed_discount_amount;
+        self
+    }
+
+    pub fn with_maximum_subsidy_amount(mut self, maximum_subsidy_amount: Option<f64>) -> Self {
+        self.maximum_subsidy_amount = maximum_subsidy_amount;
+        self
+    }
+
+    pub fn with_grant_quantity(mut self, grant_quantity: Option<f64>) -> Self {
+        self.grant_quantity = grant_quantity;
+        self
+    }
+
+    pub fn with_currency_code(mut self, currency_code: Option<String>) -> Self {
+        self.currency_code = currency_code;
+        self
+    }
+
+    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
+        self.updated_at_ms = updated_at_ms;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MarketingCampaignRecord {
-    pub marketing_campaign_id: String,
-    pub coupon_template_id: String,
+    pub marketing_campaign_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub campaign_code: String,
     pub display_name: String,
+    pub campaign_kind: MarketingCampaignKind,
     pub status: MarketingCampaignStatus,
-    #[serde(default)]
-    pub approval_state: MarketingCampaignApprovalState,
-    #[serde(default = "default_marketing_campaign_revision")]
-    pub revision: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub root_marketing_campaign_id: Option<String>,
+    pub channel_source: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_marketing_campaign_id: Option<String>,
+    pub budget_amount: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub start_at_ms: Option<u64>,
+    pub currency_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub end_at_ms: Option<u64>,
+    pub subsidy_cap_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_user_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starts_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends_at_ms: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
 impl MarketingCampaignRecord {
     pub fn new(
-        marketing_campaign_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
+        marketing_campaign_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        campaign_code: impl Into<String>,
+        display_name: impl Into<String>,
+        campaign_kind: MarketingCampaignKind,
+        created_at_ms: u64,
     ) -> Self {
         Self {
-            marketing_campaign_id: marketing_campaign_id.into(),
-            coupon_template_id: coupon_template_id.into(),
-            display_name: String::new(),
+            marketing_campaign_id,
+            tenant_id,
+            organization_id,
+            campaign_code: campaign_code.into(),
+            display_name: display_name.into(),
+            campaign_kind,
             status: MarketingCampaignStatus::Draft,
-            approval_state: MarketingCampaignApprovalState::default(),
-            revision: default_marketing_campaign_revision(),
-            root_marketing_campaign_id: None,
-            parent_marketing_campaign_id: None,
-            start_at_ms: None,
-            end_at_ms: None,
-            created_at_ms: 0,
-            updated_at_ms: 0,
+            channel_source: None,
+            budget_amount: None,
+            currency_code: None,
+            subsidy_cap_amount: None,
+            owner_user_id: None,
+            starts_at_ms: None,
+            ends_at_ms: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
         }
-    }
-
-    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
-        self.display_name = display_name.into();
-        self
     }
 
     pub fn with_status(mut self, status: MarketingCampaignStatus) -> Self {
@@ -1004,47 +413,38 @@ impl MarketingCampaignRecord {
         self
     }
 
-    pub fn with_approval_state(
-        mut self,
-        approval_state: MarketingCampaignApprovalState,
-    ) -> Self {
-        self.approval_state = approval_state;
+    pub fn with_channel_source(mut self, channel_source: Option<String>) -> Self {
+        self.channel_source = channel_source;
         self
     }
 
-    pub fn with_revision(mut self, revision: u32) -> Self {
-        self.revision = revision.max(default_marketing_campaign_revision());
+    pub fn with_budget_amount(mut self, budget_amount: Option<f64>) -> Self {
+        self.budget_amount = budget_amount;
         self
     }
 
-    pub fn with_root_marketing_campaign_id(
-        mut self,
-        root_marketing_campaign_id: Option<String>,
-    ) -> Self {
-        self.root_marketing_campaign_id = root_marketing_campaign_id;
+    pub fn with_currency_code(mut self, currency_code: Option<String>) -> Self {
+        self.currency_code = currency_code;
         self
     }
 
-    pub fn with_parent_marketing_campaign_id(
-        mut self,
-        parent_marketing_campaign_id: Option<String>,
-    ) -> Self {
-        self.parent_marketing_campaign_id = parent_marketing_campaign_id;
+    pub fn with_subsidy_cap_amount(mut self, subsidy_cap_amount: Option<f64>) -> Self {
+        self.subsidy_cap_amount = subsidy_cap_amount;
         self
     }
 
-    pub fn with_start_at_ms(mut self, start_at_ms: Option<u64>) -> Self {
-        self.start_at_ms = start_at_ms;
+    pub fn with_owner_user_id(mut self, owner_user_id: Option<u64>) -> Self {
+        self.owner_user_id = owner_user_id;
         self
     }
 
-    pub fn with_end_at_ms(mut self, end_at_ms: Option<u64>) -> Self {
-        self.end_at_ms = end_at_ms;
+    pub fn with_starts_at_ms(mut self, starts_at_ms: Option<u64>) -> Self {
+        self.starts_at_ms = starts_at_ms;
         self
     }
 
-    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
-        self.created_at_ms = created_at_ms;
+    pub fn with_ends_at_ms(mut self, ends_at_ms: Option<u64>) -> Self {
+        self.ends_at_ms = ends_at_ms;
         self
     }
 
@@ -1052,135 +452,94 @@ impl MarketingCampaignRecord {
         self.updated_at_ms = updated_at_ms;
         self
     }
-
-    pub fn is_effective_at(&self, now_ms: u64) -> bool {
-        if self.status != MarketingCampaignStatus::Active {
-            return false;
-        }
-
-        let after_start = self.start_at_ms.is_none_or(|value| now_ms >= value);
-        let before_end = self.end_at_ms.is_none_or(|value| now_ms <= value);
-        after_start && before_end
-    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CampaignBudgetRecord {
-    pub campaign_budget_id: String,
-    pub marketing_campaign_id: String,
-    pub status: CampaignBudgetStatus,
-    pub total_budget_minor: u64,
-    pub reserved_budget_minor: u64,
-    pub consumed_budget_minor: u64,
-    pub created_at_ms: u64,
-    pub updated_at_ms: u64,
-}
-
-impl CampaignBudgetRecord {
-    pub fn new(
-        campaign_budget_id: impl Into<String>,
-        marketing_campaign_id: impl Into<String>,
-    ) -> Self {
-        Self {
-            campaign_budget_id: campaign_budget_id.into(),
-            marketing_campaign_id: marketing_campaign_id.into(),
-            status: CampaignBudgetStatus::Draft,
-            total_budget_minor: 0,
-            reserved_budget_minor: 0,
-            consumed_budget_minor: 0,
-            created_at_ms: 0,
-            updated_at_ms: 0,
-        }
-    }
-
-    pub fn with_status(mut self, status: CampaignBudgetStatus) -> Self {
-        self.status = status;
-        self
-    }
-
-    pub fn with_total_budget_minor(mut self, total_budget_minor: u64) -> Self {
-        self.total_budget_minor = total_budget_minor;
-        self
-    }
-
-    pub fn with_reserved_budget_minor(mut self, reserved_budget_minor: u64) -> Self {
-        self.reserved_budget_minor = reserved_budget_minor;
-        self
-    }
-
-    pub fn with_consumed_budget_minor(mut self, consumed_budget_minor: u64) -> Self {
-        self.consumed_budget_minor = consumed_budget_minor;
-        self
-    }
-
-    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
-        self.created_at_ms = created_at_ms;
-        self
-    }
-
-    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
-        self.updated_at_ms = updated_at_ms;
-        self
-    }
-
-    pub fn available_budget_minor(&self) -> u64 {
-        self.total_budget_minor
-            .saturating_sub(self.reserved_budget_minor)
-            .saturating_sub(self.consumed_budget_minor)
-    }
-
-    pub fn can_reserve(&self, amount_minor: u64) -> bool {
-        self.status == CampaignBudgetStatus::Active && amount_minor <= self.available_budget_minor()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponCodeRecord {
-    pub coupon_code_id: String,
-    pub coupon_template_id: String,
-    pub code_value: String,
-    pub status: CouponCodeStatus,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CouponCodeBatchRecord {
+    pub coupon_code_batch_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub coupon_template_id: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub claimed_subject_scope: Option<MarketingSubjectScope>,
+    pub marketing_campaign_id: Option<u64>,
+    pub generation_mode: CouponCodeGenerationMode,
+    pub status: CouponCodeBatchStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub claimed_subject_id: Option<String>,
+    pub batch_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_prefix: Option<String>,
+    pub issued_count: u64,
+    pub claimed_count: u64,
+    pub redeemed_count: u64,
+    pub voided_count: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at_ms: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
-impl CouponCodeRecord {
+impl CouponCodeBatchRecord {
     pub fn new(
-        coupon_code_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
-        code_value: impl Into<String>,
+        coupon_code_batch_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        coupon_template_id: u64,
+        marketing_campaign_id: Option<u64>,
+        generation_mode: CouponCodeGenerationMode,
+        created_at_ms: u64,
     ) -> Self {
         Self {
-            coupon_code_id: coupon_code_id.into(),
-            coupon_template_id: coupon_template_id.into(),
-            code_value: code_value.into(),
-            status: CouponCodeStatus::Available,
-            claimed_subject_scope: None,
-            claimed_subject_id: None,
+            coupon_code_batch_id,
+            tenant_id,
+            organization_id,
+            coupon_template_id,
+            marketing_campaign_id,
+            generation_mode,
+            status: CouponCodeBatchStatus::Draft,
+            batch_kind: None,
+            code_prefix: None,
+            issued_count: 0,
+            claimed_count: 0,
+            redeemed_count: 0,
+            voided_count: 0,
             expires_at_ms: None,
-            created_at_ms: 0,
-            updated_at_ms: 0,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
         }
     }
 
-    pub fn with_status(mut self, status: CouponCodeStatus) -> Self {
+    pub fn with_status(mut self, status: CouponCodeBatchStatus) -> Self {
         self.status = status;
         self
     }
 
-    pub fn with_claimed_subject(
-        mut self,
-        claimed_subject_scope: Option<MarketingSubjectScope>,
-        claimed_subject_id: Option<String>,
-    ) -> Self {
-        self.claimed_subject_scope = claimed_subject_scope;
-        self.claimed_subject_id = claimed_subject_id;
+    pub fn with_batch_kind(mut self, batch_kind: Option<String>) -> Self {
+        self.batch_kind = batch_kind;
+        self
+    }
+
+    pub fn with_code_prefix(mut self, code_prefix: Option<String>) -> Self {
+        self.code_prefix = code_prefix;
+        self
+    }
+
+    pub fn with_issued_count(mut self, issued_count: u64) -> Self {
+        self.issued_count = issued_count;
+        self
+    }
+
+    pub fn with_claimed_count(mut self, claimed_count: u64) -> Self {
+        self.claimed_count = claimed_count;
+        self
+    }
+
+    pub fn with_redeemed_count(mut self, redeemed_count: u64) -> Self {
+        self.redeemed_count = redeemed_count;
+        self
+    }
+
+    pub fn with_voided_count(mut self, voided_count: u64) -> Self {
+        self.voided_count = voided_count;
         self
     }
 
@@ -1189,73 +548,118 @@ impl CouponCodeRecord {
         self
     }
 
-    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
-        self.created_at_ms = created_at_ms;
-        self
-    }
-
     pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
         self.updated_at_ms = updated_at_ms;
         self
     }
-
-    pub fn is_redeemable_at(&self, now_ms: u64) -> bool {
-        self.status == CouponCodeStatus::Available
-            && self.expires_at_ms.is_none_or(|value| now_ms <= value)
-    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponReservationRecord {
-    pub coupon_reservation_id: String,
-    pub coupon_code_id: String,
-    pub subject_scope: MarketingSubjectScope,
-    pub subject_id: String,
-    pub reservation_status: CouponReservationStatus,
-    pub budget_reserved_minor: u64,
-    pub expires_at_ms: u64,
+fn default_claim_required() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CouponCodeRecord {
+    pub coupon_code_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub coupon_code_batch_id: u64,
+    pub coupon_template_id: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketing_campaign_id: Option<u64>,
+    pub code_lookup_hash: String,
+    pub code_kind: CouponCodeKind,
+    pub status: CouponCodeStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_code_prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_code_suffix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_subject_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_subject_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claimed_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redeemed_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at_ms: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
-impl CouponReservationRecord {
+impl CouponCodeRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        coupon_reservation_id: impl Into<String>,
-        coupon_code_id: impl Into<String>,
-        subject_scope: MarketingSubjectScope,
-        subject_id: impl Into<String>,
-        expires_at_ms: u64,
+        coupon_code_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        coupon_code_batch_id: u64,
+        coupon_template_id: u64,
+        marketing_campaign_id: Option<u64>,
+        code_lookup_hash: impl Into<String>,
+        code_kind: CouponCodeKind,
+        created_at_ms: u64,
     ) -> Self {
         Self {
-            coupon_reservation_id: coupon_reservation_id.into(),
-            coupon_code_id: coupon_code_id.into(),
-            subject_scope,
-            subject_id: subject_id.into(),
-            reservation_status: CouponReservationStatus::Reserved,
-            budget_reserved_minor: 0,
-            expires_at_ms,
-            created_at_ms: 0,
-            updated_at_ms: 0,
+            coupon_code_id,
+            tenant_id,
+            organization_id,
+            coupon_code_batch_id,
+            coupon_template_id,
+            marketing_campaign_id,
+            code_lookup_hash: code_lookup_hash.into(),
+            code_kind,
+            status: CouponCodeStatus::Issued,
+            display_code_prefix: None,
+            display_code_suffix: None,
+            claim_subject_type: None,
+            claim_subject_id: None,
+            claimed_at_ms: None,
+            redeemed_at_ms: None,
+            expires_at_ms: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
         }
     }
 
-    pub fn with_status(mut self, reservation_status: CouponReservationStatus) -> Self {
-        self.reservation_status = reservation_status;
+    pub fn with_status(mut self, status: CouponCodeStatus) -> Self {
+        self.status = status;
         self
     }
 
-    pub fn with_budget_reserved_minor(mut self, budget_reserved_minor: u64) -> Self {
-        self.budget_reserved_minor = budget_reserved_minor;
+    pub fn with_display_code_prefix(mut self, display_code_prefix: Option<String>) -> Self {
+        self.display_code_prefix = display_code_prefix;
         self
     }
 
-    pub fn with_expires_at_ms(mut self, expires_at_ms: u64) -> Self {
+    pub fn with_display_code_suffix(mut self, display_code_suffix: Option<String>) -> Self {
+        self.display_code_suffix = display_code_suffix;
+        self
+    }
+
+    pub fn with_claim_subject_type(mut self, claim_subject_type: Option<String>) -> Self {
+        self.claim_subject_type = claim_subject_type;
+        self
+    }
+
+    pub fn with_claim_subject_id(mut self, claim_subject_id: Option<String>) -> Self {
+        self.claim_subject_id = claim_subject_id;
+        self
+    }
+
+    pub fn with_claimed_at_ms(mut self, claimed_at_ms: Option<u64>) -> Self {
+        self.claimed_at_ms = claimed_at_ms;
+        self
+    }
+
+    pub fn with_redeemed_at_ms(mut self, redeemed_at_ms: Option<u64>) -> Self {
+        self.redeemed_at_ms = redeemed_at_ms;
+        self
+    }
+
+    pub fn with_expires_at_ms(mut self, expires_at_ms: Option<u64>) -> Self {
         self.expires_at_ms = expires_at_ms;
-        self
-    }
-
-    pub fn with_created_at_ms(mut self, created_at_ms: u64) -> Self {
-        self.created_at_ms = created_at_ms;
         self
     }
 
@@ -1263,57 +667,165 @@ impl CouponReservationRecord {
         self.updated_at_ms = updated_at_ms;
         self
     }
+}
 
-    pub fn is_active_at(&self, now_ms: u64) -> bool {
-        self.reservation_status == CouponReservationStatus::Reserved && now_ms <= self.expires_at_ms
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CouponClaimRecord {
+    pub coupon_claim_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub coupon_code_id: u64,
+    pub coupon_template_id: u64,
+    pub subject_type: String,
+    pub subject_id: String,
+    pub status: CouponClaimStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at_ms: Option<u64>,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
+impl CouponClaimRecord {
+    pub fn new(
+        coupon_claim_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        coupon_code_id: u64,
+        coupon_template_id: u64,
+        subject_type: impl Into<String>,
+        subject_id: impl Into<String>,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            coupon_claim_id,
+            tenant_id,
+            organization_id,
+            coupon_code_id,
+            coupon_template_id,
+            subject_type: subject_type.into(),
+            subject_id: subject_id.into(),
+            status: CouponClaimStatus::Pending,
+            account_id: None,
+            project_id: None,
+            expires_at_ms: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
+        }
+    }
+
+    pub fn with_status(mut self, status: CouponClaimStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    pub fn with_account_id(mut self, account_id: Option<u64>) -> Self {
+        self.account_id = account_id;
+        self
+    }
+
+    pub fn with_project_id(mut self, project_id: Option<String>) -> Self {
+        self.project_id = project_id;
+        self
+    }
+
+    pub fn with_expires_at_ms(mut self, expires_at_ms: Option<u64>) -> Self {
+        self.expires_at_ms = expires_at_ms;
+        self
+    }
+
+    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
+        self.updated_at_ms = updated_at_ms;
+        self
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CouponRedemptionRecord {
-    pub coupon_redemption_id: String,
-    pub coupon_reservation_id: String,
-    pub coupon_code_id: String,
-    pub coupon_template_id: String,
-    pub redemption_status: CouponRedemptionStatus,
-    pub subsidy_amount_minor: u64,
+    pub coupon_redemption_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub coupon_code_id: u64,
+    pub coupon_template_id: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketing_campaign_id: Option<u64>,
+    pub subject_type: String,
+    pub subject_id: String,
+    pub status: CouponRedemptionStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub payment_event_id: Option<String>,
-    pub redeemed_at_ms: u64,
+    pub payment_order_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub benefit_lot_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_adjustment_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subsidy_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
+    pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
 impl CouponRedemptionRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        coupon_redemption_id: impl Into<String>,
-        coupon_reservation_id: impl Into<String>,
-        coupon_code_id: impl Into<String>,
-        coupon_template_id: impl Into<String>,
-        redeemed_at_ms: u64,
+        coupon_redemption_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        coupon_code_id: u64,
+        coupon_template_id: u64,
+        marketing_campaign_id: Option<u64>,
+        subject_type: impl Into<String>,
+        subject_id: impl Into<String>,
+        created_at_ms: u64,
     ) -> Self {
         Self {
-            coupon_redemption_id: coupon_redemption_id.into(),
-            coupon_reservation_id: coupon_reservation_id.into(),
-            coupon_code_id: coupon_code_id.into(),
-            coupon_template_id: coupon_template_id.into(),
-            redemption_status: CouponRedemptionStatus::Pending,
-            subsidy_amount_minor: 0,
+            coupon_redemption_id,
+            tenant_id,
+            organization_id,
+            coupon_code_id,
+            coupon_template_id,
+            marketing_campaign_id,
+            subject_type: subject_type.into(),
+            subject_id: subject_id.into(),
+            status: CouponRedemptionStatus::Pending,
+            account_id: None,
+            project_id: None,
             order_id: None,
-            payment_event_id: None,
-            redeemed_at_ms,
-            updated_at_ms: redeemed_at_ms,
+            payment_order_id: None,
+            benefit_lot_id: None,
+            pricing_adjustment_id: None,
+            subsidy_amount: None,
+            currency_code: None,
+            idempotency_key: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
         }
     }
 
-    pub fn with_status(mut self, redemption_status: CouponRedemptionStatus) -> Self {
-        self.redemption_status = redemption_status;
+    pub fn with_status(mut self, status: CouponRedemptionStatus) -> Self {
+        self.status = status;
         self
     }
 
-    pub fn with_subsidy_amount_minor(mut self, subsidy_amount_minor: u64) -> Self {
-        self.subsidy_amount_minor = subsidy_amount_minor;
+    pub fn with_account_id(mut self, account_id: Option<u64>) -> Self {
+        self.account_id = account_id;
+        self
+    }
+
+    pub fn with_project_id(mut self, project_id: Option<String>) -> Self {
+        self.project_id = project_id;
         self
     }
 
@@ -1322,8 +834,33 @@ impl CouponRedemptionRecord {
         self
     }
 
-    pub fn with_payment_event_id(mut self, payment_event_id: Option<String>) -> Self {
-        self.payment_event_id = payment_event_id;
+    pub fn with_payment_order_id(mut self, payment_order_id: Option<String>) -> Self {
+        self.payment_order_id = payment_order_id;
+        self
+    }
+
+    pub fn with_benefit_lot_id(mut self, benefit_lot_id: Option<u64>) -> Self {
+        self.benefit_lot_id = benefit_lot_id;
+        self
+    }
+
+    pub fn with_pricing_adjustment_id(mut self, pricing_adjustment_id: Option<String>) -> Self {
+        self.pricing_adjustment_id = pricing_adjustment_id;
+        self
+    }
+
+    pub fn with_subsidy_amount(mut self, subsidy_amount: Option<f64>) -> Self {
+        self.subsidy_amount = subsidy_amount;
+        self
+    }
+
+    pub fn with_currency_code(mut self, currency_code: Option<String>) -> Self {
+        self.currency_code = currency_code;
+        self
+    }
+
+    pub fn with_idempotency_key(mut self, idempotency_key: Option<String>) -> Self {
+        self.idempotency_key = idempotency_key;
         self
     }
 
@@ -1333,93 +870,269 @@ impl CouponRedemptionRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CouponRollbackRecord {
-    pub coupon_rollback_id: String,
-    pub coupon_redemption_id: String,
-    pub rollback_type: CouponRollbackType,
-    pub rollback_status: CouponRollbackStatus,
-    pub restored_budget_minor: u64,
-    pub restored_inventory_count: u64,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReferralProgramRecord {
+    pub referral_program_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub program_code: String,
+    pub display_name: String,
+    pub status: ReferralProgramStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invite_reward_template_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub referee_reward_template_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starts_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends_at_ms: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
-impl CouponRollbackRecord {
+impl ReferralProgramRecord {
     pub fn new(
-        coupon_rollback_id: impl Into<String>,
-        coupon_redemption_id: impl Into<String>,
-        rollback_type: CouponRollbackType,
+        referral_program_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        program_code: impl Into<String>,
+        display_name: impl Into<String>,
         created_at_ms: u64,
     ) -> Self {
         Self {
-            coupon_rollback_id: coupon_rollback_id.into(),
-            coupon_redemption_id: coupon_redemption_id.into(),
-            rollback_type,
-            rollback_status: CouponRollbackStatus::Pending,
-            restored_budget_minor: 0,
-            restored_inventory_count: 0,
+            referral_program_id,
+            tenant_id,
+            organization_id,
+            program_code: program_code.into(),
+            display_name: display_name.into(),
+            status: ReferralProgramStatus::Draft,
+            invite_reward_template_id: None,
+            referee_reward_template_id: None,
+            starts_at_ms: None,
+            ends_at_ms: None,
             created_at_ms,
             updated_at_ms: created_at_ms,
         }
     }
 
-    pub fn with_status(mut self, rollback_status: CouponRollbackStatus) -> Self {
-        self.rollback_status = rollback_status;
-        self
-    }
-
-    pub fn with_restored_budget_minor(mut self, restored_budget_minor: u64) -> Self {
-        self.restored_budget_minor = restored_budget_minor;
-        self
-    }
-
-    pub fn with_restored_inventory_count(mut self, restored_inventory_count: u64) -> Self {
-        self.restored_inventory_count = restored_inventory_count;
-        self
-    }
-
-    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
-        self.updated_at_ms = updated_at_ms;
-        self
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct MarketingOutboxEventRecord {
-    pub marketing_outbox_event_id: String,
-    pub aggregate_type: String,
-    pub aggregate_id: String,
-    pub event_type: String,
-    pub status: MarketingOutboxEventStatus,
-    pub payload_json: String,
-    pub created_at_ms: u64,
-    pub updated_at_ms: u64,
-}
-
-impl MarketingOutboxEventRecord {
-    pub fn new(
-        marketing_outbox_event_id: impl Into<String>,
-        aggregate_type: impl Into<String>,
-        aggregate_id: impl Into<String>,
-        event_type: impl Into<String>,
-        payload_json: impl Into<String>,
-        created_at_ms: u64,
-    ) -> Self {
-        Self {
-            marketing_outbox_event_id: marketing_outbox_event_id.into(),
-            aggregate_type: aggregate_type.into(),
-            aggregate_id: aggregate_id.into(),
-            event_type: event_type.into(),
-            status: MarketingOutboxEventStatus::Pending,
-            payload_json: payload_json.into(),
-            created_at_ms,
-            updated_at_ms: created_at_ms,
-        }
-    }
-
-    pub fn with_status(mut self, status: MarketingOutboxEventStatus) -> Self {
+    pub fn with_status(mut self, status: ReferralProgramStatus) -> Self {
         self.status = status;
+        self
+    }
+
+    pub fn with_invite_reward_template_id(
+        mut self,
+        invite_reward_template_id: Option<u64>,
+    ) -> Self {
+        self.invite_reward_template_id = invite_reward_template_id;
+        self
+    }
+
+    pub fn with_referee_reward_template_id(
+        mut self,
+        referee_reward_template_id: Option<u64>,
+    ) -> Self {
+        self.referee_reward_template_id = referee_reward_template_id;
+        self
+    }
+
+    pub fn with_starts_at_ms(mut self, starts_at_ms: Option<u64>) -> Self {
+        self.starts_at_ms = starts_at_ms;
+        self
+    }
+
+    pub fn with_ends_at_ms(mut self, ends_at_ms: Option<u64>) -> Self {
+        self.ends_at_ms = ends_at_ms;
+        self
+    }
+
+    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
+        self.updated_at_ms = updated_at_ms;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReferralInviteRecord {
+    pub referral_invite_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub referral_program_id: u64,
+    pub referrer_user_id: u64,
+    pub status: ReferralInviteStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coupon_code_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub referred_user_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewarded_at_ms: Option<u64>,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
+impl ReferralInviteRecord {
+    pub fn new(
+        referral_invite_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        referral_program_id: u64,
+        referrer_user_id: u64,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            referral_invite_id,
+            tenant_id,
+            organization_id,
+            referral_program_id,
+            referrer_user_id,
+            status: ReferralInviteStatus::Issued,
+            coupon_code_id: None,
+            source_code: None,
+            referred_user_id: None,
+            accepted_at_ms: None,
+            rewarded_at_ms: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
+        }
+    }
+
+    pub fn with_status(mut self, status: ReferralInviteStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    pub fn with_coupon_code_id(mut self, coupon_code_id: Option<u64>) -> Self {
+        self.coupon_code_id = coupon_code_id;
+        self
+    }
+
+    pub fn with_source_code(mut self, source_code: Option<String>) -> Self {
+        self.source_code = source_code;
+        self
+    }
+
+    pub fn with_referred_user_id(mut self, referred_user_id: Option<u64>) -> Self {
+        self.referred_user_id = referred_user_id;
+        self
+    }
+
+    pub fn with_accepted_at_ms(mut self, accepted_at_ms: Option<u64>) -> Self {
+        self.accepted_at_ms = accepted_at_ms;
+        self
+    }
+
+    pub fn with_rewarded_at_ms(mut self, rewarded_at_ms: Option<u64>) -> Self {
+        self.rewarded_at_ms = rewarded_at_ms;
+        self
+    }
+
+    pub fn with_updated_at_ms(mut self, updated_at_ms: u64) -> Self {
+        self.updated_at_ms = updated_at_ms;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MarketingAttributionTouchRecord {
+    pub attribution_touch_id: u64,
+    pub tenant_id: u64,
+    pub organization_id: u64,
+    pub source_kind: AttributionSourceKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utm_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utm_campaign: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utm_medium: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partner_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub referrer_user_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invite_code_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion_subject_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub converted_at_ms: Option<u64>,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
+impl MarketingAttributionTouchRecord {
+    pub fn new(
+        attribution_touch_id: u64,
+        tenant_id: u64,
+        organization_id: u64,
+        source_kind: AttributionSourceKind,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            attribution_touch_id,
+            tenant_id,
+            organization_id,
+            source_kind,
+            source_code: None,
+            utm_source: None,
+            utm_campaign: None,
+            utm_medium: None,
+            partner_id: None,
+            referrer_user_id: None,
+            invite_code_id: None,
+            conversion_subject_id: None,
+            converted_at_ms: None,
+            created_at_ms,
+            updated_at_ms: created_at_ms,
+        }
+    }
+
+    pub fn with_source_code(mut self, source_code: Option<String>) -> Self {
+        self.source_code = source_code;
+        self
+    }
+
+    pub fn with_utm_source(mut self, utm_source: Option<String>) -> Self {
+        self.utm_source = utm_source;
+        self
+    }
+
+    pub fn with_utm_campaign(mut self, utm_campaign: Option<String>) -> Self {
+        self.utm_campaign = utm_campaign;
+        self
+    }
+
+    pub fn with_utm_medium(mut self, utm_medium: Option<String>) -> Self {
+        self.utm_medium = utm_medium;
+        self
+    }
+
+    pub fn with_partner_id(mut self, partner_id: Option<String>) -> Self {
+        self.partner_id = partner_id;
+        self
+    }
+
+    pub fn with_referrer_user_id(mut self, referrer_user_id: Option<u64>) -> Self {
+        self.referrer_user_id = referrer_user_id;
+        self
+    }
+
+    pub fn with_invite_code_id(mut self, invite_code_id: Option<u64>) -> Self {
+        self.invite_code_id = invite_code_id;
+        self
+    }
+
+    pub fn with_conversion_subject_id(mut self, conversion_subject_id: Option<String>) -> Self {
+        self.conversion_subject_id = conversion_subject_id;
+        self
+    }
+
+    pub fn with_converted_at_ms(mut self, converted_at_ms: Option<u64>) -> Self {
+        self.converted_at_ms = converted_at_ms;
         self
     }
 

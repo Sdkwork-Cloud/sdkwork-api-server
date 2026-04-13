@@ -98,9 +98,9 @@ Current strengths:
 Current weakness:
 
 - the gateway still records coarse usage, billing events, and ledger entries on compatibility-era paths
-- `sdkwork-api-app-billing` now has the first clean-slate `AccountKernelStore` read-model and hold-planning APIs, but its mutation flow is still incomplete and the legacy quota summaries are still present beside the new surface
+- `sdkwork-api-app-billing` now has the first clean-slate `AccountKernelStore` read-model and hold-planning APIs, and the SQLite path now also has transaction-backed command orchestration for create-hold, capture-hold, and release-hold flows with request-meter-fact and settlement persistence
 - there is still no immutable meter-fact to settlement pipeline in the request path
-- no account hold and release lifecycle in the app or interface layer
+- the app layer now has an account hold and release lifecycle, but the HTTP gateway still has not cut over to it
 - no pricing plan resolution flow that reproduces historical charges exactly at settlement time
 - no benefit-lot application model for prepaid, promo, or package offsets in business logic
 

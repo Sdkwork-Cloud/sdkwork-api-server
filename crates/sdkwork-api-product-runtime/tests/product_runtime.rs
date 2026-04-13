@@ -31,7 +31,7 @@ async fn desktop_product_runtime_serves_static_sites_and_all_api_health_routes()
 
     let (loader, config) = StandaloneConfigLoader::from_local_root_and_pairs(
         &config_root,
-        std::iter::empty::<(&str, &str)>(),
+        [("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP", "true")],
     )
     .unwrap();
 
@@ -136,6 +136,100 @@ async fn desktop_product_runtime_serves_static_sites_and_all_api_health_routes()
 }
 
 #[tokio::test]
+async fn desktop_product_runtime_rejects_local_dev_defaults_without_explicit_dev_mode() {
+    let config_root = temp_root("desktop-runtime-security");
+    let admin_site_dir = temp_root("desktop-security-admin-site");
+    let portal_site_dir = temp_root("desktop-security-portal-site");
+    fs::write(admin_site_dir.join("index.html"), "admin").unwrap();
+    fs::write(portal_site_dir.join("index.html"), "portal").unwrap();
+
+    let (loader, config) = StandaloneConfigLoader::from_local_root_and_pairs(
+        &config_root,
+        std::iter::empty::<(&str, &str)>(),
+    )
+    .unwrap();
+
+    let error = RouterProductRuntime::start(
+        loader,
+        config,
+        RouterProductRuntimeOptions::desktop(ProductSiteDirs::new(
+            &admin_site_dir,
+            &portal_site_dir,
+        )),
+    )
+    .await
+    .err()
+    .expect("runtime should reject insecure local-dev startup defaults");
+
+    assert!(
+        error
+            .to_string()
+            .contains("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn desktop_product_runtime_does_not_bootstrap_default_users_without_explicit_dev_mode() {
+    let config_root = temp_root("desktop-runtime-no-default-users");
+    let admin_site_dir = temp_root("desktop-no-default-admin-site");
+    let portal_site_dir = temp_root("desktop-no-default-portal-site");
+    fs::write(admin_site_dir.join("index.html"), "admin").unwrap();
+    fs::write(portal_site_dir.join("index.html"), "portal").unwrap();
+
+    let (loader, config) = StandaloneConfigLoader::from_local_root_and_pairs(
+        &config_root,
+        [
+            (
+                "SDKWORK_ADMIN_JWT_SIGNING_SECRET",
+                "prod-admin-jwt-secret-1234567890",
+            ),
+            (
+                "SDKWORK_PORTAL_JWT_SIGNING_SECRET",
+                "prod-portal-jwt-secret-1234567890",
+            ),
+            (
+                "SDKWORK_CREDENTIAL_MASTER_KEY",
+                "prod-master-key-1234567890",
+            ),
+        ],
+    )
+    .unwrap();
+
+    let runtime = RouterProductRuntime::start(
+        loader,
+        config,
+        RouterProductRuntimeOptions::desktop(ProductSiteDirs::new(
+            &admin_site_dir,
+            &portal_site_dir,
+        )),
+    )
+    .await
+    .unwrap();
+
+    let base_url = runtime.public_base_url().unwrap().to_owned();
+    let client = http_client();
+
+    let admin_response = client
+        .post(format!("{base_url}/api/admin/auth/login"))
+        .header("content-type", "application/json")
+        .body(r#"{"email":"admin@sdkwork.local","password":"ChangeMe123!"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(admin_response.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+    let portal_response = client
+        .post(format!("{base_url}/api/portal/auth/login"))
+        .header("content-type", "application/json")
+        .body(r#"{"email":"portal@sdkwork.local","password":"ChangeMe123!"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(portal_response.status(), reqwest::StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn server_product_runtime_rejects_web_role_without_required_api_upstreams() {
     let config_root = temp_root("server-runtime-config");
     let admin_site_dir = temp_root("server-admin-site");
@@ -145,7 +239,7 @@ async fn server_product_runtime_rejects_web_role_without_required_api_upstreams(
 
     let (loader, config) = StandaloneConfigLoader::from_local_root_and_pairs(
         &config_root,
-        std::iter::empty::<(&str, &str)>(),
+        [("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP", "true")],
     )
     .unwrap();
 
@@ -170,7 +264,7 @@ async fn product_runtime_supports_redis_cache_backend_during_startup() {
     let config_root = temp_root("runtime-cache-backend");
     let (loader, mut config) = StandaloneConfigLoader::from_local_root_and_pairs(
         &config_root,
-        std::iter::empty::<(&str, &str)>(),
+        [("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP", "true")],
     )
     .unwrap();
     let redis_server = MinimalRedisPingServer::start();

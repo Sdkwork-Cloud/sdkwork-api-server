@@ -9,10 +9,6 @@ anyhow.workspace = true
 async-trait.workspace = true
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
-sha2.workspace = true
-
-[dev-dependencies]
-sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 tokio.workspace = true
 
 [lib]

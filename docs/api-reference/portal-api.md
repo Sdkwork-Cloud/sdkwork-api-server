@@ -20,7 +20,7 @@ curl -X POST http://127.0.0.1:8082/portal/auth/register \
   }'
 ```
 
-Default local demo login:
+Default local demo login for explicit development mode:
 
 ```bash
 curl -X POST http://127.0.0.1:8082/portal/auth/login \
@@ -30,6 +30,8 @@ curl -X POST http://127.0.0.1:8082/portal/auth/login \
     "password":"ChangeMe123!"
   }'
 ```
+
+The built-in `portal@sdkwork.local / ChangeMe123!` demo account is seeded only when startup enables `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`. In secure runtime mode, end users must register normally or be provisioned through admin flows.
 
 Password rotation:
 
@@ -52,8 +54,8 @@ curl -X POST http://127.0.0.1:8082/portal/auth/change-password \
 | workspace | `GET /portal/workspace` | inspect the caller-owned default workspace |
 | dashboard | `GET /portal/dashboard` | workspace identity plus a combined usage and billing snapshot for the active project |
 | usage | `GET /portal/usage/records`, `GET /portal/usage/summary` | recent requests, token-unit history, and aggregate request counts |
-| marketing | `POST /portal/marketing/coupon-validations`, `POST /portal/marketing/coupon-reservations`, `POST /portal/marketing/coupon-redemptions/confirm`, `POST /portal/marketing/coupon-redemptions/rollback`, `GET /portal/marketing/my-coupons`, `GET /portal/marketing/reward-history`, `GET /portal/marketing/redemptions`, `GET /portal/marketing/codes` | coupon eligibility checks, reservation and redemption lifecycle, and caller-owned reward history |
-| billing | `GET /portal/billing/summary`, `GET /portal/billing/ledger`, `GET /portal/billing/events`, `GET /portal/billing/events/summary`, `GET /portal/billing/account`, `GET /portal/billing/account/balance`, `GET /portal/billing/account/benefit-lots`, `GET /portal/billing/account/holds`, `GET /portal/billing/account/request-settlements`, `GET /portal/billing/pricing-plans`, `GET /portal/billing/pricing-rates` | quota posture, workspace-scoped Billing 2.0 event inspection, and tenant-facing canonical commercial account visibility |
+| billing | `GET /portal/billing/summary`, `GET /portal/billing/ledger`, `GET /portal/billing/events`, `GET /portal/billing/events/summary` | effective workspace balance, quota posture, ledger visibility, and workspace-scoped Billing 2.0 event inspection |
+| commerce | `GET /portal/commerce/catalog`, `POST /portal/commerce/quote`, `GET /portal/commerce/orders`, `POST /portal/commerce/orders`, `POST /portal/commerce/orders/{order_id}/settle`, `POST /portal/commerce/orders/{order_id}/cancel`, `POST /portal/commerce/orders/{order_id}/payment-events`, `GET /portal/commerce/orders/{order_id}/checkout-session`, `GET /portal/commerce/membership` | workspace commerce catalog, quote preview, order lifecycle, checkout posture, and membership read models |
 | API keys | `GET /portal/api-keys`, `POST /portal/api-keys`, `POST /portal/api-keys/{hashed_key}/status`, `DELETE /portal/api-keys/{hashed_key}` | self-service gateway API key lifecycle inside the caller-owned workspace |
 | API key groups | `GET /portal/api-key-groups`, `POST /portal/api-key-groups`, `PATCH /portal/api-key-groups/{group_id}`, `POST /portal/api-key-groups/{group_id}/status`, `DELETE /portal/api-key-groups/{group_id}` | self-service API key group lifecycle scoped to the authenticated workspace |
 | routing | `GET /portal/routing/summary`, `GET /portal/routing/profiles`, `POST /portal/routing/profiles`, `GET /portal/routing/preferences`, `POST /portal/routing/preferences`, `GET /portal/routing/snapshots`, `POST /portal/routing/preview`, `GET /portal/routing/decision-logs` | workspace-scoped routing posture, reusable profile discovery and save-from-posture flows for group binding, compiled route evidence, preview, and decision evidence |
@@ -65,13 +67,12 @@ curl -X POST http://127.0.0.1:8082/portal/auth/change-password \
 3. inspect the default tenant and project workspace
 4. open the dashboard snapshot for recent requests, token units, and quota posture
 5. review usage and billing detail views
-6. inspect the canonical workspace commercial account, benefit lots, active holds, and settled requests
-7. inspect workspace billing events and event summaries for group, capability, and accounting-mode visibility
-8. validate, reserve, confirm, and if necessary roll back coupon redemptions with replay-safe idempotency controls
-9. review workspace routing posture and save the current posture as a reusable routing profile when a group should inherit a stable route plan
-10. create one or more API key groups for stable policy attachment
-11. issue a gateway API key, optionally binding it to a group with `api_key_group_id`
-12. use that key against the gateway `/v1/*` surface
+6. inspect workspace billing events and event summaries for group, capability, and accounting-mode visibility
+7. review workspace routing posture and save the current posture as a reusable routing profile when a group should inherit a stable route plan
+8. create one or more API key groups for stable policy attachment
+9. issue a gateway API key, optionally binding it to a group with `api_key_group_id`
+10. copy the plaintext key immediately because later reads only retain a non-secret `key_prefix`
+11. use that key against the gateway `/v1/*` surface
 
 ## Browser App
 
@@ -110,6 +111,15 @@ The portal browser experience is a dedicated app:
 
 ## Billing Event Notes
 
+- `GET /portal/billing/summary` returns `remaining_units` as the effective spendable balance for the active workspace
+- when the active workspace has a canonical recharge account, `GET /portal/billing/summary` sets `balance_source` to `canonical_account` and also exposes:
+  - `quota_remaining_units`
+  - `canonical_account_id`
+  - `canonical_available_balance`
+  - `canonical_held_balance`
+  - `canonical_grant_balance`
+  - `canonical_consumed_balance`
+- when no canonical recharge account exists yet, `balance_source` remains `quota_policy` and `remaining_units` continues to reflect the active quota layer
 - `GET /portal/billing/events` returns only billing events inside the authenticated workspace tenant and project
 - `GET /portal/billing/events/summary` aggregates only workspace-visible billing events by:
   - project
@@ -123,23 +133,11 @@ The portal browser experience is a dedicated app:
   - `video_seconds`
   - `music_seconds`
 
-## Marketing Coupon Notes
+## Commerce Settlement Notes
 
-- `POST /portal/marketing/coupon-validations` and `POST /portal/marketing/coupon-reservations` require `target_kind` so the portal boundary can enforce the coupon template `eligible_target_kinds` restriction against the actual redemption or checkout flow
-- `POST /portal/marketing/coupon-reservations`, `POST /portal/marketing/coupon-redemptions/confirm`, and `POST /portal/marketing/coupon-redemptions/rollback` accept an optional JSON `idempotency_key`
-- the same three mutation routes also accept the standard `Idempotency-Key` header
-- `POST /portal/marketing/coupon-validations`, `POST /portal/marketing/coupon-reservations`, `POST /portal/marketing/coupon-redemptions/confirm`, and `POST /portal/marketing/coupon-redemptions/rollback` are now subject to workspace project coupon rate-limit policies and return `429` when the configured validation, reserve, confirm, or rollback budget is exhausted
-- portal coupon throttling evaluates policies against the authenticated workspace project together with the resolved coupon subject bucket such as `project:{project_id}` or `user:{user_id}`, which prevents one caller subject from consuming another subject's coupon quota window
-- when both the JSON `idempotency_key` and the `Idempotency-Key` header are supplied, they must normalize to the same value or the request is rejected with `400`
-- replaying the same mutation for the same caller subject and the same idempotency key returns the existing reservation, redemption, or rollback instead of creating a duplicate record
-- coupon reservation idempotency now includes `target_kind` in the reservation fingerprint, which prevents the same idempotency key from being replayed across incompatible redemption targets
-- reusing the same idempotency key for a different coupon mutation payload returns `409`, which protects the reward and checkout ledger from ambiguous retries
-
-## Canonical Commercial Account Notes
-
-- `GET /portal/billing/account` returns the authenticated workspace primary commercial account with summarized available, held, consumed, and granted balance posture
-- `GET /portal/billing/account/balance` returns the computed active balance snapshot for the same workspace account
-- `GET /portal/billing/account/benefit-lots`, `GET /portal/billing/account/holds`, and `GET /portal/billing/account/request-settlements` are workspace-scoped and never leak another tenant or project account
-- `GET /portal/billing/pricing-plans` and `GET /portal/billing/pricing-rates` expose only pricing records attached to the authenticated workspace commercial scope
-- portal pricing reads also synchronize due `planned` versions before filtering the workspace scope, so tenant-facing billing posture naturally reflects staged plans once their effective window opens
-- portal commercial account routes return `404` when the workspace commercial account has not been provisioned yet, which lets the frontend distinguish bootstrap gaps from authentication failures
+- `POST /portal/commerce/orders/{order_id}/settle` is a portal-user action, not a payment-provider callback
+- paid orders are rejected from direct portal settlement unless `SDKWORK_PORTAL_ALLOW_MANUAL_SETTLEMENT=true` is explicitly enabled for lab-only flows
+- `POST /portal/commerce/orders/{order_id}/payment-events` no longer accepts direct end-user settlement events from a portal JWT session
+- payment provider callbacks must use `POST /portal/internal/commerce/orders/{order_id}/payment-events`
+- internal callback ingestion requires `x-sdkwork-payment-callback-secret` and the server-side secret `SDKWORK_PORTAL_PAYMENT_CALLBACK_SECRET`
+- zero-pay orders may still complete without an external payment provider because fulfillment does not require a paid settlement callback

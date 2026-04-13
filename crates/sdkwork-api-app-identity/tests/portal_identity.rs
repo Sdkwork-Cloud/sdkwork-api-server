@@ -1,9 +1,8 @@
 use sdkwork_api_app_identity::{
     change_portal_password, create_portal_api_key, list_portal_api_keys,
-    load_portal_workspace_summary, login_portal_user, register_portal_user, verify_portal_jwt,
-    PortalIdentityError,
+    load_portal_workspace_summary, login_portal_user, login_portal_user_with_bootstrap,
+    register_portal_user, verify_portal_jwt, PortalIdentityError,
 };
-use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
 async fn memory_store() -> SqliteAdminStore {
@@ -18,7 +17,7 @@ async fn portal_registration_login_and_workspace_summary_work() {
     let session = register_portal_user(
         &store,
         "portal@example.com",
-        "PortalPass123!",
+        "hunter2!",
         "Portal User",
         "portal-test-secret",
     )
@@ -46,7 +45,7 @@ async fn portal_registration_login_and_workspace_summary_work() {
     let login = login_portal_user(
         &store,
         "portal@example.com",
-        "PortalPass123!",
+        "hunter2!",
         "portal-test-secret",
     )
     .await
@@ -62,7 +61,7 @@ async fn portal_api_key_listing_is_workspace_scoped_and_login_rejects_invalid_pa
     let alice = register_portal_user(
         &store,
         "alice@example.com",
-        "PortalPass123!",
+        "hunter2!",
         "Alice",
         "portal-test-secret",
     )
@@ -71,7 +70,7 @@ async fn portal_api_key_listing_is_workspace_scoped_and_login_rejects_invalid_pa
     let bob = register_portal_user(
         &store,
         "bob@example.com",
-        "PortalPass123!",
+        "hunter2!",
         "Bob",
         "portal-test-secret",
     )
@@ -180,51 +179,22 @@ async fn portal_password_change_rejects_old_password_and_accepts_new_password() 
 }
 
 #[tokio::test]
-async fn portal_registration_rejects_weak_passwords() {
+async fn disabled_portal_bootstrap_does_not_seed_default_credentials() {
     let store = memory_store().await;
 
-    let error = register_portal_user(
-        &store,
-        "weak@example.com",
-        "password1234",
-        "Weak User",
-        "portal-test-secret",
-    )
-    .await
-    .unwrap_err();
-
-    assert!(matches!(
-        error,
-        PortalIdentityError::InvalidInput(message)
-            if message == "password must include an uppercase letter"
-    ));
-}
-
-#[tokio::test]
-async fn production_bootstrap_workspace_does_not_lazy_create_default_portal_user() {
-    let store = memory_store().await;
-    store
-        .insert_tenant(&Tenant::new("tenant_global_default", "Global Default Workspace"))
-        .await
-        .unwrap();
-    store
-        .insert_project(&Project::new(
-            "tenant_global_default",
-            "project_global_default",
-            "production-default",
-        ))
-        .await
-        .unwrap();
-
-    let error = login_portal_user(
+    let error = login_portal_user_with_bootstrap(
         &store,
         "portal@sdkwork.local",
         "ChangeMe123!",
         "portal-test-secret",
+        false,
     )
     .await
     .unwrap_err();
-
     assert!(matches!(error, PortalIdentityError::InvalidCredentials));
-    assert!(store.list_portal_users().await.unwrap().is_empty());
+    assert!(store
+        .find_portal_user_by_email("portal@sdkwork.local")
+        .await
+        .unwrap()
+        .is_none());
 }

@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::{
     configure_capability_catalog_cache_store, configure_route_decision_cache_store,
     configure_route_recovery_probe_lock_store,
 };
+use sdkwork_api_app_rate_limit::InMemoryGatewayTrafficController;
 use sdkwork_api_app_runtime::{
     build_admin_store_from_config, build_cache_runtime_from_config,
     resolve_service_runtime_node_id, start_extension_runtime_rollout_supervision,
@@ -40,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
     let state = GatewayApiState::with_live_store_and_secret_manager_handle(
         live_store.clone(),
         live_secret_manager.clone(),
+        Arc::new(InMemoryGatewayTrafficController::new()),
     );
     let listener_host = StandaloneListenerHost::bind(
         config.gateway_bind.clone(),

@@ -9,15 +9,13 @@ anyhow.workspace = true
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sdkwork-api-config = { path = "../sdkwork-api-config" }
 sdkwork-api-app-catalog = { path = "../sdkwork-api-app-catalog" }
 sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
-sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
+sdkwork-api-app-coupon = { path = "../sdkwork-api-app-coupon" }
 sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-extension = { path = "../sdkwork-api-app-extension" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
-sdkwork-api-app-jobs = { path = "../sdkwork-api-app-jobs" }
 sdkwork-api-app-marketing = { path = "../sdkwork-api-app-marketing" }
 sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
 sdkwork-api-app-runtime = { path = "../sdkwork-api-app-runtime" }
@@ -26,10 +24,9 @@ sdkwork-api-app-tenant = { path = "../sdkwork-api-app-tenant" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
-sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
+sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
-sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
@@ -37,17 +34,14 @@ sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
 sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
+sdkwork-api-openapi = { path = "../sdkwork-api-openapi" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 sqlx.workspace = true
-utoipa.workspace = true
-utoipa-axum.workspace = true
-utoipa-swagger-ui.workspace = true
 
 [dev-dependencies]
 serial_test.workspace = true
 serde_json.workspace = true
-sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
 sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }

@@ -74,6 +74,6 @@ async fn health_route_returns_ok_and_metrics_require_bearer_token() {
     let body = String::from_utf8(bytes.to_vec()).unwrap();
     assert!(body.contains("sdkwork_service_info{service=\"gateway\"} 1"));
     assert!(body.contains(
-        "sdkwork_http_requests_total{service=\"gateway\",method=\"GET\",route=\"/health\",status=\"200\"} 2"
+        "sdkwork_http_requests_total{service=\"gateway\",method=\"GET\",route=\"/health\",status=\"200\",tenant=\"none\",model=\"none\",provider=\"none\",billing_mode=\"none\",retry_outcome=\"none\",failover_outcome=\"none\",payment_outcome=\"none\"} 2"
     ));
 }

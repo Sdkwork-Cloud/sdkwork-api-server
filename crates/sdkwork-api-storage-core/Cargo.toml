@@ -7,14 +7,14 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
-serde.workspace = true
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
-sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-domain-coupon = { path = "../sdkwork-api-domain-coupon" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
-sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }
+sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }

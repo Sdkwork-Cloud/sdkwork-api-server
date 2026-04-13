@@ -1,0 +1,20 @@
+[package]
+name = "sdkwork-api-app-payment"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
+sdkwork-api-observability = { path = "../sdkwork-api-observability" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
+
+[lib]
+path = "src/lib.rs"

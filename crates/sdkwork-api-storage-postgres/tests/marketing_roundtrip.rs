@@ -1,13 +1,148 @@
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CampaignBudgetStatus, CouponCodeRecord, CouponCodeStatus,
-    CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
-    CouponReservationRecord, CouponReservationStatus, CouponRollbackRecord, CouponRollbackStatus,
-    CouponRollbackType, CouponTemplateRecord, CouponTemplateStatus, MarketingBenefitKind,
-    MarketingCampaignRecord, MarketingCampaignStatus, MarketingOutboxEventRecord,
-    MarketingOutboxEventStatus, MarketingStackingPolicy, MarketingSubjectScope,
+    AttributionSourceKind, CouponBenefitKind, CouponBenefitRuleRecord, CouponClaimRecord,
+    CouponClaimStatus, CouponCodeBatchRecord, CouponCodeBatchStatus, CouponCodeGenerationMode,
+    CouponCodeKind, CouponCodeRecord, CouponCodeStatus, CouponDistributionKind,
+    CouponRedemptionRecord, CouponRedemptionStatus, CouponStackingPolicy, CouponTemplateRecord,
+    CouponTemplateStatus, MarketingAttributionTouchRecord, MarketingCampaignKind,
+    MarketingCampaignRecord, MarketingCampaignStatus, ReferralInviteRecord, ReferralInviteStatus,
+    ReferralProgramRecord, ReferralProgramStatus,
 };
-use sdkwork_api_storage_core::MarketingStore;
 use sdkwork_api_storage_postgres::{run_migrations, PostgresAdminStore};
+use sqlx::PgPool;
+
+#[tokio::test]
+async fn postgres_store_creates_marketing_kernel_tables_when_url_is_provided() {
+    let Some(database_url) = std::env::var("SDKWORK_TEST_POSTGRES_URL").ok() else {
+        return;
+    };
+
+    let pool = run_migrations(&database_url).await.unwrap();
+
+    for table_name in [
+        "ai_marketing_coupon_template",
+        "ai_marketing_coupon_benefit_rule",
+        "ai_marketing_campaign",
+        "ai_marketing_coupon_code_batch",
+        "ai_marketing_coupon_code",
+        "ai_marketing_coupon_claim",
+        "ai_marketing_coupon_redemption",
+        "ai_marketing_referral_program",
+        "ai_marketing_referral_invite",
+        "ai_marketing_attribution_touch",
+    ] {
+        let row: (String,) = sqlx::query_as(
+            "select tablename
+             from pg_tables
+             where schemaname = 'public' and tablename = $1",
+        )
+        .bind(table_name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(row.0, table_name);
+    }
+
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_code",
+        "code_lookup_hash",
+        "text",
+        false,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_code",
+        "claim_subject_id",
+        "text",
+        true,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_claim",
+        "subject_type",
+        "text",
+        false,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_claim",
+        "subject_id",
+        "text",
+        false,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_redemption",
+        "subject_type",
+        "text",
+        false,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_redemption",
+        "subject_id",
+        "text",
+        false,
+        None,
+    )
+    .await;
+    assert_pg_column(
+        &pool,
+        "ai_marketing_coupon_redemption",
+        "idempotency_key",
+        "text",
+        true,
+        None,
+    )
+    .await;
+
+    let index_names: Vec<(String,)> = sqlx::query_as(
+        "select indexname
+         from pg_indexes
+         where schemaname = 'public'
+           and tablename in (
+             'ai_marketing_coupon_template',
+             'ai_marketing_campaign',
+             'ai_marketing_coupon_code_batch',
+             'ai_marketing_coupon_code',
+             'ai_marketing_coupon_redemption'
+           )
+         order by indexname",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let index_names = index_names
+        .into_iter()
+        .map(|(name,)| name)
+        .collect::<std::collections::HashSet<_>>();
+
+    for index_name in [
+        "idx_ai_marketing_coupon_template_scope_status",
+        "idx_ai_marketing_campaign_scope_status",
+        "idx_ai_marketing_coupon_code_batch_template_status",
+        "idx_ai_marketing_coupon_code_lookup_hash",
+        "idx_ai_marketing_coupon_code_subject",
+        "idx_ai_marketing_coupon_claim_subject_status",
+        "idx_ai_marketing_coupon_redemption_lineage",
+        "idx_ai_marketing_coupon_redemption_idempotency",
+    ] {
+        assert!(
+            index_names.contains(index_name),
+            "missing index {index_name}"
+        );
+    }
+}
 
 #[tokio::test]
 async fn postgres_store_round_trips_marketing_kernel_records_when_url_is_provided() {
@@ -19,239 +154,318 @@ async fn postgres_store_round_trips_marketing_kernel_records_when_url_is_provide
     let store = PostgresAdminStore::new(pool);
 
     let template = CouponTemplateRecord::new(
-        "tpl_postgres_launch_1",
-        "postgres-launch-boost",
-        MarketingBenefitKind::FixedAmountOff,
+        101,
+        1001,
+        2002,
+        "spring-launch",
+        "Spring launch 20% off",
+        CouponBenefitKind::PercentageDiscount,
+        CouponDistributionKind::SharedCode,
+        1_710_000_000,
     )
-    .with_display_name("Postgres Launch Boost")
     .with_status(CouponTemplateStatus::Active)
-    .with_distribution_kind(CouponDistributionKind::UniqueCode)
-    .with_benefit(
-        sdkwork_api_domain_marketing::CouponBenefitSpec::new(MarketingBenefitKind::FixedAmountOff)
-            .with_discount_amount_minor(Some(3_000))
-            .with_currency_code(Some("USD".to_owned()))
-            .with_max_discount_minor(Some(3_000)),
-    )
-    .with_restriction(
-        sdkwork_api_domain_marketing::CouponRestrictionSpec::new(MarketingSubjectScope::Project)
-            .with_min_order_amount_minor(Some(12_000))
-            .with_exclusive_group(Some("postgres-launch".to_owned()))
-            .with_stacking_policy(MarketingStackingPolicy::Exclusive)
-            .with_eligible_target_kinds(vec!["workspace_recharge".to_owned()]),
-    )
-    .with_created_at_ms(1_000)
-    .with_updated_at_ms(1_100);
+    .with_stacking_policy(CouponStackingPolicy::ExclusiveWithinGroup)
+    .with_exclusive_group(Some("seasonal-discount".to_owned()))
+    .with_ends_at_ms(Some(1_710_999_999))
+    .with_max_total_redemptions(Some(20_000))
+    .with_max_redemptions_per_subject(Some(1))
+    .with_claim_required(false)
+    .with_updated_at_ms(1_710_000_100);
 
-    let campaign =
-        MarketingCampaignRecord::new("cmp_postgres_launch_1", template.coupon_template_id.clone())
-            .with_display_name("Postgres Launch Campaign")
-            .with_status(MarketingCampaignStatus::Active)
-            .with_start_at_ms(Some(2_000))
-            .with_end_at_ms(Some(9_000))
-            .with_created_at_ms(1_200)
-            .with_updated_at_ms(1_300);
+    let benefit_rule = CouponBenefitRuleRecord::new(
+        201,
+        1001,
+        2002,
+        template.coupon_template_id,
+        CouponBenefitKind::PercentageDiscount,
+        1_710_000_001,
+    )
+    .with_target_order_kind(Some("recharge_pack".to_owned()))
+    .with_target_product_id(Some("pack-100k".to_owned()))
+    .with_percentage_off(Some(20.0))
+    .with_maximum_subsidy_amount(Some(50.0))
+    .with_currency_code(Some("USD".to_owned()))
+    .with_updated_at_ms(1_710_000_101);
 
-    let budget = CampaignBudgetRecord::new(
-        "budget_postgres_launch_1",
-        campaign.marketing_campaign_id.clone(),
+    let campaign = MarketingCampaignRecord::new(
+        301,
+        1001,
+        2002,
+        "launch-2026-q2",
+        "Q2 Launch Push",
+        MarketingCampaignKind::Launch,
+        1_710_000_002,
     )
-    .with_status(CampaignBudgetStatus::Active)
-    .with_total_budget_minor(200_000)
-    .with_reserved_budget_minor(15_000)
-    .with_consumed_budget_minor(5_000)
-    .with_created_at_ms(1_400)
-    .with_updated_at_ms(1_500);
+    .with_status(MarketingCampaignStatus::Active)
+    .with_channel_source(Some("partner-marketplace".to_owned()))
+    .with_budget_amount(Some(20_000.0))
+    .with_currency_code(Some("USD".to_owned()))
+    .with_subsidy_cap_amount(Some(15_000.0))
+    .with_owner_user_id(Some(9001))
+    .with_ends_at_ms(Some(1_710_999_999))
+    .with_updated_at_ms(1_710_000_102);
 
-    let redeemable_code = CouponCodeRecord::new(
-        "code_postgres_launch_live",
-        template.coupon_template_id.clone(),
-        "PGSAVE30",
+    let batch = CouponCodeBatchRecord::new(
+        401,
+        1001,
+        2002,
+        template.coupon_template_id,
+        Some(campaign.marketing_campaign_id),
+        CouponCodeGenerationMode::BulkRandom,
+        1_710_000_003,
     )
-    .with_status(CouponCodeStatus::Available)
-    .with_expires_at_ms(Some(8_000))
-    .with_created_at_ms(1_600)
-    .with_updated_at_ms(1_700);
-    let disabled_code = CouponCodeRecord::new(
-        "code_postgres_launch_disabled",
-        template.coupon_template_id.clone(),
-        "PGDISABLED",
-    )
-    .with_status(CouponCodeStatus::Disabled)
-    .with_created_at_ms(1_601)
-    .with_updated_at_ms(1_701);
+    .with_status(CouponCodeBatchStatus::Active)
+    .with_batch_kind(Some("partner-distribution".to_owned()))
+    .with_code_prefix(Some("SPR".to_owned()))
+    .with_issued_count(5000)
+    .with_claimed_count(120)
+    .with_redeemed_count(75)
+    .with_voided_count(3)
+    .with_expires_at_ms(Some(1_710_999_999))
+    .with_updated_at_ms(1_710_000_103);
 
-    let active_reservation = CouponReservationRecord::new(
-        "reservation_postgres_launch_live",
-        redeemable_code.coupon_code_id.clone(),
-        MarketingSubjectScope::Project,
-        "project-postgres-1",
-        7_000,
+    let code = CouponCodeRecord::new(
+        501,
+        1001,
+        2002,
+        batch.coupon_code_batch_id,
+        template.coupon_template_id,
+        Some(campaign.marketing_campaign_id),
+        "hash:spring-code-001",
+        CouponCodeKind::SingleUseUnique,
+        1_710_000_004,
     )
-    .with_status(CouponReservationStatus::Reserved)
-    .with_budget_reserved_minor(3_000)
-    .with_created_at_ms(1_800)
-    .with_updated_at_ms(1_801);
-    let expired_reservation = CouponReservationRecord::new(
-        "reservation_postgres_launch_expired",
-        disabled_code.coupon_code_id.clone(),
-        MarketingSubjectScope::Project,
-        "project-postgres-2",
-        4_000,
+    .with_status(CouponCodeStatus::Claimed)
+    .with_display_code_prefix(Some("SPR".to_owned()))
+    .with_display_code_suffix(Some("001".to_owned()))
+    .with_claim_subject_type(Some("user".to_owned()))
+    .with_claim_subject_id(Some("1001:2002:9002".to_owned()))
+    .with_claimed_at_ms(Some(1_710_000_123))
+    .with_expires_at_ms(Some(1_710_999_999))
+    .with_updated_at_ms(1_710_000_104);
+
+    let claim = CouponClaimRecord::new(
+        601,
+        1001,
+        2002,
+        code.coupon_code_id,
+        template.coupon_template_id,
+        "user",
+        "9002",
+        1_710_000_005,
     )
-    .with_status(CouponReservationStatus::Expired)
-    .with_budget_reserved_minor(1_000)
-    .with_created_at_ms(1_802)
-    .with_updated_at_ms(1_803);
+    .with_status(CouponClaimStatus::Claimed)
+    .with_account_id(Some(7001))
+    .with_project_id(Some("project-live".to_owned()))
+    .with_expires_at_ms(Some(1_710_999_999))
+    .with_updated_at_ms(1_710_000_105);
 
     let redemption = CouponRedemptionRecord::new(
-        "redemption_postgres_launch_1",
-        active_reservation.coupon_reservation_id.clone(),
-        redeemable_code.coupon_code_id.clone(),
-        template.coupon_template_id.clone(),
-        1_900,
+        701,
+        1001,
+        2002,
+        code.coupon_code_id,
+        template.coupon_template_id,
+        Some(campaign.marketing_campaign_id),
+        "user",
+        "9002",
+        1_710_000_006,
     )
-    .with_status(CouponRedemptionStatus::Redeemed)
-    .with_subsidy_amount_minor(3_000)
-    .with_order_id(Some("pg-order-1".to_owned()))
-    .with_payment_event_id(Some("pg-payment-1".to_owned()))
-    .with_updated_at_ms(1_901);
+    .with_status(CouponRedemptionStatus::Fulfilled)
+    .with_account_id(Some(7001))
+    .with_project_id(Some("project-live".to_owned()))
+    .with_order_id(Some("order_123".to_owned()))
+    .with_payment_order_id(Some("pay_123".to_owned()))
+    .with_benefit_lot_id(Some(8801))
+    .with_pricing_adjustment_id(Some("pricing_adjustment_1".to_owned()))
+    .with_subsidy_amount(Some(18.5))
+    .with_currency_code(Some("USD".to_owned()))
+    .with_idempotency_key(Some("redeem:501:9002".to_owned()))
+    .with_updated_at_ms(1_710_000_106);
 
-    let rollback = CouponRollbackRecord::new(
-        "rollback_postgres_launch_1",
-        redemption.coupon_redemption_id.clone(),
-        CouponRollbackType::Refund,
-        2_000,
+    let referral_program = ReferralProgramRecord::new(
+        801,
+        1001,
+        2002,
+        "invite-growth",
+        "Invite Growth",
+        1_710_000_007,
     )
-    .with_status(CouponRollbackStatus::Completed)
-    .with_restored_budget_minor(3_000)
-    .with_restored_inventory_count(1)
-    .with_updated_at_ms(2_001);
+    .with_status(ReferralProgramStatus::Active)
+    .with_invite_reward_template_id(Some(111))
+    .with_referee_reward_template_id(Some(112))
+    .with_ends_at_ms(Some(1_710_999_999))
+    .with_updated_at_ms(1_710_000_107);
 
-    let outbox = MarketingOutboxEventRecord::new(
-        "outbox_postgres_launch_1",
-        "coupon_redemption",
-        redemption.coupon_redemption_id.clone(),
-        "coupon.redemption.redeemed",
-        "{\"redemption_id\":\"redemption_postgres_launch_1\"}",
-        2_100,
+    let referral_invite = ReferralInviteRecord::new(
+        901,
+        1001,
+        2002,
+        referral_program.referral_program_id,
+        9002,
+        1_710_000_008,
     )
-    .with_status(MarketingOutboxEventStatus::Pending)
-    .with_updated_at_ms(2_101);
+    .with_status(ReferralInviteStatus::Rewarded)
+    .with_coupon_code_id(Some(code.coupon_code_id))
+    .with_source_code(Some("INVITE-A1B2".to_owned()))
+    .with_referred_user_id(Some(9003))
+    .with_accepted_at_ms(Some(1_710_000_050))
+    .with_rewarded_at_ms(Some(1_710_000_200))
+    .with_updated_at_ms(1_710_000_108);
+
+    let touch = MarketingAttributionTouchRecord::new(
+        1001,
+        1001,
+        2002,
+        AttributionSourceKind::Referral,
+        1_710_000_009,
+    )
+    .with_source_code(Some("INVITE-A1B2".to_owned()))
+    .with_utm_source(Some("partner".to_owned()))
+    .with_utm_campaign(Some("launch-2026-q2".to_owned()))
+    .with_utm_medium(Some("invite".to_owned()))
+    .with_partner_id(Some("partner-01".to_owned()))
+    .with_referrer_user_id(Some(9002))
+    .with_invite_code_id(Some(code.coupon_code_id))
+    .with_conversion_subject_id(Some("workspace:9003".to_owned()))
+    .with_converted_at_ms(Some(1_710_000_250))
+    .with_updated_at_ms(1_710_000_109);
 
     store
         .insert_coupon_template_record(&template)
         .await
         .unwrap();
     store
+        .insert_coupon_benefit_rule_record(&benefit_rule)
+        .await
+        .unwrap();
+    store
         .insert_marketing_campaign_record(&campaign)
         .await
         .unwrap();
-    store.insert_campaign_budget_record(&budget).await.unwrap();
-    store
-        .insert_coupon_code_record(&redeemable_code)
-        .await
-        .unwrap();
-    store
-        .insert_coupon_code_record(&disabled_code)
-        .await
-        .unwrap();
-    store
-        .insert_coupon_reservation_record(&active_reservation)
-        .await
-        .unwrap();
-    store
-        .insert_coupon_reservation_record(&expired_reservation)
-        .await
-        .unwrap();
+    store.insert_coupon_code_batch_record(&batch).await.unwrap();
+    store.insert_coupon_code_record(&code).await.unwrap();
+    store.insert_coupon_claim_record(&claim).await.unwrap();
     store
         .insert_coupon_redemption_record(&redemption)
         .await
         .unwrap();
     store
-        .insert_coupon_rollback_record(&rollback)
+        .insert_referral_program_record(&referral_program)
         .await
         .unwrap();
     store
-        .insert_marketing_outbox_event_record(&outbox)
+        .insert_referral_invite_record(&referral_invite)
+        .await
+        .unwrap();
+    store
+        .insert_marketing_attribution_touch_record(&touch)
         .await
         .unwrap();
 
     assert_eq!(
-        store
-            .find_coupon_template_record(&template.coupon_template_id)
-            .await
-            .unwrap(),
-        Some(template.clone())
+        store.find_coupon_template_record(101).await.unwrap(),
+        Some(template)
     );
     assert_eq!(
         store
-            .find_coupon_template_record_by_template_key(&template.template_key)
+            .list_coupon_benefit_rule_records()
             .await
-            .unwrap(),
-        Some(template.clone())
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        store.list_marketing_campaign_records().await.unwrap().len(),
+        1
+    );
+    assert_eq!(
+        store.list_coupon_code_batch_records().await.unwrap().len(),
+        1
     );
     assert_eq!(
         store
-            .list_marketing_campaign_records_for_template(&template.coupon_template_id)
+            .find_coupon_code_record_by_lookup_hash("hash:spring-code-001")
             .await
-            .unwrap(),
-        vec![campaign.clone()]
+            .unwrap()
+            .map(|record| record.coupon_code_id),
+        Some(501)
     );
     assert_eq!(
         store
-            .list_campaign_budget_records_for_campaign(&campaign.marketing_campaign_id)
+            .list_coupon_code_records_for_subject("user", "1001:2002:9002")
             .await
-            .unwrap(),
-        vec![budget.clone()]
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(store.list_coupon_claim_records().await.unwrap().len(), 1);
+    assert_eq!(
+        store.list_coupon_claim_records().await.unwrap()[0].subject_id,
+        "9002"
     );
     assert_eq!(
         store
-            .find_coupon_code_record(&redeemable_code.coupon_code_id)
+            .find_coupon_redemption_record_by_idempotency_key("redeem:501:9002")
             .await
-            .unwrap(),
-        Some(redeemable_code.clone())
+            .unwrap()
+            .map(|record| record.coupon_redemption_id),
+        Some(701)
     );
     assert_eq!(
         store
-            .find_coupon_code_record_by_value(&redeemable_code.code_value)
+            .find_coupon_redemption_record_by_idempotency_key("redeem:501:9002")
             .await
-            .unwrap(),
-        Some(redeemable_code.clone())
+            .unwrap()
+            .map(|record| record.subject_id),
+        Some("9002".to_owned())
     );
+    assert_eq!(
+        store.list_referral_program_records().await.unwrap().len(),
+        1
+    );
+    assert_eq!(store.list_referral_invite_records().await.unwrap().len(), 1);
     assert_eq!(
         store
-            .list_redeemable_coupon_code_records_at(7_500)
+            .list_marketing_attribution_touch_records()
             .await
-            .unwrap(),
-        vec![redeemable_code.clone()]
+            .unwrap()
+            .len(),
+        1
     );
-    assert_eq!(
-        store
-            .find_coupon_reservation_record(&active_reservation.coupon_reservation_id)
-            .await
-            .unwrap(),
-        Some(active_reservation.clone())
-    );
-    assert_eq!(
-        store
-            .list_active_coupon_reservation_records_at(6_500)
-            .await
-            .unwrap(),
-        vec![active_reservation.clone()]
-    );
-    assert_eq!(
-        store
-            .find_coupon_redemption_record(&redemption.coupon_redemption_id)
-            .await
-            .unwrap(),
-        Some(redemption.clone())
-    );
-    assert_eq!(
-        store.list_coupon_rollback_records().await.unwrap(),
-        vec![rollback]
-    );
-    assert_eq!(
-        store.list_marketing_outbox_event_records().await.unwrap(),
-        vec![outbox]
-    );
+}
+
+async fn assert_pg_column(
+    pool: &PgPool,
+    table_name: &str,
+    column_name: &str,
+    data_type: &str,
+    nullable: bool,
+    default_contains: Option<&str>,
+) {
+    let row: (String, String, Option<String>) = sqlx::query_as(
+        "select data_type, is_nullable, column_default
+         from information_schema.columns
+         where table_schema = 'public'
+           and table_name = $1
+           and column_name = $2",
+    )
+    .bind(table_name)
+    .bind(column_name)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    assert_eq!(row.0, data_type);
+    assert_eq!(row.1 == "YES", nullable);
+    match default_contains {
+        Some(expected) => assert!(
+            row.2
+                .as_deref()
+                .is_some_and(|value| value.contains(expected)),
+            "expected default for {table_name}.{column_name} to contain {expected:?}, got {:?}",
+            row.2
+        ),
+        None => {}
+    }
 }

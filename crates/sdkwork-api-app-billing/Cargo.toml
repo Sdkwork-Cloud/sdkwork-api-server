@@ -12,12 +12,14 @@ serde_json.workspace = true
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
 sdkwork-api-policy-quota = { path = "../sdkwork-api-policy-quota" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 utoipa.workspace = true
 
 [dev-dependencies]
+sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
 tokio.workspace = true
 
 [lib]

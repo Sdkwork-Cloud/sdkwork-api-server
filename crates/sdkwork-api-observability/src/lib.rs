@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
@@ -14,10 +15,18 @@ use tracing::Instrument;
 
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
+const LATENCY_BUCKETS_MS: [u64; 11] = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 static TRACING_INIT: OnceLock<()> = OnceLock::new();
-static SHARED_SERVICE_METRICS: OnceLock<Mutex<BTreeMap<String, Arc<ServiceMetricsState>>>> =
-    OnceLock::new();
+
+tokio::task_local! {
+    static CURRENT_HTTP_METRICS_REGISTRY: Arc<HttpMetricsRegistry>;
+}
+
+tokio::task_local! {
+    static CURRENT_HTTP_METRIC_DIMENSIONS: Arc<Mutex<HttpMetricDimensions>>;
+}
 
 pub fn service_name(name: &str) -> &str {
     name
@@ -36,10 +45,364 @@ impl RequestId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TelemetryCardinalityLimits {
+    route_limit: usize,
+    tenant_limit: usize,
+    model_limit: usize,
+    provider_limit: usize,
+    billing_mode_limit: usize,
+    retry_outcome_limit: usize,
+    failover_outcome_limit: usize,
+    payment_outcome_limit: usize,
+    event_kind_limit: usize,
+    result_limit: usize,
+}
+
+impl Default for TelemetryCardinalityLimits {
+    fn default() -> Self {
+        Self {
+            route_limit: 128,
+            tenant_limit: 128,
+            model_limit: 256,
+            provider_limit: 128,
+            billing_mode_limit: 32,
+            retry_outcome_limit: 16,
+            failover_outcome_limit: 16,
+            payment_outcome_limit: 32,
+            event_kind_limit: 32,
+            result_limit: 32,
+        }
+    }
+}
+
+impl TelemetryCardinalityLimits {
+    pub fn with_route_limit(mut self, limit: usize) -> Self {
+        self.route_limit = limit.max(1);
+        self
+    }
+
+    pub fn with_tenant_limit(mut self, limit: usize) -> Self {
+        self.tenant_limit = limit.max(1);
+        self
+    }
+
+    pub fn with_model_limit(mut self, limit: usize) -> Self {
+        self.model_limit = limit.max(1);
+        self
+    }
+
+    pub fn with_provider_limit(mut self, limit: usize) -> Self {
+        self.provider_limit = limit.max(1);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum DimensionKind {
+    Route,
+    Tenant,
+    Model,
+    Provider,
+    BillingMode,
+    RetryOutcome,
+    FailoverOutcome,
+    PaymentOutcome,
+    EventKind,
+    Result,
+}
+
+#[derive(Debug, Clone)]
+struct MetricCardinalityLimiter {
+    limits: TelemetryCardinalityLimits,
+    seen: BTreeMap<DimensionKind, BTreeSet<String>>,
+}
+
+impl MetricCardinalityLimiter {
+    fn new(limits: TelemetryCardinalityLimits) -> Self {
+        Self {
+            limits,
+            seen: BTreeMap::new(),
+        }
+    }
+
+    fn normalize(
+        &mut self,
+        kind: DimensionKind,
+        value: Option<&str>,
+        missing_fallback: &'static str,
+    ) -> String {
+        let Some(value) = value.and_then(sanitize_label_value) else {
+            return missing_fallback.to_owned();
+        };
+
+        let limit = match kind {
+            DimensionKind::Route => self.limits.route_limit,
+            DimensionKind::Tenant => self.limits.tenant_limit,
+            DimensionKind::Model => self.limits.model_limit,
+            DimensionKind::Provider => self.limits.provider_limit,
+            DimensionKind::BillingMode => self.limits.billing_mode_limit,
+            DimensionKind::RetryOutcome => self.limits.retry_outcome_limit,
+            DimensionKind::FailoverOutcome => self.limits.failover_outcome_limit,
+            DimensionKind::PaymentOutcome => self.limits.payment_outcome_limit,
+            DimensionKind::EventKind => self.limits.event_kind_limit,
+            DimensionKind::Result => self.limits.result_limit,
+        };
+
+        let seen = self.seen.entry(kind).or_default();
+        if seen.contains(&value) || seen.len() < limit {
+            seen.insert(value.clone());
+            value
+        } else {
+            "other".to_owned()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HttpMetricDimensions {
+    pub route: Option<String>,
+    pub tenant: Option<String>,
+    pub model: Option<String>,
+    pub provider: Option<String>,
+    pub billing_mode: Option<String>,
+    pub retry_outcome: Option<String>,
+    pub failover_outcome: Option<String>,
+    pub payment_outcome: Option<String>,
+}
+
+impl HttpMetricDimensions {
+    pub fn with_route(mut self, value: impl Into<String>) -> Self {
+        self.route = Some(value.into());
+        self
+    }
+
+    pub fn with_route_option(mut self, value: Option<String>) -> Self {
+        self.route = value;
+        self
+    }
+
+    pub fn with_tenant(mut self, value: impl Into<String>) -> Self {
+        self.tenant = Some(value.into());
+        self
+    }
+
+    pub fn with_tenant_option(mut self, value: Option<String>) -> Self {
+        self.tenant = value;
+        self
+    }
+
+    pub fn with_model(mut self, value: impl Into<String>) -> Self {
+        self.model = Some(value.into());
+        self
+    }
+
+    pub fn with_model_option(mut self, value: Option<String>) -> Self {
+        self.model = value;
+        self
+    }
+
+    pub fn with_provider(mut self, value: impl Into<String>) -> Self {
+        self.provider = Some(value.into());
+        self
+    }
+
+    pub fn with_provider_option(mut self, value: Option<String>) -> Self {
+        self.provider = value;
+        self
+    }
+
+    pub fn with_billing_mode(mut self, value: impl Into<String>) -> Self {
+        self.billing_mode = Some(value.into());
+        self
+    }
+
+    pub fn with_billing_mode_option(mut self, value: Option<String>) -> Self {
+        self.billing_mode = value;
+        self
+    }
+
+    pub fn with_retry_outcome(mut self, value: impl Into<String>) -> Self {
+        self.retry_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_retry_outcome_option(mut self, value: Option<String>) -> Self {
+        self.retry_outcome = value;
+        self
+    }
+
+    pub fn with_failover_outcome(mut self, value: impl Into<String>) -> Self {
+        self.failover_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_failover_outcome_option(mut self, value: Option<String>) -> Self {
+        self.failover_outcome = value;
+        self
+    }
+
+    pub fn with_payment_outcome(mut self, value: impl Into<String>) -> Self {
+        self.payment_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_payment_outcome_option(mut self, value: Option<String>) -> Self {
+        self.payment_outcome = value;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProviderExecutionMetricDimensions {
+    pub route: Option<String>,
+    pub tenant: Option<String>,
+    pub model: Option<String>,
+    pub provider: Option<String>,
+    pub billing_mode: Option<String>,
+    pub retry_outcome: Option<String>,
+    pub failover_outcome: Option<String>,
+    pub result: Option<String>,
+}
+
+impl ProviderExecutionMetricDimensions {
+    pub fn with_route(mut self, value: impl Into<String>) -> Self {
+        self.route = Some(value.into());
+        self
+    }
+
+    pub fn with_tenant(mut self, value: impl Into<String>) -> Self {
+        self.tenant = Some(value.into());
+        self
+    }
+
+    pub fn with_model(mut self, value: impl Into<String>) -> Self {
+        self.model = Some(value.into());
+        self
+    }
+
+    pub fn with_provider(mut self, value: impl Into<String>) -> Self {
+        self.provider = Some(value.into());
+        self
+    }
+
+    pub fn with_billing_mode(mut self, value: impl Into<String>) -> Self {
+        self.billing_mode = Some(value.into());
+        self
+    }
+
+    pub fn with_retry_outcome(mut self, value: impl Into<String>) -> Self {
+        self.retry_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_failover_outcome(mut self, value: impl Into<String>) -> Self {
+        self.failover_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_result(mut self, value: impl Into<String>) -> Self {
+        self.result = Some(value.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PaymentMetricDimensions {
+    pub provider: Option<String>,
+    pub tenant: Option<String>,
+    pub payment_outcome: Option<String>,
+}
+
+impl PaymentMetricDimensions {
+    pub fn with_provider(mut self, value: impl Into<String>) -> Self {
+        self.provider = Some(value.into());
+        self
+    }
+
+    pub fn with_tenant(mut self, value: impl Into<String>) -> Self {
+        self.tenant = Some(value.into());
+        self
+    }
+
+    pub fn with_payment_outcome(mut self, value: impl Into<String>) -> Self {
+        self.payment_outcome = Some(value.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CommercialEventKind {
+    HoldFailure,
+    SettlementReplay,
+    FailoverActivation,
+    CallbackReplay,
+    Throttling,
+}
+
+impl CommercialEventKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::HoldFailure => "hold_failure",
+            Self::SettlementReplay => "settlement_replay",
+            Self::FailoverActivation => "failover_activation",
+            Self::CallbackReplay => "callback_replay",
+            Self::Throttling => "throttling",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommercialEventDimensions {
+    pub route: Option<String>,
+    pub tenant: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub payment_outcome: Option<String>,
+    pub result: Option<String>,
+}
+
+impl CommercialEventDimensions {
+    pub fn with_route(mut self, value: impl Into<String>) -> Self {
+        self.route = Some(value.into());
+        self
+    }
+
+    pub fn with_tenant(mut self, value: impl Into<String>) -> Self {
+        self.tenant = Some(value.into());
+        self
+    }
+
+    pub fn with_provider(mut self, value: impl Into<String>) -> Self {
+        self.provider = Some(value.into());
+        self
+    }
+
+    pub fn with_model(mut self, value: impl Into<String>) -> Self {
+        self.model = Some(value.into());
+        self
+    }
+
+    pub fn with_model_option(mut self, value: Option<String>) -> Self {
+        self.model = value;
+        self
+    }
+
+    pub fn with_payment_outcome(mut self, value: impl Into<String>) -> Self {
+        self.payment_outcome = Some(value.into());
+        self
+    }
+
+    pub fn with_result(mut self, value: impl Into<String>) -> Self {
+        self.result = Some(value.into());
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpMetricsRegistry {
     service: Arc<str>,
-    state: Arc<ServiceMetricsState>,
+    state: Arc<Mutex<TelemetryState>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,141 +410,105 @@ struct HttpMetricKey {
     method: String,
     route: String,
     status: u16,
+    tenant: String,
+    model: String,
+    provider: String,
+    billing_mode: String,
+    retry_outcome: String,
+    failover_outcome: String,
+    payment_outcome: String,
 }
 
-#[derive(Debug, Clone, Default)]
-struct HttpMetricValue {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ProviderExecutionMetricKey {
+    route: String,
+    tenant: String,
+    model: String,
+    provider: String,
+    billing_mode: String,
+    retry_outcome: String,
+    failover_outcome: String,
+    result: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct PaymentMetricKey {
+    provider: String,
+    tenant: String,
+    payment_outcome: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct CommercialEventKey {
+    event_kind: String,
+    route: String,
+    tenant: String,
+    provider: String,
+    model: String,
+    payment_outcome: String,
+    result: String,
+}
+
+#[derive(Debug, Clone)]
+struct TelemetryState {
+    http_metrics: BTreeMap<HttpMetricKey, HistogramMetricValue>,
+    provider_metrics: BTreeMap<ProviderExecutionMetricKey, HistogramMetricValue>,
+    payment_metrics: BTreeMap<PaymentMetricKey, u64>,
+    commercial_events: BTreeMap<CommercialEventKey, u64>,
+    limiter: MetricCardinalityLimiter,
+}
+
+#[derive(Debug, Clone)]
+struct HistogramMetricValue {
     count: u64,
     duration_ms_sum: u64,
+    bucket_counts: Vec<u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct UpstreamMetricKey {
-    capability: String,
-    provider: String,
-    outcome: String,
+impl Default for HistogramMetricValue {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            duration_ms_sum: 0,
+            bucket_counts: vec![0; LATENCY_BUCKETS_MS.len() + 1],
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct UpstreamRetryMetricKey {
-    capability: String,
-    provider: String,
-    outcome: String,
-}
+impl HistogramMetricValue {
+    fn observe(&mut self, duration_ms: u64) {
+        self.count += 1;
+        self.duration_ms_sum += duration_ms;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct UpstreamRetryReasonMetricKey {
-    capability: String,
-    provider: String,
-    outcome: String,
-    reason: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct UpstreamRetryDelayMetricKey {
-    capability: String,
-    provider: String,
-    source: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct GatewayFailoverMetricKey {
-    capability: String,
-    from_provider: String,
-    to_provider: String,
-    outcome: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ProviderHealthMetricKey {
-    provider: String,
-    runtime: String,
-}
-
-#[derive(Debug, Clone, Default)]
-struct ProviderHealthMetricValue {
-    healthy: u64,
-    observed_at_ms: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ProviderHealthPersistFailureMetricKey {
-    provider: String,
-    runtime: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ProviderHealthRecoveryProbeMetricKey {
-    provider: String,
-    outcome: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct GatewayExecutionContextFailureMetricKey {
-    capability: String,
-    provider: String,
-    reason: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct CommerceReconciliationAttemptMetricKey {
-    outcome: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct MarketingRecoveryAttemptMetricKey {
-    outcome: String,
-}
-
-#[derive(Debug, Clone, Default)]
-struct CommerceReconciliationMetricValue {
-    backlog_orders: u64,
-    checkpoint_lag_ms: u64,
-    processed_orders_total: u64,
-    last_success_at_ms: u64,
-    last_failure_at_ms: u64,
-}
-
-#[derive(Debug, Clone, Default)]
-struct MarketingRecoveryMetricValue {
-    scanned_reservations_total: u64,
-    expired_reservations_total: u64,
-    released_codes_total: u64,
-    released_budget_minor_total: u64,
-    outbox_events_total: u64,
-    last_success_at_ms: u64,
-    last_failure_at_ms: u64,
-}
-
-#[derive(Debug, Default)]
-struct ServiceMetricsState {
-    http_metrics: Mutex<BTreeMap<HttpMetricKey, HttpMetricValue>>,
-    upstream_metrics: Mutex<BTreeMap<UpstreamMetricKey, u64>>,
-    upstream_retry_metrics: Mutex<BTreeMap<UpstreamRetryMetricKey, u64>>,
-    upstream_retry_reason_metrics: Mutex<BTreeMap<UpstreamRetryReasonMetricKey, u64>>,
-    upstream_retry_delay_metrics: Mutex<BTreeMap<UpstreamRetryDelayMetricKey, u64>>,
-    gateway_failover_metrics: Mutex<BTreeMap<GatewayFailoverMetricKey, u64>>,
-    provider_health_metrics: Mutex<BTreeMap<ProviderHealthMetricKey, ProviderHealthMetricValue>>,
-    provider_health_persist_failure_metrics:
-        Mutex<BTreeMap<ProviderHealthPersistFailureMetricKey, u64>>,
-    provider_health_recovery_probe_metrics:
-        Mutex<BTreeMap<ProviderHealthRecoveryProbeMetricKey, u64>>,
-    gateway_execution_context_failure_metrics:
-        Mutex<BTreeMap<GatewayExecutionContextFailureMetricKey, u64>>,
-    commerce_reconciliation_attempt_metrics:
-        Mutex<BTreeMap<CommerceReconciliationAttemptMetricKey, u64>>,
-    commerce_reconciliation_metrics: Mutex<CommerceReconciliationMetricValue>,
-    marketing_recovery_attempt_metrics:
-        Mutex<BTreeMap<MarketingRecoveryAttemptMetricKey, u64>>,
-    marketing_recovery_metrics: Mutex<MarketingRecoveryMetricValue>,
+        for (index, boundary) in LATENCY_BUCKETS_MS.iter().enumerate() {
+            if duration_ms <= *boundary {
+                self.bucket_counts[index] += 1;
+            }
+        }
+        if let Some(last) = self.bucket_counts.last_mut() {
+            *last += 1;
+        }
+    }
 }
 
 impl HttpMetricsRegistry {
     pub fn new(service: impl Into<String>) -> Self {
-        let service = service.into();
+        Self::with_cardinality_limits(service, TelemetryCardinalityLimits::default())
+    }
+
+    pub fn with_cardinality_limits(
+        service: impl Into<String>,
+        limits: TelemetryCardinalityLimits,
+    ) -> Self {
         Self {
-            service: service.clone().into(),
-            state: shared_service_metrics(&service),
+            service: service.into().into(),
+            state: Arc::new(Mutex::new(TelemetryState {
+                http_metrics: BTreeMap::new(),
+                provider_metrics: BTreeMap::new(),
+                payment_metrics: BTreeMap::new(),
+                commercial_events: BTreeMap::new(),
+                limiter: MetricCardinalityLimiter::new(limits),
+            })),
         }
     }
 
@@ -190,341 +517,211 @@ impl HttpMetricsRegistry {
     }
 
     pub fn record(&self, method: &str, route: &str, status: u16, duration_ms: u64) {
-        let key = HttpMetricKey {
-            method: method.to_owned(),
-            route: route.to_owned(),
+        self.record_with_dimensions(
+            method,
+            route,
             status,
-        };
-
-        let mut metrics = match self.state.http_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        entry.count += 1;
-        entry.duration_ms_sum += duration_ms;
-    }
-
-    pub fn record_upstream_outcome(&self, capability: &str, provider: &str, outcome: &str) {
-        let key = UpstreamMetricKey {
-            capability: capability.to_owned(),
-            provider: provider.to_owned(),
-            outcome: outcome.to_owned(),
-        };
-
-        let mut metrics = match self.state.upstream_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_upstream_retry(&self, capability: &str, provider: &str, outcome: &str) {
-        let key = UpstreamRetryMetricKey {
-            capability: capability.to_owned(),
-            provider: provider.to_owned(),
-            outcome: outcome.to_owned(),
-        };
-
-        let mut metrics = match self.state.upstream_retry_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_upstream_retry_reason(
-        &self,
-        capability: &str,
-        provider: &str,
-        outcome: &str,
-        reason: &str,
-    ) {
-        let key = UpstreamRetryReasonMetricKey {
-            capability: capability.to_owned(),
-            provider: provider.to_owned(),
-            outcome: outcome.to_owned(),
-            reason: reason.to_owned(),
-        };
-
-        let mut metrics = match self.state.upstream_retry_reason_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_upstream_retry_delay(
-        &self,
-        capability: &str,
-        provider: &str,
-        source: &str,
-        delay_ms: u64,
-    ) {
-        let key = UpstreamRetryDelayMetricKey {
-            capability: capability.to_owned(),
-            provider: provider.to_owned(),
-            source: source.to_owned(),
-        };
-
-        let mut metrics = match self.state.upstream_retry_delay_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += delay_ms;
-    }
-
-    pub fn record_gateway_failover(
-        &self,
-        capability: &str,
-        from_provider: &str,
-        to_provider: &str,
-        outcome: &str,
-    ) {
-        let key = GatewayFailoverMetricKey {
-            capability: capability.to_owned(),
-            from_provider: from_provider.to_owned(),
-            to_provider: to_provider.to_owned(),
-            outcome: outcome.to_owned(),
-        };
-
-        let mut metrics = match self.state.gateway_failover_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_provider_health(
-        &self,
-        provider: &str,
-        runtime: &str,
-        healthy: bool,
-        observed_at_ms: u64,
-    ) {
-        let key = ProviderHealthMetricKey {
-            provider: provider.to_owned(),
-            runtime: runtime.to_owned(),
-        };
-
-        let mut metrics = match self.state.provider_health_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        metrics.insert(
-            key,
-            ProviderHealthMetricValue {
-                healthy: healthy.into(),
-                observed_at_ms,
-            },
+            duration_ms,
+            HttpMetricDimensions::default(),
         );
     }
 
-    pub fn record_provider_health_persist_failure(&self, provider: &str, runtime: &str) {
-        let key = ProviderHealthPersistFailureMetricKey {
-            provider: provider.to_owned(),
-            runtime: runtime.to_owned(),
-        };
-
-        let mut metrics = match self.state.provider_health_persist_failure_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_provider_health_recovery_probe(&self, provider: &str, outcome: &str) {
-        let key = ProviderHealthRecoveryProbeMetricKey {
-            provider: provider.to_owned(),
-            outcome: outcome.to_owned(),
-        };
-
-        let mut metrics = match self.state.provider_health_recovery_probe_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
-    pub fn record_gateway_execution_context_failure(
+    pub fn record_with_dimensions(
         &self,
-        capability: &str,
-        provider: &str,
-        reason: &str,
+        method: &str,
+        route: &str,
+        status: u16,
+        duration_ms: u64,
+        dimensions: HttpMetricDimensions,
     ) {
-        let key = GatewayExecutionContextFailureMetricKey {
-            capability: capability.to_owned(),
-            provider: provider.to_owned(),
-            reason: reason.to_owned(),
+        let dimensions = merge_http_dimensions_with_current_context(dimensions)
+            .with_route_option(Some(route.to_owned()));
+        let mut state = lock_mutex(&self.state);
+        let key = HttpMetricKey {
+            method: method.to_owned(),
+            route: state.limiter.normalize(
+                DimensionKind::Route,
+                dimensions.route.as_deref(),
+                "unmatched",
+            ),
+            status,
+            tenant: state.limiter.normalize(
+                DimensionKind::Tenant,
+                dimensions.tenant.as_deref(),
+                "none",
+            ),
+            model: state.limiter.normalize(
+                DimensionKind::Model,
+                dimensions.model.as_deref(),
+                "none",
+            ),
+            provider: state.limiter.normalize(
+                DimensionKind::Provider,
+                dimensions.provider.as_deref(),
+                "none",
+            ),
+            billing_mode: state.limiter.normalize(
+                DimensionKind::BillingMode,
+                dimensions.billing_mode.as_deref(),
+                "none",
+            ),
+            retry_outcome: state.limiter.normalize(
+                DimensionKind::RetryOutcome,
+                dimensions.retry_outcome.as_deref(),
+                "none",
+            ),
+            failover_outcome: state.limiter.normalize(
+                DimensionKind::FailoverOutcome,
+                dimensions.failover_outcome.as_deref(),
+                "none",
+            ),
+            payment_outcome: state.limiter.normalize(
+                DimensionKind::PaymentOutcome,
+                dimensions.payment_outcome.as_deref(),
+                "none",
+            ),
         };
 
-        let mut metrics = match self.state.gateway_execution_context_failure_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
+        state
+            .http_metrics
+            .entry(key)
+            .or_default()
+            .observe(duration_ms);
     }
 
-    pub fn record_commerce_reconciliation_success(
+    pub fn record_provider_execution(
         &self,
-        backlog_orders: u64,
-        checkpoint_lag_ms: u64,
-        processed_orders: u64,
-        observed_at_ms: u64,
+        duration_ms: u64,
+        dimensions: ProviderExecutionMetricDimensions,
     ) {
-        self.record_commerce_reconciliation_attempt("success");
-        let mut metrics = match self.state.commerce_reconciliation_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
+        let dimensions = merge_provider_dimensions_with_current_context(dimensions);
+        let mut state = lock_mutex(&self.state);
+        let key = ProviderExecutionMetricKey {
+            route: state.limiter.normalize(
+                DimensionKind::Route,
+                dimensions.route.as_deref(),
+                "none",
+            ),
+            tenant: state.limiter.normalize(
+                DimensionKind::Tenant,
+                dimensions.tenant.as_deref(),
+                "none",
+            ),
+            model: state.limiter.normalize(
+                DimensionKind::Model,
+                dimensions.model.as_deref(),
+                "none",
+            ),
+            provider: state.limiter.normalize(
+                DimensionKind::Provider,
+                dimensions.provider.as_deref(),
+                "none",
+            ),
+            billing_mode: state.limiter.normalize(
+                DimensionKind::BillingMode,
+                dimensions.billing_mode.as_deref(),
+                "none",
+            ),
+            retry_outcome: state.limiter.normalize(
+                DimensionKind::RetryOutcome,
+                dimensions.retry_outcome.as_deref(),
+                "none",
+            ),
+            failover_outcome: state.limiter.normalize(
+                DimensionKind::FailoverOutcome,
+                dimensions.failover_outcome.as_deref(),
+                "none",
+            ),
+            result: state.limiter.normalize(
+                DimensionKind::Result,
+                dimensions.result.as_deref(),
+                "none",
+            ),
         };
-        metrics.backlog_orders = backlog_orders;
-        metrics.checkpoint_lag_ms = checkpoint_lag_ms;
-        metrics.processed_orders_total += processed_orders;
-        metrics.last_success_at_ms = observed_at_ms;
+
+        state
+            .provider_metrics
+            .entry(key)
+            .or_default()
+            .observe(duration_ms);
     }
 
-    pub fn record_commerce_reconciliation_failure(
+    pub fn record_payment_callback(&self, dimensions: PaymentMetricDimensions) {
+        let dimensions = merge_payment_dimensions_with_current_context(dimensions);
+        let mut state = lock_mutex(&self.state);
+        let key = PaymentMetricKey {
+            provider: state.limiter.normalize(
+                DimensionKind::Provider,
+                dimensions.provider.as_deref(),
+                "none",
+            ),
+            tenant: state.limiter.normalize(
+                DimensionKind::Tenant,
+                dimensions.tenant.as_deref(),
+                "none",
+            ),
+            payment_outcome: state.limiter.normalize(
+                DimensionKind::PaymentOutcome,
+                dimensions.payment_outcome.as_deref(),
+                "none",
+            ),
+        };
+
+        *state.payment_metrics.entry(key).or_default() += 1;
+    }
+
+    pub fn record_commercial_event(
         &self,
-        backlog_orders: u64,
-        checkpoint_lag_ms: u64,
-        observed_at_ms: u64,
+        kind: CommercialEventKind,
+        dimensions: CommercialEventDimensions,
     ) {
-        self.record_commerce_reconciliation_attempt("failure");
-        let mut metrics = match self.state.commerce_reconciliation_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
+        let dimensions = merge_commercial_event_dimensions_with_current_context(dimensions);
+        let mut state = lock_mutex(&self.state);
+        let key = CommercialEventKey {
+            event_kind: state.limiter.normalize(
+                DimensionKind::EventKind,
+                Some(kind.as_str()),
+                "none",
+            ),
+            route: state.limiter.normalize(
+                DimensionKind::Route,
+                dimensions.route.as_deref(),
+                "none",
+            ),
+            tenant: state.limiter.normalize(
+                DimensionKind::Tenant,
+                dimensions.tenant.as_deref(),
+                "none",
+            ),
+            provider: state.limiter.normalize(
+                DimensionKind::Provider,
+                dimensions.provider.as_deref(),
+                "none",
+            ),
+            model: state.limiter.normalize(
+                DimensionKind::Model,
+                dimensions.model.as_deref(),
+                "none",
+            ),
+            payment_outcome: state.limiter.normalize(
+                DimensionKind::PaymentOutcome,
+                dimensions.payment_outcome.as_deref(),
+                "none",
+            ),
+            result: state.limiter.normalize(
+                DimensionKind::Result,
+                dimensions.result.as_deref(),
+                "none",
+            ),
         };
-        metrics.backlog_orders = backlog_orders;
-        metrics.checkpoint_lag_ms = checkpoint_lag_ms;
-        metrics.last_failure_at_ms = observed_at_ms;
-    }
 
-    fn record_commerce_reconciliation_attempt(&self, outcome: &str) {
-        let key = CommerceReconciliationAttemptMetricKey {
-            outcome: outcome.to_owned(),
-        };
-        let mut metrics = match self.state.commerce_reconciliation_attempt_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
+        *state.commercial_events.entry(key).or_default() += 1;
     }
+}
 
-    pub fn record_marketing_recovery_success(
-        &self,
-        scanned_reservations: u64,
-        expired_reservations: u64,
-        released_codes: u64,
-        released_budget_minor: u64,
-        outbox_events: u64,
-        observed_at_ms: u64,
-    ) {
-        self.record_marketing_recovery_attempt("success");
-        let mut metrics = match self.state.marketing_recovery_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        metrics.scanned_reservations_total += scanned_reservations;
-        metrics.expired_reservations_total += expired_reservations;
-        metrics.released_codes_total += released_codes;
-        metrics.released_budget_minor_total += released_budget_minor;
-        metrics.outbox_events_total += outbox_events;
-        metrics.last_success_at_ms = observed_at_ms;
-    }
-
-    pub fn record_marketing_recovery_failure(&self, observed_at_ms: u64) {
-        self.record_marketing_recovery_attempt("failure");
-        let mut metrics = match self.state.marketing_recovery_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        metrics.last_failure_at_ms = observed_at_ms;
-    }
-
-    fn record_marketing_recovery_attempt(&self, outcome: &str) {
-        let key = MarketingRecoveryAttemptMetricKey {
-            outcome: outcome.to_owned(),
-        };
-        let mut metrics = match self.state.marketing_recovery_attempt_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let entry = metrics.entry(key).or_default();
-        *entry += 1;
-    }
-
+impl HttpMetricsRegistry {
     pub fn render_prometheus(&self) -> String {
-        let metrics = match self.state.http_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let upstream_metrics = match self.state.upstream_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let upstream_retry_metrics = match self.state.upstream_retry_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let upstream_retry_reason_metrics = match self.state.upstream_retry_reason_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let upstream_retry_delay_metrics = match self.state.upstream_retry_delay_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let gateway_failover_metrics = match self.state.gateway_failover_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let provider_health_metrics = match self.state.provider_health_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        let provider_health_persist_failure_metrics =
-            match self.state.provider_health_persist_failure_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let provider_health_recovery_probe_metrics =
-            match self.state.provider_health_recovery_probe_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let gateway_execution_context_failure_metrics =
-            match self.state.gateway_execution_context_failure_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let commerce_reconciliation_attempt_metrics =
-            match self.state.commerce_reconciliation_attempt_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let commerce_reconciliation_metrics =
-            match self.state.commerce_reconciliation_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let marketing_recovery_attempt_metrics =
-            match self.state.marketing_recovery_attempt_metrics.lock() {
-                Ok(metrics) => metrics,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-        let marketing_recovery_metrics = match self.state.marketing_recovery_metrics.lock() {
-            Ok(metrics) => metrics,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        let state = lock_mutex(&self.state);
 
         let mut output = String::new();
         output.push_str("# HELP sdkwork_service_info Static service identity metric\n");
@@ -536,353 +733,166 @@ impl HttpMetricsRegistry {
 
         output.push_str("# HELP sdkwork_http_requests_total Total HTTP requests observed\n");
         output.push_str("# TYPE sdkwork_http_requests_total counter\n");
-        for (key, value) in metrics.iter() {
+        for (key, value) in &state.http_metrics {
             output.push_str(&format!(
-                "sdkwork_http_requests_total{{service=\"{}\",method=\"{}\",route=\"{}\",status=\"{}\"}} {}\n",
+                "sdkwork_http_requests_total{{service=\"{}\",method=\"{}\",route=\"{}\",status=\"{}\",tenant=\"{}\",model=\"{}\",provider=\"{}\",billing_mode=\"{}\",retry_outcome=\"{}\",failover_outcome=\"{}\",payment_outcome=\"{}\"}} {}\n",
                 escape_label(self.service()),
                 escape_label(&key.method),
                 escape_label(&key.route),
                 key.status,
+                escape_label(&key.tenant),
+                escape_label(&key.model),
+                escape_label(&key.provider),
+                escape_label(&key.billing_mode),
+                escape_label(&key.retry_outcome),
+                escape_label(&key.failover_outcome),
+                escape_label(&key.payment_outcome),
                 value.count
             ));
         }
 
         output.push_str(
-            "# HELP sdkwork_http_request_duration_ms_sum Cumulative request duration in milliseconds\n",
+            "# HELP sdkwork_http_request_duration_ms Request latency histogram in milliseconds\n",
         );
-        output.push_str("# TYPE sdkwork_http_request_duration_ms_sum counter\n");
-        for (key, value) in metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_http_request_duration_ms_sum{{service=\"{}\",method=\"{}\",route=\"{}\",status=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.method),
-                escape_label(&key.route),
-                key.status,
-                value.duration_ms_sum
-            ));
+        output.push_str("# TYPE sdkwork_http_request_duration_ms histogram\n");
+        for (key, value) in &state.http_metrics {
+            render_histogram(
+                &mut output,
+                "sdkwork_http_request_duration_ms",
+                format!(
+                    "service=\"{}\",method=\"{}\",route=\"{}\",status=\"{}\",tenant=\"{}\",model=\"{}\",provider=\"{}\",billing_mode=\"{}\",retry_outcome=\"{}\",failover_outcome=\"{}\",payment_outcome=\"{}\"",
+                    escape_label(self.service()),
+                    escape_label(&key.method),
+                    escape_label(&key.route),
+                    key.status,
+                    escape_label(&key.tenant),
+                    escape_label(&key.model),
+                    escape_label(&key.provider),
+                    escape_label(&key.billing_mode),
+                    escape_label(&key.retry_outcome),
+                    escape_label(&key.failover_outcome),
+                    escape_label(&key.payment_outcome),
+                ),
+                value,
+            );
         }
 
         output.push_str(
-            "# HELP sdkwork_http_request_duration_ms_count Request count paired with duration summaries\n",
+            "# HELP sdkwork_provider_execution_total Total provider execution attempts observed\n",
         );
-        output.push_str("# TYPE sdkwork_http_request_duration_ms_count counter\n");
-        for (key, value) in metrics.iter() {
+        output.push_str("# TYPE sdkwork_provider_execution_total counter\n");
+        for (key, value) in &state.provider_metrics {
             output.push_str(&format!(
-                "sdkwork_http_request_duration_ms_count{{service=\"{}\",method=\"{}\",route=\"{}\",status=\"{}\"}} {}\n",
+                "sdkwork_provider_execution_total{{service=\"{}\",route=\"{}\",tenant=\"{}\",model=\"{}\",provider=\"{}\",billing_mode=\"{}\",retry_outcome=\"{}\",failover_outcome=\"{}\",result=\"{}\"}} {}\n",
                 escape_label(self.service()),
-                escape_label(&key.method),
                 escape_label(&key.route),
-                key.status,
+                escape_label(&key.tenant),
+                escape_label(&key.model),
+                escape_label(&key.provider),
+                escape_label(&key.billing_mode),
+                escape_label(&key.retry_outcome),
+                escape_label(&key.failover_outcome),
+                escape_label(&key.result),
                 value.count
             ));
         }
 
-        output.push_str(
-            "# HELP sdkwork_upstream_requests_total Total upstream execution outcomes observed\n",
-        );
-        output.push_str("# TYPE sdkwork_upstream_requests_total counter\n");
-        for (key, value) in upstream_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_upstream_requests_total{{service=\"{}\",capability=\"{}\",provider=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.provider),
-                escape_label(&key.outcome),
-                value
-            ));
-        }
-
-        output.push_str("# HELP sdkwork_upstream_retries_total Total upstream retry control decisions observed\n");
-        output.push_str("# TYPE sdkwork_upstream_retries_total counter\n");
-        for (key, value) in upstream_retry_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_upstream_retries_total{{service=\"{}\",capability=\"{}\",provider=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.provider),
-                escape_label(&key.outcome),
-                value
-            ));
+        output.push_str("# HELP sdkwork_provider_execution_duration_ms Provider execution latency histogram in milliseconds\n");
+        output.push_str("# TYPE sdkwork_provider_execution_duration_ms histogram\n");
+        for (key, value) in &state.provider_metrics {
+            render_histogram(
+                &mut output,
+                "sdkwork_provider_execution_duration_ms",
+                format!(
+                    "service=\"{}\",route=\"{}\",tenant=\"{}\",model=\"{}\",provider=\"{}\",billing_mode=\"{}\",retry_outcome=\"{}\",failover_outcome=\"{}\",result=\"{}\"",
+                    escape_label(self.service()),
+                    escape_label(&key.route),
+                    escape_label(&key.tenant),
+                    escape_label(&key.model),
+                    escape_label(&key.provider),
+                    escape_label(&key.billing_mode),
+                    escape_label(&key.retry_outcome),
+                    escape_label(&key.failover_outcome),
+                    escape_label(&key.result),
+                ),
+                value,
+            );
         }
 
         output.push_str(
-            "# HELP sdkwork_upstream_retry_reasons_total Total upstream retry reasons observed\n",
+            "# HELP sdkwork_payment_callbacks_total Total payment callbacks by outcome\n",
         );
-        output.push_str("# TYPE sdkwork_upstream_retry_reasons_total counter\n");
-        for (key, value) in upstream_retry_reason_metrics.iter() {
+        output.push_str("# TYPE sdkwork_payment_callbacks_total counter\n");
+        for (key, value) in &state.payment_metrics {
             output.push_str(&format!(
-                "sdkwork_upstream_retry_reasons_total{{service=\"{}\",capability=\"{}\",provider=\"{}\",outcome=\"{}\",reason=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.provider),
-                escape_label(&key.outcome),
-                escape_label(&key.reason),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_upstream_retry_delay_ms_total Cumulative upstream retry delay in milliseconds\n",
-        );
-        output.push_str("# TYPE sdkwork_upstream_retry_delay_ms_total counter\n");
-        for (key, value) in upstream_retry_delay_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_upstream_retry_delay_ms_total{{service=\"{}\",capability=\"{}\",provider=\"{}\",source=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.provider),
-                escape_label(&key.source),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_gateway_failovers_total Total gateway failover outcomes observed\n",
-        );
-        output.push_str("# TYPE sdkwork_gateway_failovers_total counter\n");
-        for (key, value) in gateway_failover_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_gateway_failovers_total{{service=\"{}\",capability=\"{}\",from_provider=\"{}\",to_provider=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.from_provider),
-                escape_label(&key.to_provider),
-                escape_label(&key.outcome),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_provider_health_status Latest observed provider health state where 1 is healthy and 0 is unhealthy\n",
-        );
-        output.push_str("# TYPE sdkwork_provider_health_status gauge\n");
-        for (key, value) in provider_health_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_provider_health_status{{service=\"{}\",provider=\"{}\",runtime=\"{}\"}} {}\n",
+                "sdkwork_payment_callbacks_total{{service=\"{}\",provider=\"{}\",tenant=\"{}\",payment_outcome=\"{}\"}} {}\n",
                 escape_label(self.service()),
                 escape_label(&key.provider),
-                escape_label(&key.runtime),
-                value.healthy
+                escape_label(&key.tenant),
+                escape_label(&key.payment_outcome),
+                value
             ));
         }
 
         output.push_str(
-            "# HELP sdkwork_provider_health_observed_at_ms Latest observed provider health timestamp in unix milliseconds\n",
+            "# HELP sdkwork_commercial_events_total Total structured commercial events emitted\n",
         );
-        output.push_str("# TYPE sdkwork_provider_health_observed_at_ms gauge\n");
-        for (key, value) in provider_health_metrics.iter() {
+        output.push_str("# TYPE sdkwork_commercial_events_total counter\n");
+        for (key, value) in &state.commercial_events {
             output.push_str(&format!(
-                "sdkwork_provider_health_observed_at_ms{{service=\"{}\",provider=\"{}\",runtime=\"{}\"}} {}\n",
+                "sdkwork_commercial_events_total{{service=\"{}\",event_kind=\"{}\",route=\"{}\",tenant=\"{}\",provider=\"{}\",model=\"{}\",payment_outcome=\"{}\",result=\"{}\"}} {}\n",
                 escape_label(self.service()),
+                escape_label(&key.event_kind),
+                escape_label(&key.route),
+                escape_label(&key.tenant),
                 escape_label(&key.provider),
-                escape_label(&key.runtime),
-                value.observed_at_ms
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_provider_health_persist_failures_total Total provider health snapshot persistence failures observed\n",
-        );
-        output.push_str("# TYPE sdkwork_provider_health_persist_failures_total counter\n");
-        for (key, value) in provider_health_persist_failure_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_provider_health_persist_failures_total{{service=\"{}\",provider=\"{}\",runtime=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.provider),
-                escape_label(&key.runtime),
+                escape_label(&key.model),
+                escape_label(&key.payment_outcome),
+                escape_label(&key.result),
                 value
             ));
         }
-
-        output.push_str(
-            "# HELP sdkwork_provider_health_recovery_probes_total Total provider health recovery probe outcomes observed\n",
-        );
-        output.push_str("# TYPE sdkwork_provider_health_recovery_probes_total counter\n");
-        for (key, value) in provider_health_recovery_probe_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_provider_health_recovery_probes_total{{service=\"{}\",provider=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.provider),
-                escape_label(&key.outcome),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_gateway_execution_context_failures_total Total gateway-local execution context failures observed\n",
-        );
-        output.push_str("# TYPE sdkwork_gateway_execution_context_failures_total counter\n");
-        for (key, value) in gateway_execution_context_failure_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_gateway_execution_context_failures_total{{service=\"{}\",capability=\"{}\",provider=\"{}\",reason=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.capability),
-                escape_label(&key.provider),
-                escape_label(&key.reason),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_attempts_total Total commerce reconciliation outcomes observed\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_attempts_total counter\n");
-        for (key, value) in commerce_reconciliation_attempt_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_commerce_reconciliation_attempts_total{{service=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.outcome),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_processed_orders_total Total commerce orders reconciled into canonical accounts\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_processed_orders_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_commerce_reconciliation_processed_orders_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            commerce_reconciliation_metrics.processed_orders_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_backlog_orders Latest observed unreconciled commerce order backlog\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_backlog_orders gauge\n");
-        output.push_str(&format!(
-            "sdkwork_commerce_reconciliation_backlog_orders{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            commerce_reconciliation_metrics.backlog_orders
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_checkpoint_lag_ms Latest observed lag between checkpoint and newest commerce order progress\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_checkpoint_lag_ms gauge\n");
-        output.push_str(&format!(
-            "sdkwork_commerce_reconciliation_checkpoint_lag_ms{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            commerce_reconciliation_metrics.checkpoint_lag_ms
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_last_success_at_ms Unix timestamp in milliseconds for the latest successful commerce reconciliation run\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_last_success_at_ms gauge\n");
-        output.push_str(&format!(
-            "sdkwork_commerce_reconciliation_last_success_at_ms{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            commerce_reconciliation_metrics.last_success_at_ms
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_commerce_reconciliation_last_failure_at_ms Unix timestamp in milliseconds for the latest failed commerce reconciliation run\n",
-        );
-        output.push_str("# TYPE sdkwork_commerce_reconciliation_last_failure_at_ms gauge\n");
-        output.push_str(&format!(
-            "sdkwork_commerce_reconciliation_last_failure_at_ms{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            commerce_reconciliation_metrics.last_failure_at_ms
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_recovery_attempts_total Total marketing recovery job outcomes observed\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_recovery_attempts_total counter\n");
-        for (key, value) in marketing_recovery_attempt_metrics.iter() {
-            output.push_str(&format!(
-                "sdkwork_marketing_recovery_attempts_total{{service=\"{}\",outcome=\"{}\"}} {}\n",
-                escape_label(self.service()),
-                escape_label(&key.outcome),
-                value
-            ));
-        }
-
-        output.push_str(
-            "# HELP sdkwork_marketing_recovery_scanned_reservations_total Total reservations scanned by marketing recovery jobs\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_recovery_scanned_reservations_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_recovery_scanned_reservations_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.scanned_reservations_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_expired_reservations_total Total stale coupon reservations expired by recovery jobs\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_expired_reservations_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_expired_reservations_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.expired_reservations_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_released_codes_total Total coupon codes released by recovery jobs\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_released_codes_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_released_codes_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.released_codes_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_released_budget_minor_total Total marketing budget minor units released by recovery jobs\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_released_budget_minor_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_released_budget_minor_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.released_budget_minor_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_recovery_outbox_events_total Total marketing recovery outbox events emitted\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_recovery_outbox_events_total counter\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_recovery_outbox_events_total{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.outbox_events_total
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_recovery_last_success_at_ms Unix timestamp in milliseconds for the latest successful marketing recovery run\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_recovery_last_success_at_ms gauge\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_recovery_last_success_at_ms{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.last_success_at_ms
-        ));
-
-        output.push_str(
-            "# HELP sdkwork_marketing_recovery_last_failure_at_ms Unix timestamp in milliseconds for the latest failed marketing recovery run\n",
-        );
-        output.push_str("# TYPE sdkwork_marketing_recovery_last_failure_at_ms gauge\n");
-        output.push_str(&format!(
-            "sdkwork_marketing_recovery_last_failure_at_ms{{service=\"{}\"}} {}\n",
-            escape_label(self.service()),
-            marketing_recovery_metrics.last_failure_at_ms
-        ));
 
         output
     }
 }
 
-fn shared_service_metrics(service: &str) -> Arc<ServiceMetricsState> {
-    let registry = SHARED_SERVICE_METRICS.get_or_init(|| Mutex::new(BTreeMap::new()));
-    let mut registry = match registry.lock() {
-        Ok(registry) => registry,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    registry
-        .entry(service.to_owned())
-        .or_insert_with(|| Arc::new(ServiceMetricsState::default()))
-        .clone()
+pub fn annotate_current_http_metrics<F>(mutator: F)
+where
+    F: FnOnce(&mut HttpMetricDimensions),
+{
+    let _ = CURRENT_HTTP_METRIC_DIMENSIONS.try_with(|dimensions| {
+        let mut dimensions = lock_mutex(dimensions);
+        mutator(&mut dimensions);
+    });
+}
+
+pub fn current_http_metrics_registry() -> Option<Arc<HttpMetricsRegistry>> {
+    CURRENT_HTTP_METRICS_REGISTRY.try_with(Arc::clone).ok()
+}
+
+pub fn record_current_provider_execution(
+    duration_ms: u64,
+    dimensions: ProviderExecutionMetricDimensions,
+) {
+    if let Some(registry) = current_http_metrics_registry() {
+        registry.record_provider_execution(duration_ms, dimensions);
+    }
+}
+
+pub fn record_current_payment_callback(dimensions: PaymentMetricDimensions) {
+    if let Some(registry) = current_http_metrics_registry() {
+        registry.record_payment_callback(dimensions);
+    }
+}
+
+pub fn record_current_commercial_event(
+    kind: CommercialEventKind,
+    dimensions: CommercialEventDimensions,
+) {
+    if let Some(registry) = current_http_metrics_registry() {
+        registry.record_commercial_event(kind, dimensions);
+    }
 }
 
 pub async fn observe_http_metrics(
@@ -898,10 +908,19 @@ pub async fn observe_http_metrics(
         .unwrap_or("unmatched")
         .to_owned();
     let started_at = Instant::now();
-    let response = next.run(request).await;
+    let dimensions = Arc::new(Mutex::new(
+        HttpMetricDimensions::default().with_route(route.clone()),
+    ));
+    let response = CURRENT_HTTP_METRICS_REGISTRY
+        .scope(
+            registry.clone(),
+            CURRENT_HTTP_METRIC_DIMENSIONS.scope(dimensions.clone(), next.run(request)),
+        )
+        .await;
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let status = response.status().as_u16();
-    registry.record(&method, &route, status, duration_ms);
+    let dimensions = lock_mutex(&dimensions).clone();
+    registry.record_with_dimensions(&method, &route, status, duration_ms, dimensions);
     response
 }
 
@@ -952,6 +971,170 @@ pub fn init_tracing(service: &str) {
     });
 }
 
+fn render_histogram(
+    output: &mut String,
+    metric_name: &str,
+    labels: String,
+    value: &HistogramMetricValue,
+) {
+    for (index, boundary) in LATENCY_BUCKETS_MS.iter().enumerate() {
+        output.push_str(&format!(
+            "{metric_name}_bucket{{{labels},le=\"{}\"}} {}\n",
+            boundary, value.bucket_counts[index]
+        ));
+    }
+    output.push_str(&format!(
+        "{metric_name}_bucket{{{labels},le=\"+Inf\"}} {}\n",
+        value.bucket_counts.last().copied().unwrap_or_default()
+    ));
+    output.push_str(&format!(
+        "{metric_name}_sum{{{labels}}} {}\n",
+        value.duration_ms_sum
+    ));
+    output.push_str(&format!(
+        "{metric_name}_count{{{labels}}} {}\n",
+        value.count
+    ));
+}
+
+fn merge_http_dimensions_with_current_context(
+    mut dimensions: HttpMetricDimensions,
+) -> HttpMetricDimensions {
+    if let Some(current) = current_http_metric_dimensions() {
+        if dimensions.route.is_none() {
+            dimensions.route = current.route;
+        }
+        if dimensions.tenant.is_none() {
+            dimensions.tenant = current.tenant;
+        }
+        if dimensions.model.is_none() {
+            dimensions.model = current.model;
+        }
+        if dimensions.provider.is_none() {
+            dimensions.provider = current.provider;
+        }
+        if dimensions.billing_mode.is_none() {
+            dimensions.billing_mode = current.billing_mode;
+        }
+        if dimensions.retry_outcome.is_none() {
+            dimensions.retry_outcome = current.retry_outcome;
+        }
+        if dimensions.failover_outcome.is_none() {
+            dimensions.failover_outcome = current.failover_outcome;
+        }
+        if dimensions.payment_outcome.is_none() {
+            dimensions.payment_outcome = current.payment_outcome;
+        }
+    }
+    dimensions
+}
+
+fn merge_provider_dimensions_with_current_context(
+    mut dimensions: ProviderExecutionMetricDimensions,
+) -> ProviderExecutionMetricDimensions {
+    if let Some(current) = current_http_metric_dimensions() {
+        if dimensions.route.is_none() {
+            dimensions.route = current.route;
+        }
+        if dimensions.tenant.is_none() {
+            dimensions.tenant = current.tenant;
+        }
+        if dimensions.model.is_none() {
+            dimensions.model = current.model;
+        }
+        if dimensions.provider.is_none() {
+            dimensions.provider = current.provider;
+        }
+        if dimensions.billing_mode.is_none() {
+            dimensions.billing_mode = current.billing_mode;
+        }
+        if dimensions.retry_outcome.is_none() {
+            dimensions.retry_outcome = current.retry_outcome;
+        }
+        if dimensions.failover_outcome.is_none() {
+            dimensions.failover_outcome = current.failover_outcome;
+        }
+    }
+    dimensions
+}
+
+fn merge_payment_dimensions_with_current_context(
+    mut dimensions: PaymentMetricDimensions,
+) -> PaymentMetricDimensions {
+    if let Some(current) = current_http_metric_dimensions() {
+        if dimensions.provider.is_none() {
+            dimensions.provider = current.provider;
+        }
+        if dimensions.tenant.is_none() {
+            dimensions.tenant = current.tenant;
+        }
+        if dimensions.payment_outcome.is_none() {
+            dimensions.payment_outcome = current.payment_outcome;
+        }
+    }
+    dimensions
+}
+
+fn merge_commercial_event_dimensions_with_current_context(
+    mut dimensions: CommercialEventDimensions,
+) -> CommercialEventDimensions {
+    if let Some(current) = current_http_metric_dimensions() {
+        if dimensions.route.is_none() {
+            dimensions.route = current.route;
+        }
+        if dimensions.tenant.is_none() {
+            dimensions.tenant = current.tenant;
+        }
+        if dimensions.provider.is_none() {
+            dimensions.provider = current.provider;
+        }
+        if dimensions.model.is_none() {
+            dimensions.model = current.model;
+        }
+        if dimensions.payment_outcome.is_none() {
+            dimensions.payment_outcome = current.payment_outcome;
+        }
+    }
+    dimensions
+}
+
+fn current_http_metric_dimensions() -> Option<HttpMetricDimensions> {
+    CURRENT_HTTP_METRIC_DIMENSIONS
+        .try_with(|dimensions| lock_mutex(dimensions).clone())
+        .ok()
+}
+
+fn sanitize_label_value(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let normalized = trimmed
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '/' | ':') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let normalized = normalized.trim_matches('_');
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized.chars().take(64).collect())
+    }
+}
+
+fn lock_mutex<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 fn escape_label(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -974,4 +1157,22 @@ fn generate_request_id() -> String {
         .as_millis();
     let sequence = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("sdkw-{millis:x}-{sequence:x}")
+}
+
+pub async fn with_current_http_metrics_registry<T, F>(
+    registry: Arc<HttpMetricsRegistry>,
+    future: F,
+) -> T
+where
+    F: Future<Output = T>,
+{
+    CURRENT_HTTP_METRICS_REGISTRY
+        .scope(
+            registry,
+            CURRENT_HTTP_METRIC_DIMENSIONS.scope(
+                Arc::new(Mutex::new(HttpMetricDimensions::default())),
+                future,
+            ),
+        )
+        .await
 }

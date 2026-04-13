@@ -36,7 +36,25 @@ fn standalone_defaults_are_local_friendly() {
         config.admin_jwt_signing_secret,
         "local-dev-admin-jwt-secret"
     );
+    assert!(!config.allow_local_dev_bootstrap);
     assert_eq!(config.storage_dialect().unwrap(), StorageDialect::Sqlite);
+}
+
+#[test]
+fn startup_security_validation_rejects_local_dev_defaults_without_explicit_dev_mode() {
+    let error = StandaloneConfig::default()
+        .validate_startup_security()
+        .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP"));
+}
+
+#[test]
+fn startup_security_validation_allows_local_dev_defaults_with_explicit_dev_mode() {
+    let mut config = StandaloneConfig::default();
+    config.allow_local_dev_bootstrap = true;
+    config.validate_startup_security().unwrap();
 }
 
 #[test]

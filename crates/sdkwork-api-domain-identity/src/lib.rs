@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GatewayApiKey {
@@ -36,7 +36,7 @@ pub trait GatewayApiKeyRepository: Send + Sync {
     fn save(&self, key: &GatewayApiKey) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GatewayApiKeyRecord {
     pub tenant_id: String,
     pub project_id: String,
@@ -44,8 +44,8 @@ pub struct GatewayApiKeyRecord {
     pub hashed_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key_group_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub raw_key: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub key_prefix: String,
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
@@ -70,7 +70,7 @@ impl GatewayApiKeyRecord {
             environment: environment.into(),
             hashed_key: hashed_key.into(),
             api_key_group_id: None,
-            raw_key: None,
+            key_prefix: String::new(),
             label: String::new(),
             notes: None,
             created_at_ms: 0,
@@ -85,11 +85,6 @@ impl GatewayApiKeyRecord {
         self
     }
 
-    pub fn with_raw_key(mut self, raw_key: impl Into<String>) -> Self {
-        self.raw_key = Some(raw_key.into());
-        self
-    }
-
     pub fn with_api_key_group_id(mut self, api_key_group_id: impl Into<String>) -> Self {
         self.api_key_group_id = Some(api_key_group_id.into());
         self
@@ -100,8 +95,8 @@ impl GatewayApiKeyRecord {
         self
     }
 
-    pub fn with_raw_key_option(mut self, raw_key: Option<String>) -> Self {
-        self.raw_key = raw_key;
+    pub fn with_key_prefix(mut self, key_prefix: impl Into<String>) -> Self {
+        self.key_prefix = key_prefix.into();
         self
     }
 
@@ -141,7 +136,7 @@ impl GatewayApiKeyRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiKeyGroupRecord {
     pub group_id: String,
     pub tenant_id: String,
@@ -316,14 +311,92 @@ impl PortalUserRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortalWorkspaceMembershipRecord {
+    pub membership_id: String,
+    pub user_id: String,
+    pub tenant_id: String,
+    pub project_id: String,
+    pub role: String,
+    pub created_at_ms: u64,
+}
+
+impl PortalWorkspaceMembershipRecord {
+    pub fn new(
+        membership_id: impl Into<String>,
+        user_id: impl Into<String>,
+        tenant_id: impl Into<String>,
+        project_id: impl Into<String>,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            membership_id: membership_id.into(),
+            user_id: user_id.into(),
+            tenant_id: tenant_id.into(),
+            project_id: project_id.into(),
+            role: "member".to_owned(),
+            created_at_ms,
+        }
+    }
+
+    pub fn with_role(mut self, role: impl Into<String>) -> Self {
+        self.role = role.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdminUserRecord {
     pub id: String,
     pub email: String,
     pub display_name: String,
     pub password_salt: String,
     pub password_hash: String,
+    pub role: AdminUserRole,
     pub active: bool,
     pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdminUserRole {
+    SuperAdmin,
+    PlatformOperator,
+    FinanceOperator,
+    ReadOnlyOperator,
+}
+
+impl AdminUserRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SuperAdmin => "super_admin",
+            Self::PlatformOperator => "platform_operator",
+            Self::FinanceOperator => "finance_operator",
+            Self::ReadOnlyOperator => "read_only_operator",
+        }
+    }
+}
+
+impl Default for AdminUserRole {
+    fn default() -> Self {
+        Self::SuperAdmin
+    }
+}
+
+impl FromStr for AdminUserRole {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim() {
+            "super_admin" => Ok(Self::SuperAdmin),
+            "platform_operator" => Ok(Self::PlatformOperator),
+            "finance_operator" => Ok(Self::FinanceOperator),
+            "read_only_operator" => Ok(Self::ReadOnlyOperator),
+            _ => Err(
+                "admin role must be one of super_admin, platform_operator, finance_operator, read_only_operator"
+                    .to_owned(),
+            ),
+        }
+    }
 }
 
 impl AdminUserRecord {
@@ -334,6 +407,7 @@ impl AdminUserRecord {
         display_name: impl Into<String>,
         password_salt: impl Into<String>,
         password_hash: impl Into<String>,
+        role: AdminUserRole,
         active: bool,
         created_at_ms: u64,
     ) -> Self {
@@ -343,13 +417,14 @@ impl AdminUserRecord {
             display_name: display_name.into(),
             password_salt: password_salt.into(),
             password_hash: password_hash.into(),
+            role,
             active,
             created_at_ms,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortalUserProfile {
     pub id: String,
     pub email: String,
@@ -374,11 +449,12 @@ impl From<&PortalUserRecord> for PortalUserProfile {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdminUserProfile {
     pub id: String,
     pub email: String,
     pub display_name: String,
+    pub role: AdminUserRole,
     pub active: bool,
     pub created_at_ms: u64,
 }
@@ -389,9 +465,88 @@ impl From<&AdminUserRecord> for AdminUserProfile {
             id: value.id.clone(),
             email: value.email.clone(),
             display_name: value.display_name.clone(),
+            role: value.role,
             active: value.active,
             created_at_ms: value.created_at_ms,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminAuditEventRecord {
+    pub event_id: String,
+    pub actor_user_id: String,
+    pub actor_email: String,
+    pub actor_role: AdminUserRole,
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: String,
+    pub approval_scope: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_tenant_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_provider_id: Option<String>,
+    pub created_at_ms: u64,
+}
+
+impl AdminAuditEventRecord {
+    pub fn new(
+        event_id: impl Into<String>,
+        actor_user_id: impl Into<String>,
+        actor_email: impl Into<String>,
+        actor_role: AdminUserRole,
+        action: impl Into<String>,
+        resource_type: impl Into<String>,
+        resource_id: impl Into<String>,
+        approval_scope: impl Into<String>,
+        created_at_ms: u64,
+    ) -> Self {
+        Self {
+            event_id: event_id.into(),
+            actor_user_id: actor_user_id.into(),
+            actor_email: actor_email.into(),
+            actor_role,
+            action: action.into(),
+            resource_type: resource_type.into(),
+            resource_id: resource_id.into(),
+            approval_scope: approval_scope.into(),
+            target_tenant_id: None,
+            target_project_id: None,
+            target_provider_id: None,
+            created_at_ms,
+        }
+    }
+
+    pub fn with_target_tenant_id(mut self, target_tenant_id: impl Into<String>) -> Self {
+        self.target_tenant_id = Some(target_tenant_id.into());
+        self
+    }
+
+    pub fn with_target_tenant_id_option(mut self, target_tenant_id: Option<String>) -> Self {
+        self.target_tenant_id = target_tenant_id;
+        self
+    }
+
+    pub fn with_target_project_id(mut self, target_project_id: impl Into<String>) -> Self {
+        self.target_project_id = Some(target_project_id.into());
+        self
+    }
+
+    pub fn with_target_project_id_option(mut self, target_project_id: Option<String>) -> Self {
+        self.target_project_id = target_project_id;
+        self
+    }
+
+    pub fn with_target_provider_id(mut self, target_provider_id: impl Into<String>) -> Self {
+        self.target_provider_id = Some(target_provider_id.into());
+        self
+    }
+
+    pub fn with_target_provider_id_option(mut self, target_provider_id: Option<String>) -> Self {
+        self.target_provider_id = target_provider_id;
+        self
     }
 }
 

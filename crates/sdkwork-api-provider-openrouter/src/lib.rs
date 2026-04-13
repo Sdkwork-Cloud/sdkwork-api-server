@@ -42,7 +42,7 @@ use sdkwork_api_provider_core::{
     OpenRouterProviderPreferences, ProviderAdapter, ProviderExecutionAdapter, ProviderOutput,
     ProviderRequest, ProviderRequestOptions, ProviderStreamOutput,
 };
-use sdkwork_api_provider_openai::OpenAiProviderAdapter;
+use sdkwork_api_provider_openai::{OpenAiProviderAdapter, OpenAiProviderHttpConfig};
 use serde_json::Value;
 
 pub fn adapter_id() -> &'static str {
@@ -62,6 +62,15 @@ impl OpenRouterProviderAdapter {
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             delegate: OpenAiProviderAdapter::new(base_url),
+        }
+    }
+
+    pub fn with_http_config(
+        base_url: impl Into<String>,
+        config: OpenAiProviderHttpConfig,
+    ) -> Self {
+        Self {
+            delegate: OpenAiProviderAdapter::with_http_config(base_url, config),
         }
     }
 
