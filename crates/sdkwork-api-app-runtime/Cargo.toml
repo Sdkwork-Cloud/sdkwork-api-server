@@ -45,6 +45,7 @@ base64.workspace = true
 ed25519-dalek.workspace = true
 reqwest.workspace = true
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
 sdkwork-api-extension-host = { path = "../sdkwork-api-extension-host" }
 sdkwork-api-secret-core = { path = "../sdkwork-api-secret-core" }

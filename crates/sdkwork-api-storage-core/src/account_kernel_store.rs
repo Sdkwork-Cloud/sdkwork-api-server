@@ -53,6 +53,21 @@ pub trait AccountKernelStore: AdminStore {
         ))
     }
 
+    async fn apply_refund_order_account_grant_reversal(
+        &self,
+        _refund_order_id: &str,
+        _lot_id: u64,
+        _reversal_quantity: f64,
+        _updated_at_ms: u64,
+        _ledger_entry: &AccountLedgerEntryRecord,
+        _ledger_allocation: &AccountLedgerAllocationRecord,
+    ) -> Result<bool> {
+        Err(unsupported_account_kernel_method(
+            self.dialect(),
+            "apply_refund_order_account_grant_reversal",
+        ))
+    }
+
     async fn list_account_benefit_lots_for_account(
         &self,
         _account_id: u64,

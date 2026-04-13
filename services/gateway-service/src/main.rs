@@ -1,13 +1,16 @@
+use std::sync::Arc;
+
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::{
     configure_capability_catalog_cache_store, configure_route_decision_cache_store,
     configure_route_recovery_probe_lock_store,
 };
+use sdkwork_api_app_rate_limit::InMemoryGatewayTrafficController;
 use sdkwork_api_app_runtime::{
-    build_admin_store_from_config, build_cache_runtime_from_config,
+    StandaloneListenerHost, StandaloneServiceKind, StandaloneServiceReloadHandles,
+    build_admin_payment_store_handles_from_config, build_cache_runtime_from_config,
     resolve_service_runtime_node_id, start_extension_runtime_rollout_supervision,
-    start_standalone_runtime_supervision, StandaloneListenerHost, StandaloneServiceKind,
-    StandaloneServiceReloadHandles,
+    start_standalone_runtime_supervision,
 };
 use sdkwork_api_config::StandaloneConfigLoader;
 use sdkwork_api_interface_http::{
@@ -28,7 +31,10 @@ async fn main() -> anyhow::Result<()> {
     if config.cache_backend.supports_shared_cache_coherence() {
         configure_capability_catalog_cache_store(cache_runtime.cache_store());
     }
-    let live_store = Reloadable::new(build_admin_store_from_config(&config).await?);
+    let initial_store_handles = build_admin_payment_store_handles_from_config(&config).await?;
+    let live_store = Reloadable::new(initial_store_handles.admin_store);
+    let live_commercial_billing = Reloadable::new(initial_store_handles.commercial_billing);
+    let live_payment_store = Reloadable::new(initial_store_handles.payment_store);
     let live_secret_manager =
         Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
             config.secret_backend,
@@ -37,9 +43,13 @@ async fn main() -> anyhow::Result<()> {
             config.secret_local_file.clone(),
             config.secret_keyring_service.clone(),
         ));
-    let state = GatewayApiState::with_live_store_and_secret_manager_handle(
+    let state =
+        GatewayApiState::with_live_store_commercial_billing_payment_store_and_secret_manager_handle(
         live_store.clone(),
+        live_commercial_billing.clone(),
+        live_payment_store.clone(),
         live_secret_manager.clone(),
+        Arc::new(InMemoryGatewayTrafficController::new()),
     );
     let listener_host = StandaloneListenerHost::bind(
         config.gateway_bind.clone(),
@@ -57,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         config_loader,
         config.clone(),
         StandaloneServiceReloadHandles::gateway(live_store)
+            .with_payment_store(live_payment_store)
             .with_secret_manager(live_secret_manager)
             .with_listener(listener_host.reload_handle())
             .with_node_id(node_id),

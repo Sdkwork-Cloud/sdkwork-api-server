@@ -95,6 +95,7 @@ export const PRICE_UNIT_OPTIONS = [
   { value: 'per_image', label: 'Image generated' },
   { value: 'per_second_audio', label: 'Audio second' },
   { value: 'per_minute_video', label: 'Video minute' },
+  { value: 'per_second_music', label: 'Music second' },
   { value: 'per_track', label: 'Music track' },
 ] as const;
 

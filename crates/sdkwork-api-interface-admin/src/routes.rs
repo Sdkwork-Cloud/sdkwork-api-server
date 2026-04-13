@@ -37,6 +37,36 @@ where
     })
 }
 
+fn metrics_route_with_state(
+    metrics: Arc<HttpMetricsRegistry>,
+    http_exposure: &HttpExposureConfig,
+) -> axum::routing::MethodRouter<AdminApiState> {
+    let expected_token: Arc<str> = Arc::from(http_exposure.metrics_bearer_token.clone());
+    get(move |headers: HeaderMap, State(state): State<AdminApiState>| {
+        let metrics = metrics.clone();
+        let expected_token = expected_token.clone();
+        async move {
+            if !metrics_request_authorized(&headers, expected_token.as_ref()) {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    [(header::WWW_AUTHENTICATE, "Bearer")],
+                    "metrics bearer token required",
+                )
+                    .into_response();
+            }
+
+            (
+                [(
+                    header::CONTENT_TYPE,
+                    "text/plain; version=0.0.4; charset=utf-8",
+                )],
+                payments::render_admin_metrics_payload(metrics.as_ref(), &state).await,
+            )
+                .into_response()
+        }
+    })
+}
+
 fn metrics_request_authorized(headers: &HeaderMap, expected_token: &str) -> bool {
     if expected_token.is_empty() {
         return false;
@@ -243,6 +273,46 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
             "/admin/commerce/reconciliation-runs/{reconciliation_run_id}/items",
             get(|| async { "commerce-reconciliation-items" }),
         )
+        .route("/admin/payments/orders", get(|| async { "payment-orders" }))
+        .route(
+            "/admin/payments/orders/{payment_order_id}",
+            get(|| async { "payment-order-dossier" }),
+        )
+        .route("/admin/payments/refunds", get(|| async { "payment-refunds" }))
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/approve",
+            post(|| async { "payment-refund-approve" }),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/cancel",
+            post(|| async { "payment-refund-cancel" }),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/start",
+            post(|| async { "payment-refund-start" }),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines",
+            get(|| async { "payment-reconciliation-lines" }),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines/{reconciliation_line_id}/resolve",
+            post(|| async { "payment-reconciliation-resolve" }),
+        )
+        .route(
+            "/admin/payments/reconciliation-summary",
+            get(|| async { "payment-reconciliation-summary" }),
+        )
+        .route(
+            "/admin/payments/gateway-accounts",
+            get(|| async { "payment-gateway-accounts" })
+                .post(|| async { "payment-gateway-accounts-upsert" }),
+        )
+        .route(
+            "/admin/payments/channel-policies",
+            get(|| async { "payment-channel-policies" })
+                .post(|| async { "payment-channel-policies-upsert" }),
+        )
         .route("/admin/async-jobs", get(|| async { "async-jobs" }))
         .route(
             "/admin/async-jobs/{job_id}/attempts",
@@ -398,7 +468,7 @@ pub fn admin_router_with_state_and_http_exposure(
     let metrics = Arc::new(HttpMetricsRegistry::new("admin"));
     Router::new()
         .merge(openapi::admin_docs_router())
-        .route("/metrics", metrics_route(metrics.clone(), &http_exposure))
+        .route("/metrics", metrics_route_with_state(metrics.clone(), &http_exposure))
         .route("/admin/health", get(|| async { "ok" }))
         .route("/admin/auth/login", post(auth::login_handler))
         .route("/admin/auth/me", get(auth::me_handler))
@@ -853,6 +923,52 @@ pub fn admin_router_with_state_and_http_exposure(
         .route(
             "/admin/commerce/reconciliation-runs/{reconciliation_run_id}/items",
             get(commerce::list_commerce_reconciliation_items_handler),
+        )
+        .route(
+            "/admin/payments/orders",
+            get(payments::list_payment_orders_handler),
+        )
+        .route(
+            "/admin/payments/orders/{payment_order_id}",
+            get(payments::get_payment_order_dossier_handler),
+        )
+        .route(
+            "/admin/payments/refunds",
+            get(payments::list_refund_orders_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/approve",
+            post(payments::approve_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/cancel",
+            post(payments::cancel_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/start",
+            post(payments::start_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines",
+            get(payments::list_payment_reconciliation_lines_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines/{reconciliation_line_id}/resolve",
+            post(payments::resolve_payment_reconciliation_line_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-summary",
+            get(payments::payment_reconciliation_summary_handler),
+        )
+        .route(
+            "/admin/payments/gateway-accounts",
+            get(payments::list_payment_gateway_accounts_handler)
+                .post(payments::upsert_payment_gateway_account_handler),
+        )
+        .route(
+            "/admin/payments/channel-policies",
+            get(payments::list_payment_channel_policies_handler)
+                .post(payments::upsert_payment_channel_policy_handler),
         )
         .route("/admin/async-jobs", get(jobs::list_async_jobs_handler))
         .route(

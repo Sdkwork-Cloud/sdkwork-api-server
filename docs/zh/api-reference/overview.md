@@ -77,7 +77,7 @@ curl -X POST http://127.0.0.1:8082/portal/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email":"portal@example.com",
-    "password":"hunter2!",
+    "password":"PortalPass123!",
     "display_name":"Portal User"
   }'
 ```

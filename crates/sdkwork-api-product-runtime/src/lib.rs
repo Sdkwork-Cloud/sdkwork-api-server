@@ -1,16 +1,16 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::{
     configure_capability_catalog_cache_store, configure_route_decision_cache_store,
 };
 use sdkwork_api_app_runtime::{
-    build_admin_store_and_commercial_billing_from_config, build_cache_runtime_from_config,
-    resolve_service_runtime_node_id, start_extension_runtime_rollout_supervision,
-    start_standalone_runtime_supervision, StandaloneListenerHost, StandaloneRuntimeSupervision,
-    StandaloneServiceKind, StandaloneServiceReloadHandles,
+    StandaloneListenerHost, StandaloneRuntimeSupervision, StandaloneServiceKind,
+    StandaloneServiceReloadHandles, build_admin_payment_store_handles_from_config,
+    build_cache_runtime_from_config, resolve_service_runtime_node_id,
+    start_extension_runtime_rollout_supervision, start_standalone_runtime_supervision,
 };
 use sdkwork_api_config::{RuntimeMode, StandaloneConfig, StandaloneConfigLoader};
 use sdkwork_api_interface_admin::{
@@ -213,10 +213,11 @@ impl RouterProductRuntime {
         let cache_runtime = build_cache_runtime_from_config(&config).await?;
         configure_route_decision_cache_store(cache_runtime.cache_store());
         configure_capability_catalog_cache_store(cache_runtime.cache_store());
-        let (store, commercial_billing) =
-            build_admin_store_and_commercial_billing_from_config(&config).await?;
-        let live_store = Reloadable::new(store);
-        let live_commercial_billing = Reloadable::new(commercial_billing);
+        let initial_store_handles = build_admin_payment_store_handles_from_config(&config).await?;
+        let live_store = Reloadable::new(initial_store_handles.admin_store);
+        let live_commercial_billing = Reloadable::new(initial_store_handles.commercial_billing);
+        let live_payment_store = Reloadable::new(initial_store_handles.payment_store);
+        let live_identity_store = Reloadable::new(initial_store_handles.identity_store);
         let live_secret_manager =
             Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
                 config.secret_backend,
@@ -233,8 +234,10 @@ impl RouterProductRuntime {
                 StandaloneListenerHost::bind(
                     requested_local_bind(&config.gateway_bind, options.mode),
                     gateway_router_with_state_and_http_exposure(
-                        GatewayApiState::with_live_store_and_secret_manager_handle(
+                        GatewayApiState::with_live_store_commercial_billing_payment_store_and_secret_manager_handle(
                             live_store.clone(),
+                            live_commercial_billing.clone(),
+                            live_payment_store.clone(),
                             live_secret_manager.clone(),
                         ),
                         config.http_exposure_config(),
@@ -251,10 +254,11 @@ impl RouterProductRuntime {
                 StandaloneListenerHost::bind(
                     requested_local_bind(&config.admin_bind, options.mode),
                     admin_router_with_state_and_http_exposure(
-                        AdminApiState::with_live_store_and_secret_manager_handle_and_commercial_billing_and_jwt_secret_handle(
+                        AdminApiState::with_live_store_and_secret_manager_handle_and_commercial_billing_payment_store_and_jwt_secret_handle(
                             live_store.clone(),
                             live_secret_manager.clone(),
                             Some(live_commercial_billing.clone()),
+                            Some(live_payment_store.clone()),
                             live_admin_jwt.clone(),
                         ),
                         config.http_exposure_config(),
@@ -271,9 +275,11 @@ impl RouterProductRuntime {
                 StandaloneListenerHost::bind(
                     requested_local_bind(&config.portal_bind, options.mode),
                     portal_router_with_state_and_http_exposure(
-                        PortalApiState::with_live_store_commercial_billing_and_jwt_secret_handle(
+                        PortalApiState::with_live_store_commercial_billing_payment_identity_store_and_jwt_secret_handle(
                             live_store.clone(),
                             Some(live_commercial_billing.clone()),
+                            Some(live_payment_store.clone()),
+                            Some(live_identity_store.clone()),
                             live_portal_jwt.clone(),
                         ),
                         config.http_exposure_config(),
@@ -340,6 +346,7 @@ impl RouterProductRuntime {
                 runtime_loader.clone(),
                 effective_config.clone(),
                 StandaloneServiceReloadHandles::gateway(live_store.clone())
+                    .with_payment_store(live_payment_store.clone())
                     .with_secret_manager(live_secret_manager.clone())
                     .with_listener(listener_host.reload_handle())
                     .with_node_id(
@@ -372,6 +379,8 @@ impl RouterProductRuntime {
                 effective_config,
                 StandaloneServiceReloadHandles::portal(live_store, live_portal_jwt)
                     .with_live_commercial_billing(live_commercial_billing)
+                    .with_payment_store(live_payment_store)
+                    .with_identity_store(live_identity_store)
                     .with_listener(listener_host.reload_handle())
                     .with_node_id(
                         portal_node_id

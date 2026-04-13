@@ -231,6 +231,7 @@ The most important runtime environment variables are:
 - `SDKWORK_PORTAL_JWT_SIGNING_SECRET`
 - `SDKWORK_SECRET_BACKEND`
 - `SDKWORK_CREDENTIAL_MASTER_KEY`
+- `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP`
 - `SDKWORK_SECRET_LOCAL_FILE`
 - `SDKWORK_SECRET_KEYRING_SERVICE`
 - `SDKWORK_SERVICE_INSTANCE_ID`
@@ -242,6 +243,24 @@ The most important runtime environment variables are:
 - `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS`
 - `SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_NATIVE_DYNAMIC_EXTENSIONS`
 - `SDKWORK_RUNTIME_SNAPSHOT_INTERVAL_SECS`
+
+## Startup Security Validation
+
+The standalone runtime rejects insecure local-development secrets by default.
+
+Rules:
+
+- `SDKWORK_ADMIN_JWT_SIGNING_SECRET=local-dev-admin-jwt-secret` is rejected unless `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`
+- `SDKWORK_PORTAL_JWT_SIGNING_SECRET=local-dev-portal-jwt-secret` is rejected unless `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`
+- `SDKWORK_CREDENTIAL_MASTER_KEY=local-dev-master-key` is rejected unless `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`
+- `SDKWORK_CREDENTIAL_LEGACY_MASTER_KEYS` must not contain `local-dev-master-key` unless `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`
+- the built-in `admin@sdkwork.local` and `portal@sdkwork.local` demo accounts are seeded only when `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP=true`
+
+Recommended production posture:
+
+- set strong, unique admin and portal JWT signing secrets
+- set a non-demo credential master key
+- leave `SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP` unset or explicitly `false`
 
 ## Cluster Runtime Coordination
 

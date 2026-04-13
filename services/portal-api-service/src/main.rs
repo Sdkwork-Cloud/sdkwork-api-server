@@ -1,6 +1,6 @@
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_runtime::{
-    build_admin_store_and_commercial_billing_from_config, build_cache_runtime_from_config,
+    build_admin_payment_store_handles_from_config, build_cache_runtime_from_config,
     resolve_service_runtime_node_id, start_standalone_runtime_supervision,
     StandaloneListenerHost, StandaloneServiceKind, StandaloneServiceReloadHandles,
 };
@@ -16,10 +16,11 @@ async fn main() -> anyhow::Result<()> {
     config.validate_security_posture()?;
     config.apply_to_process_env();
     let _cache_runtime = build_cache_runtime_from_config(&config).await?;
-    let (store, commercial_billing) =
-        build_admin_store_and_commercial_billing_from_config(&config).await?;
-    let live_store = Reloadable::new(store);
-    let live_commercial_billing = Reloadable::new(commercial_billing);
+    let store_handles = build_admin_payment_store_handles_from_config(&config).await?;
+    let live_store = Reloadable::new(store_handles.admin_store);
+    let live_commercial_billing = Reloadable::new(store_handles.commercial_billing);
+    let live_payment_store = Reloadable::new(store_handles.payment_store);
+    let live_identity_store = Reloadable::new(store_handles.identity_store);
     let live_portal_jwt = Reloadable::new(config.portal_jwt_signing_secret.clone());
     let live_secret_manager =
         Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
@@ -30,10 +31,12 @@ async fn main() -> anyhow::Result<()> {
             config.secret_keyring_service.clone(),
         ));
     let state =
-        PortalApiState::with_live_store_secret_manager_commercial_billing_and_jwt_secret_handle(
+        PortalApiState::with_live_store_secret_manager_commercial_billing_payment_identity_store_and_jwt_secret_handle(
         live_store.clone(),
         live_secret_manager.clone(),
         Some(live_commercial_billing.clone()),
+        Some(live_payment_store.clone()),
+        Some(live_identity_store.clone()),
         live_portal_jwt.clone(),
     );
     let listener_host =
@@ -49,6 +52,8 @@ async fn main() -> anyhow::Result<()> {
         config.clone(),
         StandaloneServiceReloadHandles::portal(live_store, live_portal_jwt)
             .with_live_commercial_billing(live_commercial_billing)
+            .with_payment_store(live_payment_store)
+            .with_identity_store(live_identity_store)
             .with_secret_manager(live_secret_manager)
             .with_listener(listener_host.reload_handle())
             .with_node_id(node_id),

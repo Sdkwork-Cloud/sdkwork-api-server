@@ -15,6 +15,7 @@ sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 sdkwork-api-domain-tenant = { path = "../sdkwork-api-domain-tenant" }

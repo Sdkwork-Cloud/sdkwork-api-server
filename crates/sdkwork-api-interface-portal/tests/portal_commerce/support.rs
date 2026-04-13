@@ -177,12 +177,29 @@ pub(super) async fn seed_portal_payment_attempt(
 }
 
 pub(super) async fn seed_marketing_catalog_coupon(store: &SqliteAdminStore) {
-    let template = CouponTemplateRecord::new(
-        "template_launch20",
+    seed_marketing_catalog_coupon_code(
+        store,
         "launch20",
+        "LAUNCH20",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Available,
+    )
+    .await;
+}
+
+pub(super) async fn seed_marketing_catalog_coupon_code(
+    store: &SqliteAdminStore,
+    slug: &str,
+    code_value: &str,
+    campaign_status: MarketingCampaignStatus,
+    code_status: CouponCodeStatus,
+) {
+    let template = CouponTemplateRecord::new(
+        format!("template_{slug}"),
+        slug,
         MarketingBenefitKind::PercentageOff,
     )
-    .with_display_name("Launch 20")
+    .with_display_name(format!("{code_value} Campaign"))
     .with_status(CouponTemplateStatus::Active)
     .with_distribution_kind(CouponDistributionKind::UniqueCode)
     .with_restriction(CouponRestrictionSpec::new(MarketingSubjectScope::Project))
@@ -196,9 +213,12 @@ pub(super) async fn seed_marketing_catalog_coupon(store: &SqliteAdminStore) {
         .await
         .unwrap();
 
-    let campaign = MarketingCampaignRecord::new("campaign_launch20", "template_launch20")
-        .with_display_name("Launch Campaign")
-        .with_status(MarketingCampaignStatus::Active)
+    let campaign = MarketingCampaignRecord::new(
+        format!("campaign_{slug}"),
+        format!("template_{slug}"),
+    )
+        .with_display_name(format!("{code_value} Campaign"))
+        .with_status(campaign_status)
         .with_created_at_ms(1_710_000_000_000)
         .with_updated_at_ms(1_710_000_000_000);
     store
@@ -206,15 +226,15 @@ pub(super) async fn seed_marketing_catalog_coupon(store: &SqliteAdminStore) {
         .await
         .unwrap();
 
-    let budget = CampaignBudgetRecord::new("budget_launch20", "campaign_launch20")
+    let budget = CampaignBudgetRecord::new(format!("budget_{slug}"), format!("campaign_{slug}"))
         .with_status(CampaignBudgetStatus::Active)
         .with_total_budget_minor(5_000)
         .with_created_at_ms(1_710_000_000_000)
         .with_updated_at_ms(1_710_000_000_000);
     store.insert_campaign_budget_record(&budget).await.unwrap();
 
-    let code = CouponCodeRecord::new("code_launch20", "template_launch20", "LAUNCH20")
-        .with_status(CouponCodeStatus::Available)
+    let code = CouponCodeRecord::new(format!("code_{slug}"), format!("template_{slug}"), code_value)
+        .with_status(code_status)
         .with_created_at_ms(1_710_000_000_000)
         .with_updated_at_ms(1_710_000_000_000);
     store.insert_coupon_code_record(&code).await.unwrap();

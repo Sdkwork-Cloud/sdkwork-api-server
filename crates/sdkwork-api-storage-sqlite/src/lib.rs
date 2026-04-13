@@ -47,6 +47,15 @@ use sdkwork_api_domain_marketing::{
     MarketingCampaignStatus, MarketingOutboxEventRecord, MarketingOutboxEventStatus,
     MarketingSubjectScope,
 };
+use sdkwork_api_domain_payment::{
+    FinanceDirection, FinanceEntryCode, FinanceJournalEntryRecord, FinanceJournalLineRecord,
+    PaymentAttemptRecord, PaymentAttemptStatus, PaymentCallbackEventRecord,
+    PaymentCallbackProcessingStatus, PaymentChannelPolicyRecord, PaymentGatewayAccountRecord,
+    PaymentOrderRecord, PaymentOrderStatus, PaymentProviderCode, PaymentRefundStatus,
+    PaymentSessionKind, PaymentSessionRecord, PaymentSessionStatus, PaymentTransactionKind,
+    PaymentTransactionRecord, ReconciliationMatchStatus, ReconciliationMatchSummaryRecord,
+    RefundOrderRecord, RefundOrderStatus,
+};
 use sdkwork_api_domain_rate_limit::{
     RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,
 };
@@ -70,7 +79,7 @@ use sdkwork_api_storage_core::{
     AtomicCouponRollbackCompensationResult, AtomicCouponRollbackResult,
     ExtensionRuntimeRolloutParticipantRecord, ExtensionRuntimeRolloutRecord, IdentityKernelStore,
     MarketingKernelTransaction, MarketingKernelTransactionExecutor, MarketingStore,
-    ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
+    PaymentKernelStore, ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
     StandaloneConfigRolloutRecord, StorageDialect,
 };
 use serde_json::Value;
@@ -93,6 +102,7 @@ mod marketing_kernel_transaction;
 mod marketing_store_impl;
 mod marketing_support;
 mod migrations;
+mod payment_kernel_store;
 mod routing_store;
 mod runtime_store;
 mod sqlite_migration_billing_schema;
@@ -102,6 +112,7 @@ mod sqlite_migration_commerce_jobs_schema;
 mod sqlite_migration_identity_schema;
 mod sqlite_migration_legacy_compat;
 mod sqlite_migration_marketing_schema;
+mod sqlite_migration_payment_schema;
 mod sqlite_migration_routing_schema;
 mod sqlite_migration_runtime_schema;
 mod sqlite_support;
@@ -121,6 +132,7 @@ pub(crate) use sqlite_migration_commerce_jobs_schema::apply_sqlite_commerce_jobs
 pub(crate) use sqlite_migration_identity_schema::apply_sqlite_identity_schema;
 pub(crate) use sqlite_migration_legacy_compat::apply_sqlite_legacy_compatibility;
 pub(crate) use sqlite_migration_marketing_schema::apply_sqlite_marketing_schema;
+pub(crate) use sqlite_migration_payment_schema::apply_sqlite_payment_schema;
 pub(crate) use sqlite_migration_routing_schema::apply_sqlite_routing_schema;
 pub(crate) use sqlite_migration_runtime_schema::apply_sqlite_runtime_schema;
 pub(crate) use sqlite_support::*;

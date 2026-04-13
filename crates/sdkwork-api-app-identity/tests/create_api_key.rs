@@ -58,6 +58,38 @@ async fn persisted_gateway_api_keys_can_be_listed_with_governance_metadata() {
 }
 
 #[tokio::test]
+async fn persisted_gateway_api_keys_do_not_retain_plaintext_after_create() {
+    let pool = run_migrations("sqlite::memory:").await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+
+    let created = persist_gateway_api_key_with_metadata(
+        &store,
+        "tenant-1",
+        "project-1",
+        "live",
+        "Production rollout",
+        Some(1_900_000_000_000),
+        None,
+        Some("Gateway launch credential"),
+        None,
+    )
+    .await
+    .unwrap();
+
+    let persisted = store
+        .find_gateway_api_key(&created.hashed)
+        .await
+        .unwrap()
+        .unwrap();
+    let persisted_json = serde_json::to_value(&persisted).unwrap();
+    assert!(persisted_json.get("raw_key").is_none());
+
+    let listed = list_gateway_api_keys(&store).await.unwrap();
+    let listed_json = serde_json::to_value(&listed[0]).unwrap();
+    assert!(listed_json.get("raw_key").is_none());
+}
+
+#[tokio::test]
 async fn resolving_gateway_context_updates_last_used_and_rejects_expired_keys() {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     let store = SqliteAdminStore::new(pool);

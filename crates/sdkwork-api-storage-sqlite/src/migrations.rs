@@ -10,6 +10,7 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     apply_sqlite_marketing_schema(&pool).await?;
     apply_sqlite_routing_schema(&pool).await?;
     apply_sqlite_billing_schema(&pool).await?;
+    apply_sqlite_payment_schema(&pool).await?;
     apply_sqlite_commerce_jobs_schema(&pool).await?;
     apply_sqlite_catalog_gateway_schema(&pool).await?;
     apply_sqlite_catalog_gateway_compatibility(&pool).await?;

@@ -429,6 +429,10 @@ pub fn gateway_router_with_state_and_http_exposure(
             "/commercial/account/benefit-lots",
             get(list_commercial_account_benefit_lots_handler),
         )
+        .route(
+            "/_sdkwork/payments/providers/{provider_code}/gateway-accounts/{gateway_account_id}/callbacks",
+            post(payment_callbacks_with_state_handler),
+        )
         .route("/v1/messages", post(anthropic_messages_with_state_handler))
         .route(
             "/v1/messages/count_tokens",

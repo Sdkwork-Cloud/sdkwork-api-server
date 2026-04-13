@@ -127,6 +127,12 @@ Add a canonical account-command transaction layer:
   - create request settlement
 - gateway admission cutover only after this layer is fully verified
 
+Current progress:
+
+- SQLite-backed account-kernel command batching now exists
+- `sdkwork-api-app-billing` now ships create-hold, capture-hold, and release-hold orchestration with request-meter-fact and settlement persistence
+- gateway admission and settlement cutover are still pending, so this gap is reduced but not closed
+
 ## Gap 2: Multimodal async job kernel is still missing
 
 **Severity:** critical

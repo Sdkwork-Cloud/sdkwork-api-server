@@ -68,7 +68,7 @@ async fn reload_standalone_runtime_config_pass(
     }
 
     let prepared_store_bundle = if database_changed {
-        Some(build_admin_store_and_commercial_billing_from_config(&next_config).await?)
+        Some(build_admin_payment_store_handles_from_config(&next_config).await?)
     } else {
         None
     };
@@ -100,7 +100,7 @@ async fn reload_standalone_runtime_config_pass(
         let next_secret_manager = build_secret_manager_from_config(&next_config);
         let validation_store = prepared_store_bundle
             .as_ref()
-            .map(|(store, _)| store.as_ref())
+            .map(|handles| handles.admin_store.as_ref())
             .unwrap_or(state.current_store.as_ref());
         validate_secret_manager_for_store(validation_store, &next_secret_manager).await?;
         Some(next_secret_manager)
@@ -119,11 +119,17 @@ async fn reload_standalone_runtime_config_pass(
         next_dynamic.apply_to_process_env();
     }
 
-    if let Some((next_store, next_commercial_billing)) = prepared_store_bundle {
-        state.current_store = next_store.clone();
-        reload_handles.store.replace(next_store);
+    if let Some(next_store_handles) = prepared_store_bundle {
+        state.current_store = next_store_handles.admin_store.clone();
+        reload_handles.store.replace(next_store_handles.admin_store);
         if let Some(live_commercial_billing) = reload_handles.commercial_billing.as_ref() {
-            live_commercial_billing.replace(next_commercial_billing);
+            live_commercial_billing.replace(next_store_handles.commercial_billing);
+        }
+        if let Some(live_payment_store) = reload_handles.payment_store.as_ref() {
+            live_payment_store.replace(next_store_handles.payment_store);
+        }
+        if let Some(live_identity_store) = reload_handles.identity_store.as_ref() {
+            live_identity_store.replace(next_store_handles.identity_store);
         }
     }
 

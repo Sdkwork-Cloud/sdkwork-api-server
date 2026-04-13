@@ -96,6 +96,10 @@ pub struct VideoObject {
     pub id: String,
     pub object: &'static str,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<f64>,
 }
 
 impl VideoObject {
@@ -104,7 +108,19 @@ impl VideoObject {
             id: id.into(),
             object: "video",
             url: url.into(),
+            status: None,
+            duration_seconds: None,
         }
+    }
+
+    pub fn with_status(mut self, status: impl Into<String>) -> Self {
+        self.status = Some(status.into());
+        self
+    }
+
+    pub fn with_duration_seconds(mut self, duration_seconds: f64) -> Self {
+        self.duration_seconds = Some(duration_seconds);
+        self
     }
 }
 

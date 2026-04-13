@@ -38,6 +38,8 @@ impl StandaloneServiceKind {
 pub struct StandaloneServiceReloadHandles {
     pub(crate) store: Reloadable<Arc<dyn AdminStore>>,
     pub(crate) commercial_billing: Option<Reloadable<Arc<dyn CommercialBillingAdminKernel>>>,
+    pub(crate) payment_store: Option<Reloadable<Arc<dyn CommercialKernelStore>>>,
+    pub(crate) identity_store: Option<Reloadable<Arc<dyn IdentityKernelStore>>>,
     pub(crate) coordination_store: Option<Reloadable<Arc<dyn AdminStore>>>,
     pub(crate) secret_manager: Option<Reloadable<CredentialSecretManager>>,
     pub(crate) admin_jwt_signing_secret: Option<Reloadable<String>>,
@@ -51,6 +53,8 @@ impl StandaloneServiceReloadHandles {
         Self {
             store,
             commercial_billing: None,
+            payment_store: None,
+            identity_store: None,
             coordination_store: None,
             secret_manager: None,
             admin_jwt_signing_secret: None,
@@ -67,6 +71,8 @@ impl StandaloneServiceReloadHandles {
         Self {
             store,
             commercial_billing: None,
+            payment_store: None,
+            identity_store: None,
             coordination_store: None,
             secret_manager: None,
             admin_jwt_signing_secret: Some(admin_jwt_signing_secret),
@@ -83,6 +89,8 @@ impl StandaloneServiceReloadHandles {
         Self {
             store,
             commercial_billing: None,
+            payment_store: None,
+            identity_store: None,
             coordination_store: None,
             secret_manager: None,
             admin_jwt_signing_secret: None,
@@ -97,6 +105,22 @@ impl StandaloneServiceReloadHandles {
         commercial_billing: Reloadable<Arc<dyn CommercialBillingAdminKernel>>,
     ) -> Self {
         self.commercial_billing = Some(commercial_billing);
+        self
+    }
+
+    pub fn with_payment_store(
+        mut self,
+        payment_store: Reloadable<Arc<dyn CommercialKernelStore>>,
+    ) -> Self {
+        self.payment_store = Some(payment_store);
+        self
+    }
+
+    pub fn with_identity_store(
+        mut self,
+        identity_store: Reloadable<Arc<dyn IdentityKernelStore>>,
+    ) -> Self {
+        self.identity_store = Some(identity_store);
         self
     }
 
