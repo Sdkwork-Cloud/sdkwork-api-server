@@ -122,6 +122,11 @@ async fn reload_standalone_runtime_config_pass(
     if let Some(next_store_handles) = prepared_store_bundle {
         state.current_store = next_store_handles.admin_store.clone();
         reload_handles.store.replace(next_store_handles.admin_store);
+        if let Some(live_gateway_commercial_billing) =
+            reload_handles.gateway_commercial_billing.as_ref()
+        {
+            live_gateway_commercial_billing.replace(next_store_handles.gateway_commercial_billing);
+        }
         if let Some(live_commercial_billing) = reload_handles.commercial_billing.as_ref() {
             live_commercial_billing.replace(next_store_handles.commercial_billing);
         }

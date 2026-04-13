@@ -1,11 +1,8 @@
-use std::sync::Arc;
-
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::{
     configure_capability_catalog_cache_store, configure_route_decision_cache_store,
     configure_route_recovery_probe_lock_store,
 };
-use sdkwork_api_app_rate_limit::InMemoryGatewayTrafficController;
 use sdkwork_api_app_runtime::{
     StandaloneListenerHost, StandaloneServiceKind, StandaloneServiceReloadHandles,
     build_admin_payment_store_handles_from_config, build_cache_runtime_from_config,
@@ -33,7 +30,8 @@ async fn main() -> anyhow::Result<()> {
     }
     let initial_store_handles = build_admin_payment_store_handles_from_config(&config).await?;
     let live_store = Reloadable::new(initial_store_handles.admin_store);
-    let live_commercial_billing = Reloadable::new(initial_store_handles.commercial_billing);
+    let live_gateway_commercial_billing =
+        Reloadable::new(initial_store_handles.gateway_commercial_billing);
     let live_payment_store = Reloadable::new(initial_store_handles.payment_store);
     let live_secret_manager =
         Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
@@ -46,10 +44,9 @@ async fn main() -> anyhow::Result<()> {
     let state =
         GatewayApiState::with_live_store_commercial_billing_payment_store_and_secret_manager_handle(
         live_store.clone(),
-        live_commercial_billing.clone(),
+        live_gateway_commercial_billing.clone(),
         live_payment_store.clone(),
         live_secret_manager.clone(),
-        Arc::new(InMemoryGatewayTrafficController::new()),
     );
     let listener_host = StandaloneListenerHost::bind(
         config.gateway_bind.clone(),
@@ -67,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
         config_loader,
         config.clone(),
         StandaloneServiceReloadHandles::gateway(live_store)
+            .with_live_gateway_commercial_billing(live_gateway_commercial_billing)
             .with_payment_store(live_payment_store)
             .with_secret_manager(live_secret_manager)
             .with_listener(listener_host.reload_handle())

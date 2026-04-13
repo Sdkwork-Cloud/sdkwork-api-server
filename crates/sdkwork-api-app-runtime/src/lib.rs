@@ -9,7 +9,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use sdkwork_api_app_billing::{
-    CommercialBillingAdminKernel, synchronize_due_pricing_plan_lifecycle_with_report,
+    CommercialBillingAdminKernel, GatewayCommercialBillingKernel,
+    synchronize_due_pricing_plan_lifecycle_with_report,
 };
 use sdkwork_api_app_credential::{CredentialSecretManager, resolve_credential_secret_with_manager};
 use sdkwork_api_app_extension::{

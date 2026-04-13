@@ -36,6 +36,7 @@ pub async fn build_admin_store_and_commercial_billing_from_config(
 
 pub struct StandaloneAdminPaymentStoreHandles {
     pub admin_store: Arc<dyn AdminStore>,
+    pub gateway_commercial_billing: Arc<dyn GatewayCommercialBillingKernel>,
     pub commercial_billing: Arc<dyn CommercialBillingAdminKernel>,
     pub payment_store: Arc<dyn CommercialKernelStore>,
     pub identity_store: Arc<dyn IdentityKernelStore>,
@@ -60,6 +61,8 @@ pub async fn build_admin_payment_store_handles_from_config(
             let store = Arc::new(SqliteAdminStore::new(pool));
             let admin_store: Arc<dyn AdminStore> = store.clone();
             let account_kernel: Arc<dyn AccountKernelStore> = store.clone();
+            let gateway_commercial_billing: Arc<dyn GatewayCommercialBillingKernel> =
+                store.clone();
             let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store.clone();
             let payment_store: Arc<dyn CommercialKernelStore> = store.clone();
             let identity_store: Arc<dyn IdentityKernelStore> = store;
@@ -74,6 +77,7 @@ pub async fn build_admin_payment_store_handles_from_config(
                 .await?;
             Ok::<StandaloneAdminPaymentStoreHandles, anyhow::Error>(StandaloneAdminPaymentStoreHandles {
                 admin_store,
+                gateway_commercial_billing,
                 commercial_billing,
                 payment_store,
                 identity_store,
@@ -84,6 +88,8 @@ pub async fn build_admin_payment_store_handles_from_config(
             let store = Arc::new(PostgresAdminStore::new(pool));
             let admin_store: Arc<dyn AdminStore> = store.clone();
             let account_kernel: Arc<dyn AccountKernelStore> = store.clone();
+            let gateway_commercial_billing: Arc<dyn GatewayCommercialBillingKernel> =
+                store.clone();
             let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store.clone();
             let payment_store: Arc<dyn CommercialKernelStore> = store.clone();
             let identity_store: Arc<dyn IdentityKernelStore> = store;
@@ -98,6 +104,7 @@ pub async fn build_admin_payment_store_handles_from_config(
                 .await?;
             Ok::<StandaloneAdminPaymentStoreHandles, anyhow::Error>(StandaloneAdminPaymentStoreHandles {
                 admin_store,
+                gateway_commercial_billing,
                 commercial_billing,
                 payment_store,
                 identity_store,

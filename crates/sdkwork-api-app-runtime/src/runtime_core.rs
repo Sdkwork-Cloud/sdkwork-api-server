@@ -37,6 +37,8 @@ impl StandaloneServiceKind {
 
 pub struct StandaloneServiceReloadHandles {
     pub(crate) store: Reloadable<Arc<dyn AdminStore>>,
+    pub(crate) gateway_commercial_billing:
+        Option<Reloadable<Arc<dyn GatewayCommercialBillingKernel>>>,
     pub(crate) commercial_billing: Option<Reloadable<Arc<dyn CommercialBillingAdminKernel>>>,
     pub(crate) payment_store: Option<Reloadable<Arc<dyn CommercialKernelStore>>>,
     pub(crate) identity_store: Option<Reloadable<Arc<dyn IdentityKernelStore>>>,
@@ -52,6 +54,7 @@ impl StandaloneServiceReloadHandles {
     pub fn gateway(store: Reloadable<Arc<dyn AdminStore>>) -> Self {
         Self {
             store,
+            gateway_commercial_billing: None,
             commercial_billing: None,
             payment_store: None,
             identity_store: None,
@@ -70,6 +73,7 @@ impl StandaloneServiceReloadHandles {
     ) -> Self {
         Self {
             store,
+            gateway_commercial_billing: None,
             commercial_billing: None,
             payment_store: None,
             identity_store: None,
@@ -88,6 +92,7 @@ impl StandaloneServiceReloadHandles {
     ) -> Self {
         Self {
             store,
+            gateway_commercial_billing: None,
             commercial_billing: None,
             payment_store: None,
             identity_store: None,
@@ -98,6 +103,14 @@ impl StandaloneServiceReloadHandles {
             listener: None,
             node_id: None,
         }
+    }
+
+    pub fn with_live_gateway_commercial_billing(
+        mut self,
+        gateway_commercial_billing: Reloadable<Arc<dyn GatewayCommercialBillingKernel>>,
+    ) -> Self {
+        self.gateway_commercial_billing = Some(gateway_commercial_billing);
+        self
     }
 
     pub fn with_live_commercial_billing(

@@ -3,15 +3,51 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use reqwest::Client;
-use sdkwork_api_app_runtime::CommercialBillingReadKernel;
+use sdkwork_api_app_credential::CredentialSecretManager;
+use sdkwork_api_app_runtime::{
+    CommercialBillingReadKernel, build_admin_payment_store_handles_from_config,
+};
 use sdkwork_api_config::{CacheBackendKind, StandaloneConfigLoader};
+use sdkwork_api_interface_http::GatewayApiState;
 use sdkwork_api_product_runtime::{
     ProductRuntimeRole, ProductSiteDirs, RouterProductRuntime, RouterProductRuntimeOptions,
 };
-use sdkwork_api_storage_core::{AccountKernelStore, AdminStore};
+use sdkwork_api_storage_core::{AccountKernelStore, AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[tokio::test]
+async fn product_runtime_builder_wires_gateway_billing_handle_into_gateway_state() {
+    let config_root = temp_root("gateway-billing-handle");
+    let database_path = config_root.join("gateway-billing.db");
+    let database_url = sqlite_url_for(database_path);
+    let (_loader, mut config) = StandaloneConfigLoader::from_local_root_and_pairs(
+        &config_root,
+        [("SDKWORK_ALLOW_LOCAL_DEV_BOOTSTRAP", "true")],
+    )
+    .unwrap();
+    config.database_url = database_url;
+
+    let store_handles = build_admin_payment_store_handles_from_config(&config)
+        .await
+        .unwrap();
+    let state =
+        GatewayApiState::with_live_store_commercial_billing_payment_store_and_secret_manager_handle(
+            Reloadable::new(store_handles.admin_store),
+            Reloadable::new(store_handles.gateway_commercial_billing),
+            Reloadable::new(store_handles.payment_store),
+            Reloadable::new(CredentialSecretManager::new_with_legacy_master_keys(
+                config.secret_backend,
+                config.credential_master_key.clone(),
+                config.credential_legacy_master_keys.clone(),
+                config.secret_local_file.clone(),
+                config.secret_keyring_service.clone(),
+            )),
+        );
+
+    let _ = state.clone();
+}
 
 #[tokio::test]
 async fn desktop_product_runtime_serves_static_sites_and_all_api_health_routes() {

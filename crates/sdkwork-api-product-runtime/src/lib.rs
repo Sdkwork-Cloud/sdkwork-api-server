@@ -215,6 +215,8 @@ impl RouterProductRuntime {
         configure_capability_catalog_cache_store(cache_runtime.cache_store());
         let initial_store_handles = build_admin_payment_store_handles_from_config(&config).await?;
         let live_store = Reloadable::new(initial_store_handles.admin_store);
+        let live_gateway_commercial_billing =
+            Reloadable::new(initial_store_handles.gateway_commercial_billing);
         let live_commercial_billing = Reloadable::new(initial_store_handles.commercial_billing);
         let live_payment_store = Reloadable::new(initial_store_handles.payment_store);
         let live_identity_store = Reloadable::new(initial_store_handles.identity_store);
@@ -236,7 +238,7 @@ impl RouterProductRuntime {
                     gateway_router_with_state_and_http_exposure(
                         GatewayApiState::with_live_store_commercial_billing_payment_store_and_secret_manager_handle(
                             live_store.clone(),
-                            live_commercial_billing.clone(),
+                            live_gateway_commercial_billing.clone(),
                             live_payment_store.clone(),
                             live_secret_manager.clone(),
                         ),
@@ -346,6 +348,9 @@ impl RouterProductRuntime {
                 runtime_loader.clone(),
                 effective_config.clone(),
                 StandaloneServiceReloadHandles::gateway(live_store.clone())
+                    .with_live_gateway_commercial_billing(
+                        live_gateway_commercial_billing.clone(),
+                    )
                     .with_payment_store(live_payment_store.clone())
                     .with_secret_manager(live_secret_manager.clone())
                     .with_listener(listener_host.reload_handle())
