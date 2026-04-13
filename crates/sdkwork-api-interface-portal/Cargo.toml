@@ -16,6 +16,7 @@ sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-jobs = { path = "../sdkwork-api-app-jobs" }
 sdkwork-api-app-marketing = { path = "../sdkwork-api-app-marketing" }
 sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
+sdkwork-api-app-payment = { path = "../sdkwork-api-app-payment" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
@@ -23,11 +24,13 @@ sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-domain-jobs = { path = "../sdkwork-api-domain-jobs" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 sdkwork-api-domain-usage = { path = "../sdkwork-api-domain-usage" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
 sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
+sdkwork-api-storage-postgres = { path = "../sdkwork-api-storage-postgres" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 serde.workspace = true
 serde_json.workspace = true
@@ -43,6 +46,8 @@ sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-credential = { path = "../sdkwork-api-domain-credential" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-app-payment = { path = "../sdkwork-api-app-payment" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-domain-routing = { path = "../sdkwork-api-domain-routing" }
 serde_json.workspace = true
 tokio.workspace = true

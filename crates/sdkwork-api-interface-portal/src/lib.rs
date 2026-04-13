@@ -31,19 +31,20 @@ use axum::{
     Json, Router,
 };
 use sdkwork_api_app_billing::{
-    list_billing_events, summarize_billing_events, summarize_billing_snapshot,
-    synchronize_due_pricing_plan_lifecycle, AccountBalanceSnapshot, AccountLedgerHistoryEntry,
-    CommercialBillingAdminKernel,
+    list_account_ledger_history, list_billing_events, summarize_account_balance, summarize_billing_events,
+    summarize_billing_snapshot, synchronize_due_pricing_plan_lifecycle, AccountBalanceSnapshot,
+    AccountLedgerHistoryEntry, AccountLotBalanceSnapshot, CommercialBillingAdminKernel,
 };
 use sdkwork_api_app_commerce::{
-    apply_portal_commerce_payment_event_with_billing, cancel_portal_commerce_order,
-    create_portal_commerce_payment_attempt, list_portal_commerce_payment_attempts,
-    list_portal_commerce_payment_methods, list_project_commerce_orders,
-    load_portal_commerce_catalog, load_portal_commerce_checkout_session_with_policy,
+    apply_portal_commerce_payment_event, apply_portal_commerce_payment_event_with_billing,
+    cancel_portal_commerce_order, create_portal_commerce_payment_attempt,
+    list_portal_commerce_payment_attempts, list_portal_commerce_payment_methods,
+    list_project_commerce_orders, load_portal_commerce_catalog,
+    load_portal_commerce_checkout_session, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_portal_commerce_payment_attempt,
-    load_project_membership, portal_commerce_product_kind,
-    portal_commerce_transaction_kind, preview_portal_commerce_quote,
-    process_portal_stripe_webhook, reclaim_expired_coupon_reservations_for_code_if_needed,
+    load_project_membership, portal_commerce_product_kind, portal_commerce_transaction_kind,
+    preview_portal_commerce_quote, process_portal_stripe_webhook,
+    reclaim_expired_coupon_reservations_for_code_if_needed, settle_portal_commerce_order,
     settle_portal_commerce_order_with_billing, submit_portal_commerce_order, CommerceError,
     CommercePaymentAttemptRecord, PaymentMethodRecord, PortalCommerceCatalog,
     PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
@@ -71,6 +72,12 @@ use sdkwork_api_app_marketing::{
 use sdkwork_api_app_rate_limit::{
     check_coupon_rate_limit, coupon_actor_bucket, CouponRateLimitAction,
 };
+use sdkwork_api_app_payment::{
+    ensure_commerce_payment_checkout, ensure_portal_payment_subject_scope,
+    list_portal_commerce_order_payment_events, list_project_commerce_order_center,
+    request_portal_commerce_order_refund, CommerceOrderCenterEntry, PaymentAttemptTimelineEntry,
+    PortalAccountHistorySnapshot,
+};
 use sdkwork_api_app_routing::{
     create_routing_profile, list_compiled_routing_snapshots, list_routing_profiles,
     persist_routing_profile, select_route_with_store_context,
@@ -79,8 +86,9 @@ use sdkwork_api_app_routing::{
 use sdkwork_api_app_usage::summarize_usage_records;
 use sdkwork_api_config::HttpExposureConfig;
 use sdkwork_api_domain_billing::{
-    AccountBenefitLotRecord, AccountHoldRecord, AccountRecord, BillingEventRecord,
-    BillingEventSummary, LedgerEntry, PricingPlanRecord, PricingRateRecord, ProjectBillingSummary,
+    AccountBenefitLotRecord, AccountLedgerAllocationRecord, AccountLedgerEntryRecord,
+    AccountHoldRecord, AccountRecord, AccountType, BillingEventRecord, BillingEventSummary,
+    LedgerEntry, PricingPlanRecord, PricingRateRecord, ProjectBillingSummary,
     RequestSettlementRecord,
 };
 use sdkwork_api_domain_catalog::ProxyProvider;
@@ -92,6 +100,10 @@ use sdkwork_api_domain_marketing::{
     CouponReservationRecord, CouponRollbackRecord, CouponRollbackType, CouponTemplateRecord,
     MarketingCampaignRecord, MarketingSubjectScope,
 };
+use sdkwork_api_domain_payment::{
+    PaymentCallbackEventRecord, PaymentOrderRecord, PaymentSessionRecord, PaymentTransactionRecord,
+    RefundOrderRecord,
+};
 use sdkwork_api_domain_rate_limit::{RateLimitPolicy, RateLimitWindowSnapshot};
 use sdkwork_api_domain_routing::{
     CompiledRoutingSnapshotRecord, ProjectRoutingPreferences, RoutingDecision, RoutingDecisionLog,
@@ -101,7 +113,7 @@ use sdkwork_api_domain_usage::{UsageRecord, UsageSummary};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
 use sdkwork_api_storage_core::{
     AdminStore, AtomicCouponConfirmationCommand, AtomicCouponReservationCommand,
-    AtomicCouponRollbackCommand, Reloadable,
+    AtomicCouponRollbackCommand, CommercialKernelStore, IdentityKernelStore, Reloadable,
 };
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
@@ -109,8 +121,86 @@ use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use tower_http::cors::{Any, CorsLayer};
 
+#[derive(Debug, Deserialize)]
+struct CreateCommerceOrderRefundRequest {
+    refund_reason_code: String,
+    requested_amount_minor: u64,
+}
 
+#[derive(Debug, Serialize)]
+struct PortalPaymentAttemptTimelineEntryResponse {
+    attempt: sdkwork_api_domain_payment::PaymentAttemptRecord,
+    sessions: Vec<PaymentSessionRecord>,
+}
 
+#[derive(Debug, Serialize)]
+struct PortalCommerceOrderCenterEntryResponse {
+    order: commerce::PortalCommerceOrderView,
+    payment_events: Vec<PortalCommercePaymentEventRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    latest_payment_event: Option<PortalCommercePaymentEventRecord>,
+    checkout_session: PortalCommerceCheckoutSession,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    payment_order: Option<PaymentOrderRecord>,
+    payment_attempts: Vec<PortalPaymentAttemptTimelineEntryResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active_payment_session: Option<PaymentSessionRecord>,
+    payment_transactions: Vec<PaymentTransactionRecord>,
+    refunds: Vec<RefundOrderRecord>,
+    refundable_amount_minor: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct PortalCommerceOrderCenterResponse {
+    project_id: String,
+    payment_simulation_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    membership: Option<PortalProjectMembershipRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reconciliation: Option<PortalCommerceReconciliationSummary>,
+    orders: Vec<PortalCommerceOrderCenterEntryResponse>,
+}
+
+#[derive(Debug, Serialize)]
+struct PortalAccountLotBalanceSnapshotResponse {
+    lot_id: u64,
+    benefit_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    scope_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    expires_at_ms: Option<u64>,
+    original_quantity: f64,
+    remaining_quantity: f64,
+    held_quantity: f64,
+    available_quantity: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct PortalAccountBalanceSnapshotResponse {
+    account_id: u64,
+    available_balance: f64,
+    held_balance: f64,
+    consumed_balance: f64,
+    grant_balance: f64,
+    active_lot_count: u64,
+    lots: Vec<PortalAccountLotBalanceSnapshotResponse>,
+}
+
+#[derive(Debug, Serialize)]
+struct PortalAccountHistoryResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    account: Option<AccountRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    balance: Option<PortalAccountBalanceSnapshotResponse>,
+    benefit_lots: Vec<AccountBenefitLotRecord>,
+    holds: Vec<AccountHoldRecord>,
+    request_settlements: Vec<RequestSettlementRecord>,
+    ledger: Vec<AccountLedgerHistoryEntry>,
+    lots: Vec<AccountBenefitLotRecord>,
+    ledger_entries: Vec<AccountLedgerEntryRecord>,
+    ledger_allocations: Vec<AccountLedgerAllocationRecord>,
+    refunds: Vec<RefundOrderRecord>,
+}
 
 pub fn try_portal_router() -> anyhow::Result<Router> {
     let service_name: Arc<str> = Arc::from("portal");
@@ -191,7 +281,8 @@ pub fn try_portal_router() -> anyhow::Result<Router> {
         )
         .route(
             "/portal/commerce/orders/{order_id}/payment-events",
-            post(|| async { "commerce-order-payment-events" }),
+            get(|| async { "commerce-order-payment-events" })
+                .post(|| async { "commerce-order-payment-events" }),
         )
         .route(
             "/portal/commerce/orders/{order_id}/payment-methods",
@@ -322,7 +413,11 @@ pub fn portal_router_with_pool_and_jwt_secret(
 
 pub fn portal_router_with_store<S>(store: Arc<S>) -> Router
 where
-    S: AdminStore + CommercialBillingAdminKernel + 'static,
+    S: AdminStore
+        + CommercialBillingAdminKernel
+        + CommercialKernelStore
+        + IdentityKernelStore
+        + 'static,
 {
     portal_router_with_store_and_jwt_secret(store, DEFAULT_PORTAL_JWT_SIGNING_SECRET)
 }
@@ -332,7 +427,11 @@ pub fn portal_router_with_store_and_jwt_secret<S>(
     jwt_signing_secret: impl Into<String>,
 ) -> Router
 where
-    S: AdminStore + CommercialBillingAdminKernel + 'static,
+    S: AdminStore
+        + CommercialBillingAdminKernel
+        + CommercialKernelStore
+        + IdentityKernelStore
+        + 'static,
 {
     portal_router_with_state(PortalApiState::with_store_and_jwt_secret(
         store,
@@ -421,7 +520,7 @@ pub fn portal_router_with_state_and_http_exposure(
         )
         .route(
             "/portal/commerce/order-center",
-            get(commerce::commerce_order_center_handler),
+            get(list_commerce_order_center_handler),
         )
         .route(
             "/portal/commerce/orders/{order_id}/settle",
@@ -432,8 +531,13 @@ pub fn portal_router_with_state_and_http_exposure(
             post(commerce::cancel_commerce_order_handler),
         )
         .route(
+            "/portal/commerce/orders/{order_id}/refunds",
+            post(create_commerce_order_refund_handler),
+        )
+        .route(
             "/portal/commerce/orders/{order_id}/payment-events",
-            post(commerce::apply_commerce_payment_event_handler),
+            get(list_commerce_payment_events_handler)
+                .post(commerce::apply_commerce_payment_event_handler),
         )
         .route(
             "/portal/commerce/orders/{order_id}/payment-methods",
@@ -489,7 +593,7 @@ pub fn portal_router_with_state_and_http_exposure(
         .route("/portal/billing/account", get(billing::billing_account_handler))
         .route(
             "/portal/billing/account-history",
-            get(billing::billing_account_history_handler),
+            get(account_history_handler),
         )
         .route(
             "/portal/billing/account/balance",
@@ -560,12 +664,734 @@ fn error_response(
     status: StatusCode,
     message: impl Into<String>,
 ) -> (StatusCode, Json<ErrorResponse>) {
-    let body = ErrorResponse {
-        error: ErrorBody {
-            message: message.into(),
-        },
+    (
+        status,
+        Json(ErrorResponse {
+            error: ErrorBody {
+                message: message.into(),
+            },
+        }),
+    )
+}
+
+fn payment_store_kernel(
+    state: &PortalApiState,
+) -> Result<&Arc<dyn CommercialKernelStore>, (StatusCode, Json<ErrorResponse>)> {
+    state.payment_store.as_ref().ok_or_else(|| {
+        error_response(
+            StatusCode::NOT_IMPLEMENTED,
+            "portal payment control plane is unavailable for the current storage runtime",
+        )
+    })
+}
+
+fn identity_store_kernel(
+    state: &PortalApiState,
+) -> Result<&Arc<dyn IdentityKernelStore>, (StatusCode, Json<ErrorResponse>)> {
+    state.identity_store.as_ref().ok_or_else(|| {
+        error_response(
+            StatusCode::NOT_IMPLEMENTED,
+            "portal payment identity bridge is unavailable for the current storage runtime",
+        )
+    })
+}
+
+fn browser_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+}
+
+async fn register_handler(
+    State(state): State<PortalApiState>,
+    Json(request): Json<RegisterRequest>,
+) -> Result<(StatusCode, Json<PortalAuthSession>), (StatusCode, Json<ErrorResponse>)> {
+    register_portal_user(
+        state.store.as_ref(),
+        &request.email,
+        &request.password,
+        &request.display_name,
+        &state.jwt_signing_secret,
+    )
+    .await
+    .map(|session| (StatusCode::CREATED, Json(session)))
+    .map_err(portal_error_response)
+}
+
+async fn login_handler(
+    State(state): State<PortalApiState>,
+    Json(request): Json<LoginRequest>,
+) -> Result<Json<PortalAuthSession>, (StatusCode, Json<ErrorResponse>)> {
+    login_portal_user(
+        state.store.as_ref(),
+        &request.email,
+        &request.password,
+        &state.jwt_signing_secret,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_error_response)
+}
+
+async fn me_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalUserProfile>, StatusCode> {
+    load_portal_user_profile(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map(Json)
+        .ok_or(StatusCode::UNAUTHORIZED)
+}
+
+async fn change_password_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+    Json(request): Json<ChangePasswordRequest>,
+) -> Result<Json<PortalUserProfile>, (StatusCode, Json<ErrorResponse>)> {
+    change_portal_password(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &request.current_password,
+        &request.new_password,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_error_response)
+}
+
+async fn workspace_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalWorkspaceSummary>, StatusCode> {
+    load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map(Json)
+}
+
+async fn list_commerce_order_center_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalCommerceOrderCenterResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let payment_store = payment_store_kernel(&state)?;
+    let identity_store = identity_store_kernel(&state)?;
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    recover_project_order_checkout_artifacts(
+        payment_store.as_ref(),
+        identity_store.as_ref(),
+        &workspace.project.id,
+        current_time_millis(),
+    )
+    .await;
+
+    let payment_entries = load_project_order_center(payment_store.as_ref(), &workspace.project.id)
+        .await
+        .map_err(portal_payment_error_response)?;
+    let membership = load_project_membership(state.store.as_ref(), &workspace.project.id)
+        .await
+        .map_err(commerce::portal_commerce_error_response)?;
+
+    let mut orders = Vec::with_capacity(payment_entries.len());
+    let mut legacy_orders = Vec::with_capacity(payment_entries.len());
+    for entry in payment_entries {
+        let order_id = entry.order.order_id.clone();
+        let mut payment_events = state
+            .store
+            .list_commerce_payment_events_for_order(&order_id)
+            .await
+            .map_err(CommerceError::from)
+            .map_err(commerce::portal_commerce_error_response)?;
+        payment_events.sort_by(|left, right| {
+            right
+                .received_at_ms
+                .cmp(&left.received_at_ms)
+                .then_with(|| right.payment_event_id.cmp(&left.payment_event_id))
+        });
+        let latest_payment_event = payment_events.first().cloned();
+        let checkout_session = load_portal_commerce_checkout_session_with_policy(
+            state.store.as_ref(),
+            &claims.claims().sub,
+            &workspace.project.id,
+            &order_id,
+            state.payment_simulation_enabled,
+        )
+        .await
+        .map_err(commerce::portal_commerce_error_response)?;
+        let order = commerce::PortalCommerceOrderView::from(entry.order);
+        legacy_orders.push(PortalOrderCenterEntry {
+            order: order.clone(),
+            payment_events: payment_events.clone(),
+            latest_payment_event: latest_payment_event.clone(),
+            checkout_session: checkout_session.clone(),
+        });
+        orders.push(PortalCommerceOrderCenterEntryResponse {
+            order,
+            payment_events,
+            latest_payment_event,
+            checkout_session,
+            payment_order: entry.payment_order,
+            payment_attempts: entry
+                .payment_attempts
+                .into_iter()
+                .map(PortalPaymentAttemptTimelineEntryResponse::from)
+                .collect(),
+            active_payment_session: entry.active_payment_session,
+            payment_transactions: entry.payment_transactions,
+            refunds: entry.refunds,
+            refundable_amount_minor: entry.refundable_amount_minor,
+        });
+    }
+
+    let reconciliation =
+        load_portal_commerce_reconciliation_summary(&state, &workspace, &legacy_orders).await?;
+
+    Ok(Json(PortalCommerceOrderCenterResponse {
+        project_id: workspace.project.id,
+        payment_simulation_enabled: state.payment_simulation_enabled,
+        membership,
+        reconciliation,
+        orders,
+    }))
+}
+
+async fn create_commerce_order_refund_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+    Json(request): Json<CreateCommerceOrderRefundRequest>,
+) -> Result<(StatusCode, Json<RefundOrderRecord>), (StatusCode, Json<ErrorResponse>)> {
+    let payment_store = payment_store_kernel(&state)?;
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    request_portal_order_refund(
+        payment_store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+        &request.refund_reason_code,
+        request.requested_amount_minor,
+        current_time_millis(),
+    )
+    .await
+    .map(|refund_order| (StatusCode::CREATED, Json(refund_order)))
+    .map_err(portal_payment_error_response)
+}
+
+async fn list_commerce_payment_events_handler(
+    claims: AuthenticatedPortalClaims,
+    Path(order_id): Path<String>,
+    State(state): State<PortalApiState>,
+) -> Result<Json<Vec<PaymentCallbackEventRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    let payment_store = payment_store_kernel(&state)?;
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    load_portal_order_payment_events(
+        payment_store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+    )
+    .await
+    .map(Json)
+    .map_err(portal_payment_error_response)
+}
+
+async fn list_usage_records_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<Vec<UsageRecord>>, StatusCode> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
+    load_project_usage_records(state.store.as_ref(), &workspace.project.id)
+        .await
+        .map(Json)
+}
+
+async fn usage_summary_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<UsageSummary>, StatusCode> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
+    let usage_records =
+        load_project_usage_records(state.store.as_ref(), &workspace.project.id).await?;
+    Ok(Json(summarize_usage_records(&usage_records)))
+}
+
+async fn billing_summary_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<ProjectBillingSummary>, StatusCode> {
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub).await?;
+    load_project_billing_summary(state.store.as_ref(), &workspace.project.id)
+        .await
+        .map(Json)
+}
+
+async fn account_history_handler(
+    claims: AuthenticatedPortalClaims,
+    State(state): State<PortalApiState>,
+) -> Result<Json<PortalAccountHistoryResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let payment_store = payment_store_kernel(&state)?;
+    let identity_store = identity_store_kernel(&state)?;
+    let workspace = load_workspace_for_user(state.store.as_ref(), &claims.claims().sub)
+        .await
+        .map_err(|status| {
+            (
+                status,
+                Json(ErrorResponse {
+                    error: ErrorBody {
+                        message: "portal workspace is unavailable".to_owned(),
+                    },
+                }),
+            )
+        })?;
+
+    let mut snapshot = load_portal_account_history_for_store(
+        payment_store.as_ref(),
+        identity_store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        current_time_millis(),
+    )
+    .await
+    .map_err(portal_payment_error_response)?;
+
+    if snapshot.account.is_none() {
+        if let Some(commercial_billing) = state.commercial_billing.as_ref() {
+            if let Some(account) = commercial_billing
+                .resolve_payable_account_for_gateway_request_context(
+                    &portal_workspace_request_context(&workspace),
+                )
+                .await
+                .map_err(commercial_billing_error_response)?
+            {
+                let account_id = account.account_id;
+                let balance = commercial_billing
+                    .summarize_account_balance(account_id, current_time_millis())
+                    .await
+                    .map_err(commercial_billing_error_response)?;
+                let ledger_entry_ids = payment_store
+                    .list_account_ledger_entry_records()
+                    .await
+                    .map_err(portal_payment_error_response)?
+                    .into_iter()
+                    .filter(|entry| entry.account_id == account_id)
+                    .map(|entry| entry.ledger_entry_id)
+                    .collect::<std::collections::BTreeSet<_>>();
+
+                snapshot.account = Some(account);
+                snapshot.balance = Some(balance);
+                snapshot.lots = payment_store
+                    .list_account_benefit_lots()
+                    .await
+                    .map_err(portal_payment_error_response)?
+                    .into_iter()
+                    .filter(|lot| lot.account_id == account_id)
+                    .collect();
+                snapshot.ledger_entries = payment_store
+                    .list_account_ledger_entry_records()
+                    .await
+                    .map_err(portal_payment_error_response)?
+                    .into_iter()
+                    .filter(|entry| entry.account_id == account_id)
+                    .collect();
+                snapshot.ledger_allocations = payment_store
+                    .list_account_ledger_allocations()
+                    .await
+                    .map_err(portal_payment_error_response)?
+                    .into_iter()
+                    .filter(|allocation| ledger_entry_ids.contains(&allocation.ledger_entry_id))
+                    .collect();
+            }
+        }
+    }
+
+    let (benefit_lots, holds, request_settlements, ledger) =
+        if let Some(account) = snapshot.account.as_ref() {
+        let mut benefit_lots = payment_store
+            .list_account_benefit_lots()
+            .await
+            .map_err(portal_payment_error_response)?
+            .into_iter()
+            .filter(|lot| lot.account_id == account.account_id)
+            .collect::<Vec<_>>();
+        benefit_lots.sort_by_key(|lot| lot.lot_id);
+
+        let mut holds = payment_store
+            .list_account_holds()
+            .await
+            .map_err(portal_payment_error_response)?
+            .into_iter()
+            .filter(|hold| hold.account_id == account.account_id)
+            .collect::<Vec<_>>();
+        holds.sort_by_key(|hold| hold.hold_id);
+
+        let mut request_settlements = payment_store
+            .list_request_settlement_records()
+            .await
+            .map_err(portal_payment_error_response)?
+            .into_iter()
+            .filter(|settlement| settlement.account_id == account.account_id)
+            .collect::<Vec<_>>();
+        request_settlements.sort_by_key(|settlement| settlement.request_settlement_id);
+
+        let ledger = list_account_ledger_history(payment_store.as_ref(), account.account_id)
+            .await
+            .map_err(portal_payment_error_response)?;
+
+        (benefit_lots, holds, request_settlements, ledger)
+        } else {
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new())
+        };
+
+    Ok(Json(PortalAccountHistoryResponse::from_parts(
+        snapshot,
+        benefit_lots,
+        holds,
+        request_settlements,
+        ledger,
+    )))
+}
+
+impl From<PaymentAttemptTimelineEntry> for PortalPaymentAttemptTimelineEntryResponse {
+    fn from(value: PaymentAttemptTimelineEntry) -> Self {
+        Self {
+            attempt: value.attempt,
+            sessions: value.sessions,
+        }
+    }
+}
+
+impl From<&AccountLotBalanceSnapshot> for PortalAccountLotBalanceSnapshotResponse {
+    fn from(value: &AccountLotBalanceSnapshot) -> Self {
+        Self {
+            lot_id: value.lot_id,
+            benefit_type: account_benefit_type_label(value.benefit_type),
+            scope_json: value.scope_json.clone(),
+            expires_at_ms: value.expires_at_ms,
+            original_quantity: value.original_quantity,
+            remaining_quantity: value.remaining_quantity,
+            held_quantity: value.held_quantity,
+            available_quantity: value.available_quantity,
+        }
+    }
+}
+
+fn account_benefit_type_label(
+    benefit_type: sdkwork_api_domain_billing::AccountBenefitType,
+) -> String {
+    match benefit_type {
+        sdkwork_api_domain_billing::AccountBenefitType::CashCredit => "cash_credit",
+        sdkwork_api_domain_billing::AccountBenefitType::PromoCredit => "promo_credit",
+        sdkwork_api_domain_billing::AccountBenefitType::RequestAllowance => "request_allowance",
+        sdkwork_api_domain_billing::AccountBenefitType::TokenAllowance => "token_allowance",
+        sdkwork_api_domain_billing::AccountBenefitType::ImageAllowance => "image_allowance",
+        sdkwork_api_domain_billing::AccountBenefitType::AudioAllowance => "audio_allowance",
+        sdkwork_api_domain_billing::AccountBenefitType::VideoAllowance => "video_allowance",
+        sdkwork_api_domain_billing::AccountBenefitType::MusicAllowance => "music_allowance",
+    }
+    .to_owned()
+}
+
+impl From<&AccountBalanceSnapshot> for PortalAccountBalanceSnapshotResponse {
+    fn from(value: &AccountBalanceSnapshot) -> Self {
+        Self {
+            account_id: value.account_id,
+            available_balance: value.available_balance,
+            held_balance: value.held_balance,
+            consumed_balance: value.consumed_balance,
+            grant_balance: value.grant_balance,
+            active_lot_count: value.active_lot_count,
+            lots: value
+                .lots
+                .iter()
+                .map(PortalAccountLotBalanceSnapshotResponse::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<PortalAccountHistorySnapshot> for PortalAccountHistoryResponse {
+    fn from(value: PortalAccountHistorySnapshot) -> Self {
+        Self::from_parts(value, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+    }
+}
+
+impl PortalAccountHistoryResponse {
+    fn from_parts(
+        value: PortalAccountHistorySnapshot,
+        benefit_lots: Vec<AccountBenefitLotRecord>,
+        holds: Vec<AccountHoldRecord>,
+        request_settlements: Vec<RequestSettlementRecord>,
+        ledger: Vec<AccountLedgerHistoryEntry>,
+    ) -> Self {
+        Self {
+            account: value.account,
+            balance: value
+                .balance
+                .as_ref()
+                .map(PortalAccountBalanceSnapshotResponse::from),
+            benefit_lots,
+            holds,
+            request_settlements,
+            ledger,
+            lots: value.lots,
+            ledger_entries: value.ledger_entries,
+            ledger_allocations: value.ledger_allocations,
+            refunds: value.refunds,
+        }
+    }
+}
+
+async fn load_project_order_center(
+    store: &dyn CommercialKernelStore,
+    project_id: &str,
+) -> anyhow::Result<Vec<CommerceOrderCenterEntry>> {
+    list_project_commerce_order_center(store, project_id).await
+}
+
+async fn recover_project_order_checkout_artifacts(
+    payment_store: &dyn CommercialKernelStore,
+    identity_store: &dyn IdentityKernelStore,
+    project_id: &str,
+    observed_at_ms: u64,
+) {
+    let Ok(orders) = list_project_commerce_orders(payment_store, project_id).await else {
+        return;
     };
-    (status, Json(body))
+
+    for order in orders {
+        if order.payable_price_cents == 0 {
+            continue;
+        }
+        let _ = sync_portal_order_checkout(
+            payment_store,
+            identity_store,
+            &order.user_id,
+            &order,
+            observed_at_ms,
+        )
+        .await;
+    }
+}
+
+async fn request_portal_order_refund(
+    store: &dyn CommercialKernelStore,
+    portal_user_id: &str,
+    project_id: &str,
+    order_id: &str,
+    refund_reason_code: &str,
+    requested_amount_minor: u64,
+    requested_at_ms: u64,
+) -> anyhow::Result<RefundOrderRecord> {
+    request_portal_commerce_order_refund(
+        store,
+        portal_user_id,
+        project_id,
+        order_id,
+        refund_reason_code,
+        requested_amount_minor,
+        requested_at_ms,
+    )
+    .await
+}
+
+async fn load_portal_order_payment_events(
+    store: &dyn CommercialKernelStore,
+    portal_user_id: &str,
+    project_id: &str,
+    order_id: &str,
+) -> anyhow::Result<Vec<PaymentCallbackEventRecord>> {
+    list_portal_commerce_order_payment_events(store, portal_user_id, project_id, order_id).await
+}
+
+async fn load_portal_account_history_for_store(
+    payment_store: &dyn CommercialKernelStore,
+    identity_store: &dyn IdentityKernelStore,
+    portal_user_id: &str,
+    project_id: &str,
+    now_ms: u64,
+) -> anyhow::Result<PortalAccountHistorySnapshot> {
+    let scope = ensure_portal_payment_subject_scope(identity_store, portal_user_id, now_ms).await?;
+
+    let mut payment_orders = payment_store
+        .list_payment_order_records()
+        .await?
+        .into_iter()
+        .filter(|payment_order| {
+            payment_order.project_id == project_id
+                && payment_order.tenant_id == scope.tenant_id
+                && payment_order.organization_id == scope.organization_id
+                && payment_order.user_id == scope.user_id
+        })
+        .collect::<Vec<_>>();
+    payment_orders.sort_by(|left, right| {
+        right
+            .created_at_ms
+            .cmp(&left.created_at_ms)
+            .then_with(|| right.payment_order_id.cmp(&left.payment_order_id))
+    });
+
+    let mut refunds = Vec::new();
+    for payment_order in &payment_orders {
+        let mut payment_refunds = payment_store
+            .list_refund_order_records_for_payment_order(&payment_order.payment_order_id)
+            .await?;
+        refunds.append(&mut payment_refunds);
+    }
+    refunds.sort_by(|left, right| {
+        right
+            .created_at_ms
+            .cmp(&left.created_at_ms)
+            .then_with(|| right.refund_order_id.cmp(&left.refund_order_id))
+    });
+
+    let Some(account) = payment_store
+        .find_account_record_by_owner(
+            scope.tenant_id,
+            scope.organization_id,
+            scope.user_id,
+            AccountType::Primary,
+        )
+        .await?
+    else {
+        return Ok(PortalAccountHistorySnapshot {
+            account: None,
+            balance: None,
+            lots: Vec::new(),
+            ledger_entries: Vec::new(),
+            ledger_allocations: Vec::new(),
+            refunds,
+        });
+    };
+
+    let balance = summarize_account_balance(payment_store, account.account_id, now_ms).await?;
+
+    let mut lots = payment_store
+        .list_account_benefit_lots()
+        .await?
+        .into_iter()
+        .filter(|lot| lot.account_id == account.account_id)
+        .collect::<Vec<_>>();
+    lots.sort_by(|left, right| {
+        right
+            .created_at_ms
+            .cmp(&left.created_at_ms)
+            .then_with(|| right.lot_id.cmp(&left.lot_id))
+    });
+
+    let mut ledger_entries = payment_store
+        .list_account_ledger_entry_records()
+        .await?
+        .into_iter()
+        .filter(|entry| entry.account_id == account.account_id)
+        .collect::<Vec<_>>();
+    ledger_entries.sort_by(|left, right| {
+        right
+            .created_at_ms
+            .cmp(&left.created_at_ms)
+            .then_with(|| right.ledger_entry_id.cmp(&left.ledger_entry_id))
+    });
+    let ledger_entry_ids = ledger_entries
+        .iter()
+        .map(|entry| entry.ledger_entry_id)
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut ledger_allocations = payment_store
+        .list_account_ledger_allocations()
+        .await?
+        .into_iter()
+        .filter(|allocation| ledger_entry_ids.contains(&allocation.ledger_entry_id))
+        .collect::<Vec<_>>();
+    ledger_allocations.sort_by(|left, right| {
+        right
+            .created_at_ms
+            .cmp(&left.created_at_ms)
+            .then_with(|| right.ledger_allocation_id.cmp(&left.ledger_allocation_id))
+    });
+
+    Ok(PortalAccountHistorySnapshot {
+        account: Some(account),
+        balance: Some(balance),
+        lots,
+        ledger_entries,
+        ledger_allocations,
+        refunds,
+    })
+}
+
+async fn sync_portal_order_checkout(
+    payment_store: &dyn CommercialKernelStore,
+    identity_store: &dyn IdentityKernelStore,
+    portal_user_id: &str,
+    order: &PortalCommerceOrderRecord,
+    observed_at_ms: u64,
+) -> anyhow::Result<()> {
+    let scope = ensure_portal_payment_subject_scope(identity_store, portal_user_id, observed_at_ms)
+        .await?;
+    ensure_commerce_payment_checkout(payment_store, &scope, order, "portal_web").await?;
+    Ok(())
+}
+
+fn portal_payment_error_response(error: anyhow::Error) -> (StatusCode, Json<ErrorResponse>) {
+    let message = error.to_string();
+    let lowered = message.to_ascii_lowercase();
+    let status = if lowered.contains("not found") {
+        StatusCode::NOT_FOUND
+    } else if lowered.contains("conflict") {
+        StatusCode::CONFLICT
+    } else if lowered.contains("required")
+        || lowered.contains("must")
+        || lowered.contains("invalid")
+        || lowered.contains("exceeds")
+        || lowered.contains("not supported")
+        || lowered.contains("outside the current")
+        || lowered.contains("does not support")
+    {
+        StatusCode::BAD_REQUEST
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+
+    (
+        status,
+        Json(ErrorResponse {
+            error: ErrorBody { message },
+        }),
+    )
 }
 fn portal_error_response(error: PortalIdentityError) -> (StatusCode, Json<ErrorResponse>) {
     let status = match error {

@@ -30,6 +30,12 @@ use sdkwork_api_domain_marketing::{
     CouponRollbackStatus, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
     MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord, MarketingOutboxEventRecord,
 };
+use sdkwork_api_domain_payment::{
+    FinanceJournalEntryRecord, FinanceJournalLineRecord, PaymentAttemptRecord,
+    PaymentCallbackEventRecord, PaymentChannelPolicyRecord, PaymentGatewayAccountRecord,
+    PaymentOrderRecord, PaymentSessionRecord, PaymentTransactionRecord,
+    ReconciliationMatchSummaryRecord, RefundOrderRecord,
+};
 use sdkwork_api_domain_rate_limit::{
     RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,
 };
@@ -52,6 +58,7 @@ mod admin_store;
 mod kernel_support;
 mod identity_kernel_store;
 mod account_kernel_store;
+mod payment_kernel_store;
 mod marketing_store;
 mod account_transaction;
 
@@ -60,6 +67,7 @@ pub use account_transaction::*;
 pub use admin_facets::*;
 pub use admin_store::*;
 pub use identity_kernel_store::*;
+pub use payment_kernel_store::*;
 pub use marketing_store::*;
 pub use types::*;
 

@@ -24,7 +24,8 @@ pub use order::{
     list_project_commerce_orders, load_portal_commerce_catalog,
     load_portal_commerce_checkout_session, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_project_membership, preview_portal_commerce_quote,
-    settle_portal_commerce_order, settle_portal_commerce_order_with_billing,
+    settle_portal_commerce_order, settle_portal_commerce_order_from_verified_payment,
+    settle_portal_commerce_order_with_billing,
     submit_portal_commerce_order,
 };
 pub(crate) use order::{

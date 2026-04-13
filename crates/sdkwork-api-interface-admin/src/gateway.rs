@@ -252,7 +252,7 @@ fn gateway_api_key_create_error_response(
     (status, Json(body))
 }
 
-fn looks_like_gateway_api_key_input_error(message: &str) -> bool {
+pub(crate) fn looks_like_gateway_api_key_input_error(message: &str) -> bool {
     matches!(
         message,
         "tenant_id is required"

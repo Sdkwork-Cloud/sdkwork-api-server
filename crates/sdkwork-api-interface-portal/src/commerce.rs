@@ -1,7 +1,7 @@
 use super::*;
 use sdkwork_api_app_commerce::project_portal_commerce_order_catalog_binding;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct PortalCommerceOrderView {
     #[serde(flatten)]
     pub(crate) order: PortalCommerceOrderRecord,
@@ -54,7 +54,7 @@ impl From<PortalCommerceOrderRecord> for PortalCommerceOrderView {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct PortalOrderCenterEntry {
     pub(crate) order: PortalCommerceOrderView,
     pub(crate) payment_events: Vec<PortalCommercePaymentEventRecord>,
@@ -263,20 +263,35 @@ pub(crate) async fn create_commerce_order_handler(
             )
         })?;
 
-    submit_portal_commerce_order(
+    let order = submit_portal_commerce_order(
         state.store.as_ref(),
         &claims.claims().sub,
         &workspace.project.id,
         &request,
     )
     .await
-    .map(|order| {
-        (
-            StatusCode::CREATED,
-            Json(PortalCommerceOrderView::from(order)),
-        )
-    })
-    .map_err(portal_commerce_error_response)
+    .map_err(portal_commerce_error_response)?;
+
+    if order.payable_price_cents > 0 {
+        if let (Some(payment_store), Some(identity_store)) =
+            (state.payment_store.as_ref(), state.identity_store.as_ref())
+        {
+            sync_portal_order_checkout(
+                payment_store.as_ref(),
+                identity_store.as_ref(),
+                &claims.claims().sub,
+                &order,
+                current_time_millis(),
+            )
+            .await
+            .map_err(portal_payment_error_response)?;
+        }
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(PortalCommerceOrderView::from(order)),
+    ))
 }
 
 pub(crate) async fn settle_commerce_order_handler(
@@ -485,6 +500,31 @@ pub(crate) async fn get_commerce_checkout_session_handler(
             )
         })?;
 
+    let order = load_portal_commerce_order(
+        state.store.as_ref(),
+        &claims.claims().sub,
+        &workspace.project.id,
+        &order_id,
+    )
+    .await
+    .map_err(portal_commerce_error_response)?;
+
+    if order.payable_price_cents > 0 {
+        if let (Some(payment_store), Some(identity_store)) =
+            (state.payment_store.as_ref(), state.identity_store.as_ref())
+        {
+            sync_portal_order_checkout(
+                payment_store.as_ref(),
+                identity_store.as_ref(),
+                &claims.claims().sub,
+                &order,
+                current_time_millis(),
+            )
+            .await
+            .map_err(portal_payment_error_response)?;
+        }
+    }
+
     load_portal_commerce_checkout_session_with_policy(
         state.store.as_ref(),
         &claims.claims().sub,
@@ -581,7 +621,9 @@ pub(crate) async fn get_project_membership_handler(
         .map_err(portal_commerce_error_response)
 }
 
-fn portal_commerce_error_response(error: CommerceError) -> (StatusCode, Json<ErrorResponse>) {
+pub(crate) fn portal_commerce_error_response(
+    error: CommerceError,
+) -> (StatusCode, Json<ErrorResponse>) {
     let status = match error {
         CommerceError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         CommerceError::NotFound(_) => StatusCode::NOT_FOUND,

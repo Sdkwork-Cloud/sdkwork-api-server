@@ -210,6 +210,133 @@ impl AccountKernelStore for SqliteAdminStore {
             .collect()
     }
 
+    async fn apply_refund_order_account_grant_reversal(
+        &self,
+        refund_order_id: &str,
+        lot_id: u64,
+        reversal_quantity: f64,
+        updated_at_ms: u64,
+        ledger_entry: &AccountLedgerEntryRecord,
+        ledger_allocation: &AccountLedgerAllocationRecord,
+    ) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        if !try_insert_refund_order_processing_step(&mut tx, refund_order_id, "account").await? {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+
+        let updated = sqlx::query(
+            "UPDATE ai_account_benefit_lot
+             SET remaining_quantity = CASE
+                    WHEN remaining_quantity - ? <= 0 THEN 0
+                    ELSE remaining_quantity - ?
+                 END,
+                 status = CASE
+                    WHEN remaining_quantity - ? <= 0 THEN ?
+                    ELSE ?
+                 END,
+                 updated_at_ms = ?
+             WHERE lot_id = ?
+               AND status = ?
+               AND (remaining_quantity - held_quantity) >= ?",
+        )
+        .bind(reversal_quantity)
+        .bind(reversal_quantity)
+        .bind(reversal_quantity)
+        .bind(account_benefit_lot_status_as_str(
+            AccountBenefitLotStatus::Exhausted,
+        ))
+        .bind(account_benefit_lot_status_as_str(
+            AccountBenefitLotStatus::Active,
+        ))
+        .bind(i64::try_from(updated_at_ms)?)
+        .bind(i64::try_from(lot_id)?)
+        .bind(account_benefit_lot_status_as_str(
+            AccountBenefitLotStatus::Active,
+        ))
+        .bind(reversal_quantity)
+        .execute(&mut *tx)
+        .await?;
+        if updated.rows_affected() != 1 {
+            let lot_exists = sqlx::query_as::<_, (i64,)>(
+                "SELECT COUNT(1)
+                 FROM ai_account_benefit_lot
+                 WHERE lot_id = ?",
+            )
+            .bind(i64::try_from(lot_id)?)
+            .fetch_one(&mut *tx)
+            .await?
+            .0 > 0;
+            if lot_exists {
+                return Err(anyhow::anyhow!(
+                    "account benefit lot {lot_id} does not have enough refundable quantity"
+                ));
+            }
+            return Err(anyhow::anyhow!(
+                "account benefit lot {lot_id} not found for refund {refund_order_id}"
+            ));
+        }
+
+        sqlx::query(
+            "INSERT INTO ai_account_ledger_entry (
+                ledger_entry_id, tenant_id, organization_id, account_id, user_id,
+                request_id, hold_id, entry_type, benefit_type, quantity, amount, created_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(ledger_entry_id) DO UPDATE SET
+                tenant_id = excluded.tenant_id,
+                organization_id = excluded.organization_id,
+                account_id = excluded.account_id,
+                user_id = excluded.user_id,
+                request_id = excluded.request_id,
+                hold_id = excluded.hold_id,
+                entry_type = excluded.entry_type,
+                benefit_type = excluded.benefit_type,
+                quantity = excluded.quantity,
+                amount = excluded.amount,
+                created_at_ms = excluded.created_at_ms",
+        )
+        .bind(i64::try_from(ledger_entry.ledger_entry_id)?)
+        .bind(i64::try_from(ledger_entry.tenant_id)?)
+        .bind(i64::try_from(ledger_entry.organization_id)?)
+        .bind(i64::try_from(ledger_entry.account_id)?)
+        .bind(i64::try_from(ledger_entry.user_id)?)
+        .bind(ledger_entry.request_id.map(i64::try_from).transpose()?)
+        .bind(ledger_entry.hold_id.map(i64::try_from).transpose()?)
+        .bind(account_ledger_entry_type_as_str(ledger_entry.entry_type))
+        .bind(&ledger_entry.benefit_type)
+        .bind(ledger_entry.quantity)
+        .bind(ledger_entry.amount)
+        .bind(i64::try_from(ledger_entry.created_at_ms)?)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "INSERT INTO ai_account_ledger_allocation (
+                ledger_allocation_id, tenant_id, organization_id, ledger_entry_id, lot_id,
+                quantity_delta, created_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(ledger_allocation_id) DO UPDATE SET
+                tenant_id = excluded.tenant_id,
+                organization_id = excluded.organization_id,
+                ledger_entry_id = excluded.ledger_entry_id,
+                lot_id = excluded.lot_id,
+                quantity_delta = excluded.quantity_delta,
+                created_at_ms = excluded.created_at_ms",
+        )
+        .bind(i64::try_from(ledger_allocation.ledger_allocation_id)?)
+        .bind(i64::try_from(ledger_allocation.tenant_id)?)
+        .bind(i64::try_from(ledger_allocation.organization_id)?)
+        .bind(i64::try_from(ledger_allocation.ledger_entry_id)?)
+        .bind(i64::try_from(ledger_allocation.lot_id)?)
+        .bind(ledger_allocation.quantity_delta)
+        .bind(i64::try_from(ledger_allocation.created_at_ms)?)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(true)
+    }
+
     async fn insert_account_hold(&self, record: &AccountHoldRecord) -> Result<AccountHoldRecord> {
         sqlx::query(
             "INSERT INTO ai_account_hold (
@@ -815,5 +942,23 @@ impl AccountKernelStore for SqliteAdminStore {
             .map(decode_request_settlement_row)
             .collect()
     }
+}
+
+async fn try_insert_refund_order_processing_step(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    refund_order_id: &str,
+    step_key: &str,
+) -> Result<bool> {
+    let result = sqlx::query(
+        "INSERT INTO ai_refund_order_processing_steps (refund_order_id, step_key, applied_at_ms)
+         VALUES (?, ?, ?)
+         ON CONFLICT(refund_order_id, step_key) DO NOTHING",
+    )
+    .bind(refund_order_id)
+    .bind(step_key)
+    .bind(current_timestamp_ms())
+    .execute(&mut **tx)
+    .await?;
+    Ok(result.rows_affected() == 1)
 }
 

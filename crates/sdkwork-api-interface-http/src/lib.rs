@@ -2,6 +2,7 @@ mod compat_anthropic;
 mod compat_gemini;
 mod compat_streaming;
 
+use std::str::FromStr;
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -44,6 +45,10 @@ use sdkwork_api_app_billing::{
     CreateBillingEventInput, GatewayCommercialBillingKernel, QuotaCheckResult,
     ReleaseAccountHoldInput, check_quota, create_billing_event, persist_billing_event,
     persist_ledger_entry,
+};
+use sdkwork_api_app_payment::{
+    PaymentCallbackIntakeDisposition, PaymentCallbackIntakeRequest,
+    PaymentCallbackNormalizedOutcome, PaymentSubjectScope, ingest_payment_callback,
 };
 use sdkwork_api_app_credential::CredentialSecretManager;
 use sdkwork_api_app_gateway::cancel_batch;
@@ -327,6 +332,7 @@ use sdkwork_api_contract_openai::videos::{
 use sdkwork_api_contract_openai::webhooks::{
     CreateWebhookRequest, DeleteWebhookResponse, UpdateWebhookRequest, WebhookObject,
 };
+use sdkwork_api_domain_payment::PaymentProviderCode;
 use sdkwork_api_domain_rate_limit::RateLimitCheckResult;
 use sdkwork_api_observability::{HttpMetricsRegistry, observe_http_metrics, observe_http_tracing};
 use sdkwork_api_policy_billing::{
@@ -334,7 +340,7 @@ use sdkwork_api_policy_billing::{
     builtin_billing_policy_registry,
 };
 use sdkwork_api_provider_core::{ProviderRequest, ProviderRequestOptions, ProviderStreamOutput};
-use sdkwork_api_storage_core::{AdminStore, Reloadable};
+use sdkwork_api_storage_core::{AdminStore, CommercialKernelStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -380,6 +386,7 @@ include!("gateway_vector_store_files.rs");
 include!("gateway_compat_handlers.rs");
 include!("gateway_market.rs");
 include!("gateway_commercial.rs");
+include!("gateway_payments.rs");
 include!("gateway_stateless_relay.rs");
 include!("gateway_streaming_support.rs");
 include!("gateway_multipart_support.rs");

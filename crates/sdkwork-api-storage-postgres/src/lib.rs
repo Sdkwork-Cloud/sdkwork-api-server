@@ -39,6 +39,15 @@ use sdkwork_api_domain_marketing::{
     MarketingCampaignStatus, MarketingOutboxEventRecord, MarketingOutboxEventStatus,
     MarketingSubjectScope,
 };
+use sdkwork_api_domain_payment::{
+    FinanceDirection, FinanceEntryCode, FinanceJournalEntryRecord, FinanceJournalLineRecord,
+    PaymentAttemptRecord, PaymentAttemptStatus, PaymentCallbackEventRecord,
+    PaymentCallbackProcessingStatus, PaymentChannelPolicyRecord, PaymentGatewayAccountRecord,
+    PaymentOrderRecord, PaymentOrderStatus, PaymentProviderCode, PaymentRefundStatus,
+    PaymentSessionKind, PaymentSessionRecord, PaymentSessionStatus, PaymentTransactionKind,
+    PaymentTransactionRecord, ReconciliationMatchStatus, ReconciliationMatchSummaryRecord,
+    RefundOrderRecord, RefundOrderStatus,
+};
 use sdkwork_api_domain_rate_limit::{
     RateLimitCheckResult, RateLimitPolicy, RateLimitWindowSnapshot,
 };
@@ -62,7 +71,7 @@ use sdkwork_api_storage_core::{
     AtomicCouponRollbackCompensationResult, AtomicCouponRollbackResult,
     ExtensionRuntimeRolloutParticipantRecord, ExtensionRuntimeRolloutRecord,
     MarketingKernelTransaction, MarketingKernelTransactionExecutor, MarketingStore,
-    ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
+    PaymentKernelStore, ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
     StandaloneConfigRolloutRecord, StorageDialect,
 };
 use serde_json::Value;
@@ -88,12 +97,14 @@ mod identity_store;
 mod jobs_store;
 mod marketing_store_impl;
 mod migrations;
+mod payment_kernel_store;
 mod postgres_migration_billing_schema;
 mod postgres_migration_catalog_gateway_schema;
 mod postgres_migration_commerce_jobs_schema;
 mod postgres_migration_compat;
 mod postgres_migration_identity_schema;
 mod postgres_migration_marketing_schema;
+mod postgres_migration_payment_schema;
 mod postgres_migration_routing_schema;
 mod postgres_migration_runtime_schema;
 mod postgres_migration_seed;
@@ -113,6 +124,7 @@ pub(crate) use postgres_migration_compat::{
 };
 pub(crate) use postgres_migration_identity_schema::apply_postgres_identity_schema;
 pub(crate) use postgres_migration_marketing_schema::apply_postgres_marketing_schema;
+pub(crate) use postgres_migration_payment_schema::apply_postgres_payment_schema;
 pub(crate) use postgres_migration_routing_schema::apply_postgres_routing_schema;
 pub(crate) use postgres_migration_runtime_schema::apply_postgres_runtime_schema;
 pub(crate) use postgres_migration_seed::seed_postgres_builtin_channels;

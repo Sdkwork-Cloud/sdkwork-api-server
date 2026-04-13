@@ -3,38 +3,23 @@ use super::*;
 #[tokio::test]
 async fn portal_commerce_catalog_exposes_plans_packs_and_active_coupons() {
     let pool = memory_pool().await;
-    sqlx::query(
-        "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_catalog_coupon_code(
+        &store,
+        "spring20",
+        "SPRING20",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Available,
     )
-    .bind("coupon_spring_launch")
-    .bind("SPRING20")
-    .bind("20% launch discount")
-    .bind("new_signup")
-    .bind(120_i64)
-    .bind(1_i64)
-    .bind("Spring launch campaign")
-    .bind("2026-05-31")
-    .bind(1_710_000_001_i64)
-    .execute(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    .await;
+    seed_marketing_catalog_coupon_code(
+        &store,
+        "inactive10",
+        "INACTIVE10",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Disabled,
     )
-    .bind("coupon_inactive")
-    .bind("INACTIVE10")
-    .bind("10% inactive discount")
-    .bind("internal")
-    .bind(40_i64)
-    .bind(0_i64)
-    .bind("Inactive campaign")
-    .bind("2026-05-31")
-    .bind(1_710_000_002_i64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    .await;
 
     let app = portal_lab_app(pool);
     let token = portal_token(app.clone()).await;
@@ -308,22 +293,15 @@ async fn portal_commerce_catalog_requires_authentication() {
 #[tokio::test]
 async fn portal_commerce_quote_prices_recharge_and_coupon_redemption() {
     let pool = memory_pool().await;
-    sqlx::query(
-        "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_catalog_coupon_code(
+        &store,
+        "spring20",
+        "SPRING20",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Available,
     )
-    .bind("coupon_spring_launch")
-    .bind("SPRING20")
-    .bind("20% launch discount")
-    .bind("new_signup")
-    .bind(120_i64)
-    .bind(1_i64)
-    .bind("Spring launch campaign")
-    .bind("2026-05-31")
-    .bind(1_710_000_001_i64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    .await;
 
     let app = portal_lab_app(pool);
     let token = portal_token(app.clone()).await;

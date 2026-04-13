@@ -19,6 +19,7 @@ sdkwork-api-app-credential = { path = "../sdkwork-api-app-credential" }
 sdkwork-api-app-gateway = { path = "../sdkwork-api-app-gateway" }
 sdkwork-api-app-identity = { path = "../sdkwork-api-app-identity" }
 sdkwork-api-app-marketing = { path = "../sdkwork-api-app-marketing" }
+sdkwork-api-app-payment = { path = "../sdkwork-api-app-payment" }
 sdkwork-api-app-rate-limit = { path = "../sdkwork-api-app-rate-limit" }
 sdkwork-api-app-routing = { path = "../sdkwork-api-app-routing" }
 sdkwork-api-app-usage = { path = "../sdkwork-api-app-usage" }
@@ -26,6 +27,7 @@ sdkwork-api-contract-openai = { path = "../sdkwork-api-contract-openai" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
 sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
 sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
 sdkwork-api-observability = { path = "../sdkwork-api-observability" }
 sdkwork-api-policy-billing = { path = "../sdkwork-api-policy-billing" }
 sdkwork-api-domain-rate-limit = { path = "../sdkwork-api-domain-rate-limit" }
@@ -48,6 +50,8 @@ sdkwork-api-cache-core = { path = "../sdkwork-api-cache-core" }
 sdkwork-api-cache-memory = { path = "../sdkwork-api-cache-memory" }
 sdkwork-api-cache-redis = { path = "../sdkwork-api-cache-redis" }
 sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
+sdkwork-api-domain-catalog = { path = "../sdkwork-api-domain-catalog" }
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
 sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
 sdkwork-api-ext-provider-native-mock = { path = "../sdkwork-api-ext-provider-native-mock" }
 sdkwork-api-extension-core = { path = "../sdkwork-api-extension-core" }

@@ -129,22 +129,15 @@ async fn portal_manual_payment_simulation_can_be_enabled_for_lab_compatibility()
 #[tokio::test]
 async fn portal_commerce_orders_queue_paid_checkout_and_fulfill_coupon_redemption() {
     let pool = memory_pool().await;
-    sqlx::query(
-        "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_catalog_coupon_code(
+        &store,
+        "spring20",
+        "SPRING20",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Available,
     )
-    .bind("coupon_spring_launch")
-    .bind("SPRING20")
-    .bind("20% launch discount")
-    .bind("new_signup")
-    .bind(120_i64)
-    .bind(1_i64)
-    .bind("Spring launch campaign")
-    .bind("2026-05-31")
-    .bind(1_710_000_001_i64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    .await;
 
     let app = portal_lab_app(pool.clone());
     let token = portal_token(app.clone()).await;
@@ -277,22 +270,15 @@ async fn portal_commerce_orders_queue_paid_checkout_and_fulfill_coupon_redemptio
 #[tokio::test]
 async fn portal_commerce_pending_recharge_can_be_settled_or_canceled() {
     let pool = memory_pool().await;
-    sqlx::query(
-        "INSERT INTO ai_coupon_campaigns (id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let store = SqliteAdminStore::new(pool.clone());
+    seed_marketing_catalog_coupon_code(
+        &store,
+        "spring20",
+        "SPRING20",
+        MarketingCampaignStatus::Active,
+        CouponCodeStatus::Available,
     )
-    .bind("coupon_spring_launch")
-    .bind("SPRING20")
-    .bind("20% launch discount")
-    .bind("new_signup")
-    .bind(120_i64)
-    .bind(1_i64)
-    .bind("Spring launch campaign")
-    .bind("2026-05-31")
-    .bind(1_710_000_001_i64)
-    .execute(&pool)
-    .await
-    .unwrap();
+    .await;
 
     let app = portal_lab_app(pool.clone());
     let token = portal_token(app.clone()).await;

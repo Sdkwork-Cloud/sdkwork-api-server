@@ -284,6 +284,16 @@ pub async fn settle_portal_commerce_order_with_billing(
     .await
 }
 
+pub async fn settle_portal_commerce_order_from_verified_payment(
+    store: &dyn AdminStore,
+    user_id: &str,
+    project_id: &str,
+    order_id: &str,
+) -> CommerceResult<CommerceOrderRecord> {
+    settle_portal_commerce_order_with_payment_event(store, None, user_id, project_id, order_id, None)
+        .await
+}
+
 pub(crate) async fn settle_portal_commerce_order_with_payment_event(
     store: &dyn AdminStore,
     commercial_billing: Option<&dyn CommercialBillingAdminKernel>,

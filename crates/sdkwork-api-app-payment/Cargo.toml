@@ -1,0 +1,25 @@
+[package]
+name = "sdkwork-api-app-payment"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+sdkwork-api-app-billing = { path = "../sdkwork-api-app-billing" }
+sdkwork-api-app-commerce = { path = "../sdkwork-api-app-commerce" }
+sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
+sdkwork-api-domain-commerce = { path = "../sdkwork-api-domain-commerce" }
+sdkwork-api-domain-identity = { path = "../sdkwork-api-domain-identity" }
+sdkwork-api-domain-payment = { path = "../sdkwork-api-domain-payment" }
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
+sha2.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+sdkwork-api-domain-billing = { path = "../sdkwork-api-domain-billing" }
+sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
+
+[lib]
+path = "src/lib.rs"

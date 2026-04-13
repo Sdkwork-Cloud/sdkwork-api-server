@@ -6,6 +6,7 @@ pub async fn run_migrations(url: &str) -> Result<PgPool> {
     apply_postgres_marketing_schema(&pool).await?;
     apply_postgres_routing_schema(&pool).await?;
     apply_postgres_billing_schema(&pool).await?;
+    apply_postgres_payment_schema(&pool).await?;
     apply_postgres_commerce_jobs_schema(&pool).await?;
     apply_postgres_catalog_gateway_schema(&pool).await?;
     apply_postgres_runtime_schema(&pool).await?;

@@ -1,6 +1,6 @@
 use super::*;
 use crate::bootstrap_data::bootstrap_repository_data_from_config;
-use sdkwork_api_storage_core::AccountKernelStore;
+use sdkwork_api_storage_core::{AccountKernelStore, CommercialKernelStore, IdentityKernelStore};
 
 const STANDALONE_SUPPORTED_STORAGE_DIALECTS: [StorageDialect; 2] =
     [StorageDialect::Sqlite, StorageDialect::Postgres];
@@ -22,13 +22,28 @@ fn standalone_cache_driver_registry() -> CacheDriverRegistry {
 pub async fn build_admin_store_from_config(
     config: &StandaloneConfig,
 ) -> Result<Arc<dyn AdminStore>> {
-    let (store, _) = build_admin_store_and_commercial_billing_from_config(config).await?;
-    Ok(store)
+    Ok(build_admin_payment_store_handles_from_config(config)
+        .await?
+        .admin_store)
 }
 
 pub async fn build_admin_store_and_commercial_billing_from_config(
     config: &StandaloneConfig,
 ) -> Result<(Arc<dyn AdminStore>, Arc<dyn CommercialBillingAdminKernel>)> {
+    let handles = build_admin_payment_store_handles_from_config(config).await?;
+    Ok((handles.admin_store, handles.commercial_billing))
+}
+
+pub struct StandaloneAdminPaymentStoreHandles {
+    pub admin_store: Arc<dyn AdminStore>,
+    pub commercial_billing: Arc<dyn CommercialBillingAdminKernel>,
+    pub payment_store: Arc<dyn CommercialKernelStore>,
+    pub identity_store: Arc<dyn IdentityKernelStore>,
+}
+
+pub async fn build_admin_payment_store_handles_from_config(
+    config: &StandaloneConfig,
+) -> Result<StandaloneAdminPaymentStoreHandles> {
     let secret_manager = build_secret_manager_from_config(config);
     let supported_dialects = supported_storage_dialects_summary();
     let Some(dialect) = config.storage_dialect() else {
@@ -45,7 +60,9 @@ pub async fn build_admin_store_and_commercial_billing_from_config(
             let store = Arc::new(SqliteAdminStore::new(pool));
             let admin_store: Arc<dyn AdminStore> = store.clone();
             let account_kernel: Arc<dyn AccountKernelStore> = store.clone();
-            let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store;
+            let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store.clone();
+            let payment_store: Arc<dyn CommercialKernelStore> = store.clone();
+            let identity_store: Arc<dyn IdentityKernelStore> = store;
             bootstrap_repository_data_from_config(
                 admin_store.as_ref(),
                 account_kernel.as_ref(),
@@ -55,17 +72,21 @@ pub async fn build_admin_store_and_commercial_billing_from_config(
             .await?;
             bootstrap_official_provider_access(admin_store.as_ref(), &secret_manager, config)
                 .await?;
-            Ok::<
-                (Arc<dyn AdminStore>, Arc<dyn CommercialBillingAdminKernel>),
-                anyhow::Error,
-            >((admin_store, commercial_billing))
+            Ok::<StandaloneAdminPaymentStoreHandles, anyhow::Error>(StandaloneAdminPaymentStoreHandles {
+                admin_store,
+                commercial_billing,
+                payment_store,
+                identity_store,
+            })
         }
         StorageDialect::Postgres => {
             let pool = run_postgres_migrations(&config.database_url).await?;
             let store = Arc::new(PostgresAdminStore::new(pool));
             let admin_store: Arc<dyn AdminStore> = store.clone();
             let account_kernel: Arc<dyn AccountKernelStore> = store.clone();
-            let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store;
+            let commercial_billing: Arc<dyn CommercialBillingAdminKernel> = store.clone();
+            let payment_store: Arc<dyn CommercialKernelStore> = store.clone();
+            let identity_store: Arc<dyn IdentityKernelStore> = store;
             bootstrap_repository_data_from_config(
                 admin_store.as_ref(),
                 account_kernel.as_ref(),
@@ -75,10 +96,12 @@ pub async fn build_admin_store_and_commercial_billing_from_config(
             .await?;
             bootstrap_official_provider_access(admin_store.as_ref(), &secret_manager, config)
                 .await?;
-            Ok::<
-                (Arc<dyn AdminStore>, Arc<dyn CommercialBillingAdminKernel>),
-                anyhow::Error,
-            >((admin_store, commercial_billing))
+            Ok::<StandaloneAdminPaymentStoreHandles, anyhow::Error>(StandaloneAdminPaymentStoreHandles {
+                admin_store,
+                commercial_billing,
+                payment_store,
+                identity_store,
+            })
         }
         other => anyhow::bail!(
             "standalone runtime supervision does not yet support storage dialect: {} (supported dialects: {})",

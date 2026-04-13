@@ -29,6 +29,7 @@ sdkwork-api-domain-marketing = { path = "../sdkwork-api-domain-marketing" }
 sdkwork-api-storage-sqlite = { path = "../sdkwork-api-storage-sqlite" }
 sqlx.workspace = true
 tokio.workspace = true
+sdkwork-api-storage-core = { path = "../sdkwork-api-storage-core" }
 
 [lib]
 path = "src/lib.rs"

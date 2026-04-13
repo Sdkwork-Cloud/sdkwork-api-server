@@ -27,9 +27,9 @@ use sdkwork_api_config::{
     StandaloneRuntimeDynamicConfig,
 };
 use sdkwork_api_storage_core::{
-    AdminStore, ExtensionRuntimeRolloutParticipantRecord, ExtensionRuntimeRolloutRecord,
-    Reloadable, ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
-    StandaloneConfigRolloutRecord, StorageDialect,
+    AdminStore, CommercialKernelStore, ExtensionRuntimeRolloutParticipantRecord,
+    ExtensionRuntimeRolloutRecord, IdentityKernelStore, Reloadable, ServiceRuntimeNodeRecord,
+    StandaloneConfigRolloutParticipantRecord, StandaloneConfigRolloutRecord, StorageDialect,
 };
 use sdkwork_api_storage_postgres::{PostgresAdminStore, run_migrations as run_postgres_migrations};
 use sdkwork_api_storage_sqlite::{SqliteAdminStore, run_migrations as run_sqlite_migrations};
@@ -82,6 +82,7 @@ pub use rollout_models::{
     ExtensionRuntimeRolloutDetails, StandaloneConfigRolloutDetails,
 };
 pub use runtime_builders::{
+    build_admin_payment_store_handles_from_config,
     build_admin_store_and_commercial_billing_from_config, build_admin_store_from_config,
     build_cache_runtime_from_config,
 };
