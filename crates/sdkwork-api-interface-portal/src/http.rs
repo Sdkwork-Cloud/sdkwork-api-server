@@ -46,11 +46,19 @@ pub(crate) fn browser_cors_layer(http_exposure: &HttpExposureConfig) -> CorsLaye
     let origins = http_exposure
         .browser_allowed_origins
         .iter()
-        .map(|origin| {
-            HeaderValue::from_str(origin)
-                .expect("browser allowed origins must be valid HTTP header values")
+        .filter_map(|origin| match HeaderValue::from_str(origin) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                eprintln!(
+                    "ignoring invalid browser allowed origin while building portal cors layer: {origin} ({error})"
+                );
+                None
+            }
         })
         .collect::<Vec<_>>();
+    if origins.is_empty() {
+        return layer;
+    }
     layer.allow_origin(origins)
 }
 

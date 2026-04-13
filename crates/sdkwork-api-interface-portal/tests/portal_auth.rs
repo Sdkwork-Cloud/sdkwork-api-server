@@ -1,5 +1,6 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use sdkwork_api_config::HttpExposureConfig;
 use sdkwork_api_storage_core::{AdminStore, Reloadable};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -137,6 +138,47 @@ async fn portal_login_preflight_includes_cors_headers() {
         .headers()
         .get("access-control-allow-methods")
         .is_some());
+}
+
+#[tokio::test]
+async fn portal_login_preflight_ignores_invalid_configured_cors_origins() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_portal::portal_router_with_state_and_http_exposure(
+        sdkwork_api_interface_portal::PortalApiState::with_store_and_jwt_secret(
+            Arc::new(SqliteAdminStore::new(pool)),
+            "portal-test-secret",
+        ),
+        HttpExposureConfig {
+            metrics_bearer_token: "portal-metrics-token".to_owned(),
+            browser_allowed_origins: vec![
+                "https://console.example.com".to_owned(),
+                "https://bad\norigin.example.com".to_owned(),
+            ],
+        },
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/portal/auth/login")
+                .header("origin", "https://console.example.com")
+                .header("access-control-request-method", "POST")
+                .header("access-control-request-headers", "content-type")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("access-control-allow-origin")
+            .and_then(|value| value.to_str().ok()),
+        Some("https://console.example.com")
+    );
 }
 
 #[tokio::test]

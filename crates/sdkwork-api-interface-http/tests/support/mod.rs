@@ -308,7 +308,10 @@ fn connector_env_guard(path: &Path) -> ExtensionEnvGuard {
     let joined_paths = std::env::join_paths([path]).unwrap();
     std::env::set_var("SDKWORK_EXTENSION_PATHS", joined_paths);
     std::env::set_var("SDKWORK_EXTENSION_ENABLE_CONNECTOR_EXTENSIONS", "true");
-    std::env::set_var("SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS", "false");
+    std::env::set_var(
+        "SDKWORK_EXTENSION_ENABLE_NATIVE_DYNAMIC_EXTENSIONS",
+        "false",
+    );
     std::env::set_var(
         "SDKWORK_EXTENSION_REQUIRE_SIGNATURE_FOR_CONNECTOR_EXTENSIONS",
         "false",

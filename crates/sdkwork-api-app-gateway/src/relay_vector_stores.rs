@@ -537,9 +537,10 @@ pub fn delete_vector_store(
 pub fn search_vector_store(
     _tenant_id: &str,
     _project_id: &str,
-    _vector_store_id: &str,
+    vector_store_id: &str,
     query: &str,
 ) -> Result<SearchVectorStoreResponse> {
+    ensure_local_vector_store_exists(vector_store_id)?;
     Ok(SearchVectorStoreResponse::sample(query))
 }
 

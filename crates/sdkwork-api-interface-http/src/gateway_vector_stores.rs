@@ -105,6 +105,28 @@ fn local_vector_store_delete_response(
     }
 }
 
+fn local_vector_store_search_result(
+    tenant_id: &str,
+    project_id: &str,
+    vector_store_id: &str,
+    query: &str,
+) -> std::result::Result<SearchVectorStoreResponse, Response> {
+    search_vector_store(tenant_id, project_id, vector_store_id, query)
+        .map_err(local_vector_store_not_found_response)
+}
+
+fn local_vector_store_search_response(
+    tenant_id: &str,
+    project_id: &str,
+    vector_store_id: &str,
+    query: &str,
+) -> Response {
+    match local_vector_store_search_result(tenant_id, project_id, vector_store_id, query) {
+        Ok(response) => Json(response).into_response(),
+        Err(response) => response,
+    }
+}
+
 async fn vector_store_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(vector_store_id): Path<String>,
@@ -197,18 +219,13 @@ async fn vector_store_search_handler(
         }
     }
 
-    Json(
-        search_vector_store(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &request.query,
-        )
-        .expect("vector store search"),
+    local_vector_store_search_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &request.query,
     )
-    .into_response()
 }
-
 
 async fn vector_stores_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
@@ -619,6 +636,16 @@ async fn vector_store_search_with_state_handler(
         }
     }
 
+    let response = match local_vector_store_search_result(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &request.query,
+    ) {
+        Ok(response) => response,
+        Err(response) => return response,
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -638,15 +665,5 @@ async fn vector_store_search_with_state_handler(
             .into_response();
     }
 
-    Json(
-        search_vector_store(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &request.query,
-        )
-        .expect("vector store search"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
-
