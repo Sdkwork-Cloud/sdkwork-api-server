@@ -1,4 +1,10 @@
 use super::*;
+use sdkwork_api_app_billing::GatewayCommercialBillingKernel;
+use sdkwork_api_domain_billing::{
+    AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountRecord,
+    AccountStatus, AccountType,
+};
+use sdkwork_api_storage_core::AccountKernelStore;
 
 #[tokio::test]
 async fn standalone_listener_host_rebinds_requests_to_new_bind() {
@@ -210,6 +216,63 @@ async fn standalone_runtime_supervision_reloads_store_and_jwt_after_config_file_
     drop(supervision);
     cleanup_dir(&config_root);
 }
+
+#[serial(runtime_config_env)]
+#[tokio::test]
+async fn standalone_runtime_supervision_reloads_gateway_billing_handle_after_database_change() {
+    let config_root = temp_root("runtime-gateway-billing-reload");
+    let initial_bind = available_bind();
+    let initial_db_path = config_root.join("initial.db");
+    let rotated_db_path = config_root.join("rotated.db");
+    let initial_db_url = sqlite_url_for_path(&initial_db_path);
+    let rotated_db_url = sqlite_url_for_path(&rotated_db_path);
+
+    seed_gateway_billing_store(&initial_db_url, 8801, 9901).await;
+    seed_gateway_billing_store(&rotated_db_url, 8802, 9902).await;
+    write_gateway_store_runtime_config_with_cache(
+        &config_root,
+        &initial_bind,
+        &initial_db_url,
+        CacheBackendKind::Memory,
+        None,
+    );
+
+    let (loader, initial_config) = StandaloneConfigLoader::from_local_root_and_pairs(
+        &config_root,
+        std::iter::empty::<(&str, &str)>(),
+    )
+    .unwrap();
+    initial_config.apply_to_process_env();
+
+    let initial_store_handles =
+        sdkwork_api_app_runtime::build_admin_payment_store_handles_from_config(&initial_config)
+            .await
+            .unwrap();
+    let live_store = Reloadable::new(initial_store_handles.admin_store);
+    let live_gateway_commercial_billing =
+        Reloadable::new(initial_store_handles.gateway_commercial_billing);
+    let supervision = start_standalone_runtime_supervision(
+        StandaloneServiceKind::Gateway,
+        loader,
+        initial_config,
+        StandaloneServiceReloadHandles::gateway(live_store)
+            .with_live_gateway_commercial_billing(live_gateway_commercial_billing.clone()),
+    );
+
+    wait_for_gateway_hold_plan(&live_gateway_commercial_billing, 8801).await;
+    write_gateway_store_runtime_config_with_cache(
+        &config_root,
+        &initial_bind,
+        &rotated_db_url,
+        CacheBackendKind::Memory,
+        None,
+    );
+    wait_for_gateway_hold_plan(&live_gateway_commercial_billing, 8802).await;
+
+    drop(supervision);
+    cleanup_dir(&config_root);
+}
+
 #[tokio::test]
 async fn standalone_runtime_supervision_continues_heartbeat_in_reloaded_database() {
     let config_root = temp_root("runtime-heartbeat-store-reload");
@@ -250,4 +313,61 @@ async fn standalone_runtime_supervision_continues_heartbeat_in_reloaded_database
 
     drop(supervision);
     cleanup_dir(&config_root);
+}
+
+async fn seed_gateway_billing_store(database_url: &str, account_id: u64, lot_id: u64) {
+    if let Some(path) = sqlite_path_from_url(database_url) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        let _ = fs::File::create(path).unwrap();
+    }
+
+    let pool = run_migrations(database_url).await.unwrap();
+    let store = SqliteAdminStore::new(pool);
+    let account = AccountRecord::new(account_id, 1001, 2002, 9001, AccountType::Primary)
+        .with_status(AccountStatus::Active)
+        .with_created_at_ms(10)
+        .with_updated_at_ms(10);
+    let lot = AccountBenefitLotRecord::new(
+        lot_id,
+        1001,
+        2002,
+        account_id,
+        9001,
+        AccountBenefitType::CashCredit,
+    )
+    .with_source_type(AccountBenefitSourceType::Recharge)
+    .with_original_quantity(10.0)
+    .with_remaining_quantity(10.0)
+    .with_created_at_ms(11)
+    .with_updated_at_ms(11);
+
+    store.insert_account_record(&account).await.unwrap();
+    store.insert_account_benefit_lot(&lot).await.unwrap();
+}
+
+async fn wait_for_gateway_hold_plan(
+    live_gateway_commercial_billing: &Reloadable<Arc<dyn GatewayCommercialBillingKernel>>,
+    account_id: u64,
+) {
+    for _ in 0..200 {
+        match live_gateway_commercial_billing
+            .snapshot()
+            .plan_account_hold(account_id, 1.0, 100)
+            .await
+        {
+            Ok(plan)
+                if plan.account_id == account_id
+                    && plan.sufficient_balance
+                    && !plan.allocations.is_empty() =>
+            {
+                return;
+            }
+            _ => {}
+        }
+        sleep(Duration::from_millis(25)).await;
+    }
+
+    panic!("gateway billing handle did not reach expected account {account_id}");
 }
