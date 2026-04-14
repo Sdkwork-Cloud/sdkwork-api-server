@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn model_retrieve_from_store_handler(
+pub(crate) async fn model_retrieve_from_store_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(model_id): Path<String>,
@@ -23,7 +23,7 @@ pub(super) async fn model_retrieve_from_store_handler(
     .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "model not found").into_response())
 }
 
-pub(super) async fn model_delete_from_store_handler(
+pub(crate) async fn model_delete_from_store_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(model_id): Path<String>,

@@ -87,41 +87,18 @@ async fn responses_with_state_handler(
             }
         }
 
-        let _local_response = match local_response_create_result(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        ) {
-            Ok(response) => response,
-            Err(response) => return response,
-        };
-
         if let Some(admission) = commercial_admission.as_ref() {
-            if let Err(response) = capture_gateway_commercial_admission(&state, admission).await {
-                return response;
+            if let Err(release_response) =
+                release_gateway_commercial_admission(&state, admission).await
+            {
+                return release_response;
             }
         }
 
-        if record_gateway_usage_for_project(
-            state.store.as_ref(),
-            request_context.tenant_id(),
-            request_context.project_id(),
-            "responses",
-            &request.model,
-            120,
-            0.12,
-        )
-        .await
-        .is_err()
-        {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to record usage",
-            )
-                .into_response();
-        }
-
-        return local_response_stream_body_response("resp_1", &request.model);
+        return invalid_request_openai_response(
+            "Local response streaming fallback is not supported without an upstream provider.",
+            "invalid_model",
+        );
     }
 
     match relay_response_from_store_with_execution_context(
@@ -187,7 +164,16 @@ async fn responses_with_state_handler(
         &request.model,
     ) {
         Ok(response) => response,
-        Err(response) => return response,
+        Err(response) => {
+            if let Some(admission) = commercial_admission.as_ref() {
+                if let Err(release_response) =
+                    release_gateway_commercial_admission(&state, admission).await
+                {
+                    return release_response;
+                }
+            }
+            return response;
+        }
     };
 
     if let Some(admission) = commercial_admission.as_ref() {

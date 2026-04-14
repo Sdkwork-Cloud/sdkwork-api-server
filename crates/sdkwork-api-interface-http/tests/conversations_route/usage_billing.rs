@@ -395,7 +395,10 @@ async fn stateful_conversation_item_usage_uses_conversation_route_key_for_provid
     let logs_json = read_json(logs).await;
     assert_eq!(logs_json.as_array().unwrap().len(), 1);
     assert_eq!(logs_json[0]["route_key"], "conv_1");
-    assert_eq!(logs_json[0]["selected_provider_id"], "provider-conversation");
+    assert_eq!(
+        logs_json[0]["selected_provider_id"],
+        "provider-conversation"
+    );
 }
 
 #[tokio::test]

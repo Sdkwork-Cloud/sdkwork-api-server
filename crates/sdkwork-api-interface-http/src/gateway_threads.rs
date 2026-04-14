@@ -1,3 +1,11 @@
+fn local_thread_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_thread_request",
+        "Requested thread was not found.",
+    )
+}
+
 async fn threads_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateThreadRequest>,
@@ -10,8 +18,12 @@ async fn threads_handler(
         }
     }
 
-    Json(create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread"))
-        .into_response()
+    let response = match create_thread(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn thread_retrieve_handler(
@@ -102,13 +114,16 @@ async fn thread_messages_handler(
         }
     }
 
-    let text = request.content.as_str().unwrap_or("hello");
+    let text = match local_thread_message_text(&request.content) {
+        Ok(text) => text,
+        Err(response) => return response,
+    };
     match local_thread_messages_create_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &thread_id,
         &request.role,
-        text,
+        text.as_ref(),
     ) {
         Ok(response) => Json(response).into_response(),
         Err(response) => response,
@@ -231,10 +246,9 @@ async fn threads_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let thread_usage_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("threads");
+            let Some(thread_usage_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream thread response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -263,8 +277,10 @@ async fn threads_with_state_handler(
         }
     }
 
-    let response =
-        create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread");
+    let response = match create_thread(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -527,10 +543,11 @@ async fn thread_messages_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let message_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(thread_id.as_str());
+            let Some(message_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream thread message response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -559,13 +576,16 @@ async fn thread_messages_with_state_handler(
         }
     }
 
-    let text = request.content.as_str().unwrap_or("hello");
+    let text = match local_thread_message_text(&request.content) {
+        Ok(text) => text,
+        Err(response) => return response,
+    };
     let response = match local_thread_messages_create_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &thread_id,
         &request.role,
-        text,
+        text.as_ref(),
     ) {
         Ok(response) => response,
         Err(response) => return response,

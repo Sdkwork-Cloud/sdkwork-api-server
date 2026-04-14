@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn eval_runs_list_handler(
+fn local_eval_run_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_eval_request",
+        "Requested eval run was not found.",
+    )
+}
+
+pub(crate) async fn eval_runs_list_handler(
     request_context: StatelessGatewayRequest,
     Path(eval_id): Path<String>,
 ) -> Response {
@@ -14,18 +22,19 @@ pub(super) async fn eval_runs_list_handler(
         }
     }
 
-    Json(
-        list_eval_runs(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-        )
-        .expect("eval runs list"),
-    )
-    .into_response()
+    let response = match list_eval_runs(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_runs_handler(
+pub(crate) async fn eval_runs_handler(
     request_context: StatelessGatewayRequest,
     Path(eval_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateEvalRunRequest>,
@@ -43,19 +52,20 @@ pub(super) async fn eval_runs_handler(
         }
     }
 
-    Json(
-        create_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &request,
-        )
-        .expect("eval run create"),
-    )
-    .into_response()
+    let response = match create_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_run_retrieve_handler(
+pub(crate) async fn eval_run_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((eval_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -72,19 +82,20 @@ pub(super) async fn eval_run_retrieve_handler(
         }
     }
 
-    Json(
-        get_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run retrieve"),
-    )
-    .into_response()
+    let response = match get_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_run_delete_handler(
+pub(crate) async fn eval_run_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((eval_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -101,19 +112,20 @@ pub(super) async fn eval_run_delete_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run delete"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::delete_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_run_cancel_handler(
+pub(crate) async fn eval_run_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path((eval_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -130,14 +142,15 @@ pub(super) async fn eval_run_cancel_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::cancel_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run cancel"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::cancel_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }

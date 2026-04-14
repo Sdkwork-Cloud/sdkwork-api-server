@@ -2958,12 +2958,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "sdkwork-api-app-marketing",
  "sdkwork-api-domain-jobs",
  "sdkwork-api-domain-marketing",
  "sdkwork-api-observability",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
- "serde_json",
  "tokio",
 ]
 
@@ -2974,6 +2974,10 @@ dependencies = [
  "anyhow",
  "sdkwork-api-domain-marketing",
  "sdkwork-api-storage-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "utoipa",
 ]
 
 [[package]]
@@ -3000,6 +3004,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "sdkwork-api-app-marketing",
  "sdkwork-api-domain-rate-limit",
  "sdkwork-api-storage-core",
  "sdkwork-api-storage-sqlite",
@@ -3047,6 +3052,7 @@ dependencies = [
  "sdkwork-api-app-credential",
  "sdkwork-api-app-extension",
  "sdkwork-api-app-gateway",
+ "sdkwork-api-app-marketing",
  "sdkwork-api-cache-core",
  "sdkwork-api-cache-memory",
  "sdkwork-api-cache-redis",
@@ -3395,6 +3401,7 @@ dependencies = [
  "sdkwork-api-extension-core",
  "sdkwork-api-interface-admin",
  "sdkwork-api-observability",
+ "sdkwork-api-openapi",
  "sdkwork-api-policy-billing",
  "sdkwork-api-provider-core",
  "sdkwork-api-storage-core",

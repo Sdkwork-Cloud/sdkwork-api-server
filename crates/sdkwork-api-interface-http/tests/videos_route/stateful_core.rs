@@ -96,8 +96,14 @@ async fn stateful_videos_routes_relay_to_openai_compatible_provider() {
             "/v1/videos/video_1",
             get(upstream_video_retrieve_handler).delete(upstream_video_delete_handler),
         )
-        .route("/v1/videos/video_1/content", get(upstream_video_content_handler))
-        .route("/v1/videos/video_1/remix", post(upstream_video_remix_handler))
+        .route(
+            "/v1/videos/video_1/content",
+            get(upstream_video_content_handler),
+        )
+        .route(
+            "/v1/videos/video_1/remix",
+            post(upstream_video_remix_handler),
+        )
         .route(
             "/v1/videos/video_1/characters",
             get(upstream_video_characters_list_handler),
@@ -107,7 +113,10 @@ async fn stateful_videos_routes_relay_to_openai_compatible_provider() {
             get(upstream_video_character_retrieve_handler)
                 .post(upstream_video_character_update_handler),
         )
-        .route("/v1/videos/video_1/extend", post(upstream_video_extend_handler))
+        .route(
+            "/v1/videos/video_1/extend",
+            post(upstream_video_extend_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
@@ -249,7 +258,10 @@ async fn stateful_videos_routes_relay_to_openai_compatible_provider() {
         .await
         .unwrap();
     assert_eq!(content_response.status(), StatusCode::OK);
-    assert_eq!(read_bytes(content_response).await, b"UPSTREAM-VIDEO".to_vec());
+    assert_eq!(
+        read_bytes(content_response).await,
+        b"UPSTREAM-VIDEO".to_vec()
+    );
 
     let remix_response = gateway_app
         .clone()

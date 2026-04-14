@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn fine_tuning_jobs_handler(
+fn local_fine_tuning_job_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning job was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_jobs_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
 ) -> Response {
@@ -14,18 +22,19 @@ pub(super) async fn fine_tuning_jobs_handler(
         }
     }
 
-    Json(
-        create_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("fine tuning"),
-    )
-    .into_response()
+    let response = match create_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_jobs_list_handler(
+pub(crate) async fn fine_tuning_jobs_list_handler(
     request_context: StatelessGatewayRequest,
 ) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::FineTuningJobsList).await
@@ -37,14 +46,16 @@ pub(super) async fn fine_tuning_jobs_list_handler(
         }
     }
 
-    Json(
-        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
-            .expect("fine tuning list"),
-    )
-    .into_response()
+    let response =
+        match list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(error) => return local_fine_tuning_job_error_response(error),
+        };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_retrieve_handler(
+pub(crate) async fn fine_tuning_job_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
@@ -63,18 +74,19 @@ pub(super) async fn fine_tuning_job_retrieve_handler(
         }
     }
 
-    Json(
-        get_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning retrieve"),
-    )
-    .into_response()
+    let response = match get_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_cancel_handler(
+pub(crate) async fn fine_tuning_job_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
@@ -91,13 +103,14 @@ pub(super) async fn fine_tuning_job_cancel_handler(
         }
     }
 
-    Json(
-        cancel_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning cancel"),
-    )
-    .into_response()
+    let response = match cancel_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
+    Json(response).into_response()
 }

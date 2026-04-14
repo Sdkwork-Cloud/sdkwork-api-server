@@ -7,10 +7,7 @@ pub(super) async fn read_json(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-pub(super) async fn assert_video_not_found(
-    response: axum::response::Response,
-    message: &str,
-) {
+pub(super) async fn assert_video_not_found(response: axum::response::Response, message: &str) {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
     assert_eq!(json["error"]["message"], message);

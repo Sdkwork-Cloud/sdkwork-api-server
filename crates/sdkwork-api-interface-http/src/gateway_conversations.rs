@@ -1,3 +1,11 @@
+fn local_conversation_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_conversation_request",
+        "Requested conversation was not found.",
+    )
+}
+
 async fn conversations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateConversationRequest>,
@@ -12,11 +20,13 @@ async fn conversations_handler(
         }
     }
 
-    Json(
-        create_conversation(request_context.tenant_id(), request_context.project_id())
-            .expect("conversation"),
-    )
-    .into_response()
+    let response = match create_conversation(request_context.tenant_id(), request_context.project_id())
+    {
+        Ok(response) => response,
+        Err(error) => return local_conversation_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn conversations_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -28,11 +38,13 @@ async fn conversations_list_handler(request_context: StatelessGatewayRequest) ->
         }
     }
 
-    Json(
-        list_conversations(request_context.tenant_id(), request_context.project_id())
-            .expect("conversation list"),
-    )
-    .into_response()
+    let response = match list_conversations(request_context.tenant_id(), request_context.project_id())
+    {
+        Ok(response) => response,
+        Err(error) => return local_conversation_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn conversation_retrieve_handler(
@@ -81,7 +93,7 @@ async fn conversation_update_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &conversation_id,
-        request.metadata.unwrap_or(serde_json::json!({})),
+        request.metadata,
     )
 }
 
@@ -228,10 +240,9 @@ async fn conversations_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let conversation_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("conversations");
+            let Some(conversation_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream conversation response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -260,8 +271,11 @@ async fn conversations_with_state_handler(
         }
     }
 
-    let response = create_conversation(request_context.tenant_id(), request_context.project_id())
-        .expect("conversation");
+    let response = match create_conversation(request_context.tenant_id(), request_context.project_id())
+    {
+        Ok(response) => response,
+        Err(error) => return local_conversation_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -326,6 +340,12 @@ async fn conversations_list_with_state_handler(
         }
     }
 
+    let response = match list_conversations(request_context.tenant_id(), request_context.project_id())
+    {
+        Ok(response) => response,
+        Err(error) => return local_conversation_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -345,11 +365,7 @@ async fn conversations_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_conversations(request_context.tenant_id(), request_context.project_id())
-            .expect("conversation list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn conversation_retrieve_with_state_handler(
@@ -367,8 +383,11 @@ async fn conversation_retrieve_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(conversation_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream conversation response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -445,8 +464,11 @@ async fn conversation_update_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(conversation_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream conversation response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -479,7 +501,7 @@ async fn conversation_update_with_state_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &conversation_id,
-        request.metadata.unwrap_or(serde_json::json!({})),
+        request.metadata,
     ) {
         Ok(response) => response,
         Err(response) => return response,
@@ -522,8 +544,11 @@ async fn conversation_delete_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(conversation_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream conversation response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -600,8 +625,11 @@ async fn conversation_items_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(conversation_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream conversation response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),

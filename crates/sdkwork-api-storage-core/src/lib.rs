@@ -29,6 +29,7 @@ use sdkwork_api_domain_marketing::{
     CouponCodeRecord, CouponRedemptionRecord, CouponReservationRecord, CouponRollbackRecord,
     CouponRollbackStatus, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
     MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord, MarketingOutboxEventRecord,
+    MarketingSubjectScope,
 };
 use sdkwork_api_domain_payment::{
     FinanceJournalEntryRecord, FinanceJournalLineRecord, PaymentAttemptRecord,
@@ -52,23 +53,23 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
-mod types;
+mod account_kernel_store;
+mod account_transaction;
 mod admin_facets;
 mod admin_store;
-mod kernel_support;
 mod identity_kernel_store;
-mod account_kernel_store;
-mod payment_kernel_store;
+mod kernel_support;
 mod marketing_store;
-mod account_transaction;
+mod payment_kernel_store;
+mod types;
 
 pub use account_kernel_store::*;
 pub use account_transaction::*;
 pub use admin_facets::*;
 pub use admin_store::*;
 pub use identity_kernel_store::*;
-pub use payment_kernel_store::*;
 pub use marketing_store::*;
+pub use payment_kernel_store::*;
 pub use types::*;
 
 pub(crate) use kernel_support::*;

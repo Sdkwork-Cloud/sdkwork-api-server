@@ -1,12 +1,12 @@
 use super::*;
 
 #[derive(Debug, Clone, Default)]
-struct PortalCouponAccountArrivalContext {
+pub(crate) struct PortalCouponAccountArrivalContext {
     account_id: Option<u64>,
     lots_by_order_id: HashMap<String, Vec<AccountBenefitLotRecord>>,
 }
 
-async fn load_portal_marketing_workspace_and_subjects(
+pub(crate) async fn load_portal_marketing_workspace_and_subjects(
     state: &PortalApiState,
     claims: &AuthenticatedPortalClaims,
 ) -> Result<(PortalWorkspaceSummary, MarketingSubjectSet), StatusCode> {
@@ -39,7 +39,7 @@ async fn load_portal_marketing_account_id(
 }
 
 impl PortalCouponAccountArrivalContext {
-    fn from_account_lots(account_id: u64, lots: Vec<AccountBenefitLotRecord>) -> Self {
+    pub(crate) fn from_account_lots(account_id: u64, lots: Vec<AccountBenefitLotRecord>) -> Self {
         let mut lots_by_order_id = HashMap::<String, Vec<AccountBenefitLotRecord>>::new();
         for lot in lots {
             if lot.source_type != sdkwork_api_domain_billing::AccountBenefitSourceType::Order {
@@ -58,7 +58,7 @@ impl PortalCouponAccountArrivalContext {
     }
 }
 
-fn coupon_validation_decision_response(
+pub(crate) fn coupon_validation_decision_response(
     decision: CouponValidationDecision,
 ) -> PortalCouponValidationDecisionResponse {
     PortalCouponValidationDecisionResponse {
@@ -68,7 +68,7 @@ fn coupon_validation_decision_response(
     }
 }
 
-fn portal_marketing_operation_status(error: &MarketingOperationError) -> StatusCode {
+pub(crate) fn portal_marketing_operation_status(error: &MarketingOperationError) -> StatusCode {
     match error {
         MarketingOperationError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         MarketingOperationError::NotFound(_) => StatusCode::NOT_FOUND,
@@ -78,7 +78,7 @@ fn portal_marketing_operation_status(error: &MarketingOperationError) -> StatusC
     }
 }
 
-async fn portal_marketing_reservation_context_owned_by_subject(
+pub(crate) async fn portal_marketing_reservation_context_owned_by_subject(
     store: &dyn AdminStore,
     subjects: &MarketingSubjectSet,
     reservation_id: &str,
@@ -89,7 +89,7 @@ async fn portal_marketing_reservation_context_owned_by_subject(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-async fn portal_marketing_redemption_context_owned_by_subject(
+pub(crate) async fn portal_marketing_redemption_context_owned_by_subject(
     store: &dyn AdminStore,
     subjects: &MarketingSubjectSet,
     redemption_id: &str,
@@ -100,7 +100,7 @@ async fn portal_marketing_redemption_context_owned_by_subject(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-async fn load_marketing_redemptions_for_subject(
+pub(crate) async fn load_marketing_redemptions_for_subject(
     store: &dyn AdminStore,
     subjects: &MarketingSubjectSet,
     status: Option<CouponRedemptionStatus>,
@@ -110,7 +110,7 @@ async fn load_marketing_redemptions_for_subject(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-async fn load_marketing_code_items(
+pub(crate) async fn load_marketing_code_items(
     store: &dyn AdminStore,
     subjects: &MarketingSubjectSet,
 ) -> Result<Vec<PortalMarketingCodeItem>, StatusCode> {
@@ -144,7 +144,7 @@ async fn load_marketing_code_items(
     Ok(items)
 }
 
-async fn load_marketing_reward_history_items(
+pub(crate) async fn load_marketing_reward_history_items(
     store: &dyn AdminStore,
     subjects: &MarketingSubjectSet,
     account_arrival: Option<&PortalCouponAccountArrivalContext>,
@@ -193,7 +193,7 @@ async fn load_marketing_reward_history_items(
     Ok(items)
 }
 
-fn summarize_marketing_redemptions(
+pub(crate) fn summarize_marketing_redemptions(
     items: &[CouponRedemptionRecord],
 ) -> PortalMarketingRedemptionSummary {
     let MarketingRedemptionSummary {
@@ -212,8 +212,13 @@ fn summarize_marketing_redemptions(
     }
 }
 
-fn summarize_marketing_code_items(items: &[PortalMarketingCodeItem]) -> PortalMarketingCodeSummary {
-    let codes = items.iter().map(|item| item.code.clone()).collect::<Vec<_>>();
+pub(crate) fn summarize_marketing_code_items(
+    items: &[PortalMarketingCodeItem],
+) -> PortalMarketingCodeSummary {
+    let codes = items
+        .iter()
+        .map(|item| item.code.clone())
+        .collect::<Vec<_>>();
     let summary = summarize_coupon_codes(&codes);
     let MarketingCodeSummary {
         total_count,
@@ -358,7 +363,7 @@ fn normalize_portal_idempotency_header_value(
         .map_err(|_| StatusCode::BAD_REQUEST)
 }
 
-fn resolve_portal_idempotency_key(
+pub(crate) fn resolve_portal_idempotency_key(
     headers: &HeaderMap,
     body_value: Option<&str>,
 ) -> Result<Option<String>, StatusCode> {
@@ -366,7 +371,7 @@ fn resolve_portal_idempotency_key(
     resolve_shared_idempotency_key(header_value, body_value).map_err(|_| StatusCode::BAD_REQUEST)
 }
 
-async fn enforce_portal_coupon_rate_limit(
+pub(crate) async fn enforce_portal_coupon_rate_limit(
     store: &dyn AdminStore,
     project_id: &str,
     action: CouponRateLimitAction,

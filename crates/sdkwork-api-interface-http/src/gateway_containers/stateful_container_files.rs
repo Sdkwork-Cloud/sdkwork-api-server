@@ -15,8 +15,11 @@ async fn container_files_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.file_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream container file response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -349,15 +352,15 @@ async fn container_file_content_with_state_handler(
         }
     }
 
-    let bytes = match local_container_file_content_result(
+    let response = local_container_file_content_response(
         request_context.tenant_id(),
         request_context.project_id(),
         &container_id,
         &file_id,
-    ) {
-        Ok(bytes) => bytes,
-        Err(response) => return response,
-    };
+    );
+    if !response.status().is_success() {
+        return response;
+    }
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -379,9 +382,5 @@ async fn container_file_content_with_state_handler(
             .into_response();
     }
 
-    Response::builder()
-        .status(axum::http::StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/octet-stream")
-        .body(Body::from(bytes))
-        .expect("valid local container file content response")
+    response
 }

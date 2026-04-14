@@ -1,6 +1,21 @@
 use super::*;
 
-pub(super) async fn thread_run_steps_list_handler(
+fn local_thread_run_step_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_run_request");
+    }
+    if message.to_ascii_lowercase().contains("run step not found") {
+        return local_gateway_error_response(error, "Requested thread run step was not found.");
+    }
+    if message.to_ascii_lowercase().contains("run not found") {
+        return local_gateway_error_response(error, "Requested thread run was not found.");
+    }
+
+    local_gateway_error_response(error, "Requested thread was not found.")
+}
+
+pub(crate) async fn thread_run_steps_list_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -17,19 +32,20 @@ pub(super) async fn thread_run_steps_list_handler(
         }
     }
 
-    Json(
-        list_thread_run_steps(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run steps"),
-    )
-    .into_response()
+    let response = match list_thread_run_steps(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_step_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_step_retrieve_handler(
+pub(crate) async fn thread_run_step_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id, step_id)): Path<(String, String, String)>,
 ) -> Response {
@@ -48,15 +64,16 @@ pub(super) async fn thread_run_step_retrieve_handler(
         }
     }
 
-    Json(
-        get_thread_run_step(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-            &step_id,
-        )
-        .expect("thread run step"),
-    )
-    .into_response()
+    let response = match get_thread_run_step(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+        &step_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_step_error_response(error),
+    };
+
+    Json(response).into_response()
 }

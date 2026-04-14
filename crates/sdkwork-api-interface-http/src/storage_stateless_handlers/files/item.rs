@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn file_retrieve_handler(
+fn local_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_file",
+        "Requested file was not found.",
+    )
+}
+
+pub(crate) async fn file_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Response {
@@ -14,18 +22,19 @@ pub(super) async fn file_retrieve_handler(
         }
     }
 
-    Json(
-        get_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &file_id,
-        )
-        .expect("file retrieve"),
-    )
-    .into_response()
+    let response = match get_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn file_delete_handler(
+pub(crate) async fn file_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Response {
@@ -39,13 +48,14 @@ pub(super) async fn file_delete_handler(
         }
     }
 
-    Json(
-        delete_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &file_id,
-        )
-        .expect("file delete"),
-    )
-    .into_response()
+    let response = match delete_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }

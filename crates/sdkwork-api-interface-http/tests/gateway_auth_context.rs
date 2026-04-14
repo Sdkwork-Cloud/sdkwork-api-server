@@ -9,9 +9,7 @@ use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountHoldStatus,
     AccountRecord, AccountType,
 };
-use sdkwork_api_domain_identity::{
-    ApiKeyGroupRecord, CanonicalApiKeyRecord, IdentityUserRecord,
-};
+use sdkwork_api_domain_identity::{ApiKeyGroupRecord, CanonicalApiKeyRecord, IdentityUserRecord};
 use sdkwork_api_storage_core::{AccountKernelStore, IdentityKernelStore};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -282,12 +280,18 @@ async fn stateful_gateway_accepts_canonical_only_api_key_and_resolves_payable_ac
     let usage_records = store.list_usage_records().await.unwrap();
     assert_eq!(usage_records.len(), 1);
     assert_eq!(usage_records[0].project_id, "project-canonical-1001");
-    assert_eq!(usage_records[0].api_key_hash.as_deref(), Some(hashed.as_str()));
+    assert_eq!(
+        usage_records[0].api_key_hash.as_deref(),
+        Some(hashed.as_str())
+    );
 
     let billing_events = store.list_billing_events().await.unwrap();
     assert_eq!(billing_events.len(), 1);
     assert_eq!(billing_events[0].project_id, "project-canonical-1001");
-    assert_eq!(billing_events[0].api_key_hash.as_deref(), Some(hashed.as_str()));
+    assert_eq!(
+        billing_events[0].api_key_hash.as_deref(),
+        Some(hashed.as_str())
+    );
 
     let canonical_key = store
         .find_canonical_api_key_record_by_hash(&hashed)

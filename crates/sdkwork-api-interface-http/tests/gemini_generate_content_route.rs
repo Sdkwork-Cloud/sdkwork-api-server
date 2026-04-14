@@ -133,7 +133,10 @@ async fn stateless_gemini_generate_content_route_returns_invalid_request_for_mis
     let json = read_json(response).await;
     assert_eq!(json["error"]["code"], 400);
     assert_eq!(json["error"]["status"], "INVALID_ARGUMENT");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 }
 
 #[serial]
@@ -271,7 +274,10 @@ async fn stateless_gemini_generate_content_route_passthroughs_native_gemini_prot
         upstream_state.authorization.lock().unwrap().as_deref(),
         None
     );
-    assert_eq!(upstream_state.body.lock().unwrap().clone().unwrap(), payload);
+    assert_eq!(
+        upstream_state.body.lock().unwrap().clone().unwrap(),
+        payload
+    );
 }
 
 #[serial(extension_env)]
@@ -391,7 +397,10 @@ async fn stateful_gemini_generate_content_route_passthroughs_native_gemini_proto
         upstream_state.x_goog_api_key.lock().unwrap().as_deref(),
         Some("sk-upstream-gemini")
     );
-    assert_eq!(upstream_state.body.lock().unwrap().clone().unwrap(), payload);
+    assert_eq!(
+        upstream_state.body.lock().unwrap().clone().unwrap(),
+        payload
+    );
 
     support::assert_single_usage_record_and_decision_log(
         admin_app,
@@ -476,7 +485,10 @@ async fn stateful_gemini_generate_content_route_derives_protocol_kind_for_legacy
         upstream_state.x_goog_api_key.lock().unwrap().as_deref(),
         Some("sk-upstream-gemini")
     );
-    assert_eq!(upstream_state.body.lock().unwrap().clone().unwrap(), payload);
+    assert_eq!(
+        upstream_state.body.lock().unwrap().clone().unwrap(),
+        payload
+    );
 
     support::assert_single_usage_record_and_decision_log(
         admin_app,
@@ -645,7 +657,10 @@ async fn stateful_gemini_generate_content_route_returns_invalid_request_for_miss
     let json = read_json(response).await;
     assert_eq!(json["error"]["code"], 400);
     assert_eq!(json["error"]["status"], "INVALID_ARGUMENT");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }
@@ -718,7 +733,8 @@ async fn stateless_gemini_stream_generate_content_route_returns_gemini_sse_event
 #[tokio::test]
 async fn stateless_gemini_stream_generate_content_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime(
 ) {
-    let _fixture = support::prepare_native_dynamic_mock_package("gemini-native-dynamic-stream-stateless");
+    let _fixture =
+        support::prepare_native_dynamic_mock_package("gemini-native-dynamic-stream-stateless");
 
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
@@ -772,8 +788,8 @@ async fn stateless_gemini_stream_generate_content_route_prefers_native_dynamic_r
 
 #[serial]
 #[tokio::test]
-async fn stateless_gemini_stream_generate_content_route_returns_invalid_request_for_missing_model(
-) {
+async fn stateless_gemini_stream_generate_content_route_returns_invalid_request_for_missing_model()
+{
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -803,7 +819,10 @@ async fn stateless_gemini_stream_generate_content_route_returns_invalid_request_
     let json = read_json(response).await;
     assert_eq!(json["error"]["code"], 400);
     assert_eq!(json["error"]["status"], "INVALID_ARGUMENT");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 }
 
 #[serial]
@@ -825,7 +844,9 @@ async fn stateful_gemini_stream_generate_content_route_returns_invalid_request_f
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/v1beta/models/:streamGenerateContent?alt=sse&key={api_key}"))
+                .uri(format!(
+                    "/v1beta/models/:streamGenerateContent?alt=sse&key={api_key}"
+                ))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     serde_json::json!({
@@ -849,7 +870,10 @@ async fn stateful_gemini_stream_generate_content_route_returns_invalid_request_f
     let json = read_json(response).await;
     assert_eq!(json["error"]["code"], 400);
     assert_eq!(json["error"]["status"], "INVALID_ARGUMENT");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }
@@ -858,7 +882,8 @@ async fn stateful_gemini_stream_generate_content_route_returns_invalid_request_f
 #[tokio::test]
 async fn stateful_gemini_stream_generate_content_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime_and_records_usage(
 ) {
-    let fixture = support::prepare_native_dynamic_mock_package("gemini-native-dynamic-stream-stateful");
+    let fixture =
+        support::prepare_native_dynamic_mock_package("gemini-native-dynamic-stream-stateful");
 
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
@@ -983,10 +1008,7 @@ async fn stateful_gemini_stream_generate_content_route_uses_connector_runtime_tr
         .map(ToOwned::to_owned);
     let body = read_text(response).await;
     assert_eq!(status, StatusCode::OK, "unexpected body: {body}");
-    assert_eq!(
-        content_type.as_deref(),
-        Some("text/event-stream")
-    );
+    assert_eq!(content_type.as_deref(), Some("text/event-stream"));
     assert!(body.contains("Hello"));
     assert!(body.contains("\"finishReason\":\"STOP\""));
     assert_eq!(
@@ -1041,7 +1063,8 @@ async fn gemini_count_tokens_route_returns_total_tokens() {
 #[tokio::test]
 async fn stateless_gemini_count_tokens_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime(
 ) {
-    let _fixture = support::prepare_native_dynamic_mock_package("gemini-native-dynamic-count-stateless");
+    let _fixture =
+        support::prepare_native_dynamic_mock_package("gemini-native-dynamic-count-stateless");
 
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(

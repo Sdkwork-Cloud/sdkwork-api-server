@@ -5,30 +5,12 @@ pub fn service_name() -> &'static str {
 }
 
 pub fn list_models(_tenant_id: &str, _project_id: &str) -> Result<ListModelsResponse> {
-    Ok(ListModelsResponse::new(vec![ModelObject::new(
-        "gpt-4.1", "sdkwork",
-    )]))
-}
-
-fn ensure_local_model_exists(model_id: &str) -> Result<()> {
-    if model_id != "gpt-4.1" {
-        bail!("model not found");
-    }
-
-    Ok(())
-}
-
-fn ensure_local_deletable_model_exists(model_id: &str) -> Result<()> {
-    if model_id != "ft:gpt-4.1:sdkwork" {
-        bail!("model not found");
-    }
-
-    Ok(())
+    bail!("Local model catalog fallback is not supported without a configured model store.")
 }
 
 pub fn get_model(_tenant_id: &str, _project_id: &str, model_id: &str) -> Result<ModelObject> {
-    ensure_local_model_exists(model_id)?;
-    Ok(ModelObject::new(model_id, "sdkwork"))
+    let _ = model_id;
+    bail!("Local model catalog fallback is not supported without a configured model store.")
 }
 
 pub fn delete_model(
@@ -36,8 +18,8 @@ pub fn delete_model(
     _project_id: &str,
     model_id: &str,
 ) -> Result<DeleteModelResponse> {
-    ensure_local_deletable_model_exists(model_id)?;
-    Ok(DeleteModelResponse::deleted(model_id))
+    let _ = model_id;
+    bail!("Local model catalog fallback is not supported without a configured model store.")
 }
 
 pub async fn list_models_from_store(

@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn conversation_items_handler(
+fn local_conversation_item_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_conversation_request",
+        "Requested conversation item was not found.",
+    )
+}
+
+pub(crate) async fn conversation_items_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateConversationItemsRequest>,
@@ -18,18 +26,19 @@ pub(super) async fn conversation_items_handler(
         }
     }
 
-    Json(
-        create_conversation_items(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &conversation_id,
-        )
-        .expect("conversation items create"),
-    )
-    .into_response()
+    let response = match create_conversation_items(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &conversation_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_conversation_item_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn conversation_items_list_handler(
+pub(crate) async fn conversation_items_list_handler(
     request_context: StatelessGatewayRequest,
     Path(conversation_id): Path<String>,
 ) -> Response {
@@ -46,18 +55,19 @@ pub(super) async fn conversation_items_list_handler(
         }
     }
 
-    Json(
-        list_conversation_items(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &conversation_id,
-        )
-        .expect("conversation items list"),
-    )
-    .into_response()
+    let response = match list_conversation_items(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &conversation_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_conversation_item_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn conversation_item_retrieve_handler(
+pub(crate) async fn conversation_item_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Response {
@@ -76,19 +86,20 @@ pub(super) async fn conversation_item_retrieve_handler(
         }
     }
 
-    Json(
-        get_conversation_item(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &conversation_id,
-            &item_id,
-        )
-        .expect("conversation item"),
-    )
-    .into_response()
+    let response = match get_conversation_item(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &conversation_id,
+        &item_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_conversation_item_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn conversation_item_delete_handler(
+pub(crate) async fn conversation_item_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((conversation_id, item_id)): Path<(String, String)>,
 ) -> Response {
@@ -107,14 +118,15 @@ pub(super) async fn conversation_item_delete_handler(
         }
     }
 
-    Json(
-        delete_conversation_item(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &conversation_id,
-            &item_id,
-        )
-        .expect("conversation item delete"),
-    )
-    .into_response()
+    let response = match delete_conversation_item(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &conversation_id,
+        &item_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_conversation_item_error_response(error),
+    };
+
+    Json(response).into_response()
 }

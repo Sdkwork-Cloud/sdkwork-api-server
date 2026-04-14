@@ -231,7 +231,10 @@ async fn stateful_containers_routes_relay_to_openai_compatible_provider() {
             .and_then(|value| value.to_str().ok()),
         Some("application/octet-stream")
     );
-    assert_eq!(read_bytes(content_response).await, b"CONTAINER-FILE".to_vec());
+    assert_eq!(
+        read_bytes(content_response).await,
+        b"CONTAINER-FILE".to_vec()
+    );
 
     let delete_response = gateway_app
         .oneshot(
@@ -283,9 +286,11 @@ async fn stateful_container_retrieve_route_returns_not_found_without_usage() {
 #[serial(extension_env)]
 #[tokio::test]
 async fn stateful_container_delete_route_returns_not_found_without_usage() {
-    let ctx =
-        local_containers_test_context("tenant-container-delete-missing", "project-container-delete-missing")
-            .await;
+    let ctx = local_containers_test_context(
+        "tenant-container-delete-missing",
+        "project-container-delete-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app

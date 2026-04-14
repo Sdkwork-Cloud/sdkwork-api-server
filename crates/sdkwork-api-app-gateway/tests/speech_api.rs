@@ -1,7 +1,7 @@
 use sdkwork_api_contract_openai::audio::CreateSpeechRequest;
 
 #[test]
-fn returns_speech_fallback_payload() {
+fn speech_requires_speech_backend() {
     let request = CreateSpeechRequest {
         model: "gpt-4o-mini-tts".to_owned(),
         voice: "nova".to_owned(),
@@ -12,8 +12,7 @@ fn returns_speech_fallback_payload() {
         stream_format: None,
     };
 
-    let response =
-        sdkwork_api_app_gateway::create_speech_response("tenant-1", "project-1", &request).unwrap();
-    assert_eq!(response.format, "wav");
-    assert!(!response.audio_base64.is_empty());
+    let error = sdkwork_api_app_gateway::create_speech_response("tenant-1", "project-1", &request)
+        .unwrap_err();
+    assert!(error.to_string().contains("not supported"));
 }

@@ -1,13 +1,29 @@
 use super::*;
 
-pub(super) fn extract_compat_gateway_token(parts: &Parts) -> Option<String> {
+pub(crate) fn extract_compat_gateway_token(parts: &Parts) -> Option<String> {
     extract_bearer_token(&parts.headers)
         .or_else(|| header_value(parts.headers.get("x-api-key")))
         .or_else(|| header_value(parts.headers.get("x-goog-api-key")))
         .or_else(|| query_parameter(parts.uri.query(), "key"))
 }
 
-pub(super) async fn enforce_gateway_request_rate_limit(
+pub(crate) async fn resolve_authenticated_gateway_request_context(
+    state: &GatewayApiState,
+    token: &str,
+) -> anyhow::Result<Option<IdentityGatewayRequestContext>> {
+    if let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token).await? {
+        return Ok(Some(context));
+    }
+
+    let Some(identity_store) = state.identity_store.as_ref() else {
+        return Ok(None);
+    };
+
+    let identity_store: &dyn IdentityKernelStore = identity_store.as_ref();
+    resolve_canonical_gateway_request_context_from_api_key(identity_store, token).await
+}
+
+pub(crate) async fn enforce_gateway_request_rate_limit(
     store: &dyn AdminStore,
     context: &IdentityGatewayRequestContext,
     route_key: &str,
@@ -70,7 +86,7 @@ fn rate_limit_exceeded_message(
     }
 }
 
-pub(super) fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
+pub(crate) fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
     let header_value = header_value(headers.get(header::AUTHORIZATION))?;
     header_value
         .strip_prefix("Bearer ")
@@ -78,7 +94,7 @@ pub(super) fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<St
         .map(ToOwned::to_owned)
 }
 
-pub(super) fn header_value(value: Option<&axum::http::HeaderValue>) -> Option<String> {
+pub(crate) fn header_value(value: Option<&axum::http::HeaderValue>) -> Option<String> {
     value
         .and_then(|value| value.to_str().ok())
         .map(ToOwned::to_owned)
@@ -97,11 +113,11 @@ fn request_options_from_header_names(
     )
 }
 
-pub(super) fn anthropic_request_options(headers: &HeaderMap) -> ProviderRequestOptions {
+pub(crate) fn anthropic_request_options(headers: &HeaderMap) -> ProviderRequestOptions {
     request_options_from_header_names(headers, &["anthropic-version", "anthropic-beta"])
 }
 
-pub(super) fn query_parameter(query: Option<&str>, key: &str) -> Option<String> {
+pub(crate) fn query_parameter(query: Option<&str>, key: &str) -> Option<String> {
     let query = query?;
     query.split('&').find_map(|pair| {
         let (name, value) = pair.split_once('=')?;

@@ -3,9 +3,7 @@ use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::routing::post;
 use axum::{Json, Router};
-use sdkwork_api_app_identity::{
-    persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput,
-};
+use sdkwork_api_app_identity::{persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput};
 use serde_json::Value;
 use sqlx::SqlitePool;
 use std::sync::{Arc, Mutex};
@@ -146,7 +144,10 @@ async fn stateful_completions_route_keeps_request_model_for_billing_despite_resp
     assert_eq!(billing_json[0]["capability"], "completions");
     assert_eq!(billing_json[0]["route_key"], request_model);
     assert_eq!(billing_json[0]["usage_model"], request_model);
-    assert_eq!(billing_json[0]["provider_id"], "provider-completions-model-route");
+    assert_eq!(
+        billing_json[0]["provider_id"],
+        "provider-completions-model-route"
+    );
     assert_eq!(billing_json[0]["accounting_mode"], "platform_credit");
     assert_eq!(billing_json[0]["channel_id"], "openai");
     assert!(billing_json[0]["api_key_hash"].as_str().unwrap().len() > 10);
@@ -496,7 +497,10 @@ async fn stateful_image_generation_records_image_count_in_billing_event() {
     assert_eq!(billing_json.as_array().unwrap().len(), 1);
     assert_eq!(billing_json[0]["capability"], "images");
     assert_eq!(billing_json[0]["route_key"], request_model);
-    assert_eq!(billing_json[0]["provider_id"], "provider-images-billing-count");
+    assert_eq!(
+        billing_json[0]["provider_id"],
+        "provider-images-billing-count"
+    );
     assert_eq!(billing_json[0]["reference_id"], "image_upstream_1");
     assert_eq!(billing_json[0]["image_count"], 2);
 }

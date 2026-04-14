@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn video_character_retrieve_canonical_handler(
+fn local_video_character_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_video_character_request",
+        "Requested video character was not found.",
+    )
+}
+
+pub(crate) async fn video_character_retrieve_canonical_handler(
     request_context: StatelessGatewayRequest,
     Path(character_id): Path<String>,
 ) -> Response {
@@ -19,13 +27,14 @@ pub(super) async fn video_character_retrieve_canonical_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::get_video_character_canonical(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &character_id,
-        )
-        .expect("video character canonical retrieve"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::get_video_character_canonical(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &character_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }

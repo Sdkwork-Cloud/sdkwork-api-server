@@ -1,3 +1,10 @@
+fn local_assistant_list_error_response() -> Response {
+    invalid_request_openai_response(
+        "Local assistant listing fallback is not supported without an upstream provider.",
+        "invalid_assistant_request",
+    )
+}
+
 async fn assistants_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateAssistantRequest>,
@@ -12,16 +19,15 @@ async fn assistants_handler(
         }
     }
 
-    Json(
-        create_assistant(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.name,
-            &request.model,
-        )
-        .expect("assistant"),
-    )
-    .into_response()
+    match create_assistant(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.name,
+        &request.model,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_gateway_invalid_or_bad_gateway_response(error, "invalid_assistant_request"),
+    }
 }
 
 async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -33,15 +39,20 @@ async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Re
         }
     }
 
-    Json(
-        list_assistants(request_context.tenant_id(), request_context.project_id())
-            .expect("assistants list"),
-    )
-    .into_response()
+    let response = match list_assistants(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(_) => return local_assistant_list_error_response(),
+    };
+
+    Json(response).into_response()
 }
 
 fn local_assistant_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested assistant was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_assistant_request",
+        "Requested assistant was not found.",
+    )
 }
 
 fn local_assistant_retrieve_result(
@@ -195,10 +206,9 @@ async fn assistants_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let assistant_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.model.as_str());
+            let Some(assistant_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream assistant response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -227,13 +237,20 @@ async fn assistants_with_state_handler(
         }
     }
 
-    let response = create_assistant(
+    let response = match create_assistant(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.name,
         &request.model,
-    )
-    .expect("assistant");
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(
+                error,
+                "invalid_assistant_request",
+            );
+        }
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -298,6 +315,11 @@ async fn assistants_list_with_state_handler(
         }
     }
 
+    let response = match list_assistants(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(_) => return local_assistant_list_error_response(),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -317,11 +339,7 @@ async fn assistants_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_assistants(request_context.tenant_id(), request_context.project_id())
-            .expect("assistants list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn assistant_retrieve_with_state_handler(

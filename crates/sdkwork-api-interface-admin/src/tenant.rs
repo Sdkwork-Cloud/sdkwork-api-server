@@ -11,18 +11,27 @@ pub(crate) async fn list_tenants_handler(
 }
 
 pub(crate) async fn create_tenant_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateTenantRequest>,
 ) -> Result<(StatusCode, Json<Tenant>), StatusCode> {
     let tenant = persist_tenant(state.store.as_ref(), &request.id, &request.name)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "tenant.create",
+        "tenant",
+        tenant.id.clone(),
+        audit::APPROVAL_SCOPE_WORKSPACE_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(tenant)))
 }
 
 pub(crate) async fn delete_tenant_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(tenant_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -45,6 +54,15 @@ pub(crate) async fn delete_tenant_handler(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
+        audit::record_admin_audit_event(
+            &state,
+            &claims,
+            "tenant.delete",
+            "tenant",
+            tenant_id,
+            audit::APPROVAL_SCOPE_WORKSPACE_CONTROL,
+        )
+        .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -62,7 +80,7 @@ pub(crate) async fn list_projects_handler(
 }
 
 pub(crate) async fn create_project_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>), StatusCode> {
@@ -74,11 +92,20 @@ pub(crate) async fn create_project_handler(
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "project.create",
+        "project",
+        project.id.clone(),
+        audit::APPROVAL_SCOPE_WORKSPACE_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(project)))
 }
 
 pub(crate) async fn delete_project_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(project_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -86,6 +113,15 @@ pub(crate) async fn delete_project_handler(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
+        audit::record_admin_audit_event(
+            &state,
+            &claims,
+            "project.delete",
+            "project",
+            project_id,
+            audit::APPROVAL_SCOPE_WORKSPACE_CONTROL,
+        )
+        .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)

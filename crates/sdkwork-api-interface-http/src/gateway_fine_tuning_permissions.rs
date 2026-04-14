@@ -104,15 +104,16 @@ async fn fine_tuning_jobs_handler(
         }
     }
 
-    Json(
-        create_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("fine tuning"),
-    )
-    .into_response()
+    let response = match create_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_create_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn fine_tuning_jobs_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -125,11 +126,13 @@ async fn fine_tuning_jobs_list_handler(request_context: StatelessGatewayRequest)
         }
     }
 
-    Json(
-        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
-            .expect("fine tuning list"),
-    )
-    .into_response()
+    let response =
+        match list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(error) => return local_fine_tuning_job_not_found_response(error),
+        };
+
+    Json(response).into_response()
 }
 
 async fn fine_tuning_job_retrieve_handler(
@@ -382,8 +385,11 @@ async fn fine_tuning_checkpoint_permissions_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(fine_tuned_model_checkpoint.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream fine tuning checkpoint permission response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),

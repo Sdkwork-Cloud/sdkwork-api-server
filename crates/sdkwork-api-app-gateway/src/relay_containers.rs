@@ -314,18 +314,19 @@ pub fn create_container(
     _project_id: &str,
     request: &CreateContainerRequest,
 ) -> Result<ContainerObject> {
-    Ok(ContainerObject::new("container_1", &request.name))
+    if request.name.trim().is_empty() {
+        bail!("Container name is required.");
+    }
+
+    bail!("Local container fallback is not supported without an upstream provider.")
 }
 
 pub fn list_containers(_tenant_id: &str, _project_id: &str) -> Result<ListContainersResponse> {
-    Ok(ListContainersResponse::new(vec![ContainerObject::new(
-        "container_1",
-        "ci-container",
-    )]))
+    bail!("Local container listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_container_exists(container_id: &str) -> Result<()> {
-    if container_id != "container_1" {
+    if !local_object_id_matches(container_id, "container") {
         bail!("container not found");
     }
 
@@ -334,7 +335,7 @@ fn ensure_local_container_exists(container_id: &str) -> Result<()> {
 
 fn ensure_local_container_file_exists(container_id: &str, file_id: &str) -> Result<()> {
     ensure_local_container_exists(container_id)?;
-    if file_id != "file_1" {
+    if !local_object_id_matches(file_id, "file") {
         bail!("container file not found");
     }
 
@@ -347,7 +348,7 @@ pub fn get_container(
     container_id: &str,
 ) -> Result<ContainerObject> {
     ensure_local_container_exists(container_id)?;
-    Ok(ContainerObject::new(container_id, "ci-container"))
+    bail!("container not found")
 }
 
 pub fn delete_container(
@@ -356,7 +357,7 @@ pub fn delete_container(
     container_id: &str,
 ) -> Result<DeleteContainerResponse> {
     ensure_local_container_exists(container_id)?;
-    Ok(DeleteContainerResponse::deleted(container_id))
+    bail!("container not found")
 }
 
 pub fn create_container_file(
@@ -366,7 +367,11 @@ pub fn create_container_file(
     request: &CreateContainerFileRequest,
 ) -> Result<ContainerFileObject> {
     ensure_local_container_exists(container_id)?;
-    Ok(ContainerFileObject::new(&request.file_id, container_id))
+    if !local_object_id_matches(&request.file_id, "file") {
+        bail!("A local file id is required for local container fallback.");
+    }
+
+    bail!("Persisted local container file state is required for local file attachment.")
 }
 
 pub fn list_container_files(
@@ -375,9 +380,7 @@ pub fn list_container_files(
     container_id: &str,
 ) -> Result<ListContainerFilesResponse> {
     ensure_local_container_exists(container_id)?;
-    Ok(ListContainerFilesResponse::new(vec![
-        ContainerFileObject::new("file_1", container_id),
-    ]))
+    bail!("Persisted local container file state is required for local file listing.")
 }
 
 pub fn get_container_file(
@@ -387,7 +390,7 @@ pub fn get_container_file(
     file_id: &str,
 ) -> Result<ContainerFileObject> {
     ensure_local_container_file_exists(container_id, file_id)?;
-    Ok(ContainerFileObject::new(file_id, container_id))
+    bail!("container file not found")
 }
 
 pub fn delete_container_file(
@@ -397,7 +400,7 @@ pub fn delete_container_file(
     file_id: &str,
 ) -> Result<DeleteContainerFileResponse> {
     ensure_local_container_file_exists(container_id, file_id)?;
-    Ok(DeleteContainerFileResponse::deleted(file_id))
+    bail!("container file not found")
 }
 
 pub fn container_file_content(
@@ -407,5 +410,5 @@ pub fn container_file_content(
     file_id: &str,
 ) -> Result<Vec<u8>> {
     ensure_local_container_file_exists(container_id, file_id)?;
-    Ok(b"CONTAINER-FILE".to_vec())
+    bail!("container file not found")
 }

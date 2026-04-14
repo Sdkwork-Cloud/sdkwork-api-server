@@ -156,19 +156,28 @@ async fn completions_with_state_handler(
         }
     }
 
-    if let Some(admission) = commercial_admission.as_ref() {
-        if let Err(response) = capture_gateway_commercial_admission(&state, admission).await {
-            return response;
-        }
-    }
-
     let local_completion = match local_completion_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
     ) {
         Ok(response) => response,
-        Err(response) => return response,
+        Err(response) => {
+            if let Some(admission) = commercial_admission.as_ref() {
+                if let Err(release_response) =
+                    release_gateway_commercial_admission(&state, admission).await
+                {
+                    return release_response;
+                }
+            }
+            return response;
+        }
+    };
+
+    if let Some(admission) = commercial_admission.as_ref() {
+        if let Err(response) = capture_gateway_commercial_admission(&state, admission).await {
+            return response;
+        }
     };
 
     if record_gateway_usage_for_project(

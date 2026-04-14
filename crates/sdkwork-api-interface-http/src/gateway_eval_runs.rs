@@ -484,10 +484,9 @@ async fn eval_runs_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let run_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(eval_id.as_str());
+            let Some(run_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream eval run response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),

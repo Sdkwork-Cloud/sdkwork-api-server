@@ -1,6 +1,22 @@
 use super::*;
 
-pub(super) async fn vector_store_files_with_state_handler(
+fn local_vector_store_files_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store was not found.",
+    )
+}
+
+fn local_vector_store_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store file was not found.",
+    )
+}
+
+pub(crate) async fn vector_store_files_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
@@ -17,8 +33,11 @@ pub(super) async fn vector_store_files_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.file_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream vector store file response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -45,13 +64,15 @@ pub(super) async fn vector_store_files_with_state_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store file");
         }
     }
-    let response = create_vector_store_file(
+    let response = match create_vector_store_file(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
         &request.file_id,
-    )
-    .expect("vector store file");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_error_response(error),
+    };
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -74,7 +95,7 @@ pub(super) async fn vector_store_files_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn vector_store_files_list_with_state_handler(
+pub(crate) async fn vector_store_files_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
@@ -114,6 +135,15 @@ pub(super) async fn vector_store_files_list_with_state_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store files list");
         }
     }
+    let response = match list_vector_store_files(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_files_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -132,18 +162,11 @@ pub(super) async fn vector_store_files_list_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        list_vector_store_files(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-        )
-        .expect("vector store files list"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }
 
-pub(super) async fn vector_store_file_retrieve_with_state_handler(
+pub(crate) async fn vector_store_file_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, file_id)): Path<(String, String)>,
@@ -187,6 +210,16 @@ pub(super) async fn vector_store_file_retrieve_with_state_handler(
             );
         }
     }
+    let response = match get_vector_store_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -206,19 +239,11 @@ pub(super) async fn vector_store_file_retrieve_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        get_vector_store_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &file_id,
-        )
-        .expect("vector store file retrieve"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }
 
-pub(super) async fn vector_store_file_delete_with_state_handler(
+pub(crate) async fn vector_store_file_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, file_id)): Path<(String, String)>,
@@ -262,6 +287,16 @@ pub(super) async fn vector_store_file_delete_with_state_handler(
             );
         }
     }
+    let response = match delete_vector_store_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -281,14 +316,6 @@ pub(super) async fn vector_store_file_delete_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        delete_vector_store_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &file_id,
-        )
-        .expect("vector store file delete"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }

@@ -1,7 +1,7 @@
 use super::errors::{bad_multipart, missing_multipart_field};
 use super::*;
 
-pub(super) async fn parse_file_request(
+pub(crate) async fn parse_file_request(
     mut multipart: Multipart,
 ) -> Result<CreateFileRequest, Response> {
     let mut purpose = None;

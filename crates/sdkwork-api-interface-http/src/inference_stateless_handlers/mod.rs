@@ -2,8 +2,10 @@ use super::*;
 
 mod audio;
 mod image;
+mod music;
 mod text;
 
-pub(super) use self::audio::*;
-pub(super) use self::image::*;
-pub(super) use self::text::*;
+pub(crate) use self::audio::*;
+pub(crate) use self::image::*;
+pub(crate) use self::music::*;
+pub(crate) use self::text::*;

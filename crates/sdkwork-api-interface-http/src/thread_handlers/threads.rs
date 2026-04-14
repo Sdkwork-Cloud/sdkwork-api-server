@@ -1,6 +1,15 @@
 use super::*;
 
-pub(super) async fn threads_with_state_handler(
+fn local_thread_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_request");
+    }
+
+    local_gateway_error_response(error, "Requested thread was not found.")
+}
+
+pub(crate) async fn threads_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateThreadRequest>,
@@ -15,10 +24,9 @@ pub(super) async fn threads_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let thread_usage_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("threads");
+            let Some(thread_usage_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream thread response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,8 +55,10 @@ pub(super) async fn threads_with_state_handler(
         }
     }
 
-    let response =
-        create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread");
+    let response = match create_thread(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -73,7 +83,7 @@ pub(super) async fn threads_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn thread_retrieve_with_state_handler(
+pub(crate) async fn thread_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
@@ -115,6 +125,15 @@ pub(super) async fn thread_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -134,18 +153,10 @@ pub(super) async fn thread_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_update_with_state_handler(
+pub(crate) async fn thread_update_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
@@ -189,6 +200,15 @@ pub(super) async fn thread_update_with_state_handler(
         }
     }
 
+    let response = match update_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -208,18 +228,10 @@ pub(super) async fn thread_update_with_state_handler(
             .into_response();
     }
 
-    Json(
-        update_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread update"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_delete_with_state_handler(
+pub(crate) async fn thread_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
@@ -261,6 +273,15 @@ pub(super) async fn thread_delete_with_state_handler(
         }
     }
 
+    let response = match delete_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -280,13 +301,5 @@ pub(super) async fn thread_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        delete_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

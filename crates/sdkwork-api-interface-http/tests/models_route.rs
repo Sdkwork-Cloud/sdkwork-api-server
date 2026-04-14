@@ -414,8 +414,8 @@ async fn models_route_refreshes_after_admin_catalog_mutation_invalidates_capabil
 
 #[tokio::test]
 #[serial]
-async fn models_route_refreshes_after_admin_catalog_mutation_invalidates_shared_redis_capability_cache()
- {
+async fn models_route_refreshes_after_admin_catalog_mutation_invalidates_shared_redis_capability_cache(
+) {
     let _cache_guard = capability_catalog_cache_reset_guard();
     let redis_server = support::FakeRedisServer::start();
     let redis_url = redis_server.url_with_db(7);

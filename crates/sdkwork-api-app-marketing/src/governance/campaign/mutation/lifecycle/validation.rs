@@ -3,7 +3,7 @@ use super::super::super::audit::{
     persist_marketing_campaign_lifecycle_audit_record,
 };
 use super::super::super::types::MarketingCampaignActionDecision;
-use super::super::super::MarketingGovernanceError;
+use crate::MarketingGovernanceError;
 use sdkwork_api_domain_marketing::{
     MarketingCampaignLifecycleAction, MarketingCampaignLifecycleAuditOutcome,
     MarketingCampaignRecord,

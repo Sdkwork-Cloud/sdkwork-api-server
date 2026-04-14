@@ -17,7 +17,7 @@ fn blocked_coupon_template_action(reason: impl Into<String>) -> CouponTemplateAc
     }
 }
 
-pub(super) fn build_coupon_template_actionability(
+pub(in crate::governance::template) fn build_coupon_template_actionability(
     coupon_template: &CouponTemplateRecord,
     now_ms: u64,
 ) -> CouponTemplateActionability {

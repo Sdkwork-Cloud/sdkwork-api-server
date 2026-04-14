@@ -13,7 +13,7 @@ mod support;
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn music_routes_return_ok() {
+async fn local_music_routes_follow_truthful_fallback_contract() {
     let app = sdkwork_api_interface_http::gateway_router();
 
     let create_response = app
@@ -31,6 +31,10 @@ async fn music_routes_return_ok() {
         .await
         .unwrap();
     assert_eq!(create_response.status(), StatusCode::OK);
+    let create_json = read_json(create_response).await;
+    let track_id = create_json["data"][0]["id"].as_str().unwrap().to_owned();
+    assert!(track_id.starts_with("music_local_"));
+    assert_eq!(create_json["data"][0]["status"], "queued");
 
     let list_response = app
         .clone()
@@ -44,32 +48,34 @@ async fn music_routes_return_ok() {
         .await
         .unwrap();
     assert_eq!(list_response.status(), StatusCode::OK);
+    let list_json = read_json(list_response).await;
+    assert_eq!(list_json["data"], Value::Array(Vec::new()));
 
     let retrieve_response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/music/music_1")
+                .uri(format!("/v1/music/{track_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(retrieve_response.status(), StatusCode::OK);
+    assert_music_not_found(retrieve_response, "Requested music was not found.").await;
 
     let content_response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/music/music_1/content")
+                .uri(format!("/v1/music/{track_id}/content"))
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(content_response.status(), StatusCode::OK);
+    assert_music_not_found(content_response, "Requested music asset was not found.").await;
 
     let lyrics_response = app
         .clone()
@@ -85,19 +91,26 @@ async fn music_routes_return_ok() {
         )
         .await
         .unwrap();
-    assert_eq!(lyrics_response.status(), StatusCode::OK);
+    assert_invalid_music_request(
+        lyrics_response,
+        "Local music lyrics fallback is not supported without a lyrics generation backend.",
+    )
+    .await;
 
     let delete_response = app
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/music/music_1")
+                .uri(format!("/v1/music/{track_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(delete_response.status(), StatusCode::OK);
+    let delete_json = read_json(delete_response).await;
+    assert_eq!(delete_json["deleted"], true);
+    assert_eq!(delete_json["id"], track_id);
 }
 
 #[serial(extension_env)]
@@ -117,7 +130,10 @@ async fn music_content_route_returns_not_found_error_for_unknown_track() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested music asset was not found.");
+    assert_eq!(
+        json["error"]["message"],
+        "Requested music asset was not found."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
 }
@@ -167,13 +183,11 @@ async fn stateless_music_routes_relay_to_openai_compatible_provider() {
     let upstream = Router::new()
         .route(
             "/v1/music",
-            get(upstream_music_list_handler)
-                .post(upstream_music_create_handler),
+            get(upstream_music_list_handler).post(upstream_music_create_handler),
         )
         .route(
             "/v1/music/music_1",
-            get(upstream_music_retrieve_handler)
-                .delete(upstream_music_delete_handler),
+            get(upstream_music_retrieve_handler).delete(upstream_music_delete_handler),
         )
         .route(
             "/v1/music/music_1/content",
@@ -256,7 +270,10 @@ async fn stateless_music_routes_relay_to_openai_compatible_provider() {
         .await
         .unwrap();
     assert_eq!(content_response.status(), StatusCode::OK);
-    assert_eq!(read_bytes(content_response).await, b"UPSTREAM-MUSIC".to_vec());
+    assert_eq!(
+        read_bytes(content_response).await,
+        b"UPSTREAM-MUSIC".to_vec()
+    );
 
     let lyrics_response = app
         .clone()
@@ -488,9 +505,11 @@ async fn create_model(
 #[serial(extension_env)]
 #[tokio::test]
 async fn stateful_music_retrieve_route_returns_not_found_without_usage() {
-    let ctx =
-        local_music_test_context("tenant-music-retrieve-missing", "project-music-retrieve-missing")
-            .await;
+    let ctx = local_music_test_context(
+        "tenant-music-retrieve-missing",
+        "project-music-retrieve-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -513,9 +532,11 @@ async fn stateful_music_retrieve_route_returns_not_found_without_usage() {
 #[serial(extension_env)]
 #[tokio::test]
 async fn stateful_music_delete_route_returns_not_found_without_usage() {
-    let ctx =
-        local_music_test_context("tenant-music-delete-missing", "project-music-delete-missing")
-            .await;
+    let ctx = local_music_test_context(
+        "tenant-music-delete-missing",
+        "project-music-delete-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -538,9 +559,11 @@ async fn stateful_music_delete_route_returns_not_found_without_usage() {
 #[serial(extension_env)]
 #[tokio::test]
 async fn stateful_music_content_route_returns_not_found_without_usage() {
-    let ctx =
-        local_music_test_context("tenant-music-content-missing", "project-music-content-missing")
-            .await;
+    let ctx = local_music_test_context(
+        "tenant-music-content-missing",
+        "project-music-content-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -560,6 +583,40 @@ async fn stateful_music_content_route_returns_not_found_without_usage() {
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
+#[serial(extension_env)]
+#[tokio::test]
+async fn stateful_music_lyrics_route_returns_invalid_request_without_usage() {
+    let ctx = local_music_test_context(
+        "tenant-music-lyrics-unsupported",
+        "project-music-lyrics-unsupported",
+    )
+    .await;
+
+    let response = ctx
+        .gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/music/lyrics")
+                .header("authorization", format!("Bearer {}", ctx.api_key))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"prompt\":\"Write uplifting synth-pop lyrics\",\"title\":\"Skyline Pulse\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_invalid_music_request(
+        response,
+        "Local music lyrics fallback is not supported without a lyrics generation backend.",
+    )
+    .await;
+    support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
+}
+
 async fn read_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -573,6 +630,14 @@ async fn assert_music_not_found(response: axum::response::Response, message: &st
     assert_eq!(json["error"]["message"], message);
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
+}
+
+async fn assert_invalid_music_request(response: axum::response::Response, message: &str) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], "invalid_music_request");
 }
 
 async fn read_bytes(response: axum::response::Response) -> Vec<u8> {

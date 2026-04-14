@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn fine_tuning_jobs_with_state_handler(
+fn local_fine_tuning_job_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning job was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_jobs_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateFineTuningJobRequest>,
@@ -15,10 +23,9 @@ pub(super) async fn fine_tuning_jobs_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let fine_tuning_job_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.model.as_str());
+            let Some(fine_tuning_job_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream fine tuning job response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,12 +54,14 @@ pub(super) async fn fine_tuning_jobs_with_state_handler(
         }
     }
 
-    let response = create_fine_tuning_job(
+    let response = match create_fine_tuning_job(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.model,
-    )
-    .expect("fine tuning");
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -77,7 +86,7 @@ pub(super) async fn fine_tuning_jobs_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_jobs_list_with_state_handler(
+pub(crate) async fn fine_tuning_jobs_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
@@ -117,6 +126,12 @@ pub(super) async fn fine_tuning_jobs_list_with_state_handler(
         }
     }
 
+    let response =
+        match list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(error) => return local_fine_tuning_job_error_response(error),
+        };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -136,14 +151,10 @@ pub(super) async fn fine_tuning_jobs_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
-            .expect("fine tuning list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_retrieve_with_state_handler(
+pub(crate) async fn fine_tuning_job_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
@@ -187,6 +198,15 @@ pub(super) async fn fine_tuning_job_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -206,18 +226,10 @@ pub(super) async fn fine_tuning_job_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_cancel_with_state_handler(
+pub(crate) async fn fine_tuning_job_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
@@ -259,6 +271,15 @@ pub(super) async fn fine_tuning_job_cancel_with_state_handler(
         }
     }
 
+    let response = match cancel_fine_tuning_job(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -278,13 +299,5 @@ pub(super) async fn fine_tuning_job_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        cancel_fine_tuning_job(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

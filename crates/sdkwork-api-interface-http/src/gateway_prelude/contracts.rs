@@ -29,6 +29,7 @@ pub(crate) use sdkwork_api_contract_openai::images::{
     CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageUpload,
 };
 pub(crate) use sdkwork_api_contract_openai::moderations::CreateModerationRequest;
+pub(crate) use sdkwork_api_contract_openai::music::{CreateMusicLyricsRequest, CreateMusicRequest};
 pub(crate) use sdkwork_api_contract_openai::realtime::CreateRealtimeSessionRequest;
 pub(crate) use sdkwork_api_contract_openai::responses::{
     CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,

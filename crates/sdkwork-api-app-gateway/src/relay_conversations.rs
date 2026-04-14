@@ -265,20 +265,18 @@ pub async fn relay_delete_conversation_item_from_store(
 }
 
 pub fn create_conversation(_tenant_id: &str, _project_id: &str) -> Result<ConversationObject> {
-    Ok(ConversationObject::new("conv_1"))
+    bail!("Local conversation fallback is not supported without an upstream provider.")
 }
 
 pub fn list_conversations(
     _tenant_id: &str,
     _project_id: &str,
 ) -> Result<ListConversationsResponse> {
-    Ok(ListConversationsResponse::new(vec![
-        ConversationObject::new("conv_1"),
-    ]))
+    bail!("Local conversation listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_conversation_exists(conversation_id: &str) -> Result<()> {
-    if conversation_id != "conv_1" {
+    if !local_object_id_matches(conversation_id, "conv") {
         bail!("conversation not found");
     }
 
@@ -291,17 +289,22 @@ pub fn get_conversation(
     conversation_id: &str,
 ) -> Result<ConversationObject> {
     ensure_local_conversation_exists(conversation_id)?;
-    Ok(ConversationObject::new(conversation_id))
+    bail!("conversation not found")
 }
 
 pub fn update_conversation(
     _tenant_id: &str,
     _project_id: &str,
     conversation_id: &str,
-    metadata: Value,
+    metadata: Option<Value>,
 ) -> Result<ConversationObject> {
     ensure_local_conversation_exists(conversation_id)?;
-    Ok(ConversationObject::with_metadata(conversation_id, metadata))
+    let Some(metadata) = metadata else {
+        bail!("Conversation metadata is required for local fallback updates.");
+    };
+
+    let _ = metadata;
+    bail!("conversation not found")
 }
 
 pub fn delete_conversation(
@@ -310,7 +313,7 @@ pub fn delete_conversation(
     conversation_id: &str,
 ) -> Result<DeleteConversationResponse> {
     ensure_local_conversation_exists(conversation_id)?;
-    Ok(DeleteConversationResponse::deleted(conversation_id))
+    bail!("conversation not found")
 }
 
 pub fn create_conversation_items(
@@ -319,9 +322,7 @@ pub fn create_conversation_items(
     conversation_id: &str,
 ) -> Result<ListConversationItemsResponse> {
     ensure_local_conversation_exists(conversation_id)?;
-    Ok(ListConversationItemsResponse::new(vec![
-        ConversationItemObject::message("item_1", "assistant", "hello"),
-    ]))
+    bail!("Persisted local conversation item state is required for local item creation.")
 }
 
 pub fn list_conversation_items(
@@ -330,14 +331,12 @@ pub fn list_conversation_items(
     conversation_id: &str,
 ) -> Result<ListConversationItemsResponse> {
     ensure_local_conversation_exists(conversation_id)?;
-    Ok(ListConversationItemsResponse::new(vec![
-        ConversationItemObject::message("item_1", "assistant", "hello"),
-    ]))
+    bail!("Persisted local conversation item state is required for local item listing.")
 }
 
 fn ensure_local_conversation_item_exists(conversation_id: &str, item_id: &str) -> Result<()> {
     ensure_local_conversation_exists(conversation_id)?;
-    if item_id != "item_1" {
+    if !local_object_id_matches(item_id, "item") {
         bail!("conversation item not found");
     }
 
@@ -351,11 +350,7 @@ pub fn get_conversation_item(
     item_id: &str,
 ) -> Result<ConversationItemObject> {
     ensure_local_conversation_item_exists(conversation_id, item_id)?;
-    Ok(ConversationItemObject::message(
-        item_id,
-        "assistant",
-        "hello",
-    ))
+    bail!("conversation item not found")
 }
 
 pub fn delete_conversation_item(
@@ -365,5 +360,5 @@ pub fn delete_conversation_item(
     item_id: &str,
 ) -> Result<DeleteConversationItemResponse> {
     ensure_local_conversation_item_exists(conversation_id, item_id)?;
-    Ok(DeleteConversationItemResponse::deleted(item_id))
+    bail!("conversation item not found")
 }

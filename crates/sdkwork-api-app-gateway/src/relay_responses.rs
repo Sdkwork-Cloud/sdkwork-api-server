@@ -751,7 +751,8 @@ fn ensure_local_response_model_present(model: &str) -> Result<()> {
 
 pub fn create_response(_tenant_id: &str, _project_id: &str, model: &str) -> Result<ResponseObject> {
     ensure_local_response_model_present(model)?;
-    Ok(ResponseObject::empty("resp_1", model))
+    let _ = model;
+    bail!("Local response fallback is not supported without an upstream provider.")
 }
 
 pub fn count_response_input_tokens(
@@ -760,11 +761,11 @@ pub fn count_response_input_tokens(
     model: &str,
 ) -> Result<ResponseInputTokensObject> {
     ensure_local_response_model_present(model)?;
-    Ok(ResponseInputTokensObject::new(42))
+    bail!("Response input token counting is not supported in local fallback.")
 }
 
 fn ensure_local_response_exists(response_id: &str) -> Result<()> {
-    if response_id != "resp_1" {
+    if !local_object_id_matches(response_id, "resp") {
         bail!("response not found");
     }
 
@@ -777,7 +778,7 @@ pub fn get_response(
     response_id: &str,
 ) -> Result<ResponseObject> {
     ensure_local_response_exists(response_id)?;
-    Ok(ResponseObject::empty(response_id, "gpt-4.1"))
+    bail!("response not found")
 }
 
 pub fn list_response_input_items(
@@ -786,9 +787,7 @@ pub fn list_response_input_items(
     response_id: &str,
 ) -> Result<ListResponseInputItemsResponse> {
     ensure_local_response_exists(response_id)?;
-    Ok(ListResponseInputItemsResponse::new(vec![
-        ResponseInputItemObject::message("item_1"),
-    ]))
+    bail!("Persisted local response input item state is required for local input item listing.")
 }
 
 pub fn delete_response(
@@ -797,7 +796,7 @@ pub fn delete_response(
     response_id: &str,
 ) -> Result<DeleteResponseResponse> {
     ensure_local_response_exists(response_id)?;
-    Ok(DeleteResponseResponse::deleted(response_id))
+    bail!("response not found")
 }
 
 pub fn cancel_response(
@@ -806,7 +805,7 @@ pub fn cancel_response(
     response_id: &str,
 ) -> Result<ResponseObject> {
     ensure_local_response_exists(response_id)?;
-    Ok(ResponseObject::cancelled(response_id, "gpt-4.1"))
+    bail!("response not found")
 }
 
 pub fn compact_response(
@@ -817,5 +816,6 @@ pub fn compact_response(
     if model.trim().is_empty() {
         bail!("Response compaction model is required.");
     }
-    Ok(ResponseCompactionObject::new("resp_cmp_1", model))
+    let _ = model;
+    bail!("Local response compaction fallback is not supported without an upstream provider.")
 }

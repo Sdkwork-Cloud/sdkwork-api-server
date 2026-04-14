@@ -1,7 +1,7 @@
 use super::errors::{bad_multipart, missing_multipart_field};
 use super::*;
 
-pub(super) async fn parse_upload_part_request(
+pub(crate) async fn parse_upload_part_request(
     upload_id: String,
     mut multipart: Multipart,
 ) -> Result<AddUploadPartRequest, Response> {

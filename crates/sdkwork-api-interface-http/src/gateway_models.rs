@@ -1,3 +1,7 @@
+fn local_models_list_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
+}
+
 async fn list_models_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::ModelsList).await {
         Ok(Some(response)) => return Json(response).into_response(),
@@ -7,15 +11,20 @@ async fn list_models_handler(request_context: StatelessGatewayRequest) -> Respon
         }
     }
 
-    Json(
-        list_models(request_context.tenant_id(), request_context.project_id())
-            .expect("models response"),
-    )
-    .into_response()
+    let response = match list_models(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_models_list_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 fn local_model_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested model was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_model",
+        "Requested model was not found.",
+    )
 }
 
 fn local_model_retrieve_response(tenant_id: &str, project_id: &str, model_id: &str) -> Response {

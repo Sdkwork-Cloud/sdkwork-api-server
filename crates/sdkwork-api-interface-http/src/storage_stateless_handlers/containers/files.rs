@@ -1,6 +1,22 @@
 use super::*;
 
-pub(super) async fn container_files_handler(
+fn local_container_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_container_request",
+        "Requested container was not found.",
+    )
+}
+
+fn local_container_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_container_request",
+        "Requested container file was not found.",
+    )
+}
+
+pub(crate) async fn container_files_handler(
     request_context: StatelessGatewayRequest,
     Path(container_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateContainerFileRequest>,
@@ -18,19 +34,20 @@ pub(super) async fn container_files_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::create_container_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-            &request,
-        )
-        .expect("container file"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::create_container_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn container_files_list_handler(
+pub(crate) async fn container_files_list_handler(
     request_context: StatelessGatewayRequest,
     Path(container_id): Path<String>,
 ) -> Response {
@@ -47,18 +64,19 @@ pub(super) async fn container_files_list_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::list_container_files(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-        )
-        .expect("container files list"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::list_container_files(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn container_file_retrieve_handler(
+pub(crate) async fn container_file_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((container_id, file_id)): Path<(String, String)>,
 ) -> Response {
@@ -75,19 +93,20 @@ pub(super) async fn container_file_retrieve_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::get_container_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-            &file_id,
-        )
-        .expect("container file retrieve"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::get_container_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn container_file_delete_handler(
+pub(crate) async fn container_file_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((container_id, file_id)): Path<(String, String)>,
 ) -> Response {
@@ -104,19 +123,20 @@ pub(super) async fn container_file_delete_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_container_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-            &file_id,
-        )
-        .expect("container file delete"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::delete_container_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+        &file_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn container_file_content_handler(
+pub(crate) async fn container_file_content_handler(
     request_context: StatelessGatewayRequest,
     Path((container_id, file_id)): Path<(String, String)>,
 ) -> Response {

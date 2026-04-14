@@ -66,9 +66,7 @@ impl<'a> ProviderRequestRewrite<'a> {
     }
 }
 
-fn provider_request_canonical_model_id<'a>(
-    request: &'a ProviderRequest<'a>,
-) -> Option<&'a str> {
+fn provider_request_canonical_model_id<'a>(request: &'a ProviderRequest<'a>) -> Option<&'a str> {
     match request {
         ProviderRequest::ModelsRetrieve(model_id) | ProviderRequest::ModelsDelete(model_id) => {
             Some(model_id)
@@ -156,8 +154,8 @@ async fn rewrite_provider_request_for_execution<'a>(
     provider: &ProxyProvider,
     request: ProviderRequest<'a>,
 ) -> Result<ProviderRequestRewrite<'a>> {
-    let Some(provider_model_id) = resolve_provider_model_id_for_request(store, provider, &request)
-        .await?
+    let Some(provider_model_id) =
+        resolve_provider_model_id_for_request(store, provider, &request).await?
     else {
         return Ok(ProviderRequestRewrite::Borrowed(request));
     };
@@ -495,11 +493,7 @@ pub(crate) async fn execute_stream_provider_request_for_descriptor_with_options(
             Ok(response) => {
                 record_gateway_upstream_outcome(capability, &descriptor.provider_id, "success");
                 persist_gateway_execution_health_snapshot(
-                    store,
-                    descriptor,
-                    true,
-                    capability,
-                    None,
+                    store, descriptor, true, capability, None,
                 )
                 .await;
                 return Ok(response.into_stream());
@@ -1325,23 +1319,6 @@ pub async fn execute_raw_stream_provider_operation_from_planned_execution_contex
         retry_policy,
     )
     .await
-}
-
-pub(crate) fn fallback_speech_bytes(format: &str) -> Vec<u8> {
-    match format {
-        "wav" => vec![
-            0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d,
-            0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00,
-            0x80, 0x3e, 0x00, 0x00, 0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00,
-            0x00, 0x00,
-        ],
-        "mp3" => vec![0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x21],
-        "opus" => b"OggS\x00\x02OpusHead\x01\x01\x00\x00\x00\x00\x00\x00\x00".to_vec(),
-        "aac" => vec![0xFF, 0xF1, 0x50, 0x80, 0x00, 0x1F, 0xFC],
-        "flac" => b"fLaC\x00\x00\x00\x22".to_vec(),
-        "pcm" => vec![0x00, 0x00],
-        _ => Vec::new(),
-    }
 }
 
 pub(crate) fn normalize_local_speech_format(format: &str) -> Result<&'static str> {

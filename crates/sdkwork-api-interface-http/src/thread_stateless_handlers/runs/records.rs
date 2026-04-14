@@ -1,6 +1,23 @@
 use super::*;
 
-pub(super) async fn thread_runs_list_handler(
+fn local_thread_run_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.to_ascii_lowercase().contains("run not found") {
+        return local_gateway_invalid_or_not_found_response(
+            error,
+            "invalid_thread_run_request",
+            "Requested thread run was not found.",
+        );
+    }
+
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_thread_run_request",
+        "Requested thread was not found.",
+    )
+}
+
+pub(crate) async fn thread_runs_list_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
 ) -> Response {
@@ -17,18 +34,19 @@ pub(super) async fn thread_runs_list_handler(
         }
     }
 
-    Json(
-        list_thread_runs(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread runs list"),
-    )
-    .into_response()
+    let response = match list_thread_runs(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_retrieve_handler(
+pub(crate) async fn thread_run_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -45,19 +63,20 @@ pub(super) async fn thread_run_retrieve_handler(
         }
     }
 
-    Json(
-        get_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run"),
-    )
-    .into_response()
+    let response = match get_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_update_handler(
+pub(crate) async fn thread_run_update_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<UpdateRunRequest>,
@@ -75,19 +94,20 @@ pub(super) async fn thread_run_update_handler(
         }
     }
 
-    Json(
-        update_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run update"),
-    )
-    .into_response()
+    let response = match update_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_cancel_handler(
+pub(crate) async fn thread_run_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, run_id)): Path<(String, String)>,
 ) -> Response {
@@ -104,14 +124,15 @@ pub(super) async fn thread_run_cancel_handler(
         }
     }
 
-    Json(
-        cancel_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run cancel"),
-    )
-    .into_response()
+    let response = match cancel_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }

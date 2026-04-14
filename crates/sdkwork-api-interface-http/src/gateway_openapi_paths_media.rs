@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 
     #[utoipa::path(
         post,
@@ -13,7 +13,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the image generation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn image_generations() {}
+    pub(crate) async fn image_generations() {}
 
     #[utoipa::path(
         post,
@@ -32,7 +32,7 @@ use super::*;
             (status = 500, description = "Gateway failed to edit the image.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn image_edits() {}
+    pub(crate) async fn image_edits() {}
 
     #[utoipa::path(
         post,
@@ -51,7 +51,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the image variation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn image_variations() {}
+    pub(crate) async fn image_variations() {}
 
     #[utoipa::path(
         post,
@@ -66,7 +66,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the transcription.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn transcriptions() {}
+    pub(crate) async fn transcriptions() {}
 
     #[utoipa::path(
         post,
@@ -81,7 +81,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the translation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn translations() {}
+    pub(crate) async fn translations() {}
 
     #[utoipa::path(
         post,
@@ -96,7 +96,7 @@ use super::*;
             (status = 500, description = "Gateway failed to synthesize speech.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn audio_speech() {}
+    pub(crate) async fn audio_speech() {}
 
     #[utoipa::path(
         get,
@@ -109,7 +109,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the voice catalog.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn audio_voices() {}
+    pub(crate) async fn audio_voices() {}
 
     #[utoipa::path(
         post,
@@ -124,4 +124,5 @@ use super::*;
             (status = 500, description = "Gateway failed to create the audio voice consent.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn audio_voice_consents() {}
+    pub(crate) async fn audio_voice_consents() {}
+

@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_compat_and_model_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_compat_and_model_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route("/v1/messages", post(anthropic_messages_handler))
         .route(

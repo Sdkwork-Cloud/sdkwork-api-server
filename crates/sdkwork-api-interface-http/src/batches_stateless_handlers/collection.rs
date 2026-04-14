@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn batches_handler(
+fn local_batch_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_batch_request",
+        "Requested batch was not found.",
+    )
+}
+
+pub(crate) async fn batches_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateBatchRequest>,
 ) -> Response {
@@ -12,19 +20,19 @@ pub(super) async fn batches_handler(
         }
     }
 
-    Json(
-        create_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.endpoint,
-            &request.input_file_id,
-        )
-        .expect("batch"),
-    )
-    .into_response()
+    let response = match create_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Response {
+pub(crate) async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::BatchesList).await {
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
@@ -33,9 +41,10 @@ pub(super) async fn batches_list_handler(request_context: StatelessGatewayReques
         }
     }
 
-    Json(
-        list_batches(request_context.tenant_id(), request_context.project_id())
-            .expect("batches list"),
-    )
-    .into_response()
+    let response = match list_batches(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
+    Json(response).into_response()
 }

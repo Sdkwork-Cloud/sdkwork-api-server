@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn transcriptions_handler(
+fn local_audio_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_audio_request")
+}
+
+pub(crate) async fn transcriptions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranscriptionRequest>,
 ) -> Response {
@@ -17,18 +21,19 @@ pub(super) async fn transcriptions_handler(
         }
     }
 
-    Json(
-        create_transcription(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("transcription"),
-    )
-    .into_response()
+    let response = match create_transcription(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn translations_handler(
+pub(crate) async fn translations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranslationRequest>,
 ) -> Response {
@@ -45,18 +50,19 @@ pub(super) async fn translations_handler(
         }
     }
 
-    Json(
-        create_translation(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("translation"),
-    )
-    .into_response()
+    let response = match create_translation(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn audio_speech_handler(
+pub(crate) async fn audio_speech_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateSpeechRequest>,
 ) -> Response {
@@ -77,7 +83,7 @@ pub(super) async fn audio_speech_handler(
     )
 }
 
-pub(super) async fn audio_voices_handler(request_context: StatelessGatewayRequest) -> Response {
+pub(crate) async fn audio_voices_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::AudioVoicesList).await {
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
@@ -86,14 +92,16 @@ pub(super) async fn audio_voices_handler(request_context: StatelessGatewayReques
         }
     }
 
-    Json(
-        list_audio_voices(request_context.tenant_id(), request_context.project_id())
-            .expect("audio voices list"),
-    )
-    .into_response()
+    let response =
+        match list_audio_voices(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(error) => return local_audio_error_response(error),
+        };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn audio_voice_consents_handler(
+pub(crate) async fn audio_voice_consents_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVoiceConsentRequest>,
 ) -> Response {
@@ -110,13 +118,14 @@ pub(super) async fn audio_voice_consents_handler(
         }
     }
 
-    Json(
-        create_audio_voice_consent(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("audio voice consent"),
-    )
-    .into_response()
+    let response = match create_audio_voice_consent(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
+    Json(response).into_response()
 }

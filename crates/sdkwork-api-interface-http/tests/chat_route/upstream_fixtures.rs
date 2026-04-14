@@ -11,7 +11,6 @@ fn capture_upstream_request(
     state.request_count.fetch_add(1, Ordering::SeqCst) + 1
 }
 
-
 pub(super) async fn upstream_chat_handler(
     State(state): State<UpstreamCaptureState>,
     headers: axum::http::HeaderMap,

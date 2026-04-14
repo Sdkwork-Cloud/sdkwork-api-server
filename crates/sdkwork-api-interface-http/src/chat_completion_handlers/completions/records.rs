@@ -1,6 +1,32 @@
 use super::*;
 
-pub(super) async fn chat_completions_list_with_state_handler(
+fn local_chat_completion_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_chat_completion_request",
+        "Requested chat completion was not found.",
+    )
+}
+
+fn local_chat_completion_list_error_response() -> Response {
+    invalid_request_openai_response(
+        "Local chat completion listing fallback is not supported without an upstream provider.",
+        "invalid_chat_completion_request",
+    )
+}
+
+fn local_chat_completion_update_metadata(
+    request: &UpdateChatCompletionRequest,
+) -> Result<Value, Response> {
+    request.metadata.clone().ok_or_else(|| {
+        invalid_request_openai_response(
+            "Chat completion metadata is required for local fallback updates.",
+            "invalid_chat_completion_request",
+        )
+    })
+}
+
+pub(crate) async fn chat_completions_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
@@ -40,6 +66,12 @@ pub(super) async fn chat_completions_list_with_state_handler(
         }
     }
 
+    let response =
+        match list_chat_completions(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(_) => return local_chat_completion_list_error_response(),
+        };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -59,14 +91,10 @@ pub(super) async fn chat_completions_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_chat_completions(request_context.tenant_id(), request_context.project_id())
-            .expect("chat completions"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn chat_completion_retrieve_with_state_handler(
+pub(crate) async fn chat_completion_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(completion_id): Path<String>,
@@ -110,6 +138,15 @@ pub(super) async fn chat_completion_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -129,18 +166,10 @@ pub(super) async fn chat_completion_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-        )
-        .expect("chat completion"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn chat_completion_update_with_state_handler(
+pub(crate) async fn chat_completion_update_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(completion_id): Path<String>,
@@ -184,6 +213,20 @@ pub(super) async fn chat_completion_update_with_state_handler(
         }
     }
 
+    let metadata = match local_chat_completion_update_metadata(&request) {
+        Ok(metadata) => metadata,
+        Err(response) => return response,
+    };
+    let response = match update_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+        metadata,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -203,19 +246,10 @@ pub(super) async fn chat_completion_update_with_state_handler(
             .into_response();
     }
 
-    Json(
-        update_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-            request.metadata.unwrap_or(serde_json::json!({})),
-        )
-        .expect("chat completion update"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn chat_completion_delete_with_state_handler(
+pub(crate) async fn chat_completion_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(completion_id): Path<String>,
@@ -257,6 +291,15 @@ pub(super) async fn chat_completion_delete_with_state_handler(
         }
     }
 
+    let response = match delete_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -276,13 +319,5 @@ pub(super) async fn chat_completion_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        delete_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-        )
-        .expect("chat completion delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

@@ -7,11 +7,7 @@ async fn stateful_thread_runs_create_route_returns_not_found_without_usage() {
         admin_token,
         api_key,
         gateway_app,
-    } = local_runs_test_context(
-        "tenant-run-create-missing",
-        "project-run-create-missing",
-    )
-    .await;
+    } = local_runs_test_context("tenant-run-create-missing", "project-run-create-missing").await;
 
     let response = gateway_app
         .oneshot(

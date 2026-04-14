@@ -1,3 +1,10 @@
+fn local_webhook_list_error_response() -> Response {
+    invalid_request_openai_response(
+        "Local webhook listing fallback is not supported without an upstream provider.",
+        "invalid_webhook_request",
+    )
+}
+
 async fn webhooks_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateWebhookRequest>,
@@ -11,16 +18,15 @@ async fn webhooks_handler(
         }
     }
 
-    Json(
-        create_webhook(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.url,
-            &request.events,
-        )
-        .expect("webhook"),
-    )
-    .into_response()
+    match create_webhook(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.url,
+        &request.events,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_gateway_invalid_or_bad_gateway_response(error, "invalid_webhook_request"),
+    }
 }
 
 async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -32,15 +38,20 @@ async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Resp
         }
     }
 
-    Json(
-        list_webhooks(request_context.tenant_id(), request_context.project_id())
-            .expect("webhooks list"),
-    )
-    .into_response()
+    let response = match list_webhooks(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(_) => return local_webhook_list_error_response(),
+    };
+
+    Json(response).into_response()
 }
 
 fn local_webhook_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested webhook was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_webhook_request",
+        "Requested webhook was not found.",
+    )
 }
 
 fn local_webhook_retrieve_result(
@@ -81,6 +92,15 @@ fn local_webhook_update_response(
         Ok(response) => Json(response).into_response(),
         Err(response) => response,
     }
+}
+
+fn local_webhook_update_url<'a>(request: &'a UpdateWebhookRequest) -> Result<&'a str, Response> {
+    request.url.as_deref().ok_or_else(|| {
+        invalid_request_openai_response(
+            "Webhook url is required for local fallback updates.",
+            "invalid_webhook_request",
+        )
+    })
 }
 
 fn local_webhook_delete_result(
@@ -140,14 +160,16 @@ async fn webhook_update_handler(
         }
     }
 
+    let webhook_url = match local_webhook_update_url(&request) {
+        Ok(url) => url,
+        Err(response) => return response,
+    };
+
     local_webhook_update_response(
         request_context.tenant_id(),
         request_context.project_id(),
         &webhook_id,
-        request
-            .url
-            .as_deref()
-            .unwrap_or("https://example.com/webhook"),
+        webhook_url,
     )
 }
 
@@ -191,10 +213,9 @@ async fn webhooks_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let webhook_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.url.as_str());
+            let Some(webhook_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream webhook response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -223,13 +244,20 @@ async fn webhooks_with_state_handler(
         }
     }
 
-    let response = create_webhook(
+    let response = match create_webhook(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.url,
         &request.events,
-    )
-    .expect("webhook");
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(
+                error,
+                "invalid_webhook_request",
+            );
+        }
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -294,6 +322,11 @@ async fn webhooks_list_with_state_handler(
         }
     }
 
+    let response = match list_webhooks(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(_) => return local_webhook_list_error_response(),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -313,11 +346,7 @@ async fn webhooks_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_webhooks(request_context.tenant_id(), request_context.project_id())
-            .expect("webhooks list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn webhook_retrieve_with_state_handler(
@@ -439,14 +468,15 @@ async fn webhook_update_with_state_handler(
     }
 
     let usage_target = request.url.as_deref().unwrap_or(webhook_id.as_str());
+    let webhook_url = match local_webhook_update_url(&request) {
+        Ok(url) => url,
+        Err(response) => return response,
+    };
     let response = match local_webhook_update_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &webhook_id,
-        request
-            .url
-            .as_deref()
-            .unwrap_or("https://example.com/webhook"),
+        webhook_url,
     ) {
         Ok(response) => response,
         Err(response) => return response,

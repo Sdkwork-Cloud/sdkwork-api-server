@@ -3,5 +3,5 @@ use super::*;
 mod document;
 mod presentation;
 
-pub(super) use self::document::*;
-pub(super) use self::presentation::*;
+pub(crate) use self::document::*;
+pub(crate) use self::presentation::*;

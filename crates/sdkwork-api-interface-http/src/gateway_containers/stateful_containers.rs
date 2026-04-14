@@ -13,10 +13,9 @@ async fn containers_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let container_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.name.as_str());
+            let Some(container_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream container response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -51,7 +50,12 @@ async fn containers_with_state_handler(
         &request,
     ) {
         Ok(response) => response,
-        Err(error) => return bad_gateway_openai_response(error.to_string()),
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(
+                error,
+                "invalid_container_request",
+            );
+        }
     };
 
     if record_gateway_usage_for_project_with_route_key(
@@ -122,7 +126,12 @@ async fn containers_list_with_state_handler(
         request_context.project_id(),
     ) {
         Ok(response) => response,
-        Err(error) => return bad_gateway_openai_response(error.to_string()),
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(
+                error,
+                "invalid_container_request",
+            );
+        }
     };
 
     if record_gateway_usage_for_project(

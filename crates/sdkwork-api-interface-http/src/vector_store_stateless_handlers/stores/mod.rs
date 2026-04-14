@@ -3,5 +3,5 @@ use super::*;
 mod records;
 mod search;
 
-pub(super) use self::records::*;
-pub(super) use self::search::*;
+pub(crate) use self::records::*;
+pub(crate) use self::search::*;

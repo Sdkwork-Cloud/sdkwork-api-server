@@ -1,5 +1,4 @@
 use anyhow::{bail, Context, Result};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sdkwork_api_app_credential::{
     official_provider_secret_configured, resolve_credential_secret_with_manager,
     resolve_official_provider_secret_with_manager,
@@ -22,13 +21,12 @@ use sdkwork_api_contract_openai::assistants::{
 use sdkwork_api_contract_openai::audio::{
     CreateSpeechRequest, CreateTranscriptionRequest, CreateTranslationRequest,
     CreateVoiceConsentRequest, ListVoicesResponse, SpeechResponse, TranscriptionObject,
-    TranslationObject, VoiceConsentObject, VoiceObject,
+    TranslationObject, VoiceConsentObject,
 };
 use sdkwork_api_contract_openai::batches::{BatchObject, CreateBatchRequest, ListBatchesResponse};
 use sdkwork_api_contract_openai::chat_completions::{
-    ChatCompletionMessageObject, ChatCompletionResponse, CreateChatCompletionRequest,
-    DeleteChatCompletionResponse, ListChatCompletionMessagesResponse, ListChatCompletionsResponse,
-    UpdateChatCompletionRequest,
+    ChatCompletionResponse, CreateChatCompletionRequest, DeleteChatCompletionResponse,
+    ListChatCompletionMessagesResponse, ListChatCompletionsResponse, UpdateChatCompletionRequest,
 };
 use sdkwork_api_contract_openai::completions::{CompletionObject, CreateCompletionRequest};
 use sdkwork_api_contract_openai::containers::{
@@ -53,19 +51,15 @@ use sdkwork_api_contract_openai::files::{
 };
 use sdkwork_api_contract_openai::fine_tuning::{
     CreateFineTuningCheckpointPermissionsRequest, CreateFineTuningJobRequest,
-    DeleteFineTuningCheckpointPermissionResponse, FineTuningCheckpointPermissionObject,
-    FineTuningJobCheckpointObject, FineTuningJobEventObject, FineTuningJobObject,
+    DeleteFineTuningCheckpointPermissionResponse, FineTuningJobObject,
     ListFineTuningCheckpointPermissionsResponse, ListFineTuningJobCheckpointsResponse,
     ListFineTuningJobEventsResponse, ListFineTuningJobsResponse,
 };
 use sdkwork_api_contract_openai::images::{
-    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageObject,
-    ImagesResponse,
+    CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImagesResponse,
 };
 use sdkwork_api_contract_openai::models::{DeleteModelResponse, ListModelsResponse, ModelObject};
-use sdkwork_api_contract_openai::moderations::{
-    CreateModerationRequest, ModerationCategoryScores, ModerationResponse, ModerationResult,
-};
+use sdkwork_api_contract_openai::moderations::{CreateModerationRequest, ModerationResponse};
 use sdkwork_api_contract_openai::music::{
     CreateMusicLyricsRequest, CreateMusicRequest, DeleteMusicResponse, MusicLyricsObject,
     MusicObject, MusicTracksResponse,
@@ -74,7 +68,7 @@ use sdkwork_api_contract_openai::realtime::{CreateRealtimeSessionRequest, Realti
 use sdkwork_api_contract_openai::responses::{
     CompactResponseRequest, CountResponseInputTokensRequest, CreateResponseRequest,
     DeleteResponseResponse, ListResponseInputItemsResponse, ResponseCompactionObject,
-    ResponseInputItemObject, ResponseInputTokensObject, ResponseObject,
+    ResponseInputTokensObject, ResponseObject,
 };
 use sdkwork_api_contract_openai::runs::{
     CreateRunRequest, CreateThreadAndRunRequest, ListRunStepsResponse, ListRunsResponse, RunObject,
@@ -144,6 +138,10 @@ use tokio::time::MissedTickBehavior;
 
 pub const LOCAL_PROVIDER_ID: &str = "sdkwork.local";
 
+pub(crate) fn local_object_id_matches(id: &str, prefix: &str) -> bool {
+    id.starts_with(&format!("{prefix}_local_"))
+}
+
 tokio::task_local! {
     static REQUEST_ROUTING_REGION: Option<String>;
 }
@@ -201,14 +199,12 @@ pub(crate) use gateway_routing::{
     select_gateway_route,
 };
 pub(crate) use gateway_runtime_execution::{
-    execute_json_provider_request_for_descriptor_with_options,
-    execute_json_provider_request, execute_json_provider_request_for_provider,
+    execute_json_provider_request, execute_json_provider_request_for_descriptor_with_options,
+    execute_json_provider_request_for_provider,
     execute_stream_provider_request_for_descriptor_with_options,
-    execute_stream_provider_request_for_provider,
-    fallback_speech_bytes,
-    normalize_local_speech_format, record_gateway_execution_failover,
-    provider_execution_descriptor_from_planned_context, record_gateway_provider_health,
-    record_gateway_provider_health_persist_failure,
+    execute_stream_provider_request_for_provider, normalize_local_speech_format,
+    provider_execution_descriptor_from_planned_context, record_gateway_execution_failover,
+    record_gateway_provider_health, record_gateway_provider_health_persist_failure,
     record_gateway_recovery_probe_from_decision,
 };
 

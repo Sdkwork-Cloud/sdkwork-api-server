@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-mod auth;
 mod audit;
+mod auth;
 mod billing;
 mod catalog;
 mod commerce;
@@ -28,11 +28,14 @@ use axum::{
     extract::FromRequestParts,
     extract::Path,
     extract::Query,
+    extract::Request,
     extract::State,
     http::header,
     http::request::Parts,
     http::HeaderMap,
+    http::Method,
     http::StatusCode,
+    middleware::Next,
     response::{Html, IntoResponse},
     routing::{delete, get, patch, post, put},
     Json, Router,
@@ -135,8 +138,8 @@ use sdkwork_api_domain_commerce::{
 };
 use sdkwork_api_domain_credential::{OfficialProviderConfig, UpstreamCredential};
 use sdkwork_api_domain_identity::{
-    AdminAuditEventRecord, AdminUserProfile, AdminUserRole, ApiKeyGroupRecord,
-    GatewayApiKeyRecord, PortalUserProfile,
+    AdminAuditEventRecord, AdminUserProfile, AdminUserRole, ApiKeyGroupRecord, GatewayApiKeyRecord,
+    PortalUserProfile,
 };
 use sdkwork_api_domain_jobs::{
     AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobCallbackRecord, AsyncJobRecord,
@@ -424,6 +427,34 @@ impl AuthenticatedAdminClaims {
     }
 }
 
+async fn load_authenticated_admin_claims(
+    headers: &HeaderMap,
+    state: &AdminApiState,
+) -> Result<AuthenticatedAdminClaims, StatusCode> {
+    let Some(header_value) = headers.get(header::AUTHORIZATION) else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+    let Ok(header_value) = header_value.to_str() else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+    let Some(token) = header_value
+        .strip_prefix("Bearer ")
+        .or_else(|| header_value.strip_prefix("bearer "))
+    else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let claims =
+        verify_jwt(token, &state.jwt_signing_secret).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let user = load_admin_user_profile(state.store.as_ref(), &claims.sub)
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?
+        .filter(|user| user.active)
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    Ok(AuthenticatedAdminClaims { claims, user })
+}
+
 impl FromRequestParts<AdminApiState> for AuthenticatedAdminClaims {
     type Rejection = StatusCode;
 
@@ -431,28 +462,11 @@ impl FromRequestParts<AdminApiState> for AuthenticatedAdminClaims {
         parts: &mut Parts,
         state: &AdminApiState,
     ) -> Result<Self, Self::Rejection> {
-        let Some(header_value) = parts.headers.get(header::AUTHORIZATION) else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
-        let Ok(header_value) = header_value.to_str() else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
-        let Some(token) = header_value
-            .strip_prefix("Bearer ")
-            .or_else(|| header_value.strip_prefix("bearer "))
-        else {
-            return Err(StatusCode::UNAUTHORIZED);
-        };
+        if let Some(claims) = parts.extensions.get::<AuthenticatedAdminClaims>() {
+            return Ok(claims.clone());
+        }
 
-        let claims =
-            verify_jwt(token, &state.jwt_signing_secret).map_err(|_| StatusCode::UNAUTHORIZED)?;
-        let user = load_admin_user_profile(state.store.as_ref(), &claims.sub)
-            .await
-            .map_err(|_| StatusCode::UNAUTHORIZED)?
-            .filter(|user| user.active)
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-
-        Ok(Self { claims, user })
+        load_authenticated_admin_claims(&parts.headers, state).await
     }
 }
 
@@ -461,11 +475,19 @@ enum AdminPrivilege {
     BillingRead,
     CatalogRead,
     CatalogWrite,
+    CommerceRead,
+    CommerceWrite,
     FinanceWrite,
     SecretRead,
     SecretWrite,
     IdentityRead,
     IdentityWrite,
+    RuntimeRead,
+    RuntimeWrite,
+    RoutingRead,
+    RoutingWrite,
+    MarketingRead,
+    MarketingWrite,
 }
 
 fn role_allows_privilege(role: AdminUserRole, privilege: AdminPrivilege) -> bool {
@@ -475,13 +497,30 @@ fn role_allows_privilege(role: AdminUserRole, privilege: AdminPrivilege) -> bool
             privilege,
             AdminPrivilege::BillingRead
                 | AdminPrivilege::CatalogRead
+                | AdminPrivilege::CommerceRead
+                | AdminPrivilege::CommerceWrite
                 | AdminPrivilege::FinanceWrite
         ),
         AdminUserRole::PlatformOperator => matches!(
             privilege,
-            AdminPrivilege::CatalogRead | AdminPrivilege::CatalogWrite
+            AdminPrivilege::CatalogRead
+                | AdminPrivilege::CatalogWrite
+                | AdminPrivilege::RuntimeRead
+                | AdminPrivilege::RuntimeWrite
+                | AdminPrivilege::RoutingRead
+                | AdminPrivilege::RoutingWrite
+                | AdminPrivilege::MarketingRead
+                | AdminPrivilege::MarketingWrite
+                | AdminPrivilege::CommerceRead
         ),
-        AdminUserRole::ReadOnlyOperator => matches!(privilege, AdminPrivilege::CatalogRead),
+        AdminUserRole::ReadOnlyOperator => matches!(
+            privilege,
+            AdminPrivilege::CatalogRead
+                | AdminPrivilege::RuntimeRead
+                | AdminPrivilege::RoutingRead
+                | AdminPrivilege::MarketingRead
+                | AdminPrivilege::CommerceRead
+        ),
     }
 }
 
@@ -606,4 +645,177 @@ fn normalize_optional_admin_text(value: Option<String>) -> Option<String> {
         let trimmed = text.trim();
         (!trimmed.is_empty()).then(|| trimmed.to_owned())
     })
+}
+
+#[derive(Clone, Copy)]
+enum AdminRouteAccess {
+    Public,
+    Authenticated,
+    Privileged(AdminPrivilege),
+}
+
+fn admin_read_method(method: &Method) -> bool {
+    method == Method::GET || method == Method::HEAD
+}
+
+fn admin_route_access(method: &Method, path: &str) -> AdminRouteAccess {
+    if path == "/admin/health" || path == "/admin/auth/login" {
+        return AdminRouteAccess::Public;
+    }
+
+    if path == "/admin/auth/me" || path == "/admin/auth/change-password" {
+        return AdminRouteAccess::Authenticated;
+    }
+
+    let read = admin_read_method(method);
+
+    if path == "/admin/api-keys" || path.starts_with("/admin/api-keys/") {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::SecretRead
+        } else {
+            AdminPrivilege::SecretWrite
+        });
+    }
+
+    if path == "/admin/credentials"
+        || path.starts_with("/admin/credentials/")
+        || path == "/admin/providers/official-configs"
+    {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::SecretRead
+        } else {
+            AdminPrivilege::SecretWrite
+        });
+    }
+
+    if path.starts_with("/admin/tenants/") && path.ends_with("/providers/readiness") {
+        return AdminRouteAccess::Privileged(AdminPrivilege::CatalogRead);
+    }
+
+    if path.starts_with("/admin/users/")
+        || path == "/admin/tenants"
+        || path.starts_with("/admin/tenants/")
+        || path == "/admin/projects"
+        || path.starts_with("/admin/projects/")
+        || path == "/admin/api-key-groups"
+        || path.starts_with("/admin/api-key-groups/")
+    {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::IdentityRead
+        } else {
+            AdminPrivilege::IdentityWrite
+        });
+    }
+
+    if path.starts_with("/admin/extensions/")
+        || path.starts_with("/admin/runtime-config/")
+        || path == "/admin/async-jobs"
+        || path.starts_with("/admin/async-jobs/")
+    {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::RuntimeRead
+        } else {
+            AdminPrivilege::RuntimeWrite
+        });
+    }
+
+    if path.starts_with("/admin/gateway/rate-limit-") || path.starts_with("/admin/routing/") {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::RoutingRead
+        } else {
+            AdminPrivilege::RoutingWrite
+        });
+    }
+
+    if path.starts_with("/admin/billing/")
+        || path.starts_with("/admin/usage/")
+        || path.starts_with("/admin/payments/")
+    {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::BillingRead
+        } else {
+            AdminPrivilege::FinanceWrite
+        });
+    }
+
+    if path.starts_with("/admin/commerce/") {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::CommerceRead
+        } else {
+            AdminPrivilege::CommerceWrite
+        });
+    }
+
+    if path.starts_with("/admin/marketing/") {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::MarketingRead
+        } else {
+            AdminPrivilege::MarketingWrite
+        });
+    }
+
+    if path == "/admin/channels"
+        || path.starts_with("/admin/channels/")
+        || path == "/admin/providers"
+        || path.starts_with("/admin/providers/")
+        || path == "/admin/channel-models"
+        || path.starts_with("/admin/channel-models/")
+        || path == "/admin/provider-accounts"
+        || path.starts_with("/admin/provider-accounts/")
+        || path == "/admin/provider-models"
+        || path.starts_with("/admin/provider-models/")
+        || path == "/admin/models"
+        || path.starts_with("/admin/models/")
+        || path == "/admin/model-prices"
+        || path.starts_with("/admin/model-prices/")
+    {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::CatalogRead
+        } else {
+            AdminPrivilege::CatalogWrite
+        });
+    }
+
+    if path.starts_with("/admin/") {
+        AdminRouteAccess::Authenticated
+    } else {
+        AdminRouteAccess::Public
+    }
+}
+
+fn admin_status_only_response(status: StatusCode) -> axum::response::Response {
+    let message = match status {
+        StatusCode::UNAUTHORIZED => "unauthorized",
+        StatusCode::FORBIDDEN => "forbidden",
+        _ => "request failed",
+    };
+    error_response(status, message).into_response()
+}
+
+async fn enforce_admin_route_access(
+    State(state): State<AdminApiState>,
+    mut request: Request,
+    next: Next,
+) -> axum::response::Response {
+    let path = request.uri().path().to_owned();
+    let method = request.method().clone();
+    let access = admin_route_access(&method, &path);
+
+    if matches!(access, AdminRouteAccess::Public) {
+        return next.run(request).await;
+    }
+
+    let claims = match load_authenticated_admin_claims(request.headers(), &state).await {
+        Ok(claims) => claims,
+        Err(status) => return admin_status_only_response(status),
+    };
+
+    if let AdminRouteAccess::Privileged(privilege) = access {
+        if require_admin_privilege(&claims, privilege).is_err() {
+            return admin_forbidden_response().into_response();
+        }
+    }
+
+    request.extensions_mut().insert(claims);
+    next.run(request).await
 }

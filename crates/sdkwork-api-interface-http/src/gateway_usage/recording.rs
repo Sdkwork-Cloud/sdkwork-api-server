@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn record_gateway_usage_for_project(
+pub(crate) async fn record_gateway_usage_for_project(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -15,7 +15,7 @@ pub(super) async fn record_gateway_usage_for_project(
     .await
 }
 
-pub(super) async fn record_gateway_usage_for_project_with_route_key(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -39,7 +39,7 @@ pub(super) async fn record_gateway_usage_for_project_with_route_key(
     .await
 }
 
-pub(super) async fn record_gateway_usage_for_project_with_route_key_and_tokens(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,

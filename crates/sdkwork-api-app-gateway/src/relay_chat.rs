@@ -863,16 +863,19 @@ pub fn create_chat_completion(
     _project_id: &str,
     model: &str,
 ) -> Result<ChatCompletionResponse> {
-    Ok(ChatCompletionResponse::empty("chatcmpl_1", model))
+    if model.trim().is_empty() {
+        bail!("Chat completion model is required.");
+    }
+
+    let _ = model;
+    bail!("Local chat completion fallback is not supported without an upstream provider.")
 }
 
 pub fn list_chat_completions(
     _tenant_id: &str,
     _project_id: &str,
 ) -> Result<ListChatCompletionsResponse> {
-    Ok(ListChatCompletionsResponse::new(vec![
-        ChatCompletionResponse::empty("chatcmpl_1", "gpt-4.1"),
-    ]))
+    bail!("Local chat completion listing fallback is not supported without an upstream provider.")
 }
 
 pub fn get_chat_completion(
@@ -881,7 +884,7 @@ pub fn get_chat_completion(
     completion_id: &str,
 ) -> Result<ChatCompletionResponse> {
     ensure_local_chat_completion_exists(completion_id)?;
-    Ok(ChatCompletionResponse::empty(completion_id, "gpt-4.1"))
+    bail!("chat completion not found")
 }
 
 pub fn update_chat_completion(
@@ -890,12 +893,9 @@ pub fn update_chat_completion(
     completion_id: &str,
     metadata: Value,
 ) -> Result<ChatCompletionResponse> {
+    let _ = metadata;
     ensure_local_chat_completion_exists(completion_id)?;
-    Ok(ChatCompletionResponse::with_metadata(
-        completion_id,
-        "gpt-4.1",
-        metadata,
-    ))
+    bail!("chat completion not found")
 }
 
 pub fn delete_chat_completion(
@@ -904,11 +904,11 @@ pub fn delete_chat_completion(
     completion_id: &str,
 ) -> Result<DeleteChatCompletionResponse> {
     ensure_local_chat_completion_exists(completion_id)?;
-    Ok(DeleteChatCompletionResponse::deleted(completion_id))
+    bail!("chat completion not found")
 }
 
 fn ensure_local_chat_completion_exists(completion_id: &str) -> Result<()> {
-    if completion_id != "chatcmpl_1" {
+    if !local_object_id_matches(completion_id, "chatcmpl") {
         bail!("chat completion not found");
     }
 
@@ -921,7 +921,5 @@ pub fn list_chat_completion_messages(
     completion_id: &str,
 ) -> Result<ListChatCompletionMessagesResponse> {
     ensure_local_chat_completion_exists(completion_id)?;
-    Ok(ListChatCompletionMessagesResponse::new(vec![
-        ChatCompletionMessageObject::assistant("msg_1", "hello"),
-    ]))
+    bail!("Persisted local chat completion message state is required for local message listing.")
 }

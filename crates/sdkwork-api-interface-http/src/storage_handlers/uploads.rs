@@ -1,6 +1,30 @@
 use super::*;
 
-pub(super) async fn uploads_with_state_handler(
+fn local_upload_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_upload_request",
+        "Requested upload was not found.",
+    )
+}
+
+fn response_upload_id(response: &Value) -> Option<&str> {
+    response
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+}
+
+fn response_upload_status(response: &Value) -> Option<&str> {
+    response
+        .get("status")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|status| !status.is_empty())
+}
+
+pub(crate) async fn uploads_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateUploadRequest>,
@@ -15,10 +39,9 @@ pub(super) async fn uploads_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let upload_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.purpose.as_str());
+            let Some(upload_id) = response_upload_id(&response) else {
+                return bad_gateway_openai_response("upstream upload response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,12 +70,14 @@ pub(super) async fn uploads_with_state_handler(
         }
     }
 
-    let response = create_upload(
+    let response = match create_upload(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("upload");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -77,7 +102,7 @@ pub(super) async fn uploads_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn upload_parts_with_state_handler(
+pub(crate) async fn upload_parts_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
@@ -98,10 +123,9 @@ pub(super) async fn upload_parts_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let part_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.upload_id.as_str());
+            let Some(part_id) = response_upload_id(&response) else {
+                return bad_gateway_openai_response("upstream upload part response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -130,12 +154,14 @@ pub(super) async fn upload_parts_with_state_handler(
         }
     }
 
-    let response = create_upload_part(
+    let response = match create_upload_part(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("upload part");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -160,7 +186,7 @@ pub(super) async fn upload_parts_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn upload_complete_with_state_handler(
+pub(crate) async fn upload_complete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
@@ -178,6 +204,13 @@ pub(super) async fn upload_complete_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
+            if response_upload_id(&response).is_none()
+                || response_upload_status(&response) != Some("completed")
+            {
+                return bad_gateway_openai_response(
+                    "upstream upload completion response missing id or completed status",
+                );
+            }
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -205,6 +238,18 @@ pub(super) async fn upload_complete_with_state_handler(
         }
     }
 
+    let response = match complete_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+    if response.id.trim().is_empty() || response.status != "completed" {
+        return bad_gateway_openai_response("failed to process local upload completion fallback");
+    }
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -224,18 +269,10 @@ pub(super) async fn upload_complete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        complete_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("upload complete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn upload_cancel_with_state_handler(
+pub(crate) async fn upload_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(upload_id): Path<String>,
@@ -250,6 +287,13 @@ pub(super) async fn upload_cancel_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
+            if response_upload_id(&response).is_none()
+                || response_upload_status(&response) != Some("cancelled")
+            {
+                return bad_gateway_openai_response(
+                    "upstream upload cancellation response missing id or cancelled status",
+                );
+            }
             if record_gateway_usage_for_project(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -277,6 +321,18 @@ pub(super) async fn upload_cancel_with_state_handler(
         }
     }
 
+    let response = match cancel_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &upload_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+    if response.id.trim().is_empty() || response.status != "cancelled" {
+        return bad_gateway_openai_response("failed to process local upload cancellation fallback");
+    }
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -296,13 +352,5 @@ pub(super) async fn upload_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        cancel_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &upload_id,
-        )
-        .expect("upload cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

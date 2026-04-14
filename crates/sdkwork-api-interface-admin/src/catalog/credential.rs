@@ -20,7 +20,7 @@ pub(crate) async fn list_credentials_handler(
 }
 
 pub(crate) async fn create_credential_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateCredentialRequest>,
 ) -> Result<(StatusCode, Json<UpstreamCredential>), StatusCode> {
@@ -34,6 +34,18 @@ pub(crate) async fn create_credential_handler(
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "credential.create",
+        "credential",
+        format!(
+            "{}:{}:{}",
+            credential.tenant_id, credential.provider_id, credential.key_reference
+        ),
+        audit::APPROVAL_SCOPE_SECRET_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(credential)))
 }
 
@@ -56,7 +68,7 @@ pub(crate) async fn list_official_provider_configs_handler(
 }
 
 pub(crate) async fn upsert_official_provider_config_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<UpsertOfficialProviderConfigRequest>,
 ) -> Result<(StatusCode, Json<OfficialProviderConfigResponse>), StatusCode> {
@@ -84,6 +96,16 @@ pub(crate) async fn upsert_official_provider_config_handler(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     };
 
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "official_provider_config.upsert",
+        "official_provider_config",
+        config.provider_id.clone(),
+        audit::APPROVAL_SCOPE_SECRET_CONTROL,
+    )
+    .await?;
+
     Ok((
         StatusCode::CREATED,
         Json(
@@ -95,7 +117,7 @@ pub(crate) async fn upsert_official_provider_config_handler(
 }
 
 pub(crate) async fn delete_credential_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path((tenant_id, provider_id, key_reference)): Path<(String, String, String)>,
 ) -> Result<StatusCode, StatusCode> {
@@ -110,6 +132,15 @@ pub(crate) async fn delete_credential_handler(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if deleted {
+        audit::record_admin_audit_event(
+            &state,
+            &claims,
+            "credential.delete",
+            "credential",
+            format!("{tenant_id}:{provider_id}:{key_reference}"),
+            audit::APPROVAL_SCOPE_SECRET_CONTROL,
+        )
+        .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)

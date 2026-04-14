@@ -1,3 +1,5 @@
+use super::*;
+
 const DEFAULT_STATELESS_TENANT_ID: &str = "sdkwork-stateless";
 const DEFAULT_STATELESS_PROJECT_ID: &str = "sdkwork-stateless-default";
 
@@ -7,10 +9,10 @@ pub struct GatewayApiState {
     live_secret_manager: Reloadable<CredentialSecretManager>,
     live_commercial_billing: Option<Reloadable<Arc<dyn GatewayCommercialBillingKernel>>>,
     live_payment_store: Option<Reloadable<Arc<dyn CommercialKernelStore>>>,
-    store: Arc<dyn AdminStore>,
-    identity_store: Option<Arc<dyn IdentityKernelStore>>,
-    secret_manager: CredentialSecretManager,
-    commercial_billing: Option<Arc<dyn GatewayCommercialBillingKernel>>,
+    pub(crate) store: Arc<dyn AdminStore>,
+    pub(crate) identity_store: Option<Arc<dyn IdentityKernelStore>>,
+    pub(crate) secret_manager: CredentialSecretManager,
+    pub(crate) commercial_billing: Option<Arc<dyn GatewayCommercialBillingKernel>>,
 }
 
 impl Clone for GatewayApiState {
@@ -184,4 +186,3 @@ tokio::task_local! {
 tokio::task_local! {
     static CURRENT_GATEWAY_REQUEST_STARTED_AT: Instant;
 }
-

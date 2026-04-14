@@ -1,14 +1,29 @@
 fn local_fine_tuning_job_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested fine-tuning job was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine-tuning job was not found.",
+    )
+}
+
+fn local_fine_tuning_job_create_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_fine_tuning_request")
 }
 
 fn local_fine_tuning_checkpoint_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested fine-tuning checkpoint was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine-tuning checkpoint was not found.",
+    )
 }
 
 fn local_fine_tuning_checkpoint_permission_not_found_response(error: anyhow::Error) -> Response {
-    if error
-        .to_string()
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_fine_tuning_request");
+    }
+    if message
         .to_ascii_lowercase()
         .contains("fine tuning checkpoint permission not found")
     {
@@ -156,10 +171,11 @@ async fn fine_tuning_jobs_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let fine_tuning_job_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.model.as_str());
+            let Some(fine_tuning_job_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream fine tuning job response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -188,12 +204,14 @@ async fn fine_tuning_jobs_with_state_handler(
         }
     }
 
-    let response = create_fine_tuning_job(
+    let response = match create_fine_tuning_job(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
-    )
-    .expect("fine tuning");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_create_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -258,6 +276,12 @@ async fn fine_tuning_jobs_list_with_state_handler(
         }
     }
 
+    let response =
+        match list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(error) => return local_fine_tuning_job_not_found_response(error),
+        };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -277,11 +301,7 @@ async fn fine_tuning_jobs_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_fine_tuning_jobs(request_context.tenant_id(), request_context.project_id())
-            .expect("fine tuning list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn fine_tuning_job_retrieve_with_state_handler(

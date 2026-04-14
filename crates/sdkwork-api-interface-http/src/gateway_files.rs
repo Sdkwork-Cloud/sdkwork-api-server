@@ -30,8 +30,12 @@ async fn files_list_handler(request_context: StatelessGatewayRequest) -> Respons
         }
     }
 
-    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
-        .into_response()
+    let response = match list_files(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn file_retrieve_handler(
@@ -98,28 +102,30 @@ async fn file_content_handler(
 }
 
 
+fn local_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(error, "invalid_file", "Requested file was not found.")
+}
+
 fn local_file_content_response(tenant_id: &str, project_id: &str, file_id: &str) -> Response {
     match file_content(tenant_id, project_id, file_id) {
-        Ok(bytes) => Response::builder()
+        Ok(bytes) => match Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/jsonl")
             .body(Body::from(bytes))
-            .expect("valid local file content response"),
-        Err(error) => local_gateway_error_response(error, "Requested file was not found."),
+        {
+            Ok(response) => response,
+            Err(_) => bad_gateway_openai_response("failed to process local file content fallback"),
+        },
+        Err(error) => local_file_error_response(error),
     }
 }
 
 fn local_file_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested file was not found.")
+    local_file_error_response(error)
 }
 
 fn local_file_create_error_response(error: anyhow::Error) -> Response {
-    let message = error.to_string();
-    if local_gateway_error_is_invalid_request(&message) {
-        return invalid_request_openai_response(message, "invalid_file");
-    }
-
-    bad_gateway_openai_response(message)
+    local_file_error_response(error)
 }
 
 fn local_file_create_result(
@@ -192,10 +198,9 @@ async fn files_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let file_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.purpose.as_str());
+            let Some(file_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream file response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -296,6 +301,11 @@ async fn files_list_with_state_handler(
         }
     }
 
+    let response = match list_files(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -315,8 +325,7 @@ async fn files_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
-        .into_response()
+    Json(response).into_response()
 }
 
 async fn file_retrieve_with_state_handler(
@@ -507,6 +516,15 @@ async fn file_content_with_state_handler(
         }
     }
 
+    let response = local_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    );
+    if !response.status().is_success() {
+        return response;
+    }
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -526,11 +544,7 @@ async fn file_content_with_state_handler(
             .into_response();
     }
 
-    local_file_content_response(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &file_id,
-    )
+    response
 }
 
 

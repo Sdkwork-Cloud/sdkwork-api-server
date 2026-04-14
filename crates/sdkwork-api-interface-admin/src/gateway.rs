@@ -55,7 +55,12 @@ pub(crate) async fn create_api_key_group_handler(
         audit::APPROVAL_SCOPE_IDENTITY_CONTROL,
     )
     .await
-    .map_err(|_| error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to record admin audit event"))?;
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
     Ok((StatusCode::CREATED, Json(group)))
 }
 
@@ -215,7 +220,12 @@ pub(crate) async fn create_api_key_handler(
         audit::APPROVAL_SCOPE_SECRET_CONTROL,
     )
     .await
-    .map_err(|_| error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to record admin audit event"))?;
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
     Ok((StatusCode::CREATED, Json(created)))
 }
 
@@ -342,7 +352,7 @@ pub(crate) async fn list_rate_limit_window_snapshots_handler(
 }
 
 pub(crate) async fn create_rate_limit_policy_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateRateLimitPolicyRequest>,
 ) -> Result<(StatusCode, Json<RateLimitPolicy>), StatusCode> {
@@ -362,6 +372,15 @@ pub(crate) async fn create_rate_limit_policy_handler(
     let policy = persist_rate_limit_policy(state.store.as_ref(), &policy)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "rate_limit_policy.create",
+        "rate_limit_policy",
+        policy.policy_id.clone(),
+        audit::APPROVAL_SCOPE_ROUTING_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(policy)))
 }
 

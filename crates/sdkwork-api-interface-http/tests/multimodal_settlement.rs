@@ -2,9 +2,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use axum::routing::{get, post};
 use axum::{extract::State, Json, Router};
-use sdkwork_api_app_identity::{
-    persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput,
-};
+use sdkwork_api_app_identity::{persist_gateway_api_key_with_metadata, PersistGatewayApiKeyInput};
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountHoldStatus,
     AccountRecord, AccountType, RequestSettlementStatus,

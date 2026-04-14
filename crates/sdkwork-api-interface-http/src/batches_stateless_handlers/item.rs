@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn batch_retrieve_handler(
+fn local_batch_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_batch_request",
+        "Requested batch was not found.",
+    )
+}
+
+pub(crate) async fn batch_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
 ) -> Response {
@@ -17,18 +25,19 @@ pub(super) async fn batch_retrieve_handler(
         }
     }
 
-    Json(
-        get_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &batch_id,
-        )
-        .expect("batch retrieve"),
-    )
-    .into_response()
+    let response = match get_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn batch_cancel_handler(
+pub(crate) async fn batch_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(batch_id): Path<String>,
 ) -> Response {
@@ -42,13 +51,14 @@ pub(super) async fn batch_cancel_handler(
         }
     }
 
-    Json(
-        cancel_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &batch_id,
-        )
-        .expect("batch cancel"),
-    )
-    .into_response()
+    let response = match cancel_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
+    Json(response).into_response()
 }

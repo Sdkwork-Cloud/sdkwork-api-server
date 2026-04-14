@@ -39,7 +39,12 @@ pub(crate) async fn upsert_operator_user_handler(
         audit::APPROVAL_SCOPE_IDENTITY_CONTROL,
     )
     .await
-    .map_err(|_| error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to record admin audit event"))?;
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
     Ok((StatusCode::CREATED, Json(user)))
 }
 
@@ -63,7 +68,12 @@ pub(crate) async fn update_operator_user_status_handler(
         audit::APPROVAL_SCOPE_IDENTITY_CONTROL,
     )
     .await
-    .map_err(|_| error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to record admin audit event"))?;
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
     Ok(Json(user))
 }
 
@@ -87,7 +97,12 @@ pub(crate) async fn reset_operator_user_password_handler(
         audit::APPROVAL_SCOPE_IDENTITY_CONTROL,
     )
     .await
-    .map_err(|_| error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to record admin audit event"))?;
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
     Ok(Json(user))
 }
 

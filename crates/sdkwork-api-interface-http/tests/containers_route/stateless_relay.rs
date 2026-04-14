@@ -170,7 +170,10 @@ async fn stateless_containers_routes_relay_to_openai_compatible_provider() {
             .and_then(|value| value.to_str().ok()),
         Some("application/octet-stream")
     );
-    assert_eq!(read_bytes(content_response).await, b"CONTAINER-FILE".to_vec());
+    assert_eq!(
+        read_bytes(content_response).await,
+        b"CONTAINER-FILE".to_vec()
+    );
 
     let delete_response = app
         .oneshot(

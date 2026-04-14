@@ -1,15 +1,12 @@
 use super::*;
 
-pub(crate) async fn fulfill_order_on_create<T>(
-    store: &T,
+pub(crate) async fn fulfill_order_on_create(
+    store: &dyn AdminStore,
     normalized_user_id: &str,
     normalized_project_id: &str,
     quote: &PortalCommerceQuote,
     order: &mut CommerceOrderRecord,
-) -> CommerceResult<()>
-where
-    T: AdminStore + CommerceQuotaStore + ?Sized,
-{
+) -> CommerceResult<()> {
     apply_quote_to_project_quota(store, normalized_project_id, quote).await?;
     activate_project_membership_if_needed(store, normalized_user_id, normalized_project_id, quote)
         .await?;
@@ -32,16 +29,13 @@ where
     })
 }
 
-pub(crate) async fn restore_settlement_side_effects<T>(
-    store: &T,
+pub(crate) async fn restore_settlement_side_effects(
+    store: &dyn AdminStore,
     project_id: &str,
     quote: &PortalCommerceQuote,
     order: &mut CommerceOrderRecord,
     snapshot: &CommerceSettlementSideEffectSnapshot,
-) -> CommerceResult<()>
-where
-    T: AdminStore + CommerceQuotaStore + ?Sized,
-{
+) -> CommerceResult<()> {
     if order.coupon_redemption_id.is_some() {
         let _ =
             rollback_order_coupon_redemption_if_needed(store, order, CouponRollbackType::Manual)

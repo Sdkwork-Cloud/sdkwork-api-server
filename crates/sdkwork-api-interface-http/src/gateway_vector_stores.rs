@@ -7,11 +7,10 @@ async fn vector_stores_list_handler(request_context: StatelessGatewayRequest) ->
         }
     }
 
-    Json(
-        list_vector_stores(request_context.tenant_id(), request_context.project_id())
-            .expect("vector stores list"),
-    )
-    .into_response()
+    match list_vector_stores(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_not_found_response(error),
+    }
 }
 
 async fn vector_stores_handler(
@@ -28,19 +27,33 @@ async fn vector_stores_handler(
         }
     }
 
-    Json(
-        create_vector_store(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.name,
-        )
-        .expect("vector store"),
-    )
-    .into_response()
+    match create_vector_store(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.name,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_not_found_response(error),
+    }
 }
 
 fn local_vector_store_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested vector store was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store was not found.",
+    )
+}
+
+fn local_vector_store_update_name<'a>(
+    request: &'a UpdateVectorStoreRequest,
+) -> Result<&'a str, Response> {
+    request.name.as_deref().ok_or_else(|| {
+        invalid_request_openai_response(
+            "Vector store name is required for local fallback updates.",
+            "invalid_vector_store_request",
+        )
+    })
 }
 
 fn local_vector_store_retrieve_result(
@@ -173,7 +186,10 @@ async fn vector_store_update_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
-        request.name.as_deref().unwrap_or("vector-store"),
+        match local_vector_store_update_name(&request) {
+            Ok(name) => name,
+            Err(response) => return response,
+        },
     )
 }
 
@@ -242,10 +258,9 @@ async fn vector_stores_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let vector_store_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.name.as_str());
+            let Some(vector_store_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream vector store response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -274,12 +289,14 @@ async fn vector_stores_with_state_handler(
         }
     }
 
-    let response = create_vector_store(
+    let response = match create_vector_store(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.name,
-    )
-    .expect("vector store");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_not_found_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -363,11 +380,10 @@ async fn vector_stores_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_vector_stores(request_context.tenant_id(), request_context.project_id())
-            .expect("vector stores list"),
-    )
-    .into_response()
+    match list_vector_stores(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_not_found_response(error),
+    }
 }
 
 async fn vector_store_retrieve_with_state_handler(
@@ -491,7 +507,10 @@ async fn vector_store_update_with_state_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
-        request.name.as_deref().unwrap_or("vector-store"),
+        match local_vector_store_update_name(&request) {
+            Ok(name) => name,
+            Err(response) => return response,
+        },
     ) {
         Ok(response) => response,
         Err(response) => return response,

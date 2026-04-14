@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_thread_and_response_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_thread_and_response_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route("/v1/threads", post(threads_handler))
         .route(

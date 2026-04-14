@@ -195,7 +195,10 @@ async fn stateful_video_extensions_usage_uses_created_video_id_for_billing() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/videos/extensions", post(upstream_video_extensions_handler))
+        .route(
+            "/v1/videos/extensions",
+            post(upstream_video_extensions_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {

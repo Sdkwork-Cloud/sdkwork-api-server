@@ -1,6 +1,20 @@
 use super::*;
 
-pub(super) async fn eval_runs_list_with_state_handler(
+fn local_eval_run_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_eval_request");
+    }
+
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("eval run not found") {
+        return local_gateway_error_response(error, "Requested eval run was not found.");
+    }
+
+    local_gateway_error_response(error, "Requested eval was not found.")
+}
+
+pub(crate) async fn eval_runs_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(eval_id): Path<String>,
@@ -42,6 +56,15 @@ pub(super) async fn eval_runs_list_with_state_handler(
         }
     }
 
+    let response = match list_eval_runs(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,18 +84,10 @@ pub(super) async fn eval_runs_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_eval_runs(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-        )
-        .expect("eval runs list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_runs_with_state_handler(
+pub(crate) async fn eval_runs_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(eval_id): Path<String>,
@@ -89,10 +104,9 @@ pub(super) async fn eval_runs_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let run_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(eval_id.as_str());
+            let Some(run_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream eval run response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -121,13 +135,15 @@ pub(super) async fn eval_runs_with_state_handler(
         }
     }
 
-    let response = create_eval_run(
+    let response = match create_eval_run(
         request_context.tenant_id(),
         request_context.project_id(),
         &eval_id,
         &request,
-    )
-    .expect("eval run create");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -152,7 +168,7 @@ pub(super) async fn eval_runs_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn eval_run_retrieve_with_state_handler(
+pub(crate) async fn eval_run_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((eval_id, run_id)): Path<(String, String)>,
@@ -196,6 +212,16 @@ pub(super) async fn eval_run_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -216,19 +242,10 @@ pub(super) async fn eval_run_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_run_delete_with_state_handler(
+pub(crate) async fn eval_run_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((eval_id, run_id)): Path<(String, String)>,
@@ -272,6 +289,16 @@ pub(super) async fn eval_run_delete_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::delete_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -292,19 +319,10 @@ pub(super) async fn eval_run_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_run_cancel_with_state_handler(
+pub(crate) async fn eval_run_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((eval_id, run_id)): Path<(String, String)>,
@@ -348,6 +366,16 @@ pub(super) async fn eval_run_cancel_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::cancel_eval_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -368,14 +396,5 @@ pub(super) async fn eval_run_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::cancel_eval_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &run_id,
-        )
-        .expect("eval run cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

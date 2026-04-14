@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn realtime_sessions_with_state_handler(
+fn local_realtime_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
+}
+
+pub(crate) async fn realtime_sessions_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateRealtimeSessionRequest>,
@@ -15,10 +19,11 @@ pub(super) async fn realtime_sessions_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let realtime_session_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.model.as_str());
+            let Some(realtime_session_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream realtime session response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,12 +52,14 @@ pub(super) async fn realtime_sessions_with_state_handler(
         }
     }
 
-    let response = create_realtime_session(
+    let response = match create_realtime_session(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
-    )
-    .expect("realtime");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_realtime_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),

@@ -504,7 +504,10 @@ async fn select_provider_account_execution_binding(
 ) -> Result<Option<ProviderAccountExecutionBinding>> {
     let mut bindings = Vec::new();
 
-    for account in store.list_provider_accounts_for_provider(&provider.id).await? {
+    for account in store
+        .list_provider_accounts_for_provider(&provider.id)
+        .await?
+    {
         if !account.enabled || !provider_account_matches_owner_scope(&account, tenant_id) {
             continue;
         }
@@ -521,10 +524,17 @@ async fn select_provider_account_execution_binding(
 
     bindings.sort_by(|left, right| {
         provider_account_region_preference(&right.account, requested_region)
-            .cmp(&provider_account_region_preference(&left.account, requested_region))
+            .cmp(&provider_account_region_preference(
+                &left.account,
+                requested_region,
+            ))
             .then_with(|| right.account.priority.cmp(&left.account.priority))
             .then_with(|| right.account.weight.cmp(&left.account.weight))
-            .then_with(|| left.account.provider_account_id.cmp(&right.account.provider_account_id))
+            .then_with(|| {
+                left.account
+                    .provider_account_id
+                    .cmp(&right.account.provider_account_id)
+            })
     });
 
     Ok(bindings.into_iter().next())
@@ -546,8 +556,14 @@ fn provider_account_region_preference(
     requested_region: Option<&str>,
 ) -> u8 {
     match (
-        account.region.as_deref().map(str::trim).filter(|value| !value.is_empty()),
-        requested_region.map(str::trim).filter(|value| !value.is_empty()),
+        account
+            .region
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty()),
+        requested_region
+            .map(str::trim)
+            .filter(|value| !value.is_empty()),
     ) {
         (Some(account_region), Some(requested_region))
             if account_region.eq_ignore_ascii_case(requested_region) =>
@@ -762,7 +778,8 @@ fn runtime_supports_raw_operations(
 fn manifest_supports_operation(manifest: &ExtensionManifest, operation: &str) -> bool {
     manifest.capabilities.iter().any(|capability| {
         capability.operation == operation
-            && capability.compatibility != sdkwork_api_extension_core::CompatibilityLevel::Unsupported
+            && capability.compatibility
+                != sdkwork_api_extension_core::CompatibilityLevel::Unsupported
     })
 }
 

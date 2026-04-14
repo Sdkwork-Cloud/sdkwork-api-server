@@ -1,15 +1,12 @@
 use super::*;
 
-pub(crate) async fn reserve_order_coupon_if_needed<T>(
-    store: &T,
+pub(crate) async fn reserve_order_coupon_if_needed(
+    store: &dyn AdminStore,
     order_id: &str,
     project_id: &str,
     quote: &PortalCommerceQuote,
     resolved_coupon: Option<&ResolvedCouponDefinition>,
-) -> CommerceResult<Option<ReservedMarketingCouponState>>
-where
-    T: AdminStore + ?Sized,
-{
+) -> CommerceResult<Option<ReservedMarketingCouponState>> {
     let Some(resolved_coupon) = resolved_coupon else {
         return Ok(None);
     };
@@ -49,14 +46,11 @@ where
     }))
 }
 
-pub(crate) async fn confirm_order_coupon_if_needed<T>(
-    store: &T,
+pub(crate) async fn confirm_order_coupon_if_needed(
+    store: &dyn AdminStore,
     order: &mut CommerceOrderRecord,
     payment_event_id: Option<&str>,
-) -> CommerceResult<()>
-where
-    T: AdminStore + ?Sized,
-{
+) -> CommerceResult<()> {
     let Some(coupon_reservation_id) = order.coupon_reservation_id.clone() else {
         return Ok(());
     };
@@ -84,13 +78,10 @@ where
     Ok(())
 }
 
-pub(crate) async fn release_order_coupon_reservation_if_needed<T>(
-    store: &T,
+pub(crate) async fn release_order_coupon_reservation_if_needed(
+    store: &dyn AdminStore,
     order: &mut CommerceOrderRecord,
-) -> CommerceResult<()>
-where
-    T: AdminStore + ?Sized,
-{
+) -> CommerceResult<()> {
     if order.coupon_redemption_id.is_some() {
         return Ok(());
     }
@@ -115,14 +106,11 @@ where
     }
 }
 
-pub(crate) async fn rollback_order_coupon_redemption_if_needed<T>(
-    store: &T,
+pub(crate) async fn rollback_order_coupon_redemption_if_needed(
+    store: &dyn AdminStore,
     order: &mut CommerceOrderRecord,
     rollback_type: CouponRollbackType,
-) -> CommerceResult<Option<CouponRollbackCompensationSnapshot>>
-where
-    T: AdminStore + ?Sized,
-{
+) -> CommerceResult<Option<CouponRollbackCompensationSnapshot>> {
     let Some(coupon_redemption_id) = order.coupon_redemption_id.clone() else {
         return Ok(None);
     };
@@ -208,13 +196,10 @@ where
     }))
 }
 
-pub(crate) async fn compensate_coupon_rollback_side_effects_if_needed<T>(
-    store: &T,
+pub(crate) async fn compensate_coupon_rollback_side_effects_if_needed(
+    store: &dyn AdminStore,
     snapshot: Option<&CouponRollbackCompensationSnapshot>,
-) -> CommerceResult<()>
-where
-    T: AdminStore + ?Sized,
-{
+) -> CommerceResult<()> {
     let Some(snapshot) = snapshot else {
         return Ok(());
     };

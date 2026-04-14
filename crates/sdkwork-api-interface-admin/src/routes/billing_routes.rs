@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn register_billing_routes(router: Router) -> Router {
+pub(super) fn register_billing_routes(router: Router<AdminApiState>) -> Router<AdminApiState> {
     router
         .route(
             "/admin/usage/records",
@@ -88,5 +88,51 @@ pub(super) fn register_billing_routes(router: Router) -> Router {
         .route(
             "/admin/billing/quota-policies",
             get(pricing::list_quota_policies_handler).post(pricing::create_quota_policy_handler),
+        )
+        .route(
+            "/admin/payments/orders",
+            get(payments::list_payment_orders_handler),
+        )
+        .route(
+            "/admin/payments/orders/{payment_order_id}",
+            get(payments::get_payment_order_dossier_handler),
+        )
+        .route(
+            "/admin/payments/refunds",
+            get(payments::list_refund_orders_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/approve",
+            post(payments::approve_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/cancel",
+            post(payments::cancel_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/refunds/{refund_order_id}/start",
+            post(payments::start_refund_order_handler),
+        )
+        .route(
+            "/admin/payments/gateway-accounts",
+            get(payments::list_payment_gateway_accounts_handler)
+                .post(payments::upsert_payment_gateway_account_handler),
+        )
+        .route(
+            "/admin/payments/channel-policies",
+            get(payments::list_payment_channel_policies_handler)
+                .post(payments::upsert_payment_channel_policy_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines",
+            get(payments::list_payment_reconciliation_lines_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-lines/{reconciliation_line_id}/resolve",
+            post(payments::resolve_payment_reconciliation_line_handler),
+        )
+        .route(
+            "/admin/payments/reconciliation-summary",
+            get(payments::payment_reconciliation_summary_handler),
         )
 }

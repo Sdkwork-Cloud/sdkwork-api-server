@@ -1,6 +1,15 @@
 use super::*;
 
-pub(super) async fn vector_store_search_with_state_handler(
+fn local_vector_store_search_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_vector_store_request");
+    }
+
+    local_gateway_error_response(error, "Requested vector store was not found.")
+}
+
+pub(crate) async fn vector_store_search_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
@@ -42,6 +51,17 @@ pub(super) async fn vector_store_search_with_state_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store search");
         }
     }
+
+    let response = match search_vector_store(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &request.query,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_search_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -60,14 +80,5 @@ pub(super) async fn vector_store_search_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        search_vector_store(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &request.query,
-        )
-        .expect("vector store search"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn chat_completion_messages_list_handler(
+fn local_chat_completion_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_chat_completion_request",
+        "Requested chat completion was not found.",
+    )
+}
+
+pub(crate) async fn chat_completion_messages_list_handler(
     request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
 ) -> Response {
@@ -19,13 +27,14 @@ pub(super) async fn chat_completion_messages_list_handler(
         }
     }
 
-    Json(
-        list_chat_completion_messages(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-        )
-        .expect("chat completion messages"),
-    )
-    .into_response()
+    let response = match list_chat_completion_messages(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }

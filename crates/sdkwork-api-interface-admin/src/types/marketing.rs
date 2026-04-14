@@ -20,6 +20,11 @@ pub(crate) struct SubmitCouponTemplateForApprovalRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateCouponTemplateStatusRequest {
+    pub(crate) status: CouponTemplateStatus,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct ApproveCouponTemplateRequest {
     pub(crate) reason: String,
 }
@@ -63,6 +68,11 @@ pub(crate) struct SubmitMarketingCampaignForApprovalRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateMarketingCampaignStatusRequest {
+    pub(crate) status: MarketingCampaignStatus,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct ApproveMarketingCampaignRequest {
     pub(crate) reason: String,
 }
@@ -93,8 +103,18 @@ pub(crate) struct ActivateCampaignBudgetRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateCampaignBudgetStatusRequest {
+    pub(crate) status: CampaignBudgetStatus,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct CloseCampaignBudgetRequest {
     pub(crate) reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateCouponCodeStatusRequest {
+    pub(crate) status: CouponCodeStatus,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

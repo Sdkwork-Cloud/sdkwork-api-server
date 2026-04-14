@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 fn local_anthropic_count_tokens_response(
     tenant_id: &str,
     project_id: &str,
@@ -6,15 +8,15 @@ fn local_anthropic_count_tokens_response(
     match count_response_input_tokens(tenant_id, project_id, model) {
         Ok(response) => match serde_json::to_value(response) {
             Ok(value) => Json(openai_count_tokens_to_anthropic(&value)).into_response(),
-            Err(error) => anthropic_bad_gateway_response(error.to_string()),
+            Err(_) => anthropic_bad_gateway_response("failed to process local anthropic fallback"),
         },
         Err(error) => {
             let message = error.to_string();
-            if message.to_ascii_lowercase().contains("required") {
+            if local_gateway_error_is_invalid_request(&message) {
                 return anthropic_invalid_request_response(message);
             }
 
-            anthropic_bad_gateway_response(message)
+            anthropic_bad_gateway_response("failed to process local anthropic fallback")
         }
     }
 }
@@ -25,7 +27,7 @@ fn local_anthropic_invalid_model_response(error: anyhow::Error) -> Response {
         return anthropic_invalid_request_response(message);
     }
 
-    anthropic_bad_gateway_response(message)
+    anthropic_bad_gateway_response("failed to process local anthropic fallback")
 }
 
 fn local_anthropic_chat_completion_result(
@@ -36,42 +38,22 @@ fn local_anthropic_chat_completion_result(
     match local_chat_completion_gateway_result(tenant_id, project_id, model) {
         Ok(response) => match serde_json::to_value(response) {
             Ok(value) => Ok(openai_chat_response_to_anthropic(&value)),
-            Err(error) => Err(anthropic_bad_gateway_response(error.to_string())),
+            Err(_) => Err(anthropic_bad_gateway_response(
+                "failed to process local anthropic fallback",
+            )),
         },
         Err(error) => Err(local_anthropic_invalid_model_response(error)),
     }
 }
 
 fn local_anthropic_stream_result(
-    tenant_id: &str,
-    project_id: &str,
-    model: &str,
+    _tenant_id: &str,
+    _project_id: &str,
+    _model: &str,
 ) -> std::result::Result<Response, Response> {
-    match local_chat_completion_gateway_result(tenant_id, project_id, model) {
-        Ok(_) => Ok(local_anthropic_stream_body_response(model)),
-        Err(error) => Err(local_anthropic_invalid_model_response(error)),
-    }
-}
-
-fn local_anthropic_stream_body_response(model: &str) -> Response {
-    let body = format!(
-        concat!(
-            "event: message_start\n",
-            "data: {{\"type\":\"message_start\",\"message\":{{\"id\":\"msg_stream\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"{model}\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{{\"input_tokens\":0,\"output_tokens\":0}}}}}}\n\n",
-            "event: content_block_start\n",
-            "data: {{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{{\"type\":\"text\",\"text\":\"\"}}}}\n\n",
-            "event: content_block_delta\n",
-            "data: {{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"Hello\"}}}}\n\n",
-            "event: content_block_stop\n",
-            "data: {{\"type\":\"content_block_stop\",\"index\":0}}\n\n",
-            "event: message_delta\n",
-            "data: {{\"type\":\"message_delta\",\"delta\":{{\"stop_reason\":\"end_turn\",\"stop_sequence\":null}},\"usage\":{{\"output_tokens\":0}}}}\n\n",
-            "event: message_stop\n",
-            "data: {{\"type\":\"message_stop\"}}\n\n"
-        ),
-        model = model,
-    );
-    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
+    Err(anthropic_invalid_request_response(
+        "Local anthropic message streaming fallback is not supported without an upstream provider.",
+    ))
 }
 
 fn local_gemini_invalid_model_response(error: anyhow::Error) -> Response {
@@ -80,7 +62,7 @@ fn local_gemini_invalid_model_response(error: anyhow::Error) -> Response {
         return gemini_invalid_request_response(message);
     }
 
-    gemini_bad_gateway_response(message)
+    gemini_bad_gateway_response("failed to process local gemini fallback")
 }
 
 fn local_gemini_chat_completion_result(
@@ -91,28 +73,22 @@ fn local_gemini_chat_completion_result(
     match local_chat_completion_gateway_result(tenant_id, project_id, model) {
         Ok(response) => match serde_json::to_value(response) {
             Ok(value) => Ok(openai_chat_response_to_gemini(&value)),
-            Err(error) => Err(gemini_bad_gateway_response(error.to_string())),
+            Err(_) => Err(gemini_bad_gateway_response(
+                "failed to process local gemini fallback",
+            )),
         },
         Err(error) => Err(local_gemini_invalid_model_response(error)),
     }
 }
 
 fn local_gemini_stream_result(
-    tenant_id: &str,
-    project_id: &str,
-    model: &str,
+    _tenant_id: &str,
+    _project_id: &str,
+    _model: &str,
 ) -> std::result::Result<Response, Response> {
-    match local_chat_completion_gateway_result(tenant_id, project_id, model) {
-        Ok(_) => Ok(local_gemini_stream_body_response()),
-        Err(error) => Err(local_gemini_invalid_model_response(error)),
-    }
-}
-
-fn local_gemini_stream_body_response() -> Response {
-    let body = concat!(
-        "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hello\"}]},\"finishReason\":\"STOP\"}]}\n\n"
-    );
-    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
+    Err(gemini_invalid_request_response(
+        "Local Gemini streamGenerateContent fallback is not supported without an upstream provider.",
+    ))
 }
 
 fn local_gemini_count_tokens_result(
@@ -123,7 +99,9 @@ fn local_gemini_count_tokens_result(
     match count_response_input_tokens(tenant_id, project_id, model) {
         Ok(response) => match serde_json::to_value(response) {
             Ok(value) => Ok(openai_count_tokens_to_gemini(&value)),
-            Err(error) => Err(gemini_bad_gateway_response(error.to_string())),
+            Err(_) => Err(gemini_bad_gateway_response(
+                "failed to process local gemini fallback",
+            )),
         },
         Err(error) => {
             let message = error.to_string();
@@ -131,7 +109,9 @@ fn local_gemini_count_tokens_result(
                 return Err(gemini_invalid_request_response(message));
             }
 
-            Err(gemini_bad_gateway_response(message))
+            Err(gemini_bad_gateway_response(
+                "failed to process local gemini fallback",
+            ))
         }
     }
 }
@@ -183,6 +163,11 @@ fn standard_protocol_status(status: reqwest::StatusCode) -> StatusCode {
     StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY)
 }
 
+fn standard_protocol_http_client() -> &'static reqwest::Client {
+    static STANDARD_PROTOCOL_HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    STANDARD_PROTOCOL_HTTP_CLIENT.get_or_init(reqwest::Client::new)
+}
+
 async fn standard_protocol_error_response(response: reqwest::Response) -> Response {
     let status = standard_protocol_status(response.status());
     let content_type = response
@@ -196,9 +181,10 @@ async fn standard_protocol_error_response(response: reqwest::Response) -> Respon
     if let Some(content_type) = content_type {
         builder = builder.header(header::CONTENT_TYPE, content_type);
     }
-    builder
-        .body(Body::from(body))
-        .expect("valid standard protocol error response")
+    match builder.body(Body::from(body)) {
+        Ok(response) => response,
+        Err(_) => bad_gateway_openai_response("failed to process upstream standard protocol error"),
+    }
 }
 
 async fn send_standard_protocol_request(
@@ -209,8 +195,7 @@ async fn send_standard_protocol_request(
     headers: &HeaderMap,
     payload: &Value,
 ) -> anyhow::Result<reqwest::Response> {
-    let client = reqwest::Client::new();
-    let mut request = client
+    let mut request = standard_protocol_http_client()
         .post(build_standard_protocol_upstream_url(
             base_url,
             path_and_query,
@@ -797,15 +782,21 @@ async fn image_edits_handler(
                 }
             }
 
-            Json(
-                create_image_edit(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("image edit"),
-            )
-            .into_response()
+            let response = match create_image_edit(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => {
+                    return local_gateway_invalid_or_bad_gateway_response(
+                        error,
+                        "invalid_image_request",
+                    );
+                }
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }
@@ -830,15 +821,21 @@ async fn image_variations_handler(
                 }
             }
 
-            Json(
-                create_image_variation(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("image variation"),
-            )
-            .into_response()
+            let response = match create_image_variation(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => {
+                    return local_gateway_invalid_or_bad_gateway_response(
+                        error,
+                        "invalid_image_request",
+                    );
+                }
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }
@@ -1166,32 +1163,24 @@ async fn anthropic_messages_with_state_handler(
             &request.model,
         ) {
             Ok(response) => response,
-            Err(response) => return response,
+            Err(response) => {
+                if let Some(admission) = commercial_admission.as_ref() {
+                    if let Err(release_response) =
+                        release_gateway_commercial_admission(&state, admission).await
+                    {
+                        return release_response;
+                    }
+                }
+                return response;
+            }
         };
 
         if let Some(admission) = commercial_admission.as_ref() {
-            if let Err(response) = capture_gateway_commercial_admission(&state, admission).await {
-                return response;
+            if let Err(release_response) =
+                release_gateway_commercial_admission(&state, admission).await
+            {
+                return release_response;
             }
-        }
-
-        if record_gateway_usage_for_project(
-            state.store.as_ref(),
-            request_context.tenant_id(),
-            request_context.project_id(),
-            "chat_completion",
-            &request.model,
-            100,
-            0.10,
-        )
-        .await
-        .is_err()
-        {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to record usage",
-            )
-                .into_response();
         }
 
         return local_response;
@@ -2569,29 +2558,11 @@ async fn gemini_models_compat_with_state_handler(
             };
 
             if let Some(admission) = commercial_admission.as_ref() {
-                if let Err(response) = capture_gateway_commercial_admission(&state, admission).await
+                if let Err(release_response) =
+                    release_gateway_commercial_admission(&state, admission).await
                 {
-                    return response;
+                    return release_response;
                 }
-            }
-
-            if record_gateway_usage_for_project(
-                state.store.as_ref(),
-                request_context.tenant_id(),
-                request_context.project_id(),
-                "chat_completion",
-                &request.model,
-                100,
-                0.10,
-            )
-            .await
-            .is_err()
-            {
-                return (
-                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "failed to record usage",
-                )
-                    .into_response();
             }
 
             local_response

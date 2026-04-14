@@ -5,7 +5,7 @@ mod handlers;
 #[path = "marketing_support.rs"]
 mod support;
 
-use support::*;
+pub(crate) use support::*;
 
 pub(crate) use handlers::{
     confirm_marketing_coupon_redemption_handler, list_marketing_codes_handler,

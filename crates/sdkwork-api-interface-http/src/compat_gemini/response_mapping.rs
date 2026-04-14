@@ -67,7 +67,7 @@ pub fn openai_count_tokens_to_gemini(response: &Value) -> Value {
     })
 }
 
-pub(super) fn openai_finish_reason_to_gemini(finish_reason: &str) -> &'static str {
+pub(crate) fn openai_finish_reason_to_gemini(finish_reason: &str) -> &'static str {
     match finish_reason {
         "length" => "MAX_TOKENS",
         "content_filter" => "SAFETY",

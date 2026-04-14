@@ -187,14 +187,15 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
         let Some(candidate_provider) = store.find_provider(candidate_provider_id).await? else {
             continue;
         };
-        let Some(candidate_descriptor) = provider_execution_descriptor_for_provider_account_context(
-            store,
-            secret_manager,
-            tenant_id,
-            &candidate_provider,
-            requested_region.as_deref(),
-        )
-        .await?
+        let Some(candidate_descriptor) =
+            provider_execution_descriptor_for_provider_account_context(
+                store,
+                secret_manager,
+                tenant_id,
+                &candidate_provider,
+                requested_region.as_deref(),
+            )
+            .await?
         else {
             continue;
         };
@@ -250,14 +251,15 @@ pub(crate) async fn resolve_store_relay_provider_for_decision(
         let Some(candidate_provider) = store.find_provider(candidate_provider_id).await? else {
             continue;
         };
-        let Some(candidate_descriptor) = provider_execution_descriptor_for_provider_account_context(
-            store,
-            secret_manager,
-            tenant_id,
-            &candidate_provider,
-            decision.requested_region.as_deref(),
-        )
-        .await?
+        let Some(candidate_descriptor) =
+            provider_execution_descriptor_for_provider_account_context(
+                store,
+                secret_manager,
+                tenant_id,
+                &candidate_provider,
+                decision.requested_region.as_deref(),
+            )
+            .await?
         else {
             continue;
         };

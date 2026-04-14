@@ -32,14 +32,33 @@ pub(crate) async fn list_commerce_reconciliation_runs_handler(
 }
 
 pub(crate) async fn create_commerce_reconciliation_run_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<AdminCommerceReconciliationRunCreateRequest>,
 ) -> Result<Json<CommerceReconciliationRunRecord>, (StatusCode, Json<ErrorResponse>)> {
-    create_admin_commerce_reconciliation_run(state.store.as_ref(), &state.secret_manager, &request)
-        .await
-        .map(Json)
-        .map_err(admin_commerce_error_response)
+    let run = create_admin_commerce_reconciliation_run(
+        state.store.as_ref(),
+        &state.secret_manager,
+        &request,
+    )
+    .await
+    .map_err(admin_commerce_error_response)?;
+    crate::audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "commerce_reconciliation_run.create",
+        "commerce_reconciliation_run",
+        run.reconciliation_run_id.clone(),
+        crate::audit::APPROVAL_SCOPE_COMMERCE_CONTROL,
+    )
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
+    Ok(Json(run))
 }
 
 pub(crate) async fn list_commerce_reconciliation_items_handler(

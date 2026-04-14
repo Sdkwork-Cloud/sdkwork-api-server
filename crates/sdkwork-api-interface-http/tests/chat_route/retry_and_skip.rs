@@ -684,4 +684,3 @@ async fn stateful_chat_route_does_not_retry_non_retryable_primary_failure() {
         "sdkwork_upstream_retries_total{service=\"gateway\",capability=\"chat_completion\",provider=\"provider-chat-non-retryable-primary\",outcome=\"scheduled\"}"
     ));
 }
-

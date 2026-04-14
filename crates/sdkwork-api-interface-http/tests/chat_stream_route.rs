@@ -54,7 +54,10 @@ async fn chat_stream_route_returns_invalid_request_for_missing_model() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = read_body(response).await;
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "invalid_model");
 }
@@ -81,7 +84,12 @@ struct UpstreamCaptureState {
 #[tokio::test]
 async fn stateful_chat_stream_route_returns_invalid_request_for_missing_model_without_usage() {
     let pool = memory_pool().await;
-    let api_key = support::issue_gateway_api_key(&pool, "tenant-chat-stream-invalid", "project-chat-stream-invalid").await;
+    let api_key = support::issue_gateway_api_key(
+        &pool,
+        "tenant-chat-stream-invalid",
+        "project-chat-stream-invalid",
+    )
+    .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
@@ -104,7 +112,10 @@ async fn stateful_chat_stream_route_returns_invalid_request_for_missing_model_wi
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = read_body(response).await;
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "invalid_model");
 
@@ -638,34 +649,34 @@ fn native_dynamic_manifest(library_path: &Path) -> sdkwork_api_extension_core::E
         "responses.create",
         sdkwork_api_extension_core::CompatibilityLevel::Native,
     ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "responses.stream",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "anthropic.messages.create",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "anthropic.messages.count_tokens",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "gemini.generate_content",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "gemini.stream_generate_content",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "gemini.count_tokens",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
-        .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
-            "audio.speech.create",
-            sdkwork_api_extension_core::CompatibilityLevel::Native,
-        ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "responses.stream",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.create",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "anthropic.messages.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.stream_generate_content",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "gemini.count_tokens",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
+    .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
+        "audio.speech.create",
+        sdkwork_api_extension_core::CompatibilityLevel::Native,
+    ))
     .with_capability(sdkwork_api_extension_core::CapabilityDescriptor::new(
         "files.content",
         sdkwork_api_extension_core::CompatibilityLevel::Native,

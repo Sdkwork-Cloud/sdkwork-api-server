@@ -2,7 +2,7 @@ use super::super::super::audit::{
     build_coupon_template_lifecycle_audit_record, persist_coupon_template_lifecycle_audit_record,
 };
 use super::super::super::types::CouponTemplateActionDecision;
-use super::super::super::MarketingGovernanceError;
+use crate::MarketingGovernanceError;
 use sdkwork_api_domain_marketing::{
     CouponTemplateLifecycleAction, CouponTemplateLifecycleAuditOutcome, CouponTemplateRecord,
 };

@@ -259,8 +259,7 @@ async fn stateful_eval_retrieve_route_returns_not_found_without_usage() {
 #[tokio::test]
 async fn stateful_eval_update_route_returns_not_found_without_usage() {
     let ctx =
-        local_evals_test_context("tenant-eval-update-missing", "project-eval-update-missing")
-            .await;
+        local_evals_test_context("tenant-eval-update-missing", "project-eval-update-missing").await;
 
     let response = ctx
         .gateway_app
@@ -284,8 +283,7 @@ async fn stateful_eval_update_route_returns_not_found_without_usage() {
 #[tokio::test]
 async fn stateful_eval_delete_route_returns_not_found_without_usage() {
     let ctx =
-        local_evals_test_context("tenant-eval-delete-missing", "project-eval-delete-missing")
-            .await;
+        local_evals_test_context("tenant-eval-delete-missing", "project-eval-delete-missing").await;
 
     let response = ctx
         .gateway_app

@@ -1,3 +1,18 @@
+use super::*;
+use anyhow::anyhow;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use sdkwork_api_app_billing::{
+    create_billing_event, persist_billing_event, CaptureAccountHoldInput, CreateAccountHoldInput,
+    CreateBillingEventInput, ReleaseAccountHoldInput,
+};
+use sdkwork_api_app_gateway::PlannedExecutionUsageContext;
+use sdkwork_api_domain_billing::BillingAccountingMode;
+use sdkwork_api_policy_billing::{
+    builtin_billing_policy_registry, BillingPolicyExecutionInput, BillingPolicyExecutionResult,
+    GROUP_DEFAULT_BILLING_POLICY_ID,
+};
 const GATEWAY_COMMERCIAL_HOLD_TTL_MS: u64 = 5 * 60 * 1000;
 const GATEWAY_COMMERCIAL_ID_SEQUENCE_BITS: u32 = 15;
 const GATEWAY_COMMERCIAL_ID_SEQUENCE_MASK: u64 = (1_u64 << GATEWAY_COMMERCIAL_ID_SEQUENCE_BITS) - 1;
@@ -5,22 +20,22 @@ const GATEWAY_COMMERCIAL_ID_SEQUENCE_MASK: u64 = (1_u64 << GATEWAY_COMMERCIAL_ID
 static GATEWAY_COMMERCIAL_ID_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
-struct GatewayCommercialAdmission {
+pub(crate) struct GatewayCommercialAdmission {
     request_id: u64,
     billing_settlement: BillingPolicyExecutionResult,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct GatewayCommercialAdmissionSpec {
-    quoted_amount: f64,
+pub(crate) struct GatewayCommercialAdmissionSpec {
+    pub(crate) quoted_amount: f64,
 }
 
-enum GatewayCommercialAdmissionDecision {
+pub(crate) enum GatewayCommercialAdmissionDecision {
     Canonical(GatewayCommercialAdmission),
     LegacyQuota,
 }
 
-async fn enforce_project_quota<S>(
+pub(crate) async fn enforce_project_quota<S>(
     store: &S,
     project_id: &str,
     requested_units: u64,
@@ -71,7 +86,7 @@ fn local_gateway_error_response(error: anyhow::Error, not_found_message: &'stati
         return not_found_openai_response(not_found_message);
     }
 
-    bad_gateway_openai_response(error.to_string())
+    bad_gateway_openai_response("failed to process local gateway fallback")
 }
 
 fn quota_exceeded_message(project_id: &str, evaluation: &QuotaCheckResult) -> String {
@@ -102,7 +117,7 @@ fn compose_gateway_commercial_record_id(now_ms: u64, sequence: u64) -> u64 {
         | (sequence & GATEWAY_COMMERCIAL_ID_SEQUENCE_MASK)
 }
 
-async fn begin_gateway_commercial_admission(
+pub(crate) async fn begin_gateway_commercial_admission(
     state: &GatewayApiState,
     request_context: &IdentityGatewayRequestContext,
     spec: GatewayCommercialAdmissionSpec,
@@ -217,7 +232,7 @@ async fn begin_gateway_commercial_admission(
     ))
 }
 
-async fn capture_gateway_commercial_admission(
+pub(crate) async fn capture_gateway_commercial_admission(
     state: &GatewayApiState,
     admission: &GatewayCommercialAdmission,
 ) -> Result<(), Response> {
@@ -252,7 +267,7 @@ async fn capture_gateway_commercial_admission(
     Ok(())
 }
 
-async fn release_gateway_commercial_admission(
+pub(crate) async fn release_gateway_commercial_admission(
     state: &GatewayApiState,
     admission: &GatewayCommercialAdmission,
 ) -> Result<(), Response> {
@@ -325,7 +340,7 @@ fn looks_like_insufficient_account_balance(error: &anyhow::Error) -> bool {
         .contains("insufficient available balance")
 }
 
-async fn record_gateway_usage_for_project(
+pub(crate) async fn record_gateway_usage_for_project(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -340,7 +355,7 @@ async fn record_gateway_usage_for_project(
     .await
 }
 
-async fn record_gateway_usage_for_project_with_context(
+pub(crate) async fn record_gateway_usage_for_project_with_context(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -366,25 +381,25 @@ async fn record_gateway_usage_for_project_with_context(
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct TokenUsageMetrics {
+pub(crate) struct TokenUsageMetrics {
     input_tokens: u64,
     output_tokens: u64,
     total_tokens: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct BillingMediaMetrics {
-    image_count: u64,
-    audio_seconds: f64,
-    video_seconds: f64,
-    music_seconds: f64,
+pub(crate) struct BillingMediaMetrics {
+    pub(crate) image_count: u64,
+    pub(crate) audio_seconds: f64,
+    pub(crate) video_seconds: f64,
+    pub(crate) music_seconds: f64,
 }
 
 fn json_u64(value: Option<&Value>) -> Option<u64> {
     value.and_then(|value| value.as_u64())
 }
 
-fn extract_token_usage_metrics(response: &Value) -> Option<TokenUsageMetrics> {
+pub(crate) fn extract_token_usage_metrics(response: &Value) -> Option<TokenUsageMetrics> {
     if let Some(usage) = response.get("usage") {
         let input_tokens = json_u64(usage.get("prompt_tokens"))
             .or_else(|| json_u64(usage.get("input_tokens")))
@@ -420,7 +435,7 @@ fn extract_token_usage_metrics(response: &Value) -> Option<TokenUsageMetrics> {
     None
 }
 
-fn response_usage_id_or_single_data_item_id(response: &Value) -> Option<&str> {
+pub(crate) fn response_usage_id_or_single_data_item_id(response: &Value) -> Option<&str> {
     response.get("id").and_then(Value::as_str).or_else(|| {
         match response
             .get("data")
@@ -441,7 +456,7 @@ fn image_count_from_response(response: &Value) -> u64 {
         .unwrap_or(0)
 }
 
-fn music_seconds_from_response(response: &Value) -> f64 {
+pub(crate) fn music_seconds_from_response(response: &Value) -> f64 {
     response
         .get("duration_seconds")
         .and_then(Value::as_f64)
@@ -457,11 +472,11 @@ fn music_seconds_from_response(response: &Value) -> f64 {
         .unwrap_or(0.0)
 }
 
-fn music_billing_units(music_seconds: f64) -> u64 {
+pub(crate) fn music_billing_units(music_seconds: f64) -> u64 {
     music_seconds.max(1.0).ceil() as u64
 }
 
-fn music_billing_amount(music_seconds: f64) -> f64 {
+pub(crate) fn music_billing_amount(music_seconds: f64) -> f64 {
     music_seconds.max(1.0) * 0.001
 }
 
@@ -494,7 +509,7 @@ fn billing_modality_for_capability(capability: &str) -> &'static str {
     }
 }
 
-async fn record_gateway_usage_for_project_with_route_key_and_reference_id(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_reference_id(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -548,7 +563,7 @@ async fn record_gateway_usage_for_project_with_route_key_and_reference_id_with_c
     .await
 }
 
-async fn record_gateway_usage_for_project_with_media_and_reference_id(
+pub(crate) async fn record_gateway_usage_for_project_with_media_and_reference_id(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -576,7 +591,7 @@ async fn record_gateway_usage_for_project_with_media_and_reference_id(
     .await
 }
 
-async fn record_gateway_usage_for_project_with_route_key(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -602,7 +617,7 @@ async fn record_gateway_usage_for_project_with_route_key(
     .await
 }
 
-async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_reference(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_reference(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -630,7 +645,7 @@ async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_referenc
     .await
 }
 
-async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -772,7 +787,7 @@ async fn resolve_gateway_billing_settlement(
     let registry = builtin_billing_policy_registry();
     let plugin = registry
         .resolve(GROUP_DEFAULT_BILLING_POLICY_ID)
-        .expect("builtin group-default billing policy plugin must exist");
+        .ok_or_else(|| anyhow!("missing builtin group-default billing policy plugin"))?;
 
     plugin.execute(BillingPolicyExecutionInput {
         api_key_group_default_accounting_mode: group_default_accounting_mode.as_deref(),
@@ -798,4 +813,3 @@ async fn load_api_key_group_default_accounting_mode(
         .await?
         .and_then(|group| group.default_accounting_mode))
 }
-

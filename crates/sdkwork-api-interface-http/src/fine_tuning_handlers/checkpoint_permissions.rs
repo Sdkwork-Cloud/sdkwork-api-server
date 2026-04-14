@@ -1,6 +1,22 @@
 use super::*;
 
-pub(super) async fn fine_tuning_checkpoint_permissions_with_state_handler(
+fn local_fine_tuning_checkpoint_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning checkpoint was not found.",
+    )
+}
+
+fn local_fine_tuning_checkpoint_permission_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning checkpoint permission was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_checkpoint_permissions_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuned_model_checkpoint): Path<String>,
@@ -17,8 +33,11 @@ pub(super) async fn fine_tuning_checkpoint_permissions_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(fine_tuned_model_checkpoint.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream fine tuning checkpoint permission response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -49,12 +68,15 @@ pub(super) async fn fine_tuning_checkpoint_permissions_with_state_handler(
         }
     }
 
-    let response = sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
+    let response = match sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
         request_context.tenant_id(),
         request_context.project_id(),
+        &fine_tuned_model_checkpoint,
         &request,
-    )
-    .expect("fine tuning checkpoint permissions create");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [permission] => permission.id.as_str(),
         _ => fine_tuned_model_checkpoint.as_str(),
@@ -83,7 +105,7 @@ pub(super) async fn fine_tuning_checkpoint_permissions_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
+pub(crate) async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuned_model_checkpoint): Path<String>,
@@ -127,6 +149,15 @@ pub(super) async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -146,18 +177,10 @@ pub(super) async fn fine_tuning_checkpoint_permissions_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuned_model_checkpoint,
-        )
-        .expect("fine tuning checkpoint permissions list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
+pub(crate) async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((fine_tuned_model_checkpoint, permission_id)): Path<(String, String)>,
@@ -203,6 +226,16 @@ pub(super) async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+        &permission_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_permission_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -223,13 +256,5 @@ pub(super) async fn fine_tuning_checkpoint_permission_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &permission_id,
-        )
-        .expect("fine tuning checkpoint permission delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

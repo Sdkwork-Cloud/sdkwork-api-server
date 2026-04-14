@@ -7,6 +7,11 @@ static ADMIN_AUDIT_EVENT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 pub(crate) const APPROVAL_SCOPE_FINANCE_CONTROL: &str = "finance_control";
 pub(crate) const APPROVAL_SCOPE_IDENTITY_CONTROL: &str = "identity_control";
 pub(crate) const APPROVAL_SCOPE_SECRET_CONTROL: &str = "secret_control";
+pub(crate) const APPROVAL_SCOPE_RUNTIME_CONTROL: &str = "runtime_control";
+pub(crate) const APPROVAL_SCOPE_CATALOG_CONTROL: &str = "catalog_control";
+pub(crate) const APPROVAL_SCOPE_COMMERCE_CONTROL: &str = "commerce_control";
+pub(crate) const APPROVAL_SCOPE_ROUTING_CONTROL: &str = "routing_control";
+pub(crate) const APPROVAL_SCOPE_WORKSPACE_CONTROL: &str = "workspace_control";
 
 fn next_admin_audit_event_id(recorded_at_ms: u64) -> String {
     let sequence = ADMIN_AUDIT_EVENT_SEQUENCE.fetch_add(1, Ordering::Relaxed) & 0xffff_ffff;

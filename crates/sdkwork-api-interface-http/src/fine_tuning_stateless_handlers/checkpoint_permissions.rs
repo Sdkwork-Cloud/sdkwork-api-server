@@ -1,6 +1,22 @@
 use super::*;
 
-pub(super) async fn fine_tuning_checkpoint_permissions_handler(
+fn local_fine_tuning_checkpoint_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning checkpoint was not found.",
+    )
+}
+
+fn local_fine_tuning_checkpoint_permission_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning checkpoint permission was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_checkpoint_permissions_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuned_model_checkpoint): Path<String>,
     ExtractJson(request): ExtractJson<CreateFineTuningCheckpointPermissionsRequest>,
@@ -20,18 +36,20 @@ pub(super) async fn fine_tuning_checkpoint_permissions_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("fine tuning checkpoint permissions create"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::create_fine_tuning_checkpoint_permissions(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_checkpoint_permissions_list_handler(
+pub(crate) async fn fine_tuning_checkpoint_permissions_list_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuned_model_checkpoint): Path<String>,
 ) -> Response {
@@ -50,18 +68,19 @@ pub(super) async fn fine_tuning_checkpoint_permissions_list_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuned_model_checkpoint,
-        )
-        .expect("fine tuning checkpoint permissions list"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::list_fine_tuning_checkpoint_permissions(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_checkpoint_permission_delete_handler(
+pub(crate) async fn fine_tuning_checkpoint_permission_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((fine_tuned_model_checkpoint, permission_id)): Path<(String, String)>,
 ) -> Response {
@@ -83,13 +102,15 @@ pub(super) async fn fine_tuning_checkpoint_permission_delete_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &permission_id,
-        )
-        .expect("fine tuning checkpoint permission delete"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::delete_fine_tuning_checkpoint_permission(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuned_model_checkpoint,
+        &permission_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_checkpoint_permission_error_response(error),
+    };
+
+    Json(response).into_response()
 }

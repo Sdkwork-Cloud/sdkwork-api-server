@@ -1,3 +1,7 @@
+fn local_audio_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_audio_request")
+}
+
 async fn transcriptions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateTranscriptionRequest>,
@@ -15,15 +19,14 @@ async fn transcriptions_handler(
         }
     }
 
-    Json(
-        create_transcription(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("transcription"),
-    )
-    .into_response()
+    match create_transcription(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_audio_error_response(error),
+    }
 }
 
 async fn translations_handler(
@@ -43,15 +46,14 @@ async fn translations_handler(
         }
     }
 
-    Json(
-        create_translation(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("translation"),
-    )
-    .into_response()
+    match create_translation(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_audio_error_response(error),
+    }
 }
 
 async fn audio_speech_handler(
@@ -84,11 +86,12 @@ async fn audio_voices_handler(request_context: StatelessGatewayRequest) -> Respo
         }
     }
 
-    Json(
-        list_audio_voices(request_context.tenant_id(), request_context.project_id())
-            .expect("audio voices list"),
-    )
-    .into_response()
+    let response = match list_audio_voices(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn audio_voice_consents_handler(
@@ -108,15 +111,14 @@ async fn audio_voice_consents_handler(
         }
     }
 
-    Json(
-        create_audio_voice_consent(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("audio voice consent"),
-    )
-    .into_response()
+    match create_audio_voice_consent(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_audio_error_response(error),
+    }
 }
 
 
@@ -162,6 +164,15 @@ async fn transcriptions_with_state_handler(
         }
     }
 
+    let response = match create_transcription(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -181,15 +192,7 @@ async fn transcriptions_with_state_handler(
             .into_response();
     }
 
-    Json(
-        create_transcription(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("transcription"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn translations_with_state_handler(
@@ -234,6 +237,15 @@ async fn translations_with_state_handler(
         }
     }
 
+    let response = match create_translation(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -253,15 +265,7 @@ async fn translations_with_state_handler(
             .into_response();
     }
 
-    Json(
-        create_translation(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("translation"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn audio_speech_with_state_handler(
@@ -306,6 +310,15 @@ async fn audio_speech_with_state_handler(
         }
     }
 
+    let response = local_speech_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    );
+    if !response.status().is_success() {
+        return response;
+    }
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -325,11 +338,7 @@ async fn audio_speech_with_state_handler(
             .into_response();
     }
 
-    local_speech_response(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &request,
-    )
+    response
 }
 
 async fn audio_voices_with_state_handler(
@@ -372,6 +381,11 @@ async fn audio_voices_with_state_handler(
         }
     }
 
+    let response = match list_audio_voices(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -391,11 +405,7 @@ async fn audio_voices_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_audio_voices(request_context.tenant_id(), request_context.project_id())
-            .expect("audio voices list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn audio_voice_consents_with_state_handler(
@@ -413,10 +423,11 @@ async fn audio_voice_consents_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let consent_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.voice.as_str());
+            let Some(consent_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream audio voice consent response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -445,12 +456,14 @@ async fn audio_voice_consents_with_state_handler(
         }
     }
 
-    let response = create_audio_voice_consent(
+    let response = match create_audio_voice_consent(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("audio voice consent");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_audio_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -504,13 +517,16 @@ fn local_speech_response(
 
     let bytes = STANDARD
         .decode(speech.audio_base64.as_bytes())
-        .unwrap_or_default();
+        .map_err(|_| bad_gateway_openai_response("failed to process local speech fallback"))?;
 
-    Response::builder()
+    match Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, speech_content_type(&speech.format))
         .body(Body::from(bytes))
-        .expect("valid speech response")
+    {
+        Ok(response) => response,
+        Err(_) => bad_gateway_openai_response("failed to process local speech fallback"),
+    }
 }
 
 

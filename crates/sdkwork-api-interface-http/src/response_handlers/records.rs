@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn response_retrieve_with_state_handler(
+fn local_response_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_response_request",
+        "Requested response was not found.",
+    )
+}
+
+pub(crate) async fn response_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(response_id): Path<String>,
@@ -42,6 +50,15 @@ pub(super) async fn response_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,18 +78,10 @@ pub(super) async fn response_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn response_input_items_list_with_state_handler(
+pub(crate) async fn response_input_items_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(response_id): Path<String>,
@@ -114,6 +123,15 @@ pub(super) async fn response_input_items_list_with_state_handler(
         }
     }
 
+    let response = match list_response_input_items(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -133,18 +151,10 @@ pub(super) async fn response_input_items_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_response_input_items(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response input items"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn response_delete_with_state_handler(
+pub(crate) async fn response_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(response_id): Path<String>,
@@ -186,6 +196,15 @@ pub(super) async fn response_delete_with_state_handler(
         }
     }
 
+    let response = match delete_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -205,18 +224,10 @@ pub(super) async fn response_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        delete_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn response_cancel_with_state_handler(
+pub(crate) async fn response_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(response_id): Path<String>,
@@ -258,6 +269,15 @@ pub(super) async fn response_cancel_with_state_handler(
         }
     }
 
+    let response = match cancel_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -277,13 +297,5 @@ pub(super) async fn response_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        cancel_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

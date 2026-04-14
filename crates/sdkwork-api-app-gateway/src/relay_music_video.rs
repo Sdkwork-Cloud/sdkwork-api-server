@@ -592,38 +592,27 @@ pub fn create_music(
     _project_id: &str,
     request: &CreateMusicRequest,
 ) -> Result<MusicTracksResponse> {
-    Ok(MusicTracksResponse::new(vec![MusicObject::new("music_1")
-        .with_status("completed")
-        .with_model(&request.model)
-        .with_title(
-            request
-                .title
-                .clone()
-                .unwrap_or_else(|| "SDKWork Track".to_owned()),
-        )
-        .with_audio_url("https://example.com/music.mp3")
-        .with_lyrics(
-            request
-                .lyrics
-                .clone()
-                .unwrap_or_else(|| "We rise with the skyline".to_owned()),
-        )
-        .with_duration_seconds(
-            request.duration_seconds.unwrap_or(123.0),
-        )]))
+    if request.model.trim().is_empty() {
+        bail!("Music model is required.");
+    }
+    if request.prompt.trim().is_empty() {
+        bail!("Music prompt is required.");
+    }
+    if let Some(continue_track_id) = request.continue_track_id.as_deref() {
+        if !local_object_id_matches(continue_track_id, "music") {
+            bail!("A local music track id is required for local continuation.");
+        }
+    }
+
+    bail!("Local music fallback is not supported without an upstream provider.")
 }
 
 pub fn list_music(_tenant_id: &str, _project_id: &str) -> Result<MusicTracksResponse> {
-    Ok(MusicTracksResponse::new(vec![MusicObject::new("music_1")
-        .with_status("completed")
-        .with_model("suno-v4")
-        .with_title("SDKWork Track")
-        .with_audio_url("https://example.com/music.mp3")
-        .with_duration_seconds(123.0)]))
+    bail!("Local music listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_music_exists(music_id: &str) -> Result<()> {
-    if music_id != "music_1" {
+    if !local_object_id_matches(music_id, "music") {
         bail!("music not found");
     }
 
@@ -632,12 +621,7 @@ fn ensure_local_music_exists(music_id: &str) -> Result<()> {
 
 pub fn get_music(_tenant_id: &str, _project_id: &str, music_id: &str) -> Result<MusicObject> {
     ensure_local_music_exists(music_id)?;
-    Ok(MusicObject::new(music_id)
-        .with_status("completed")
-        .with_model("suno-v4")
-        .with_title("SDKWork Track")
-        .with_audio_url("https://example.com/music.mp3")
-        .with_duration_seconds(123.0))
+    bail!("music not found")
 }
 
 pub fn delete_music(
@@ -646,14 +630,12 @@ pub fn delete_music(
     music_id: &str,
 ) -> Result<DeleteMusicResponse> {
     ensure_local_music_exists(music_id)?;
-    Ok(DeleteMusicResponse::deleted(music_id))
+    bail!("music not found")
 }
 
 pub fn music_content(_tenant_id: &str, _project_id: &str, music_id: &str) -> Result<Vec<u8>> {
     ensure_local_music_exists(music_id)?;
-    Ok(vec![
-        0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x21,
-    ])
+    bail!("music not found")
 }
 
 pub fn create_music_lyrics(
@@ -661,43 +643,50 @@ pub fn create_music_lyrics(
     _project_id: &str,
     request: &CreateMusicLyricsRequest,
 ) -> Result<MusicLyricsObject> {
-    Ok(
-        MusicLyricsObject::new("lyrics_1", "completed", &request.prompt).with_title(
-            request
-                .title
-                .clone()
-                .unwrap_or_else(|| "SDKWork Lyrics".to_owned()),
-        ),
-    )
+    if request.prompt.trim().is_empty() {
+        bail!("Music lyrics prompt is required.");
+    }
+
+    bail!("Local music lyrics fallback is not supported without a lyrics generation backend.")
 }
 
 pub fn create_video(
     _tenant_id: &str,
     _project_id: &str,
-    _model: &str,
-    _prompt: &str,
+    model: &str,
+    prompt: &str,
 ) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1",
-        "https://example.com/video.mp4",
-    )]))
+    if model.trim().is_empty() {
+        bail!("Video model is required.");
+    }
+    if prompt.trim().is_empty() {
+        bail!("Video prompt is required.");
+    }
+
+    bail!("Local video fallback is not supported without a persisted asset store.")
 }
 
 pub fn list_videos(_tenant_id: &str, _project_id: &str) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1",
-        "https://example.com/video.mp4",
-    )]))
+    bail!("Local video listing fallback is not supported without an upstream provider.")
 }
 
 pub fn get_video(_tenant_id: &str, _project_id: &str, video_id: &str) -> Result<VideoObject> {
     ensure_local_video_exists(video_id)?;
-    Ok(VideoObject::new(video_id, "https://example.com/video.mp4"))
+    bail!("video not found")
 }
 
 fn ensure_local_video_exists(video_id: &str) -> Result<()> {
-    if video_id != "video_1" {
+    if !local_object_id_matches(video_id, "video") {
         bail!("video not found");
+    }
+
+    Ok(())
+}
+
+fn ensure_local_video_character_exists(video_id: &str, character_id: &str) -> Result<()> {
+    ensure_local_video_exists(video_id)?;
+    if !local_object_id_matches(character_id, "char") {
+        bail!("video character not found");
     }
 
     Ok(())
@@ -709,24 +698,26 @@ pub fn delete_video(
     video_id: &str,
 ) -> Result<DeleteVideoResponse> {
     ensure_local_video_exists(video_id)?;
-    Ok(DeleteVideoResponse::deleted(video_id))
+    bail!("video not found")
 }
 
 pub fn video_content(_tenant_id: &str, _project_id: &str, video_id: &str) -> Result<Vec<u8>> {
     ensure_local_video_exists(video_id)?;
-    Ok(b"VIDEO".to_vec())
+    bail!("video not found")
 }
 
 pub fn remix_video(
     _tenant_id: &str,
     _project_id: &str,
-    _video_id: &str,
-    _prompt: &str,
+    video_id: &str,
+    prompt: &str,
 ) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1_remix",
-        "https://example.com/video-remix.mp4",
-    )]))
+    ensure_local_video_exists(video_id)?;
+    if prompt.trim().is_empty() {
+        bail!("Video prompt is required.");
+    }
+
+    bail!("Local video fallback is not supported without a persisted asset store.")
 }
 
 pub fn create_video_character(
@@ -734,26 +725,31 @@ pub fn create_video_character(
     _project_id: &str,
     request: &CreateVideoCharacterRequest,
 ) -> Result<VideoCharacterObject> {
-    Ok(VideoCharacterObject::new("char_1", &request.name))
+    ensure_local_video_exists(&request.video_id)?;
+    if request.name.trim().is_empty() {
+        bail!("Video character name is required.");
+    }
+
+    bail!("Persisted local video character state is required for local character creation.")
 }
 
 pub fn list_video_characters(
     _tenant_id: &str,
     _project_id: &str,
-    _video_id: &str,
+    video_id: &str,
 ) -> Result<VideoCharactersResponse> {
-    Ok(VideoCharactersResponse::new(vec![
-        VideoCharacterObject::new("char_1", "Hero"),
-    ]))
+    ensure_local_video_exists(video_id)?;
+    bail!("Persisted local video character state is required for local character listing.")
 }
 
 pub fn get_video_character(
     _tenant_id: &str,
     _project_id: &str,
-    _video_id: &str,
+    video_id: &str,
     character_id: &str,
 ) -> Result<VideoCharacterObject> {
-    Ok(VideoCharacterObject::new(character_id, "Hero"))
+    ensure_local_video_character_exists(video_id, character_id)?;
+    bail!("video character not found")
 }
 
 pub fn get_video_character_canonical(
@@ -761,52 +757,71 @@ pub fn get_video_character_canonical(
     _project_id: &str,
     character_id: &str,
 ) -> Result<VideoCharacterObject> {
-    Ok(VideoCharacterObject::new(character_id, "Hero"))
+    if !local_object_id_matches(character_id, "char") {
+        bail!("video character not found");
+    }
+
+    bail!("video character not found")
 }
 
 pub fn update_video_character(
     _tenant_id: &str,
     _project_id: &str,
-    _video_id: &str,
+    video_id: &str,
     character_id: &str,
     request: &UpdateVideoCharacterRequest,
 ) -> Result<VideoCharacterObject> {
-    Ok(VideoCharacterObject::new(
-        character_id,
-        request.name.as_deref().unwrap_or("Hero"),
-    ))
+    ensure_local_video_character_exists(video_id, character_id)?;
+    let Some(name) = request
+        .name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+    else {
+        bail!("Video character name is required.");
+    };
+
+    let _ = name;
+    bail!("video character not found")
 }
 
 pub fn extend_video(
     _tenant_id: &str,
     _project_id: &str,
-    _video_id: &str,
-    _prompt: &str,
+    video_id: &str,
+    prompt: &str,
 ) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1_extended",
-        "https://example.com/video-extended.mp4",
-    )]))
+    ensure_local_video_exists(video_id)?;
+    if prompt.trim().is_empty() {
+        bail!("Video prompt is required.");
+    }
+
+    bail!("Local video fallback is not supported without a persisted asset store.")
 }
 
 pub fn edit_video(
     _tenant_id: &str,
     _project_id: &str,
-    _request: &EditVideoRequest,
+    request: &EditVideoRequest,
 ) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1_edited",
-        "https://example.com/video-edited.mp4",
-    )]))
+    ensure_local_video_exists(&request.video_id)?;
+    if request.prompt.trim().is_empty() {
+        bail!("Video prompt is required.");
+    }
+
+    bail!("Local video fallback is not supported without a persisted asset store.")
 }
 
 pub fn extensions_video(
     _tenant_id: &str,
     _project_id: &str,
-    _request: &ExtendVideoRequest,
+    request: &ExtendVideoRequest,
 ) -> Result<VideosResponse> {
-    Ok(VideosResponse::new(vec![VideoObject::new(
-        "video_1_extended",
-        "https://example.com/video-extended.mp4",
-    )]))
+    if let Some(video_id) = request.video_id.as_deref() {
+        ensure_local_video_exists(video_id)?;
+    }
+    if request.prompt.trim().is_empty() {
+        bail!("Video prompt is required.");
+    }
+
+    bail!("Local video fallback is not supported without a persisted asset store.")
 }

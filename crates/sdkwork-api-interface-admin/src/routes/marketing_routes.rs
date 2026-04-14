@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn register_marketing_routes(router: Router) -> Router {
+pub(super) fn register_marketing_routes(router: Router<AdminApiState>) -> Router<AdminApiState> {
     router
         .route(
             "/admin/marketing/coupon-templates",

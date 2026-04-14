@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn files_handler(
+fn local_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_file",
+        "Requested file was not found.",
+    )
+}
+
+pub(crate) async fn files_handler(
     request_context: StatelessGatewayRequest,
     multipart: Multipart,
 ) -> Response {
@@ -16,21 +24,22 @@ pub(super) async fn files_handler(
                 }
             }
 
-            Json(
-                create_file(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("file"),
-            )
-            .into_response()
+            let response = match create_file(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_file_error_response(error),
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }
 }
 
-pub(super) async fn files_list_handler(request_context: StatelessGatewayRequest) -> Response {
+pub(crate) async fn files_list_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::FilesList).await {
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
@@ -39,6 +48,10 @@ pub(super) async fn files_list_handler(request_context: StatelessGatewayRequest)
         }
     }
 
-    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
-        .into_response()
+    let response = match list_files(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
+    Json(response).into_response()
 }

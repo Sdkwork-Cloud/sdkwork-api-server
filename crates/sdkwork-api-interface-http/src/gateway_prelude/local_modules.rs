@@ -24,6 +24,7 @@ pub(crate) use crate::eval_stateless_handlers::*;
 pub(crate) use crate::fine_tuning_handlers::*;
 pub(crate) use crate::fine_tuning_stateless_handlers::*;
 pub(crate) use crate::gateway_auth::*;
+pub(crate) use crate::gateway_commercial::enforce_project_quota;
 pub(crate) use crate::gateway_docs::*;
 pub(crate) use crate::gateway_response_helpers::*;
 pub(crate) use crate::gateway_router_common::*;
@@ -41,7 +42,9 @@ pub(crate) use crate::realtime_handlers::*;
 pub(crate) use crate::realtime_stateless_handlers::*;
 pub(crate) use crate::response_handlers::*;
 pub(crate) use crate::response_stateless_handlers::*;
-pub(crate) use crate::stateless_gateway::{StatelessGatewayRequest, apply_request_routing_region};
+pub(crate) use crate::stateless_gateway::{
+    apply_request_routing_region, StatelessGatewayContext, StatelessGatewayRequest,
+};
 pub(crate) use crate::stateless_relay::*;
 pub(crate) use crate::storage_handlers::*;
 pub(crate) use crate::storage_stateless_handlers::*;

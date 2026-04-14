@@ -1,7 +1,7 @@
 use super::errors::{bad_multipart, missing_multipart_field};
 use super::*;
 
-pub(super) async fn parse_image_edit_request(
+pub(crate) async fn parse_image_edit_request(
     mut multipart: Multipart,
 ) -> Result<CreateImageEditRequest, Response> {
     let mut model = None;
@@ -56,7 +56,7 @@ pub(super) async fn parse_image_edit_request(
     Ok(request)
 }
 
-pub(super) async fn parse_image_variation_request(
+pub(crate) async fn parse_image_variation_request(
     mut multipart: Multipart,
 ) -> Result<CreateImageVariationRequest, Response> {
     let mut model = None;

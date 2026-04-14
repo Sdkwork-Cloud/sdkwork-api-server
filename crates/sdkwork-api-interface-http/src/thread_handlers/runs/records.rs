@@ -1,6 +1,23 @@
 use super::*;
 
-pub(super) async fn thread_runs_list_with_state_handler(
+fn local_thread_run_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.to_ascii_lowercase().contains("run not found") {
+        return local_gateway_invalid_or_not_found_response(
+            error,
+            "invalid_thread_run_request",
+            "Requested thread run was not found.",
+        );
+    }
+
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_thread_run_request",
+        "Requested thread was not found.",
+    )
+}
+
+pub(crate) async fn thread_runs_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(thread_id): Path<String>,
@@ -42,6 +59,15 @@ pub(super) async fn thread_runs_list_with_state_handler(
         }
     }
 
+    let response = match list_thread_runs(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,18 +87,10 @@ pub(super) async fn thread_runs_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_thread_runs(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread runs list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_retrieve_with_state_handler(
+pub(crate) async fn thread_run_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
@@ -116,6 +134,16 @@ pub(super) async fn thread_run_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -136,19 +164,10 @@ pub(super) async fn thread_run_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_update_with_state_handler(
+pub(crate) async fn thread_run_update_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
@@ -194,6 +213,16 @@ pub(super) async fn thread_run_update_with_state_handler(
         }
     }
 
+    let response = match update_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -214,19 +243,10 @@ pub(super) async fn thread_run_update_with_state_handler(
             .into_response();
     }
 
-    Json(
-        update_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run update"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_run_cancel_with_state_handler(
+pub(crate) async fn thread_run_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((thread_id, run_id)): Path<(String, String)>,
@@ -270,6 +290,16 @@ pub(super) async fn thread_run_cancel_with_state_handler(
         }
     }
 
+    let response = match cancel_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &run_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -290,14 +320,5 @@ pub(super) async fn thread_run_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        cancel_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &run_id,
-        )
-        .expect("thread run cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

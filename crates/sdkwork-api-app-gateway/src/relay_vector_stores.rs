@@ -489,17 +489,20 @@ pub fn create_vector_store(
     _project_id: &str,
     name: &str,
 ) -> Result<VectorStoreObject> {
-    Ok(VectorStoreObject::new("vs_1", name))
+    if name.trim().is_empty() {
+        bail!("Vector store name is required.");
+    }
+
+    let _ = name;
+    bail!("Local vector store fallback is not supported without an upstream provider.")
 }
 
 pub fn list_vector_stores(_tenant_id: &str, _project_id: &str) -> Result<ListVectorStoresResponse> {
-    Ok(ListVectorStoresResponse::new(vec![VectorStoreObject::new(
-        "vs_1", "kb-main",
-    )]))
+    bail!("Local vector store listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_vector_store_exists(vector_store_id: &str) -> Result<()> {
-    if vector_store_id != "vs_1" {
+    if !local_object_id_matches(vector_store_id, "vs") {
         bail!("vector store not found");
     }
 
@@ -512,7 +515,7 @@ pub fn get_vector_store(
     vector_store_id: &str,
 ) -> Result<VectorStoreObject> {
     ensure_local_vector_store_exists(vector_store_id)?;
-    Ok(VectorStoreObject::new(vector_store_id, "kb-main"))
+    bail!("vector store not found")
 }
 
 pub fn update_vector_store(
@@ -522,7 +525,12 @@ pub fn update_vector_store(
     name: &str,
 ) -> Result<VectorStoreObject> {
     ensure_local_vector_store_exists(vector_store_id)?;
-    Ok(VectorStoreObject::new(vector_store_id, name))
+    if name.trim().is_empty() {
+        bail!("Vector store name is required.");
+    }
+
+    let _ = name;
+    bail!("vector store not found")
 }
 
 pub fn delete_vector_store(
@@ -531,7 +539,7 @@ pub fn delete_vector_store(
     vector_store_id: &str,
 ) -> Result<DeleteVectorStoreResponse> {
     ensure_local_vector_store_exists(vector_store_id)?;
-    Ok(DeleteVectorStoreResponse::deleted(vector_store_id))
+    bail!("vector store not found")
 }
 
 pub fn search_vector_store(
@@ -541,11 +549,16 @@ pub fn search_vector_store(
     query: &str,
 ) -> Result<SearchVectorStoreResponse> {
     ensure_local_vector_store_exists(vector_store_id)?;
-    Ok(SearchVectorStoreResponse::sample(query))
+    if query.trim().is_empty() {
+        bail!("Vector store search query is required.");
+    }
+
+    bail!("Persisted local vector store index state is required for local search.")
 }
 
 fn ensure_local_vector_store_file_exists(vector_store_id: &str, file_id: &str) -> Result<()> {
-    if vector_store_id != "vs_1" || file_id != "file_1" {
+    ensure_local_vector_store_exists(vector_store_id)?;
+    if !local_object_id_matches(file_id, "file") {
         bail!("vector store file not found");
     }
 
@@ -556,7 +569,8 @@ fn ensure_local_vector_store_file_batch_exists(
     vector_store_id: &str,
     batch_id: &str,
 ) -> Result<()> {
-    if vector_store_id != "vs_1" || batch_id != "vsfb_1" {
+    ensure_local_vector_store_exists(vector_store_id)?;
+    if !local_object_id_matches(batch_id, "vsfb") {
         bail!("vector store file batch not found");
     }
 
@@ -566,20 +580,24 @@ fn ensure_local_vector_store_file_batch_exists(
 pub fn create_vector_store_file(
     _tenant_id: &str,
     _project_id: &str,
-    _vector_store_id: &str,
+    vector_store_id: &str,
     file_id: &str,
 ) -> Result<VectorStoreFileObject> {
-    Ok(VectorStoreFileObject::new(file_id))
+    ensure_local_vector_store_exists(vector_store_id)?;
+    if !local_object_id_matches(file_id, "file") {
+        bail!("A local file id is required for local vector store fallback.");
+    }
+
+    bail!("Persisted local vector store file state is required for local file attachment.")
 }
 
 pub fn list_vector_store_files(
     _tenant_id: &str,
     _project_id: &str,
-    _vector_store_id: &str,
+    vector_store_id: &str,
 ) -> Result<ListVectorStoreFilesResponse> {
-    Ok(ListVectorStoreFilesResponse::new(vec![
-        VectorStoreFileObject::new("file_1"),
-    ]))
+    ensure_local_vector_store_exists(vector_store_id)?;
+    bail!("Persisted local vector store file state is required for local file listing.")
 }
 
 pub fn get_vector_store_file(
@@ -589,7 +607,7 @@ pub fn get_vector_store_file(
     file_id: &str,
 ) -> Result<VectorStoreFileObject> {
     ensure_local_vector_store_file_exists(vector_store_id, file_id)?;
-    Ok(VectorStoreFileObject::new(file_id))
+    bail!("vector store file not found")
 }
 
 pub fn delete_vector_store_file(
@@ -599,17 +617,28 @@ pub fn delete_vector_store_file(
     file_id: &str,
 ) -> Result<DeleteVectorStoreFileResponse> {
     ensure_local_vector_store_file_exists(vector_store_id, file_id)?;
-    Ok(DeleteVectorStoreFileResponse::deleted(file_id))
+    bail!("vector store file not found")
 }
 
 pub fn create_vector_store_file_batch<T: AsRef<str>>(
     _tenant_id: &str,
     _project_id: &str,
-    _vector_store_id: &str,
+    vector_store_id: &str,
     file_ids: &[T],
 ) -> Result<VectorStoreFileBatchObject> {
-    let _ = file_ids.first().map(AsRef::as_ref);
-    Ok(VectorStoreFileBatchObject::new("vsfb_1"))
+    ensure_local_vector_store_exists(vector_store_id)?;
+    if file_ids.is_empty() {
+        bail!("At least one local file id is required for local vector store fallback.");
+    }
+    if file_ids
+        .iter()
+        .map(AsRef::as_ref)
+        .any(|file_id| !local_object_id_matches(file_id, "file"))
+    {
+        bail!("A local file id is required for local vector store fallback.");
+    }
+
+    bail!("Persisted local vector store file batch state is required for local batch creation.")
 }
 
 pub fn get_vector_store_file_batch(
@@ -619,7 +648,7 @@ pub fn get_vector_store_file_batch(
     batch_id: &str,
 ) -> Result<VectorStoreFileBatchObject> {
     ensure_local_vector_store_file_batch_exists(vector_store_id, batch_id)?;
-    Ok(VectorStoreFileBatchObject::new(batch_id))
+    bail!("vector store file batch not found")
 }
 
 pub fn cancel_vector_store_file_batch(
@@ -629,7 +658,7 @@ pub fn cancel_vector_store_file_batch(
     batch_id: &str,
 ) -> Result<VectorStoreFileBatchObject> {
     ensure_local_vector_store_file_batch_exists(vector_store_id, batch_id)?;
-    Ok(VectorStoreFileBatchObject::cancelled(batch_id))
+    bail!("vector store file batch not found")
 }
 
 pub fn list_vector_store_file_batch_files(
@@ -639,7 +668,5 @@ pub fn list_vector_store_file_batch_files(
     batch_id: &str,
 ) -> Result<ListVectorStoreFilesResponse> {
     ensure_local_vector_store_file_batch_exists(vector_store_id, batch_id)?;
-    Ok(ListVectorStoreFilesResponse::new(vec![
-        VectorStoreFileObject::new("file_1"),
-    ]))
+    bail!("Persisted local vector store file batch state is required for local batch file listing.")
 }

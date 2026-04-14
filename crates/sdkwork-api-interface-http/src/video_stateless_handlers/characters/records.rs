@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn video_characters_list_handler(
+fn local_video_character_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_video_character_request",
+        "Requested video character was not found.",
+    )
+}
+
+pub(crate) async fn video_characters_list_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
 ) -> Response {
@@ -17,18 +25,19 @@ pub(super) async fn video_characters_list_handler(
         }
     }
 
-    Json(
-        list_video_characters(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-        )
-        .expect("video characters list"),
-    )
-    .into_response()
+    let response = match list_video_characters(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_character_retrieve_handler(
+pub(crate) async fn video_character_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((video_id, character_id)): Path<(String, String)>,
 ) -> Response {
@@ -47,19 +56,20 @@ pub(super) async fn video_character_retrieve_handler(
         }
     }
 
-    Json(
-        get_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-        )
-        .expect("video character retrieve"),
-    )
-    .into_response()
+    let response = match get_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_character_update_handler(
+pub(crate) async fn video_character_update_handler(
     request_context: StatelessGatewayRequest,
     Path((video_id, character_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<UpdateVideoCharacterRequest>,
@@ -77,20 +87,21 @@ pub(super) async fn video_character_update_handler(
         }
     }
 
-    Json(
-        update_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-            &request,
-        )
-        .expect("video character update"),
-    )
-    .into_response()
+    let response = match update_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_character_create_handler(
+pub(crate) async fn video_character_create_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVideoCharacterRequest>,
 ) -> Response {
@@ -107,13 +118,14 @@ pub(super) async fn video_character_create_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::create_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video character create"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::create_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }

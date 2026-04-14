@@ -12,6 +12,8 @@ pub(crate) struct UpsertOperatorUserRequest {
     pub(crate) display_name: String,
     #[serde(default)]
     pub(crate) password: Option<String>,
+    #[serde(default)]
+    pub(crate) role: Option<AdminUserRole>,
     #[serde(default = "default_user_active")]
     pub(crate) active: bool,
 }

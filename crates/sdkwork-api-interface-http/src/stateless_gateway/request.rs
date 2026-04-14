@@ -2,7 +2,7 @@ use super::config::StatelessGatewayContext;
 use super::*;
 
 #[derive(Clone, Debug)]
-pub(super) struct StatelessGatewayRequest(StatelessGatewayContext);
+pub(crate) struct StatelessGatewayRequest(StatelessGatewayContext);
 
 impl StatelessGatewayRequest {
     pub(crate) fn tenant_id(&self) -> &str {

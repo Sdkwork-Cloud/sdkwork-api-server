@@ -15,15 +15,14 @@ async fn realtime_sessions_handler(
         }
     }
 
-    Json(
-        create_realtime_session(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("realtime session"),
-    )
-    .into_response()
+    match create_realtime_session(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_gateway_invalid_or_bad_gateway_response(error, "invalid_realtime_request"),
+    }
 }
 
 
@@ -42,10 +41,9 @@ async fn realtime_sessions_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let realtime_session_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.model.as_str());
+            let Some(realtime_session_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream realtime session response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -74,12 +72,19 @@ async fn realtime_sessions_with_state_handler(
         }
     }
 
-    let response = create_realtime_session(
+    let response = match create_realtime_session(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
-    )
-    .expect("realtime");
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(
+                error,
+                "invalid_realtime_request",
+            );
+        }
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),

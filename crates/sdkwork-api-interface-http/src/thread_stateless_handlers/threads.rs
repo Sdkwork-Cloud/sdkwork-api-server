@@ -1,6 +1,15 @@
 use super::*;
 
-pub(super) async fn threads_handler(
+fn local_thread_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_request");
+    }
+
+    local_gateway_error_response(error, "Requested thread was not found.")
+}
+
+pub(crate) async fn threads_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateThreadRequest>,
 ) -> Response {
@@ -12,11 +21,15 @@ pub(super) async fn threads_handler(
         }
     }
 
-    Json(create_thread(request_context.tenant_id(), request_context.project_id()).expect("thread"))
-        .into_response()
+    let response = match create_thread(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_thread_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_retrieve_handler(
+pub(crate) async fn thread_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
 ) -> Response {
@@ -33,18 +46,21 @@ pub(super) async fn thread_retrieve_handler(
         }
     }
 
-    Json(
-        get_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread retrieve"),
-    )
-    .into_response()
+    let response = match get_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_error_response(error, "Requested thread was not found.")
+        }
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_update_handler(
+pub(crate) async fn thread_update_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateThreadRequest>,
@@ -62,18 +78,21 @@ pub(super) async fn thread_update_handler(
         }
     }
 
-    Json(
-        update_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread update"),
-    )
-    .into_response()
+    let response = match update_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_error_response(error, "Requested thread was not found.")
+        }
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_delete_handler(
+pub(crate) async fn thread_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
 ) -> Response {
@@ -87,13 +106,16 @@ pub(super) async fn thread_delete_handler(
         }
     }
 
-    Json(
-        delete_thread(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-        )
-        .expect("thread delete"),
-    )
-    .into_response()
+    let response = match delete_thread(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return local_gateway_error_response(error, "Requested thread was not found.")
+        }
+    };
+
+    Json(response).into_response()
 }

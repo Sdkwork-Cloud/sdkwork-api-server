@@ -1,3 +1,10 @@
+fn local_chat_completion_list_error_response() -> Response {
+    invalid_request_openai_response(
+        "Local chat completion listing fallback is not supported without an upstream provider.",
+        "invalid_chat_completion_request",
+    )
+}
+
 async fn chat_completions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
@@ -42,11 +49,17 @@ async fn chat_completions_list_handler(request_context: StatelessGatewayRequest)
     match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletionsList).await
     {
         Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => Json(
-            list_chat_completions(request_context.tenant_id(), request_context.project_id())
-                .expect("chat completions"),
-        )
-        .into_response(),
+        Ok(None) => {
+            let response = match list_chat_completions(
+                request_context.tenant_id(),
+                request_context.project_id(),
+            ) {
+                Ok(response) => response,
+                Err(_) => return local_chat_completion_list_error_response(),
+            };
+
+            Json(response).into_response()
+        }
         Err(_) => bad_gateway_openai_response("failed to relay upstream chat completion list"),
     }
 }
@@ -99,7 +112,7 @@ async fn chat_completion_update_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &completion_id,
-        request.metadata.unwrap_or(serde_json::json!({})),
+        request.metadata,
     )
 }
 
@@ -306,13 +319,35 @@ async fn chat_completions_with_state_handler(
         }
     }
 
+    if request.stream.unwrap_or(false) {
+        if let Some(admission) = commercial_admission.as_ref() {
+            if let Err(response) = release_gateway_commercial_admission(&state, admission).await {
+                return response;
+            }
+        }
+
+        return invalid_request_openai_response(
+            "Local chat completion streaming fallback is not supported without an upstream provider.",
+            "invalid_chat_completion_request",
+        );
+    }
+
     let local_chat_completion = match local_chat_completion_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
     ) {
         Ok(response) => response,
-        Err(response) => return response,
+        Err(response) => {
+            if let Some(admission) = commercial_admission.as_ref() {
+                if let Err(release_response) =
+                    release_gateway_commercial_admission(&state, admission).await
+                {
+                    return release_response;
+                }
+            }
+            return response;
+        }
     };
 
     if let Some(admission) = commercial_admission.as_ref() {
@@ -339,11 +374,7 @@ async fn chat_completions_with_state_handler(
             .into_response();
     }
 
-    if request.stream.unwrap_or(false) {
-        local_chat_completion_stream_body_response()
-    } else {
-        Json(local_chat_completion).into_response()
-    }
+    Json(local_chat_completion).into_response()
 }
 
 async fn anthropic_messages_handler(
@@ -598,6 +629,12 @@ async fn chat_completions_list_with_state_handler(
         }
     }
 
+    let local_response =
+        match list_chat_completions(request_context.tenant_id(), request_context.project_id()) {
+            Ok(response) => response,
+            Err(_) => return local_chat_completion_list_error_response(),
+        };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -617,11 +654,7 @@ async fn chat_completions_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_chat_completions(request_context.tenant_id(), request_context.project_id())
-            .expect("chat completions"),
-    )
-    .into_response()
+    Json(local_response).into_response()
 }
 
 async fn chat_completion_retrieve_with_state_handler(
@@ -747,7 +780,7 @@ async fn chat_completion_update_with_state_handler(
         request_context.tenant_id(),
         request_context.project_id(),
         &completion_id,
-        request.metadata.unwrap_or(serde_json::json!({})),
+        request.metadata,
     ) {
         Ok(response) => response,
         Err(response) => return response,

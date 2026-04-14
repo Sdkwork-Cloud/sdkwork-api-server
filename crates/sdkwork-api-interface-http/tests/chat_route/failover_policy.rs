@@ -296,7 +296,10 @@ async fn stateful_chat_route_fails_over_before_execution_when_primary_lacks_tena
     let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let primary_address = primary_listener.local_addr().unwrap();
     let primary_upstream = Router::new()
-        .route("/v1/chat/completions", post(upstream_chat_handler_with_usage))
+        .route(
+            "/v1/chat/completions",
+            post(upstream_chat_handler_with_usage),
+        )
         .with_state(primary_state.clone());
     tokio::spawn(async move {
         axum::serve(primary_listener, primary_upstream)
@@ -426,8 +429,8 @@ async fn stateful_chat_route_fails_over_before_execution_when_primary_lacks_tena
 }
 
 #[tokio::test]
-async fn stateful_chat_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
-{
+async fn stateful_chat_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin(
+) {
     let tenant_id = "tenant-chat-preflight-incompatible-standard-json";
     let project_id = "project-chat-preflight-incompatible-standard-json";
     let primary_state = UpstreamCaptureState::default();
@@ -947,18 +950,16 @@ async fn stateful_chat_route_does_not_fail_over_when_policy_disables_execution_f
     assert!(metrics_text.contains(
         "sdkwork_upstream_requests_total{service=\"gateway\",capability=\"chat_completion\",provider=\"provider-chat-failover-disabled-primary\",outcome=\"failure\"} 1"
     ));
-    assert!(
-        !metrics_text
-            .contains("provider=\"provider-chat-failover-disabled-backup\",outcome=\"success\"")
-    );
+    assert!(!metrics_text
+        .contains("provider=\"provider-chat-failover-disabled-backup\",outcome=\"success\""));
     assert!(!metrics_text.contains(
         "sdkwork_gateway_failovers_total{service=\"gateway\",capability=\"chat_completion\",from_provider=\"provider-chat-failover-disabled-primary\",to_provider=\"provider-chat-failover-disabled-backup\",outcome=\"success\"}"
     ));
 }
 
 #[tokio::test]
-async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential()
-{
+async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential(
+) {
     let tenant_id = "tenant-chat-preflight-missing-credential-stream";
     let project_id = "project-chat-preflight-missing-credential-stream";
     let primary_state = UpstreamCaptureState::default();
@@ -967,7 +968,10 @@ async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_lac
     let primary_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let primary_address = primary_listener.local_addr().unwrap();
     let primary_upstream = Router::new()
-        .route("/v1/chat/completions", post(upstream_chat_stream_handler_success))
+        .route(
+            "/v1/chat/completions",
+            post(upstream_chat_stream_handler_success),
+        )
         .with_state(primary_state.clone());
     tokio::spawn(async move {
         axum::serve(primary_listener, primary_upstream)
@@ -1102,8 +1106,8 @@ async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_lac
 }
 
 #[tokio::test]
-async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
-{
+async fn stateful_chat_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin(
+) {
     let tenant_id = "tenant-chat-stream-preflight-incompatible-standard";
     let project_id = "project-chat-stream-preflight-incompatible-standard";
     let primary_state = UpstreamCaptureState::default();
@@ -1626,4 +1630,3 @@ async fn create_chat_routing_policy_for_failover(
         .unwrap();
     assert_eq!(policy.status(), StatusCode::CREATED);
 }
-

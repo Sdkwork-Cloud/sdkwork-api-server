@@ -203,55 +203,82 @@ pub(crate) async fn list_refund_orders_handler(
 }
 
 pub(crate) async fn approve_refund_order_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(refund_order_id): Path<String>,
     Json(request): Json<ApproveRefundOrderRequest>,
 ) -> Result<Json<RefundOrderRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    approve_refund_order_request(
+    let refund = approve_refund_order_request(
         payment_store.as_ref(),
         &refund_order_id,
         request.approved_amount_minor,
         request.approved_at_ms,
     )
     .await
-    .map(Json)
-    .map_err(map_refund_request_action_error)
+    .map_err(map_refund_request_action_error)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_refund.approve",
+        "refund_order",
+        refund.refund_order_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
+    Ok(Json(refund))
 }
 
 pub(crate) async fn cancel_refund_order_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(refund_order_id): Path<String>,
     Json(request): Json<CancelRefundOrderRequest>,
 ) -> Result<Json<RefundOrderRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    cancel_refund_order_request(
+    let refund = cancel_refund_order_request(
         payment_store.as_ref(),
         &refund_order_id,
         request.canceled_at_ms,
     )
     .await
-    .map(Json)
-    .map_err(map_refund_request_action_error)
+    .map_err(map_refund_request_action_error)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_refund.cancel",
+        "refund_order",
+        refund.refund_order_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
+    Ok(Json(refund))
 }
 
 pub(crate) async fn start_refund_order_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(refund_order_id): Path<String>,
     Json(request): Json<StartRefundOrderRequest>,
 ) -> Result<Json<RefundOrderRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    start_refund_order_execution(
+    let refund = start_refund_order_execution(
         payment_store.as_ref(),
         &refund_order_id,
         request.started_at_ms,
     )
     .await
-    .map(Json)
-    .map_err(map_refund_request_action_error)
+    .map_err(map_refund_request_action_error)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_refund.start",
+        "refund_order",
+        refund.refund_order_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
+    Ok(Json(refund))
 }
 
 pub(crate) async fn list_payment_gateway_accounts_handler(
@@ -267,7 +294,7 @@ pub(crate) async fn list_payment_gateway_accounts_handler(
 }
 
 pub(crate) async fn upsert_payment_gateway_account_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<UpsertPaymentGatewayAccountRequest>,
 ) -> Result<(StatusCode, Json<PaymentGatewayAccountRecord>), StatusCode> {
@@ -278,6 +305,15 @@ pub(crate) async fn upsert_payment_gateway_account_handler(
         .insert_payment_gateway_account_record(&record)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_gateway_account.upsert",
+        "payment_gateway_account",
+        record.gateway_account_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -294,7 +330,7 @@ pub(crate) async fn list_payment_channel_policies_handler(
 }
 
 pub(crate) async fn upsert_payment_channel_policy_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<UpsertPaymentChannelPolicyRequest>,
 ) -> Result<(StatusCode, Json<PaymentChannelPolicyRecord>), StatusCode> {
@@ -305,6 +341,15 @@ pub(crate) async fn upsert_payment_channel_policy_handler(
         .insert_payment_channel_policy_record(&record)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_channel_policy.upsert",
+        "payment_channel_policy",
+        record.channel_policy_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -334,21 +379,30 @@ pub(crate) async fn payment_reconciliation_summary_handler(
 }
 
 pub(crate) async fn resolve_payment_reconciliation_line_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(reconciliation_line_id): Path<String>,
     Json(request): Json<ResolveReconciliationLineRequest>,
 ) -> Result<Json<ReconciliationMatchSummaryRecord>, StatusCode> {
     let payment_store = payment_store_kernel(&state).map_err(|(status, _)| status)?;
-    resolve_admin_payment_reconciliation_line(
+    let line = resolve_admin_payment_reconciliation_line(
         payment_store.as_ref(),
         &reconciliation_line_id,
         request.resolved_at_ms.unwrap_or_else(unix_timestamp_ms),
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(Json)
-    .ok_or(StatusCode::NOT_FOUND)
+    .ok_or(StatusCode::NOT_FOUND)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_reconciliation.resolve",
+        "payment_reconciliation_line",
+        line.reconciliation_line_id.clone(),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
+    Ok(Json(line))
 }
 
 pub(crate) async fn render_admin_metrics_payload(

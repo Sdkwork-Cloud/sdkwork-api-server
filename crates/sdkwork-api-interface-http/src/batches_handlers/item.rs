@@ -1,6 +1,15 @@
 use super::*;
 
-pub(super) async fn batch_retrieve_with_state_handler(
+fn local_batch_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_batch_request");
+    }
+
+    local_gateway_error_response(error, "Requested batch was not found.")
+}
+
+pub(crate) async fn batch_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(batch_id): Path<String>,
@@ -42,6 +51,15 @@ pub(super) async fn batch_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,18 +79,10 @@ pub(super) async fn batch_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &batch_id,
-        )
-        .expect("batch retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn batch_cancel_with_state_handler(
+pub(crate) async fn batch_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(batch_id): Path<String>,
@@ -114,6 +124,15 @@ pub(super) async fn batch_cancel_with_state_handler(
         }
     }
 
+    let response = match cancel_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -133,13 +152,5 @@ pub(super) async fn batch_cancel_with_state_handler(
             .into_response();
     }
 
-    Json(
-        cancel_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &batch_id,
-        )
-        .expect("batch cancel"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

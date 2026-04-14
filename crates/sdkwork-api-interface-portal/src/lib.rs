@@ -22,6 +22,8 @@ pub(crate) use marketing_types::*;
 pub use state::PortalApiState;
 pub(crate) use state::{AuthenticatedPortalClaims, DEFAULT_PORTAL_JWT_SIGNING_SECRET};
 
+const PORTAL_DEFAULT_BODY_LIMIT_BYTES: usize = 2 * 1024 * 1024;
+
 use axum::{
     body::Bytes,
     extract::{FromRequestParts, Path, Query, State},
@@ -65,8 +67,20 @@ use sdkwork_api_app_jobs::{
     find_async_job, list_async_job_assets, list_async_job_attempts, list_async_jobs,
 };
 use sdkwork_api_app_marketing::{
-    confirm_coupon_redemption, reserve_coupon_redemption, rollback_coupon_redemption,
-    validate_coupon_stack, CouponValidationDecision,
+    confirm_coupon_for_subject, confirm_coupon_redemption,
+    list_coupon_code_views_for_subjects, list_coupon_redemptions_for_subjects,
+    list_coupon_reward_history_views_for_subjects,
+    load_coupon_redemption_context_owned_by_subject,
+    load_coupon_reservation_context_owned_by_subject, marketing_subject_scope_token,
+    reserve_coupon_for_subject, reserve_coupon_redemption,
+    resolve_idempotency_key as resolve_shared_idempotency_key, rollback_coupon_for_subject,
+    rollback_coupon_redemption, summarize_coupon_codes, summarize_coupon_redemptions,
+    validate_coupon_for_subject, validate_coupon_stack, ConfirmCouponInput,
+    CouponValidationDecision, MarketingCodeSummary, MarketingCodeView,
+    MarketingOperationError, MarketingRedemptionOwnershipView,
+    MarketingRedemptionSummary, MarketingReservationOwnershipView,
+    MarketingRewardHistoryView, MarketingSubjectSet, ReserveCouponInput,
+    RollbackCouponInput, ValidatedCouponResult,
 };
 use sdkwork_api_app_payment::{
     ensure_commerce_payment_checkout, ensure_portal_payment_subject_scope,
@@ -386,6 +400,9 @@ pub fn try_portal_router() -> anyhow::Result<Router> {
         .layer(axum::middleware::from_fn_with_state(
             metrics,
             observe_http_metrics,
+        ))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            PORTAL_DEFAULT_BODY_LIMIT_BYTES,
         ))
         .layer(http::browser_cors_layer(&http_exposure))
         .layer(axum::middleware::from_fn_with_state(
@@ -733,6 +750,9 @@ pub fn portal_router_with_state_and_http_exposure(
         .layer(axum::middleware::from_fn_with_state(
             metrics,
             observe_http_metrics,
+        ))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            PORTAL_DEFAULT_BODY_LIMIT_BYTES,
         ))
         .layer(http::browser_cors_layer(&http_exposure))
         .layer(axum::middleware::from_fn_with_state(

@@ -1,4 +1,7 @@
-use super::auth_utils::{extract_bearer_token, header_value, query_parameter};
+use super::auth_utils::{
+    extract_bearer_token, header_value, query_parameter,
+    resolve_authenticated_gateway_request_context,
+};
 use super::*;
 
 tokio::task_local! {
@@ -9,17 +12,17 @@ tokio::task_local! {
     static CURRENT_GATEWAY_REQUEST_STARTED_AT: Instant;
 }
 
-pub(super) fn current_gateway_request_context() -> Option<IdentityGatewayRequestContext> {
+pub(crate) fn current_gateway_request_context() -> Option<IdentityGatewayRequestContext> {
     CURRENT_GATEWAY_REQUEST_CONTEXT.try_with(Clone::clone).ok()
 }
 
-pub(super) fn current_gateway_request_latency_ms() -> Option<u64> {
+pub(crate) fn current_gateway_request_latency_ms() -> Option<u64> {
     CURRENT_GATEWAY_REQUEST_STARTED_AT
         .try_with(|started_at| started_at.elapsed().as_millis() as u64)
         .ok()
 }
 
-pub(super) async fn apply_gateway_request_context(
+pub(crate) async fn apply_gateway_request_context(
     State(state): State<GatewayApiState>,
     mut request: Request<Body>,
     next: Next,
@@ -33,16 +36,20 @@ pub(super) async fn apply_gateway_request_context(
         return next.run(request).await;
     };
 
-    let Ok(Some(context)) = resolve_gateway_request_context(state.store.as_ref(), &token).await
+    let Ok(Some(context)) = resolve_authenticated_gateway_request_context(&state, &token).await
     else {
         return next.run(request).await;
     };
 
+    let api_key_group_id = context.api_key_group_id().map(ToOwned::to_owned);
     request.extensions_mut().insert(context.clone());
     CURRENT_GATEWAY_REQUEST_CONTEXT
         .scope(
             context,
-            CURRENT_GATEWAY_REQUEST_STARTED_AT.scope(Instant::now(), next.run(request)),
+            with_request_api_key_group_id(
+                api_key_group_id,
+                CURRENT_GATEWAY_REQUEST_STARTED_AT.scope(Instant::now(), next.run(request)),
+            ),
         )
         .await
 }

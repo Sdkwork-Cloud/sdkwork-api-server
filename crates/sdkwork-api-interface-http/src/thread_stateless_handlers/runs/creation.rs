@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn thread_and_run_handler(
+fn local_thread_run_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_thread_run_request",
+        "Requested thread was not found.",
+    )
+}
+
+pub(crate) async fn thread_and_run_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateThreadAndRunRequest>,
 ) -> Response {
@@ -14,18 +22,20 @@ pub(super) async fn thread_and_run_handler(
         }
     }
 
-    Json(
-        create_thread_and_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.assistant_id,
-        )
-        .expect("thread and run create"),
-    )
-    .into_response()
+    let response = match create_thread_and_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.assistant_id,
+        request.model.as_deref(),
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_runs_handler(
+pub(crate) async fn thread_runs_handler(
     request_context: StatelessGatewayRequest,
     Path(thread_id): Path<String>,
     ExtractJson(request): ExtractJson<CreateRunRequest>,
@@ -43,15 +53,16 @@ pub(super) async fn thread_runs_handler(
         }
     }
 
-    Json(
-        create_thread_run(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &request.assistant_id,
-            request.model.as_deref(),
-        )
-        .expect("thread run create"),
-    )
-    .into_response()
+    let response = match create_thread_run(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &request.assistant_id,
+        request.model.as_deref(),
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_run_error_response(error),
+    };
+
+    Json(response).into_response()
 }

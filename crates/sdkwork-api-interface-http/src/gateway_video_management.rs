@@ -1,3 +1,16 @@
+fn local_video_character_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_video_request");
+    }
+
+    local_gateway_error_response(error, "Requested video character was not found.")
+}
+
+fn local_video_transform_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_video_request")
+}
+
 async fn video_characters_list_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
@@ -15,15 +28,14 @@ async fn video_characters_list_handler(
         }
     }
 
-    Json(
-        list_video_characters(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-        )
-        .expect("video characters list"),
-    )
-    .into_response()
+    match list_video_characters(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_character_error_response(error),
+    }
 }
 
 async fn video_character_retrieve_handler(
@@ -45,16 +57,15 @@ async fn video_character_retrieve_handler(
         }
     }
 
-    Json(
-        get_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-        )
-        .expect("video character retrieve"),
-    )
-    .into_response()
+    match get_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_character_error_response(error),
+    }
 }
 
 async fn video_character_update_handler(
@@ -75,17 +86,16 @@ async fn video_character_update_handler(
         }
     }
 
-    Json(
-        update_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-            &request,
-        )
-        .expect("video character update"),
-    )
-    .into_response()
+    match update_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_character_error_response(error),
+    }
 }
 
 async fn video_extend_handler(
@@ -106,16 +116,15 @@ async fn video_extend_handler(
         }
     }
 
-    Json(
-        extend_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &request.prompt,
-        )
-        .expect("video extend"),
-    )
-    .into_response()
+    match extend_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &request.prompt,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_transform_error_response(error),
+    }
 }
 
 async fn video_character_create_handler(
@@ -135,15 +144,14 @@ async fn video_character_create_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::create_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video character create"),
-    )
-    .into_response()
+    match sdkwork_api_app_gateway::create_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_character_error_response(error),
+    }
 }
 
 async fn video_character_retrieve_canonical_handler(
@@ -165,15 +173,14 @@ async fn video_character_retrieve_canonical_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::get_video_character_canonical(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &character_id,
-        )
-        .expect("video character canonical retrieve"),
-    )
-    .into_response()
+    match sdkwork_api_app_gateway::get_video_character_canonical(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &character_id,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_character_error_response(error),
+    }
 }
 
 async fn video_edits_handler(
@@ -190,15 +197,14 @@ async fn video_edits_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::edit_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video edits"),
-    )
-    .into_response()
+    match sdkwork_api_app_gateway::edit_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_transform_error_response(error),
+    }
 }
 
 async fn video_extensions_handler(
@@ -218,15 +224,14 @@ async fn video_extensions_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::extensions_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video extensions"),
-    )
-    .into_response()
+    match sdkwork_api_app_gateway::extensions_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_transform_error_response(error),
+    }
 }
 
 
@@ -247,8 +252,9 @@ async fn video_remix_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model =
-                response_usage_id_or_single_data_item_id(&response).unwrap_or(video_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response("upstream video remix response missing usage id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -277,13 +283,15 @@ async fn video_remix_with_state_handler(
         }
     }
 
-    let response = remix_video(
+    let response = match remix_video(
         request_context.tenant_id(),
         request_context.project_id(),
         &video_id,
         &request.prompt,
-    )
-    .expect("video remix");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [item] => item.id.as_str(),
         _ => video_id.as_str(),
@@ -373,15 +381,16 @@ async fn video_characters_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_video_characters(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-        )
-        .expect("video characters list"),
-    )
-    .into_response()
+    let response = match list_video_characters(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn video_character_retrieve_with_state_handler(
@@ -450,16 +459,17 @@ async fn video_character_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-        )
-        .expect("video character retrieve"),
-    )
-    .into_response()
+    let response = match get_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn video_character_update_with_state_handler(
@@ -528,17 +538,18 @@ async fn video_character_update_with_state_handler(
             .into_response();
     }
 
-    Json(
-        update_video_character(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &character_id,
-            &request,
-        )
-        .expect("video character update"),
-    )
-    .into_response()
+    let response = match update_video_character(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &character_id,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn video_extend_with_state_handler(
@@ -558,8 +569,11 @@ async fn video_extend_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model =
-                response_usage_id_or_single_data_item_id(&response).unwrap_or(video_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream video extend response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -588,13 +602,15 @@ async fn video_extend_with_state_handler(
         }
     }
 
-    let response = extend_video(
+    let response = match extend_video(
         request_context.tenant_id(),
         request_context.project_id(),
         &video_id,
         &request.prompt,
-    )
-    .expect("video extend");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [item] => item.id.as_str(),
         _ => video_id.as_str(),
@@ -638,10 +654,11 @@ async fn video_character_create_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let character_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.video_id.as_str());
+            let Some(character_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream video character response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -670,12 +687,14 @@ async fn video_character_create_with_state_handler(
         }
     }
 
-    let response = sdkwork_api_app_gateway::create_video_character(
+    let response = match sdkwork_api_app_gateway::create_video_character(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("video character create");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -763,15 +782,16 @@ async fn video_character_retrieve_canonical_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::get_video_character_canonical(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &character_id,
-        )
-        .expect("video character canonical retrieve"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::get_video_character_canonical(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &character_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_character_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn video_edits_with_state_handler(
@@ -789,8 +809,9 @@ async fn video_edits_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.video_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response("upstream video edit response missing usage id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -819,12 +840,14 @@ async fn video_edits_with_state_handler(
         }
     }
 
-    let response = sdkwork_api_app_gateway::edit_video(
+    let response = match sdkwork_api_app_gateway::edit_video(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("video edits");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [item] => item.id.as_str(),
         _ => request.video_id.as_str(),
@@ -869,8 +892,11 @@ async fn video_extensions_with_state_handler(
     {
         Ok(Some(response)) => {
             let route_key = request.video_id.as_deref().unwrap_or("videos");
-            let usage_model =
-                response_usage_id_or_single_data_item_id(&response).unwrap_or(route_key);
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream video extension response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -899,12 +925,14 @@ async fn video_extensions_with_state_handler(
         }
     }
 
-    let response = sdkwork_api_app_gateway::extensions_video(
+    let response = match sdkwork_api_app_gateway::extensions_video(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("video extensions");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
     let route_key = request.video_id.as_deref().unwrap_or("videos");
     let usage_model = match response.data.as_slice() {
         [item] => item.id.as_str(),

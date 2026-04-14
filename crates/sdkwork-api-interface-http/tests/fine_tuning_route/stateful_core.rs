@@ -28,9 +28,11 @@ async fn stateful_fine_tuning_retrieve_route_returns_not_found_without_usage() {
 
 #[tokio::test]
 async fn stateful_fine_tuning_cancel_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-cancel-missing", "project-fine-tuning-cancel-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-cancel-missing",
+        "project-fine-tuning-cancel-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -52,9 +54,11 @@ async fn stateful_fine_tuning_cancel_route_returns_not_found_without_usage() {
 
 #[tokio::test]
 async fn stateful_fine_tuning_events_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-events-missing", "project-fine-tuning-events-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-events-missing",
+        "project-fine-tuning-events-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -102,9 +106,11 @@ async fn stateful_fine_tuning_checkpoints_route_returns_not_found_without_usage(
 
 #[tokio::test]
 async fn stateful_fine_tuning_pause_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-pause-missing", "project-fine-tuning-pause-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-pause-missing",
+        "project-fine-tuning-pause-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -126,9 +132,11 @@ async fn stateful_fine_tuning_pause_route_returns_not_found_without_usage() {
 
 #[tokio::test]
 async fn stateful_fine_tuning_resume_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-resume-missing", "project-fine-tuning-resume-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-resume-missing",
+        "project-fine-tuning-resume-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -151,9 +159,11 @@ async fn stateful_fine_tuning_resume_route_returns_not_found_without_usage() {
 #[tokio::test]
 async fn stateful_fine_tuning_checkpoint_permissions_create_route_returns_not_found_without_usage()
 {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-perms-create-missing", "project-fine-tuning-perms-create-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-perms-create-missing",
+        "project-fine-tuning-perms-create-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -176,9 +186,11 @@ async fn stateful_fine_tuning_checkpoint_permissions_create_route_returns_not_fo
 
 #[tokio::test]
 async fn stateful_fine_tuning_checkpoint_permissions_list_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-perms-list-missing", "project-fine-tuning-perms-list-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-perms-list-missing",
+        "project-fine-tuning-perms-list-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app
@@ -200,9 +212,11 @@ async fn stateful_fine_tuning_checkpoint_permissions_list_route_returns_not_foun
 
 #[tokio::test]
 async fn stateful_fine_tuning_checkpoint_permission_delete_route_returns_not_found_without_usage() {
-    let ctx =
-        local_fine_tuning_test_context("tenant-fine-tuning-perm-delete-missing", "project-fine-tuning-perm-delete-missing")
-            .await;
+    let ctx = local_fine_tuning_test_context(
+        "tenant-fine-tuning-perm-delete-missing",
+        "project-fine-tuning-perm-delete-missing",
+    )
+    .await;
 
     let response = ctx
         .gateway_app

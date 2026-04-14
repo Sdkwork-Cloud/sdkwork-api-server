@@ -3,5 +3,5 @@ use super::*;
 mod files;
 mod records;
 
-pub(super) use self::files::*;
-pub(super) use self::records::*;
+pub(crate) use self::files::*;
+pub(crate) use self::records::*;

@@ -10,8 +10,8 @@ use sdkwork_api_domain_billing::{
 use sdkwork_api_domain_marketing::{
     CampaignBudgetRecord, CampaignBudgetStatus, CouponBenefitSpec, CouponCodeRecord,
     CouponCodeStatus, CouponDistributionKind, CouponRestrictionSpec, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord,
-    MarketingCampaignStatus, MarketingSubjectScope,
+    CouponTemplateStatus, MarketingBenefitKind, MarketingCampaignRecord, MarketingCampaignStatus,
+    MarketingSubjectScope,
 };
 use sdkwork_api_storage_core::{AccountKernelStore, AdminStore};
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
@@ -32,7 +32,11 @@ async fn memory_pool() -> SqlitePool {
         .unwrap()
 }
 
-fn gateway_request_context(tenant_id: &str, project_id: &str, api_key: &str) -> GatewayRequestContext {
+fn gateway_request_context(
+    tenant_id: &str,
+    project_id: &str,
+    api_key: &str,
+) -> GatewayRequestContext {
     GatewayRequestContext {
         tenant_id: tenant_id.to_owned(),
         project_id: project_id.to_owned(),
@@ -52,8 +56,9 @@ async fn seed_gateway_project_account(
     project_id: &str,
     api_key: &str,
 ) -> AccountRecord {
-    let subject =
-        gateway_auth_subject_from_request_context(&gateway_request_context(tenant_id, project_id, api_key));
+    let subject = gateway_auth_subject_from_request_context(&gateway_request_context(
+        tenant_id, project_id, api_key,
+    ));
     let account = AccountRecord::new(
         7701,
         subject.tenant_id,
@@ -107,14 +112,20 @@ async fn seed_marketing_account_entitlement_coupon(store: &SqliteAdminStore) {
     )
     .with_created_at_ms(1_710_000_000_000)
     .with_updated_at_ms(1_710_000_000_000);
-    store.insert_coupon_template_record(&template).await.unwrap();
+    store
+        .insert_coupon_template_record(&template)
+        .await
+        .unwrap();
 
     let campaign = MarketingCampaignRecord::new("campaign_launch20", "template_launch20")
         .with_display_name("Launch Campaign")
         .with_status(MarketingCampaignStatus::Active)
         .with_created_at_ms(1_710_000_000_000)
         .with_updated_at_ms(1_710_000_000_000);
-    store.insert_marketing_campaign_record(&campaign).await.unwrap();
+    store
+        .insert_marketing_campaign_record(&campaign)
+        .await
+        .unwrap();
 
     let budget = CampaignBudgetRecord::new("budget_launch20", "campaign_launch20")
         .with_status(CampaignBudgetStatus::Active)
@@ -141,35 +152,40 @@ async fn seed_custom_marketing_coupon(
     restriction: CouponRestrictionSpec,
 ) {
     let benefit = match benefit_kind {
-        MarketingBenefitKind::PercentageOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_percent(Some(20)),
-        MarketingBenefitKind::FixedAmountOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_amount_minor(Some(2_000)),
+        MarketingBenefitKind::PercentageOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_percent(Some(20))
+        }
+        MarketingBenefitKind::FixedAmountOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_amount_minor(Some(2_000))
+        }
         MarketingBenefitKind::GrantUnits => {
             CouponBenefitSpec::new(benefit_kind).with_grant_units(Some(300))
         }
     };
 
-    let template = CouponTemplateRecord::new(
-        template_id,
-        code_value.to_ascii_lowercase(),
-        benefit_kind,
-    )
-    .with_display_name(format!("{code_value} template"))
-    .with_status(CouponTemplateStatus::Active)
-    .with_distribution_kind(CouponDistributionKind::UniqueCode)
-    .with_restriction(restriction)
-    .with_benefit(benefit)
-    .with_created_at_ms(1_710_000_000_000)
-    .with_updated_at_ms(1_710_000_000_000);
-    store.insert_coupon_template_record(&template).await.unwrap();
+    let template =
+        CouponTemplateRecord::new(template_id, code_value.to_ascii_lowercase(), benefit_kind)
+            .with_display_name(format!("{code_value} template"))
+            .with_status(CouponTemplateStatus::Active)
+            .with_distribution_kind(CouponDistributionKind::UniqueCode)
+            .with_restriction(restriction)
+            .with_benefit(benefit)
+            .with_created_at_ms(1_710_000_000_000)
+            .with_updated_at_ms(1_710_000_000_000);
+    store
+        .insert_coupon_template_record(&template)
+        .await
+        .unwrap();
 
     let campaign = MarketingCampaignRecord::new(campaign_id, template_id)
         .with_display_name(format!("{code_value} campaign"))
         .with_status(MarketingCampaignStatus::Active)
         .with_created_at_ms(1_710_000_000_000)
         .with_updated_at_ms(1_710_000_000_000);
-    store.insert_marketing_campaign_record(&campaign).await.unwrap();
+    store
+        .insert_marketing_campaign_record(&campaign)
+        .await
+        .unwrap();
 
     let budget = CampaignBudgetRecord::new(budget_id, campaign_id)
         .with_status(CampaignBudgetStatus::Active)
@@ -231,18 +247,13 @@ async fn public_market_routes_expose_products_offers_and_quote_pricing() {
         .unwrap();
     assert_eq!(offers.status(), StatusCode::OK);
     let offers_json = read_json(offers).await;
-    assert!(offers_json["items"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|item| {
-            item["quote_target_kind"] == "recharge_pack"
-                && item["quote_target_id"] == "pack-100k"
-                && item["quote_kind"] == "product_purchase"
-                && item["publication_status"] == "published"
-                && item["pricing_rate_id"]
-                    == "pricing_rate:recharge_pack:pack-100k:credit.prepaid_pack"
-        }));
+    assert!(offers_json["items"].as_array().unwrap().iter().any(|item| {
+        item["quote_target_kind"] == "recharge_pack"
+            && item["quote_target_id"] == "pack-100k"
+            && item["quote_kind"] == "product_purchase"
+            && item["publication_status"] == "published"
+            && item["pricing_rate_id"] == "pricing_rate:recharge_pack:pack-100k:credit.prepaid_pack"
+    }));
 
     let quote = app
         .oneshot(
@@ -350,7 +361,10 @@ async fn public_coupon_and_commercial_routes_expose_coupon_semantics_and_account
         .as_str()
         .unwrap()
         .to_owned();
-    assert_eq!(reserved_json["reservation"]["reservation_status"], "reserved");
+    assert_eq!(
+        reserved_json["reservation"]["reservation_status"],
+        "reserved"
+    );
     assert_eq!(
         reserved_json["effect"]["effect_kind"],
         "account_entitlement"
@@ -377,7 +391,10 @@ async fn public_coupon_and_commercial_routes_expose_coupon_semantics_and_account
         .as_str()
         .unwrap()
         .to_owned();
-    assert_eq!(confirmed_json["redemption"]["redemption_status"], "redeemed");
+    assert_eq!(
+        confirmed_json["redemption"]["redemption_status"],
+        "redeemed"
+    );
     assert_eq!(
         confirmed_json["effect"]["effect_kind"],
         "account_entitlement"
@@ -423,18 +440,19 @@ async fn public_coupon_and_commercial_routes_expose_coupon_semantics_and_account
         .unwrap();
     assert_eq!(benefit_lots.status(), StatusCode::OK);
     let benefit_lots_json = read_json(benefit_lots).await;
-    assert_eq!(benefit_lots_json["account"]["account_id"], account.account_id);
-    assert!(
-        benefit_lots_json["benefit_lots"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| {
-                item["lot_id"] == benefit_lot.lot_id
-                    && item["source_type"] == "order"
-                    && item["scope_order_id"] == "order_public_reward"
-            })
+    assert_eq!(
+        benefit_lots_json["account"]["account_id"],
+        account.account_id
     );
+    assert!(benefit_lots_json["benefit_lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| {
+            item["lot_id"] == benefit_lot.lot_id
+                && item["source_type"] == "order"
+                && item["scope_order_id"] == "order_public_reward"
+        }));
 
     let rolled_back = app
         .oneshot(
@@ -452,9 +470,15 @@ async fn public_coupon_and_commercial_routes_expose_coupon_semantics_and_account
         .unwrap();
     assert_eq!(rolled_back.status(), StatusCode::OK);
     let rolled_back_json = read_json(rolled_back).await;
-    assert_eq!(rolled_back_json["redemption"]["redemption_status"], "rolled_back");
+    assert_eq!(
+        rolled_back_json["redemption"]["redemption_status"],
+        "rolled_back"
+    );
     assert_eq!(rolled_back_json["rollback"]["rollback_status"], "completed");
-    assert_eq!(rolled_back_json["effect"]["effect_kind"], "account_entitlement");
+    assert_eq!(
+        rolled_back_json["effect"]["effect_kind"],
+        "account_entitlement"
+    );
     assert_eq!(rolled_back_json["rollback"]["rollback_type"], "refund");
 }
 
@@ -551,13 +575,11 @@ async fn public_commercial_benefit_lots_route_is_cursor_paginated() {
             .collect::<Vec<_>>(),
         vec![8801, 9901]
     );
-    assert!(
-        first_page_json["benefit_lots"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|item| item["lot_id"] != 7700)
-    );
+    assert!(first_page_json["benefit_lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["lot_id"] != 7700));
 
     let second_page = app
         .oneshot(

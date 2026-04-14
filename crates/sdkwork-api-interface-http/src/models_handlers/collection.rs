@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn list_models_from_store_handler(
+pub(crate) async fn list_models_from_store_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Result<Json<sdkwork_api_contract_openai::models::ListModelsResponse>, Response> {

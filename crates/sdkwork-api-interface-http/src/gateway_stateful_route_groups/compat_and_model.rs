@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateful_compat_and_model_routes(router: Router) -> Router {
+pub(crate) fn apply_stateful_compat_and_model_routes(
+    router: Router<GatewayApiState>,
+) -> Router<GatewayApiState> {
     router
         .route("/v1/messages", post(anthropic_messages_with_state_handler))
         .route(

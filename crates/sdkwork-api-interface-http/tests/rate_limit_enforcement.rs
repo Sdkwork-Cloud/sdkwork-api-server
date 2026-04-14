@@ -68,7 +68,10 @@ async fn gateway_chat_completions_returns_429_when_rate_limit_is_exhausted() {
         .await
         .unwrap();
     assert!(first.status().is_success());
-    assert_eq!(header_text(&first, "x-ratelimit-policy"), "rate-project-1-chat");
+    assert_eq!(
+        header_text(&first, "x-ratelimit-policy"),
+        "rate-project-1-chat"
+    );
     assert_eq!(header_text(&first, "x-ratelimit-limit"), "1");
     assert_eq!(header_text(&first, "x-ratelimit-remaining"), "0");
     let success_reset = header_text(&first, "x-ratelimit-reset")
@@ -93,7 +96,10 @@ async fn gateway_chat_completions_returns_429_when_rate_limit_is_exhausted() {
         .unwrap();
 
     assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(header_text(&second, "x-ratelimit-policy"), "rate-project-1-chat");
+    assert_eq!(
+        header_text(&second, "x-ratelimit-policy"),
+        "rate-project-1-chat"
+    );
     assert_eq!(header_text(&second, "x-ratelimit-limit"), "1");
     assert_eq!(header_text(&second, "x-ratelimit-remaining"), "0");
     let retry_after = header_text(&second, "retry-after").parse::<u64>().unwrap();

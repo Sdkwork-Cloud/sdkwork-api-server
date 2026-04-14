@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use sdkwork_api_app_identity::{
-    GatewayRequestContext, gateway_auth_subject_from_request_context, hash_gateway_api_key,
+    gateway_auth_subject_from_request_context, hash_gateway_api_key, GatewayRequestContext,
 };
 use sdkwork_api_domain_billing::{
     AccountBenefitLotRecord, AccountBenefitSourceType, AccountBenefitType, AccountHoldStatus,
@@ -322,8 +322,8 @@ async fn stateful_anthropic_messages_route_captures_platform_credit_hold_into_re
 }
 
 #[tokio::test]
-async fn stateful_gemini_generate_content_route_captures_platform_credit_hold_into_request_settlement()
- {
+async fn stateful_gemini_generate_content_route_captures_platform_credit_hold_into_request_settlement(
+) {
     let tenant_id = "tenant-commercial-admission-gemini";
     let project_id = "project-commercial-admission-gemini";
     let pool = memory_pool().await;

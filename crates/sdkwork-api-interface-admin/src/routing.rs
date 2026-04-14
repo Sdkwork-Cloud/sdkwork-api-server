@@ -109,7 +109,7 @@ pub(crate) async fn list_routing_profiles_handler(
 }
 
 pub(crate) async fn create_routing_policy_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateRoutingPolicyRequest>,
 ) -> Result<(StatusCode, Json<RoutingPolicy>), StatusCode> {
@@ -134,11 +134,20 @@ pub(crate) async fn create_routing_policy_handler(
     let policy = persist_routing_policy(state.store.as_ref(), &policy)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "routing_policy.create",
+        "routing_policy",
+        policy.policy_id.clone(),
+        audit::APPROVAL_SCOPE_ROUTING_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(policy)))
 }
 
 pub(crate) async fn create_routing_profile_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateRoutingProfileRequest>,
 ) -> Result<(StatusCode, Json<RoutingProfileRecord>), StatusCode> {
@@ -162,5 +171,14 @@ pub(crate) async fn create_routing_profile_handler(
     let profile = persist_routing_profile(state.store.as_ref(), &profile)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "routing_profile.create",
+        "routing_profile",
+        profile.profile_id.clone(),
+        audit::APPROVAL_SCOPE_ROUTING_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(profile)))
 }

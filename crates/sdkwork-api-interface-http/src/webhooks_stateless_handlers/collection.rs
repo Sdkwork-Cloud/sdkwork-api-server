@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn webhooks_handler(
+fn local_webhook_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_webhook_request",
+        "Requested webhook was not found.",
+    )
+}
+
+pub(crate) async fn webhooks_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateWebhookRequest>,
 ) -> Response {
@@ -13,19 +21,20 @@ pub(super) async fn webhooks_handler(
         }
     }
 
-    Json(
-        create_webhook(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.url,
-            &request.events,
-        )
-        .expect("webhook"),
-    )
-    .into_response()
+    let response = match create_webhook(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.url,
+        &request.events,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_webhook_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Response {
+pub(crate) async fn webhooks_list_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::WebhooksList).await {
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
@@ -34,9 +43,10 @@ pub(super) async fn webhooks_list_handler(request_context: StatelessGatewayReque
         }
     }
 
-    Json(
-        list_webhooks(request_context.tenant_id(), request_context.project_id())
-            .expect("webhooks list"),
-    )
-    .into_response()
+    let response = match list_webhooks(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_webhook_error_response(error),
+    };
+
+    Json(response).into_response()
 }

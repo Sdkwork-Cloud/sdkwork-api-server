@@ -1,4 +1,9 @@
 fn local_container_not_found_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_container_request");
+    }
+
     local_gateway_error_response(error, "Requested container was not found.")
 }
 
@@ -149,9 +154,12 @@ fn local_container_file_content_response(
             Ok(bytes) => bytes,
             Err(response) => return response,
         };
-    Response::builder()
+    match Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/octet-stream")
         .body(Body::from(bytes))
-        .expect("valid local container file content response")
+    {
+        Ok(response) => response,
+        Err(_) => bad_gateway_openai_response("failed to process local container file content fallback"),
+    }
 }

@@ -5,6 +5,8 @@ mod catalog_routes;
 mod commerce_routes;
 mod marketing_routes;
 
+const ADMIN_DEFAULT_BODY_LIMIT_BYTES: usize = 2 * 1024 * 1024;
+
 fn http_exposure_config() -> anyhow::Result<HttpExposureConfig> {
     HttpExposureConfig::from_env()
 }
@@ -358,6 +360,9 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
             metrics,
             observe_http_metrics,
         ))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            ADMIN_DEFAULT_BODY_LIMIT_BYTES,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             service_name,
             observe_http_tracing,
@@ -372,8 +377,19 @@ pub fn admin_router_with_pool(pool: SqlitePool) -> Router {
     admin_router_with_pool_and_master_key(pool, "local-dev-master-key")
 }
 
+pub fn try_admin_router_with_pool(pool: SqlitePool) -> anyhow::Result<Router> {
+    try_admin_router_with_pool_and_master_key(pool, "local-dev-master-key")
+}
+
 pub fn admin_router_with_store(store: Arc<dyn AdminStore>) -> Router {
     admin_router_with_store_and_secret_manager(
+        store,
+        CredentialSecretManager::database_encrypted("local-dev-master-key"),
+    )
+}
+
+pub fn try_admin_router_with_store(store: Arc<dyn AdminStore>) -> anyhow::Result<Router> {
+    try_admin_router_with_store_and_secret_manager(
         store,
         CredentialSecretManager::database_encrypted("local-dev-master-key"),
     )
@@ -386,11 +402,25 @@ pub fn admin_router_with_pool_and_master_key(
     admin_router_with_state(AdminApiState::with_master_key(pool, credential_master_key))
 }
 
+pub fn try_admin_router_with_pool_and_master_key(
+    pool: SqlitePool,
+    credential_master_key: impl Into<String>,
+) -> anyhow::Result<Router> {
+    try_admin_router_with_state(AdminApiState::with_master_key(pool, credential_master_key))
+}
+
 pub fn admin_router_with_pool_and_secret_manager(
     pool: SqlitePool,
     secret_manager: CredentialSecretManager,
 ) -> Router {
     admin_router_with_state(AdminApiState::with_secret_manager(pool, secret_manager))
+}
+
+pub fn try_admin_router_with_pool_and_secret_manager(
+    pool: SqlitePool,
+    secret_manager: CredentialSecretManager,
+) -> anyhow::Result<Router> {
+    try_admin_router_with_state(AdminApiState::with_secret_manager(pool, secret_manager))
 }
 
 pub fn admin_router_with_store_and_secret_manager(
@@ -404,12 +434,35 @@ pub fn admin_router_with_store_and_secret_manager(
     )
 }
 
+pub fn try_admin_router_with_store_and_secret_manager(
+    store: Arc<dyn AdminStore>,
+    secret_manager: CredentialSecretManager,
+) -> anyhow::Result<Router> {
+    try_admin_router_with_store_and_secret_manager_and_jwt_secret(
+        store,
+        secret_manager,
+        DEFAULT_ADMIN_JWT_SIGNING_SECRET,
+    )
+}
+
 pub fn admin_router_with_store_and_secret_manager_and_jwt_secret(
     store: Arc<dyn AdminStore>,
     secret_manager: CredentialSecretManager,
     jwt_signing_secret: impl Into<String>,
 ) -> Router {
     admin_router_with_state(AdminApiState::with_store_and_secret_manager_and_jwt_secret(
+        store,
+        secret_manager,
+        jwt_signing_secret,
+    ))
+}
+
+pub fn try_admin_router_with_store_and_secret_manager_and_jwt_secret(
+    store: Arc<dyn AdminStore>,
+    secret_manager: CredentialSecretManager,
+    jwt_signing_secret: impl Into<String>,
+) -> anyhow::Result<Router> {
+    try_admin_router_with_state(AdminApiState::with_store_and_secret_manager_and_jwt_secret(
         store,
         secret_manager,
         jwt_signing_secret,
@@ -435,7 +488,7 @@ pub fn admin_router_with_state_and_http_exposure(
     let metrics = Arc::new(HttpMetricsRegistry::new("admin"));
     billing_routes::register_billing_routes(catalog_routes::register_catalog_routes(
         commerce_routes::register_commerce_routes(marketing_routes::register_marketing_routes(
-            Router::new(),
+            Router::<AdminApiState>::new(),
         )),
     ))
     .merge(openapi::admin_docs_router())
@@ -609,8 +662,15 @@ pub fn admin_router_with_state_and_http_exposure(
         post(routing::simulate_routing_handler),
     )
     .layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        enforce_admin_route_access,
+    ))
+    .layer(axum::middleware::from_fn_with_state(
         metrics,
         observe_http_metrics,
+    ))
+    .layer(axum::extract::DefaultBodyLimit::max(
+        ADMIN_DEFAULT_BODY_LIMIT_BYTES,
     ))
     .layer(axum::middleware::from_fn_with_state(
         service_name,

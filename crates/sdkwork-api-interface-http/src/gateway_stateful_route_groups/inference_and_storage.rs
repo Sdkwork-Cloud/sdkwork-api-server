@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateful_inference_and_storage_routes(router: Router) -> Router {
+pub(crate) fn apply_stateful_inference_and_storage_routes(
+    router: Router<GatewayApiState>,
+) -> Router<GatewayApiState> {
     router
         .route("/v1/embeddings", post(embeddings_with_state_handler))
         .route("/v1/moderations", post(moderations_with_state_handler))
@@ -26,6 +28,19 @@ pub(super) fn apply_stateful_inference_and_storage_routes(router: Router) -> Rou
         .route(
             "/v1/audio/voice_consents",
             post(audio_voice_consents_with_state_handler),
+        )
+        .route(
+            "/v1/music",
+            get(music_list_with_state_handler).post(music_with_state_handler),
+        )
+        .route("/v1/music/lyrics", post(music_lyrics_with_state_handler))
+        .route(
+            "/v1/music/{music_id}",
+            get(music_retrieve_with_state_handler).delete(music_delete_with_state_handler),
+        )
+        .route(
+            "/v1/music/{music_id}/content",
+            get(music_content_with_state_handler),
         )
         .route(
             "/v1/containers",

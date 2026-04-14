@@ -53,7 +53,7 @@ pub(crate) async fn list_providers_handler(
 }
 
 pub(crate) async fn create_provider_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateProviderRequest>,
 ) -> Result<(StatusCode, Json<ProviderCreateResponse>), StatusCode> {
@@ -91,6 +91,15 @@ pub(crate) async fn create_provider_handler(
         .map_err(|error| super::catalog_write_error_status(&error))?;
     }
     invalidate_catalog_cache_after_mutation().await;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "provider.create",
+        "provider",
+        provider.id.clone(),
+        audit::APPROVAL_SCOPE_CATALOG_CONTROL,
+    )
+    .await?;
     Ok((
         StatusCode::CREATED,
         Json(ProviderCreateResponse {
@@ -134,7 +143,7 @@ pub(crate) async fn list_tenant_provider_readiness_handler(
 }
 
 pub(crate) async fn delete_provider_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path(provider_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -161,6 +170,15 @@ pub(crate) async fn delete_provider_handler(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
         invalidate_catalog_cache_after_mutation().await;
+        audit::record_admin_audit_event(
+            &state,
+            &claims,
+            "provider.delete",
+            "provider",
+            provider_id,
+            audit::APPROVAL_SCOPE_CATALOG_CONTROL,
+        )
+        .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)

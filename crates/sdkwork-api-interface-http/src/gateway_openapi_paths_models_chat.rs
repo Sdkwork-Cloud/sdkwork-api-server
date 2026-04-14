@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 
     #[utoipa::path(
         get,
@@ -6,7 +6,7 @@ use super::*;
         tag = "system",
         responses((status = 200, description = "Gateway health check."))
     )]
-    pub(super) async fn health() {}
+    pub(crate) async fn health() {}
 
     #[utoipa::path(
         get,
@@ -19,7 +19,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load model catalog.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn list_models() {}
+    pub(crate) async fn list_models() {}
 
     #[utoipa::path(
         get,
@@ -34,7 +34,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load model metadata.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn get_model() {}
+    pub(crate) async fn get_model() {}
 
     #[utoipa::path(
         post,
@@ -49,7 +49,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the chat completion.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn chat_completions() {}
+    pub(crate) async fn chat_completions() {}
 
     #[utoipa::path(
         post,
@@ -64,7 +64,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the completion.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn completions() {}
+    pub(crate) async fn completions() {}
 
     #[utoipa::path(
         post,
@@ -79,7 +79,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn responses() {}
+    pub(crate) async fn responses() {}
 
     #[utoipa::path(
         post,
@@ -94,7 +94,7 @@ use super::*;
             (status = 500, description = "Gateway failed to count response input tokens.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn responses_input_tokens() {}
+    pub(crate) async fn responses_input_tokens() {}
 
     #[utoipa::path(
         post,
@@ -109,7 +109,7 @@ use super::*;
             (status = 500, description = "Gateway failed to compact the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn responses_compact() {}
+    pub(crate) async fn responses_compact() {}
 
     #[utoipa::path(
         get,
@@ -124,7 +124,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn response_get() {}
+    pub(crate) async fn response_get() {}
 
     #[utoipa::path(
         delete,
@@ -139,7 +139,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn response_delete() {}
+    pub(crate) async fn response_delete() {}
 
     #[utoipa::path(
         get,
@@ -154,7 +154,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load response input items.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn response_input_items() {}
+    pub(crate) async fn response_input_items() {}
 
     #[utoipa::path(
         post,
@@ -169,7 +169,7 @@ use super::*;
             (status = 500, description = "Gateway failed to cancel the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn response_cancel() {}
+    pub(crate) async fn response_cancel() {}
 
     #[utoipa::path(
         post,
@@ -184,7 +184,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create embeddings.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn embeddings() {}
+    pub(crate) async fn embeddings() {}
 
     #[utoipa::path(
         post,
@@ -199,4 +199,5 @@ use super::*;
             (status = 500, description = "Gateway failed to create the moderation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn moderations() {}
+    pub(crate) async fn moderations() {}
+

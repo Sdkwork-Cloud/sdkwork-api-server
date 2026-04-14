@@ -460,41 +460,52 @@ pub async fn relay_cancel_batch_from_store(
     .await
 }
 
-pub fn create_eval(_tenant_id: &str, _project_id: &str, name: &str) -> Result<EvalObject> {
-    Ok(EvalObject::new("eval_1", name))
+pub fn create_eval(
+    _tenant_id: &str,
+    _project_id: &str,
+    request: &CreateEvalRequest,
+) -> Result<EvalObject> {
+    if request.name.trim().is_empty() {
+        bail!("Eval name is required.");
+    }
+    if request.data_source_config.r#type != "file" {
+        bail!("Only file-based local eval fallback is supported.");
+    }
+    if !local_object_id_matches(&request.data_source_config.file_id, "file") {
+        bail!("A local file id is required for local eval fallback.");
+    }
+
+    bail!("Local eval fallback is not supported without an upstream provider.")
 }
 
 pub fn list_evals(_tenant_id: &str, _project_id: &str) -> Result<ListEvalsResponse> {
-    Ok(ListEvalsResponse::new(vec![EvalObject::new(
-        "eval_1",
-        "qa-benchmark",
-    )]))
+    bail!("Local eval listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_eval_exists(eval_id: &str) -> Result<()> {
-    if eval_id != "eval_1" {
+    if !local_object_id_matches(eval_id, "eval") {
         bail!("eval not found");
     }
 
     Ok(())
 }
 
-fn ensure_local_eval_run_exists(eval_id: &str, run_id: &str) -> Result<()> {
+fn ensure_local_eval_run_reference(eval_id: &str, run_id: &str) -> Result<()> {
     ensure_local_eval_exists(eval_id)?;
-    if run_id != "run_1" {
+    if !local_object_id_matches(run_id, "run") {
         bail!("eval run not found");
     }
 
     Ok(())
 }
 
-fn ensure_local_eval_run_output_item_exists(
+fn ensure_local_eval_run_output_item_reference(
     eval_id: &str,
     run_id: &str,
     output_item_id: &str,
 ) -> Result<()> {
-    ensure_local_eval_run_exists(eval_id, run_id)?;
-    if output_item_id != "output_item_1" {
+    ensure_local_eval_run_reference(eval_id, run_id)?;
+    if !local_object_id_matches(output_item_id, "output_item") {
         bail!("eval run output item not found");
     }
 
@@ -503,7 +514,7 @@ fn ensure_local_eval_run_output_item_exists(
 
 pub fn get_eval(_tenant_id: &str, _project_id: &str, eval_id: &str) -> Result<EvalObject> {
     ensure_local_eval_exists(eval_id)?;
-    Ok(EvalObject::new(eval_id, "qa-benchmark"))
+    bail!("eval not found")
 }
 
 pub fn update_eval(
@@ -513,10 +524,16 @@ pub fn update_eval(
     request: &UpdateEvalRequest,
 ) -> Result<EvalObject> {
     ensure_local_eval_exists(eval_id)?;
-    Ok(EvalObject::new(
-        eval_id,
-        request.name.as_deref().unwrap_or("qa-benchmark"),
-    ))
+    let Some(name) = request
+        .name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+    else {
+        bail!("Eval name is required.");
+    };
+
+    let _ = name;
+    bail!("eval not found")
 }
 
 pub fn delete_eval(
@@ -525,7 +542,7 @@ pub fn delete_eval(
     eval_id: &str,
 ) -> Result<DeleteEvalResponse> {
     ensure_local_eval_exists(eval_id)?;
-    Ok(DeleteEvalResponse::deleted(eval_id))
+    bail!("eval not found")
 }
 
 pub fn list_eval_runs(
@@ -534,19 +551,21 @@ pub fn list_eval_runs(
     eval_id: &str,
 ) -> Result<ListEvalRunsResponse> {
     ensure_local_eval_exists(eval_id)?;
-    Ok(ListEvalRunsResponse::new(vec![EvalRunObject::completed(
-        "run_1",
-    )]))
+    bail!("Persisted local eval run state is required for local run listing.")
 }
 
 pub fn create_eval_run(
     _tenant_id: &str,
     _project_id: &str,
     eval_id: &str,
-    _request: &CreateEvalRunRequest,
+    request: &CreateEvalRunRequest,
 ) -> Result<EvalRunObject> {
     ensure_local_eval_exists(eval_id)?;
-    Ok(EvalRunObject::queued("run_1"))
+    if request.name.trim().is_empty() {
+        bail!("Eval run name is required.");
+    }
+
+    bail!("Persisted local eval run state is required for local run creation.")
 }
 
 pub fn get_eval_run(
@@ -555,8 +574,8 @@ pub fn get_eval_run(
     eval_id: &str,
     run_id: &str,
 ) -> Result<EvalRunObject> {
-    ensure_local_eval_run_exists(eval_id, run_id)?;
-    Ok(EvalRunObject::completed(run_id))
+    ensure_local_eval_run_reference(eval_id, run_id)?;
+    bail!("eval run not found")
 }
 
 pub fn delete_eval_run(
@@ -565,8 +584,8 @@ pub fn delete_eval_run(
     eval_id: &str,
     run_id: &str,
 ) -> Result<DeleteEvalRunResponse> {
-    ensure_local_eval_run_exists(eval_id, run_id)?;
-    Ok(DeleteEvalRunResponse::deleted(run_id))
+    ensure_local_eval_run_reference(eval_id, run_id)?;
+    bail!("eval run not found")
 }
 
 pub fn cancel_eval_run(
@@ -575,12 +594,8 @@ pub fn cancel_eval_run(
     eval_id: &str,
     run_id: &str,
 ) -> Result<EvalRunObject> {
-    ensure_local_eval_run_exists(eval_id, run_id)?;
-    Ok(EvalRunObject {
-        id: run_id.to_owned(),
-        object: "eval.run",
-        status: "cancelled",
-    })
+    ensure_local_eval_run_reference(eval_id, run_id)?;
+    bail!("eval run not found")
 }
 
 pub fn list_eval_run_output_items(
@@ -589,10 +604,8 @@ pub fn list_eval_run_output_items(
     eval_id: &str,
     run_id: &str,
 ) -> Result<ListEvalRunOutputItemsResponse> {
-    ensure_local_eval_run_exists(eval_id, run_id)?;
-    Ok(ListEvalRunOutputItemsResponse::new(vec![
-        EvalRunOutputItemObject::passed("output_item_1"),
-    ]))
+    ensure_local_eval_run_reference(eval_id, run_id)?;
+    bail!("Persisted local eval run output item state is required for local output item listing.")
 }
 
 pub fn get_eval_run_output_item(
@@ -602,29 +615,34 @@ pub fn get_eval_run_output_item(
     run_id: &str,
     output_item_id: &str,
 ) -> Result<EvalRunOutputItemObject> {
-    ensure_local_eval_run_output_item_exists(eval_id, run_id, output_item_id)?;
-    Ok(EvalRunOutputItemObject::passed(output_item_id))
+    ensure_local_eval_run_output_item_reference(eval_id, run_id, output_item_id)?;
+    bail!("eval run output item not found")
 }
 
 pub fn create_batch(
     _tenant_id: &str,
     _project_id: &str,
-    endpoint: &str,
-    input_file_id: &str,
+    request: &CreateBatchRequest,
 ) -> Result<BatchObject> {
-    Ok(BatchObject::new("batch_1", endpoint, input_file_id))
+    if request.endpoint.trim().is_empty() {
+        bail!("Batch endpoint is required.");
+    }
+    if request.completion_window.trim().is_empty() {
+        bail!("Batch completion window is required.");
+    }
+    if !local_object_id_matches(&request.input_file_id, "file") {
+        bail!("A local file id is required for local batch fallback.");
+    }
+
+    bail!("Local batch fallback is not supported without an upstream provider.")
 }
 
 pub fn list_batches(_tenant_id: &str, _project_id: &str) -> Result<ListBatchesResponse> {
-    Ok(ListBatchesResponse::new(vec![BatchObject::new(
-        "batch_1",
-        "/v1/responses",
-        "file_1",
-    )]))
+    bail!("Local batch listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_batch_exists(batch_id: &str) -> Result<()> {
-    if batch_id != "batch_1" {
+    if !local_object_id_matches(batch_id, "batch") {
         bail!("batch not found");
     }
 
@@ -633,10 +651,10 @@ fn ensure_local_batch_exists(batch_id: &str) -> Result<()> {
 
 pub fn get_batch(_tenant_id: &str, _project_id: &str, batch_id: &str) -> Result<BatchObject> {
     ensure_local_batch_exists(batch_id)?;
-    Ok(BatchObject::new(batch_id, "/v1/responses", "file_1"))
+    bail!("batch not found")
 }
 
 pub fn cancel_batch(_tenant_id: &str, _project_id: &str, batch_id: &str) -> Result<BatchObject> {
     ensure_local_batch_exists(batch_id)?;
-    Ok(BatchObject::cancelled(batch_id, "/v1/responses", "file_1"))
+    bail!("batch not found")
 }

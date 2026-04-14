@@ -87,7 +87,11 @@ pub fn builtin_extension_host() -> ExtensionHost {
     host
 }
 
-fn register_builtin_openai_provider(host: &mut ExtensionHost, extension_id: &str, adapter_kind: &str) {
+fn register_builtin_openai_provider(
+    host: &mut ExtensionHost,
+    extension_id: &str,
+    adapter_kind: &str,
+) {
     host.register_builtin_provider(BuiltinProviderExtensionFactory::new(
         openai_protocol_manifest(extension_id),
         adapter_kind,

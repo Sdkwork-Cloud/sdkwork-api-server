@@ -16,6 +16,7 @@ mod eval_stateless_handlers;
 mod fine_tuning_handlers;
 mod fine_tuning_stateless_handlers;
 mod gateway_auth;
+mod gateway_commercial;
 mod gateway_docs;
 mod gateway_http;
 mod gateway_prelude;
@@ -100,8 +101,7 @@ pub fn try_gateway_router_with_store(store: Arc<dyn AdminStore>) -> anyhow::Resu
 }
 
 pub fn gateway_router_with_store(store: Arc<dyn AdminStore>) -> Router {
-    try_gateway_router_with_store(store)
-        .expect("http exposure config should load from process env")
+    try_gateway_router_with_store(store).expect("http exposure config should load from process env")
 }
 
 pub fn try_gateway_router_with_pool_and_master_key(

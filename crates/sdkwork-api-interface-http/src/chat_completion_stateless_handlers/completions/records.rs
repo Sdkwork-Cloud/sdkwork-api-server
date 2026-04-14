@@ -1,21 +1,53 @@
 use super::*;
 
-pub(super) async fn chat_completions_list_handler(
+fn local_chat_completion_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_chat_completion_request",
+        "Requested chat completion was not found.",
+    )
+}
+
+fn local_chat_completion_list_error_response() -> Response {
+    invalid_request_openai_response(
+        "Local chat completion listing fallback is not supported without an upstream provider.",
+        "invalid_chat_completion_request",
+    )
+}
+
+fn local_chat_completion_update_metadata(
+    request: &UpdateChatCompletionRequest,
+) -> Result<Value, Response> {
+    request.metadata.clone().ok_or_else(|| {
+        invalid_request_openai_response(
+            "Chat completion metadata is required for local fallback updates.",
+            "invalid_chat_completion_request",
+        )
+    })
+}
+
+pub(crate) async fn chat_completions_list_handler(
     request_context: StatelessGatewayRequest,
 ) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::ChatCompletionsList).await
     {
         Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => Json(
-            list_chat_completions(request_context.tenant_id(), request_context.project_id())
-                .expect("chat completions"),
-        )
-        .into_response(),
+        Ok(None) => {
+            let response = match list_chat_completions(
+                request_context.tenant_id(),
+                request_context.project_id(),
+            ) {
+                Ok(response) => response,
+                Err(_) => return local_chat_completion_list_error_response(),
+            };
+
+            Json(response).into_response()
+        }
         Err(_) => bad_gateway_openai_response("failed to relay upstream chat completion list"),
     }
 }
 
-pub(super) async fn chat_completion_retrieve_handler(
+pub(crate) async fn chat_completion_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
 ) -> Response {
@@ -34,18 +66,19 @@ pub(super) async fn chat_completion_retrieve_handler(
         }
     }
 
-    Json(
-        get_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-        )
-        .expect("chat completion"),
-    )
-    .into_response()
+    let response = match get_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn chat_completion_update_handler(
+pub(crate) async fn chat_completion_update_handler(
     request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
     ExtractJson(request): ExtractJson<UpdateChatCompletionRequest>,
@@ -63,19 +96,23 @@ pub(super) async fn chat_completion_update_handler(
         }
     }
 
-    Json(
-        update_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-            request.metadata.unwrap_or(serde_json::json!({})),
-        )
-        .expect("chat completion update"),
-    )
-    .into_response()
+    let response = match update_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+        match local_chat_completion_update_metadata(&request) {
+            Ok(metadata) => metadata,
+            Err(response) => return response,
+        },
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn chat_completion_delete_handler(
+pub(crate) async fn chat_completion_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(completion_id): Path<String>,
 ) -> Response {
@@ -92,13 +129,14 @@ pub(super) async fn chat_completion_delete_handler(
         }
     }
 
-    Json(
-        delete_chat_completion(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &completion_id,
-        )
-        .expect("chat completion delete"),
-    )
-    .into_response()
+    let response = match delete_chat_completion(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &completion_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_chat_completion_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }

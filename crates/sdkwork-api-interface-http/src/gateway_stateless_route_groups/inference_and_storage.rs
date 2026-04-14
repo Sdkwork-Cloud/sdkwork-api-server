@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_inference_and_storage_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_inference_and_storage_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route("/v1/embeddings", post(embeddings_handler))
         .route("/v1/moderations", post(moderations_handler))
@@ -15,6 +17,13 @@ pub(super) fn apply_stateless_inference_and_storage_routes(router: Router) -> Ro
             "/v1/audio/voice_consents",
             post(audio_voice_consents_handler),
         )
+        .route("/v1/music", get(music_list_handler).post(music_handler))
+        .route("/v1/music/lyrics", post(music_lyrics_handler))
+        .route(
+            "/v1/music/{music_id}",
+            get(music_retrieve_handler).delete(music_delete_handler),
+        )
+        .route("/v1/music/{music_id}/content", get(music_content_handler))
         .route(
             "/v1/containers",
             get(containers_list_handler).post(containers_handler),

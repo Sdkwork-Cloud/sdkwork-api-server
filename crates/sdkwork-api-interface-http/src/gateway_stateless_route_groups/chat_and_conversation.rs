@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_chat_and_conversation_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_chat_and_conversation_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route(
             "/v1/chat/completions",

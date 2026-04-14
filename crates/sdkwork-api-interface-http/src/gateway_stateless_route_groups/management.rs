@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_management_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_management_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route(
             "/v1/fine_tuning/jobs",

@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn realtime_sessions_handler(
+fn local_realtime_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
+}
+
+pub(crate) async fn realtime_sessions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateRealtimeSessionRequest>,
 ) -> Response {
@@ -17,13 +21,14 @@ pub(super) async fn realtime_sessions_handler(
         }
     }
 
-    Json(
-        create_realtime_session(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("realtime session"),
-    )
-    .into_response()
+    let response = match create_realtime_session(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_realtime_error_response(error),
+    };
+
+    Json(response).into_response()
 }

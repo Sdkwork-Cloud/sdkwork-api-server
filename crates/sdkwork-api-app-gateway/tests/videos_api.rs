@@ -3,48 +3,51 @@ use sdkwork_api_app_gateway::{
 };
 
 #[test]
-fn returns_video_list_for_create() {
-    let response = create_video(
+fn create_video_requires_backing_asset_store() {
+    let error = create_video(
         "tenant-1",
         "project-1",
         "sora-1",
         "A short cinematic flyover",
     )
-    .unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "video");
+    .unwrap_err();
+    assert!(error.to_string().contains("not supported"));
 }
 
 #[test]
 fn lists_video_objects() {
     let response = list_videos("tenant-1", "project-1").unwrap();
     assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "video");
+    assert!(response.data.is_empty());
 }
 
 #[test]
-fn retrieves_video_object() {
-    let response = get_video("tenant-1", "project-1", "video_1").unwrap();
-    assert_eq!(response.id, "video_1");
-    assert_eq!(response.object, "video");
+fn retrieving_video_requires_persisted_state() {
+    let error = get_video("tenant-1", "project-1", "video_local_0000000000000001").unwrap_err();
+    assert!(error.to_string().contains("not found"));
 }
 
 #[test]
 fn deletes_video_object() {
-    let response = delete_video("tenant-1", "project-1", "video_1").unwrap();
-    assert_eq!(response.id, "video_1");
+    let response = delete_video("tenant-1", "project-1", "video_local_0000000000000001").unwrap();
+    assert_eq!(response.id, "video_local_0000000000000001");
     assert!(response.deleted);
 }
 
 #[test]
-fn returns_video_bytes() {
-    let response = video_content("tenant-1", "project-1", "video_1").unwrap();
-    assert_eq!(response, b"VIDEO".to_vec());
+fn video_content_requires_persisted_state() {
+    let error = video_content("tenant-1", "project-1", "video_local_0000000000000001").unwrap_err();
+    assert!(error.to_string().contains("not found"));
 }
 
 #[test]
-fn remixes_video() {
-    let response = remix_video("tenant-1", "project-1", "video_1", "Make it sunset").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].id, "video_1_remix");
+fn remixes_video_requires_backing_asset_store() {
+    let error = remix_video(
+        "tenant-1",
+        "project-1",
+        "video_local_0000000000000001",
+        "Make it sunset",
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("not supported"));
 }

@@ -1,3 +1,7 @@
+fn local_video_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_video_request")
+}
+
 async fn videos_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateVideoRequest>,
@@ -10,16 +14,15 @@ async fn videos_handler(
         }
     }
 
-    Json(
-        create_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-            &request.prompt,
-        )
-        .expect("video"),
-    )
-    .into_response()
+    match create_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+        &request.prompt,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_error_response(error),
+    }
 }
 
 async fn videos_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -31,11 +34,12 @@ async fn videos_list_handler(request_context: StatelessGatewayRequest) -> Respon
         }
     }
 
-    Json(
-        list_videos(request_context.tenant_id(), request_context.project_id())
-            .expect("videos list"),
-    )
-    .into_response()
+    let response = match list_videos(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_video_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn video_retrieve_handler(
@@ -122,16 +126,15 @@ async fn video_remix_handler(
         }
     }
 
-    Json(
-        remix_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &request.prompt,
-        )
-        .expect("video remix"),
-    )
-    .into_response()
+    match remix_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &request.prompt,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_video_error_response(error),
+    }
 }
 
 
@@ -184,11 +187,14 @@ fn local_video_content_response(tenant_id: &str, project_id: &str, video_id: &st
         Ok(bytes) => bytes,
         Err(response) => return response,
     };
-    Response::builder()
+    match Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, "video/mp4")
         .body(Body::from(bytes))
-        .expect("valid local video content response")
+    {
+        Ok(response) => response,
+        Err(_) => bad_gateway_openai_response("failed to process local video content fallback"),
+    }
 }
 
 
@@ -207,8 +213,9 @@ async fn videos_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.model.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response("upstream video response missing usage id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -237,13 +244,15 @@ async fn videos_with_state_handler(
         }
     }
 
-    let response = create_video(
+    let response = match create_video(
         request_context.tenant_id(),
         request_context.project_id(),
         &request.model,
         &request.prompt,
-    )
-    .expect("video");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [video] => video.id.as_str(),
         _ => request.model.as_str(),
@@ -312,6 +321,11 @@ async fn videos_list_with_state_handler(
         }
     }
 
+    let response = match list_videos(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_video_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -331,11 +345,7 @@ async fn videos_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_videos(request_context.tenant_id(), request_context.project_id())
-            .expect("videos list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
 async fn video_retrieve_with_state_handler(
@@ -526,14 +536,14 @@ async fn video_content_with_state_handler(
         }
     }
 
-    let bytes = match local_video_content_result(
+    let response = local_video_content_response(
         request_context.tenant_id(),
         request_context.project_id(),
         &video_id,
-    ) {
-        Ok(bytes) => bytes,
-        Err(response) => return response,
-    };
+    );
+    if !response.status().is_success() {
+        return response;
+    }
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
@@ -554,10 +564,6 @@ async fn video_content_with_state_handler(
             .into_response();
     }
 
-    Response::builder()
-        .status(axum::http::StatusCode::OK)
-        .header(header::CONTENT_TYPE, "video/mp4")
-        .body(Body::from(bytes))
-        .expect("valid local video content response")
+    response
 }
 

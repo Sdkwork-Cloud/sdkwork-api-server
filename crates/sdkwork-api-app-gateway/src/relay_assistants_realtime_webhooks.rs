@@ -356,17 +356,23 @@ pub fn create_assistant(
     name: &str,
     model: &str,
 ) -> Result<AssistantObject> {
-    Ok(AssistantObject::new("asst_1", name, model))
+    if name.trim().is_empty() {
+        bail!("Assistant name is required.");
+    }
+    if model.trim().is_empty() {
+        bail!("Assistant model is required.");
+    }
+
+    let _ = (name, model);
+    bail!("Local assistant fallback is not supported without an upstream provider.")
 }
 
 pub fn list_assistants(_tenant_id: &str, _project_id: &str) -> Result<ListAssistantsResponse> {
-    Ok(ListAssistantsResponse::new(vec![AssistantObject::new(
-        "asst_1", "Support", "gpt-4.1",
-    )]))
+    bail!("Local assistant listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_assistant_exists(assistant_id: &str) -> Result<()> {
-    if assistant_id != "asst_1" {
+    if !local_object_id_matches(assistant_id, "asst") {
         bail!("assistant not found");
     }
 
@@ -379,7 +385,7 @@ pub fn get_assistant(
     assistant_id: &str,
 ) -> Result<AssistantObject> {
     ensure_local_assistant_exists(assistant_id)?;
-    Ok(AssistantObject::new(assistant_id, "Support", "gpt-4.1"))
+    bail!("assistant not found")
 }
 
 pub fn update_assistant(
@@ -388,8 +394,9 @@ pub fn update_assistant(
     assistant_id: &str,
     name: &str,
 ) -> Result<AssistantObject> {
+    let _ = name;
     ensure_local_assistant_exists(assistant_id)?;
-    Ok(AssistantObject::new(assistant_id, name, "gpt-4.1"))
+    bail!("assistant not found")
 }
 
 pub fn delete_assistant(
@@ -398,7 +405,7 @@ pub fn delete_assistant(
     assistant_id: &str,
 ) -> Result<DeleteAssistantResponse> {
     ensure_local_assistant_exists(assistant_id)?;
-    Ok(DeleteAssistantResponse::deleted(assistant_id))
+    bail!("assistant not found")
 }
 
 pub fn create_webhook(
@@ -407,18 +414,20 @@ pub fn create_webhook(
     url: &str,
     _events: &[String],
 ) -> Result<WebhookObject> {
-    Ok(WebhookObject::new("wh_1", url))
+    if url.trim().is_empty() {
+        bail!("Webhook url is required.");
+    }
+
+    let _ = url;
+    bail!("Local webhook fallback is not supported without an upstream provider.")
 }
 
 pub fn list_webhooks(_tenant_id: &str, _project_id: &str) -> Result<ListWebhooksResponse> {
-    Ok(ListWebhooksResponse::new(vec![WebhookObject::new(
-        "wh_1",
-        "https://example.com/webhook",
-    )]))
+    bail!("Local webhook listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_webhook_exists(webhook_id: &str) -> Result<()> {
-    if webhook_id != "wh_1" {
+    if !local_object_id_matches(webhook_id, "wh") {
         bail!("webhook not found");
     }
 
@@ -427,10 +436,7 @@ fn ensure_local_webhook_exists(webhook_id: &str) -> Result<()> {
 
 pub fn get_webhook(_tenant_id: &str, _project_id: &str, webhook_id: &str) -> Result<WebhookObject> {
     ensure_local_webhook_exists(webhook_id)?;
-    Ok(WebhookObject::new(
-        webhook_id,
-        "https://example.com/webhook",
-    ))
+    bail!("webhook not found")
 }
 
 pub fn update_webhook(
@@ -440,7 +446,12 @@ pub fn update_webhook(
     url: &str,
 ) -> Result<WebhookObject> {
     ensure_local_webhook_exists(webhook_id)?;
-    Ok(WebhookObject::new(webhook_id, url))
+    if url.trim().is_empty() {
+        bail!("Webhook url is required.");
+    }
+
+    let _ = url;
+    bail!("webhook not found")
 }
 
 pub fn delete_webhook(
@@ -449,7 +460,7 @@ pub fn delete_webhook(
     webhook_id: &str,
 ) -> Result<DeleteWebhookResponse> {
     ensure_local_webhook_exists(webhook_id)?;
-    Ok(DeleteWebhookResponse::deleted(webhook_id))
+    bail!("webhook not found")
 }
 
 pub fn create_realtime_session(
@@ -457,5 +468,10 @@ pub fn create_realtime_session(
     _project_id: &str,
     model: &str,
 ) -> Result<RealtimeSessionObject> {
-    Ok(RealtimeSessionObject::new("sess_1", model))
+    if model.trim().is_empty() {
+        bail!("Realtime session model is required.");
+    }
+
+    let _ = model;
+    bail!("Local realtime session fallback is not supported without an upstream provider.")
 }

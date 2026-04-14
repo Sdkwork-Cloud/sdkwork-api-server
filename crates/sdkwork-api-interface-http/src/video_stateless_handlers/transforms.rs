@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn video_remix_handler(
+fn local_video_transform_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_video_request",
+        "Requested video was not found.",
+    )
+}
+
+pub(crate) async fn video_remix_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
     ExtractJson(request): ExtractJson<RemixVideoRequest>,
@@ -18,19 +26,20 @@ pub(super) async fn video_remix_handler(
         }
     }
 
-    Json(
-        remix_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &request.prompt,
-        )
-        .expect("video remix"),
-    )
-    .into_response()
+    let response = match remix_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &request.prompt,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_extend_handler(
+pub(crate) async fn video_extend_handler(
     request_context: StatelessGatewayRequest,
     Path(video_id): Path<String>,
     ExtractJson(request): ExtractJson<ExtendVideoRequest>,
@@ -48,19 +57,20 @@ pub(super) async fn video_extend_handler(
         }
     }
 
-    Json(
-        extend_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &video_id,
-            &request.prompt,
-        )
-        .expect("video extend"),
-    )
-    .into_response()
+    let response = match extend_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &video_id,
+        &request.prompt,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_edits_handler(
+pub(crate) async fn video_edits_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<EditVideoRequest>,
 ) -> Response {
@@ -74,18 +84,19 @@ pub(super) async fn video_edits_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::edit_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video edits"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::edit_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn video_extensions_handler(
+pub(crate) async fn video_extensions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<ExtendVideoRequest>,
 ) -> Response {
@@ -102,13 +113,14 @@ pub(super) async fn video_extensions_handler(
         }
     }
 
-    Json(
-        sdkwork_api_app_gateway::extensions_video(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("video extensions"),
-    )
-    .into_response()
+    let response = match sdkwork_api_app_gateway::extensions_video(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_video_transform_error_response(error),
+    };
+
+    Json(response).into_response()
 }

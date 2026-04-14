@@ -1,6 +1,22 @@
 use super::*;
 
-pub(super) async fn thread_message_retrieve_handler(
+fn local_thread_message_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_request");
+    }
+
+    if message
+        .to_ascii_lowercase()
+        .contains("thread message not found")
+    {
+        return local_gateway_error_response(error, "Requested thread message was not found.");
+    }
+
+    local_gateway_error_response(error, "Requested thread was not found.")
+}
+
+pub(crate) async fn thread_message_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Response {
@@ -17,19 +33,20 @@ pub(super) async fn thread_message_retrieve_handler(
         }
     }
 
-    Json(
-        get_thread_message(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &message_id,
-        )
-        .expect("thread message retrieve"),
-    )
-    .into_response()
+    let response = match get_thread_message(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &message_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_message_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_message_update_handler(
+pub(crate) async fn thread_message_update_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
     ExtractJson(request): ExtractJson<UpdateThreadMessageRequest>,
@@ -47,19 +64,20 @@ pub(super) async fn thread_message_update_handler(
         }
     }
 
-    Json(
-        update_thread_message(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &message_id,
-        )
-        .expect("thread message update"),
-    )
-    .into_response()
+    let response = match update_thread_message(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &message_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_message_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn thread_message_delete_handler(
+pub(crate) async fn thread_message_delete_handler(
     request_context: StatelessGatewayRequest,
     Path((thread_id, message_id)): Path<(String, String)>,
 ) -> Response {
@@ -76,14 +94,15 @@ pub(super) async fn thread_message_delete_handler(
         }
     }
 
-    Json(
-        delete_thread_message(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &thread_id,
-            &message_id,
-        )
-        .expect("thread message delete"),
-    )
-    .into_response()
+    let response = match delete_thread_message(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &thread_id,
+        &message_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_thread_message_error_response(error),
+    };
+
+    Json(response).into_response()
 }

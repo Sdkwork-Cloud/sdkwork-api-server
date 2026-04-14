@@ -203,8 +203,8 @@ async fn stateful_fine_tuning_job_create_usage_uses_created_job_id_for_billing()
 }
 
 #[tokio::test]
-async fn stateful_fine_tuning_checkpoint_permission_usage_uses_checkpoint_route_key_for_provider_selection()
-{
+async fn stateful_fine_tuning_checkpoint_permission_usage_uses_checkpoint_route_key_for_provider_selection(
+) {
     let tenant_id = "tenant-fine-tuning-permission-usage";
     let project_id = "project-fine-tuning-permission-usage";
     let checkpoint_id = "ft:gpt-4.1-mini:checkpoint-1";
@@ -418,8 +418,8 @@ async fn stateful_fine_tuning_checkpoint_permission_usage_uses_checkpoint_route_
 }
 
 #[tokio::test]
-async fn stateful_fine_tuning_checkpoint_permissions_create_usage_uses_created_permission_id_for_billing()
-{
+async fn stateful_fine_tuning_checkpoint_permissions_create_usage_uses_created_permission_id_for_billing(
+) {
     let tenant_id = "tenant-fine-tuning-permission-create";
     let project_id = "project-fine-tuning-permission-create";
     let checkpoint_id = "ft:gpt-4.1-mini:checkpoint-1";

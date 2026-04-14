@@ -244,9 +244,7 @@ async fn stateless_fine_tuning_extended_routes_relay_to_openai_compatible_provid
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(
-                    "/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions/perm_1",
-                )
+                .uri("/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions/perm_1")
                 .body(Body::empty())
                 .unwrap(),
         )

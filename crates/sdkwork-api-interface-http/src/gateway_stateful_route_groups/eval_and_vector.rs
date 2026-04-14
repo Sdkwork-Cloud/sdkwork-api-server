@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateful_eval_and_vector_routes(router: Router) -> Router {
+pub(crate) fn apply_stateful_eval_and_vector_routes(
+    router: Router<GatewayApiState>,
+) -> Router<GatewayApiState> {
     router
         .route(
             "/v1/evals",

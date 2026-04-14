@@ -275,7 +275,9 @@ async fn stateful_evals_routes_record_usage_and_billing_for_non_create_operation
     let usage_json = read_json(usage).await;
     let usage_records = usage_json.as_array().unwrap();
     assert_eq!(usage_records.len(), 11);
-    assert!(usage_records.iter().all(|entry| entry["project_id"] == project_id));
+    assert!(usage_records
+        .iter()
+        .all(|entry| entry["project_id"] == project_id));
     assert!(usage_records
         .iter()
         .all(|entry| entry["provider"] == "provider-openai-official"));

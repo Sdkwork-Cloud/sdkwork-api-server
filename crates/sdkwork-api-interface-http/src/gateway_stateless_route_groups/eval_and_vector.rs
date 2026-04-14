@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_eval_and_vector_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_eval_and_vector_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route("/v1/evals", get(evals_list_handler).post(evals_handler))
         .route(

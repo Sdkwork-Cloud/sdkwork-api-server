@@ -192,14 +192,7 @@ async fn response_compact_with_state_handler(
         &request.model,
     ) {
         Ok(response) => response,
-        Err(error) => {
-            let message = error.to_string();
-            if message.to_ascii_lowercase().contains("required") {
-                return invalid_request_openai_response(message, "invalid_model");
-            }
-
-            return bad_gateway_openai_response(message);
-        }
+        Err(error) => return local_gateway_invalid_or_bad_gateway_response(error, "invalid_model"),
     };
 
     if record_gateway_usage_for_project(

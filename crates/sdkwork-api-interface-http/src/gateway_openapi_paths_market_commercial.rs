@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 
 #[utoipa::path(
     get,
@@ -11,7 +11,7 @@ use super::*;
         (status = 500, description = "Gateway failed to load API products.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn market_products() {}
+pub(crate) async fn market_products() {}
 
 #[utoipa::path(
     get,
@@ -24,7 +24,7 @@ pub(super) async fn market_products() {}
         (status = 500, description = "Gateway failed to load product offers.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn market_offers() {}
+pub(crate) async fn market_offers() {}
 
 #[utoipa::path(
     post,
@@ -40,7 +40,7 @@ pub(super) async fn market_offers() {}
         (status = 500, description = "Gateway failed to preview the quote.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn market_quotes() {}
+pub(crate) async fn market_quotes() {}
 
 #[utoipa::path(
     post,
@@ -57,7 +57,7 @@ pub(super) async fn market_quotes() {}
         (status = 500, description = "Gateway failed to validate the coupon.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn marketing_coupon_validate() {}
+pub(crate) async fn marketing_coupon_validate() {}
 
 #[utoipa::path(
     post,
@@ -75,7 +75,7 @@ pub(super) async fn marketing_coupon_validate() {}
         (status = 500, description = "Gateway failed to reserve the coupon.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn marketing_coupon_reserve() {}
+pub(crate) async fn marketing_coupon_reserve() {}
 
 #[utoipa::path(
     post,
@@ -93,7 +93,7 @@ pub(super) async fn marketing_coupon_reserve() {}
         (status = 500, description = "Gateway failed to confirm the coupon redemption.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn marketing_coupon_confirm() {}
+pub(crate) async fn marketing_coupon_confirm() {}
 
 #[utoipa::path(
     post,
@@ -111,7 +111,7 @@ pub(super) async fn marketing_coupon_confirm() {}
         (status = 500, description = "Gateway failed to rollback the coupon redemption.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn marketing_coupon_rollback() {}
+pub(crate) async fn marketing_coupon_rollback() {}
 
 #[utoipa::path(
     get,
@@ -126,7 +126,7 @@ pub(super) async fn marketing_coupon_rollback() {}
         (status = 500, description = "Gateway failed to load the commercial account.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn commercial_account() {}
+pub(crate) async fn commercial_account() {}
 
 #[utoipa::path(
     get,
@@ -145,4 +145,5 @@ pub(super) async fn commercial_account() {}
         (status = 500, description = "Gateway failed to load commercial account benefit lots.", body = GatewayApiErrorResponse)
     )
 )]
-pub(super) async fn commercial_account_benefit_lots() {}
+pub(crate) async fn commercial_account_benefit_lots() {}
+

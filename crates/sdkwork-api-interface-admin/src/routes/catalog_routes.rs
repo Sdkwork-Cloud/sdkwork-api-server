@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn register_catalog_routes(router: Router) -> Router {
+pub(super) fn register_catalog_routes(router: Router<AdminApiState>) -> Router<AdminApiState> {
     router
         .route(
             "/admin/tenants/{tenant_id}/providers/readiness",

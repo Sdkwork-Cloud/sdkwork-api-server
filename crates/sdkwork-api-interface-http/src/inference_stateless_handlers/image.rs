@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn image_generations_handler(
+fn local_image_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_image_request")
+}
+
+pub(crate) async fn image_generations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateImageRequest>,
 ) -> Response {
@@ -17,18 +21,19 @@ pub(super) async fn image_generations_handler(
         }
     }
 
-    Json(
-        create_image_generation(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("image generation"),
-    )
-    .into_response()
+    let response = match create_image_generation(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_image_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn image_edits_handler(
+pub(crate) async fn image_edits_handler(
     request_context: StatelessGatewayRequest,
     multipart: Multipart,
 ) -> Response {
@@ -47,21 +52,22 @@ pub(super) async fn image_edits_handler(
                 }
             }
 
-            Json(
-                create_image_edit(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("image edit"),
-            )
-            .into_response()
+            let response = match create_image_edit(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_image_error_response(error),
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }
 }
 
-pub(super) async fn image_variations_handler(
+pub(crate) async fn image_variations_handler(
     request_context: StatelessGatewayRequest,
     multipart: Multipart,
 ) -> Response {
@@ -80,15 +86,16 @@ pub(super) async fn image_variations_handler(
                 }
             }
 
-            Json(
-                create_image_variation(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("image variation"),
-            )
-            .into_response()
+            let response = match create_image_variation(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_image_error_response(error),
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }

@@ -312,8 +312,8 @@ async fn stateful_responses_route_fails_over_before_execution_when_primary_lacks
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn stateful_responses_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
-{
+async fn stateful_responses_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin(
+) {
     let tenant_id = "tenant-responses-preflight-incompatible-standard-json";
     let project_id = "project-responses-preflight-incompatible-standard-json";
     let primary_state = UpstreamCaptureState::default();
@@ -715,11 +715,8 @@ async fn stateful_responses_route_does_not_fail_over_when_policy_disables_execut
     assert!(metrics_text.contains(
         "sdkwork_upstream_requests_total{service=\"gateway\",capability=\"responses\",provider=\"provider-responses-failover-disabled-primary\",outcome=\"failure\"} 1"
     ));
-    assert!(
-        !metrics_text.contains(
-            "provider=\"provider-responses-failover-disabled-backup\",outcome=\"success\""
-        )
-    );
+    assert!(!metrics_text
+        .contains("provider=\"provider-responses-failover-disabled-backup\",outcome=\"success\""));
     assert!(!metrics_text.contains(
         "sdkwork_gateway_failovers_total{service=\"gateway\",capability=\"responses\",from_provider=\"provider-responses-failover-disabled-primary\",to_provider=\"provider-responses-failover-disabled-backup\",outcome=\"success\"}"
     ));
@@ -727,8 +724,8 @@ async fn stateful_responses_route_does_not_fail_over_when_policy_disables_execut
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential()
-{
+async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_lacks_tenant_credential(
+) {
     let tenant_id = "tenant-responses-preflight-missing-credential-stream";
     let project_id = "project-responses-preflight-missing-credential-stream";
     let primary_state = UpstreamCaptureState::default();
@@ -870,8 +867,8 @@ async fn stateful_responses_stream_route_fails_over_before_execution_when_primar
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin()
-{
+async fn stateful_responses_stream_route_fails_over_before_execution_when_primary_requires_non_openai_standard_without_plugin(
+) {
     let tenant_id = "tenant-responses-stream-preflight-incompatible-standard";
     let project_id = "project-responses-stream-preflight-incompatible-standard";
     let primary_state = UpstreamCaptureState::default();

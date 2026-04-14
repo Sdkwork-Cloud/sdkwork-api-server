@@ -290,8 +290,10 @@ pub async fn settle_portal_commerce_order_from_verified_payment(
     project_id: &str,
     order_id: &str,
 ) -> CommerceResult<CommerceOrderRecord> {
-    settle_portal_commerce_order_with_payment_event(store, None, user_id, project_id, order_id, None)
-        .await
+    settle_portal_commerce_order_with_payment_event(
+        store, None, user_id, project_id, order_id, None,
+    )
+    .await
 }
 
 pub(crate) async fn settle_portal_commerce_order_with_payment_event(
@@ -459,17 +461,14 @@ pub async fn cancel_portal_commerce_order(
         .map_err(CommerceError::from)
 }
 
-pub(crate) async fn refund_portal_commerce_order<T>(
-    store: &T,
+pub(crate) async fn refund_portal_commerce_order(
+    store: &dyn AdminStore,
     commercial_billing: Option<&dyn CommercialBillingAdminKernel>,
     user_id: &str,
     project_id: &str,
     order_id: &str,
     refund_provider: &str,
-) -> CommerceResult<CommerceOrderRecord>
-where
-    T: AdminStore + CommerceQuotaStore + ?Sized,
-{
+) -> CommerceResult<CommerceOrderRecord> {
     let normalized_user_id = user_id.trim();
     let normalized_project_id = project_id.trim();
     let normalized_order_id = order_id.trim();

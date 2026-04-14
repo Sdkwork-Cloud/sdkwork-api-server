@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn model_retrieve_handler(
+fn local_model_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_model",
+        "Requested model was not found.",
+    )
+}
+
+pub(crate) async fn model_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(model_id): Path<String>,
 ) -> Response {
@@ -14,18 +22,19 @@ pub(super) async fn model_retrieve_handler(
         }
     }
 
-    Json(
-        get_model(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &model_id,
-        )
-        .expect("model response"),
-    )
-    .into_response()
+    let response = match get_model(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &model_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_model_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn model_delete_handler(
+pub(crate) async fn model_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(model_id): Path<String>,
 ) -> Response {
@@ -39,13 +48,14 @@ pub(super) async fn model_delete_handler(
         }
     }
 
-    Json(
-        delete_model(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &model_id,
-        )
-        .expect("model delete response"),
-    )
-    .into_response()
+    let response = match delete_model(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &model_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_model_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }

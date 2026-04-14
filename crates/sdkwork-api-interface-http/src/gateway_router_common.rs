@@ -1,17 +1,22 @@
 use super::*;
 
-pub(super) fn gateway_service_name() -> Arc<str> {
+const GATEWAY_DEFAULT_BODY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+
+pub(crate) fn gateway_service_name() -> Arc<str> {
     Arc::from("gateway")
 }
 
-pub(super) fn gateway_http_metrics() -> Arc<HttpMetricsRegistry> {
+pub(crate) fn gateway_http_metrics() -> Arc<HttpMetricsRegistry> {
     Arc::new(HttpMetricsRegistry::new("gateway"))
 }
 
-pub(super) fn gateway_base_router(
+pub(crate) fn gateway_base_router<S>(
     metrics: Arc<HttpMetricsRegistry>,
     http_exposure: Option<&sdkwork_api_config::HttpExposureConfig>,
-) -> Router {
+) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     let metrics_route = match http_exposure {
         Some(http_exposure) => super::gateway_http::metrics_route(metrics.clone(), http_exposure),
         None => get({
@@ -31,21 +36,27 @@ pub(super) fn gateway_base_router(
         }),
     };
 
-    Router::new()
-        .route("/openapi.json", get(gateway_openapi_handler))
-        .route("/docs", get(gateway_docs_handler))
+    Router::<S>::new()
+        .route(
+            "/openapi.json",
+            get(super::gateway_docs::gateway_openapi_handler),
+        )
+        .route("/docs", get(super::gateway_docs::gateway_docs_handler))
         .route("/metrics", metrics_route)
         .route("/health", get(|| async { "ok" }))
 }
 
-pub(super) fn finalize_stateful_gateway_router(
-    router: Router,
+pub(crate) fn finalize_stateful_gateway_router(
+    router: Router<GatewayApiState>,
     state: GatewayApiState,
     service_name: Arc<str>,
     metrics: Arc<HttpMetricsRegistry>,
     http_exposure: Option<&sdkwork_api_config::HttpExposureConfig>,
 ) -> Router {
     let router = router
+        .layer(axum::extract::DefaultBodyLimit::max(
+            GATEWAY_DEFAULT_BODY_LIMIT_BYTES,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             apply_gateway_request_context,
@@ -66,14 +77,17 @@ pub(super) fn finalize_stateful_gateway_router(
     router.with_state(state)
 }
 
-pub(super) fn finalize_stateless_gateway_router(
-    router: Router,
+pub(crate) fn finalize_stateless_gateway_router(
+    router: Router<StatelessGatewayContext>,
     config: StatelessGatewayConfig,
     service_name: Arc<str>,
     metrics: Arc<HttpMetricsRegistry>,
     http_exposure: Option<&sdkwork_api_config::HttpExposureConfig>,
 ) -> Router {
     let router = router
+        .layer(axum::extract::DefaultBodyLimit::max(
+            GATEWAY_DEFAULT_BODY_LIMIT_BYTES,
+        ))
         .layer(axum::middleware::from_fn(apply_request_routing_region))
         .layer(axum::middleware::from_fn_with_state(
             metrics,

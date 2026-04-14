@@ -103,8 +103,8 @@ impl StatelessGatewayConfig {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct StatelessGatewayContext {
-    pub(super) tenant_id: Arc<str>,
-    pub(super) project_id: Arc<str>,
-    pub(super) upstream: Option<Arc<StatelessGatewayUpstream>>,
+pub(crate) struct StatelessGatewayContext {
+    pub(crate) tenant_id: Arc<str>,
+    pub(crate) project_id: Arc<str>,
+    pub(crate) upstream: Option<Arc<StatelessGatewayUpstream>>,
 }

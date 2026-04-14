@@ -11,7 +11,7 @@ pub(crate) async fn list_extension_installations_handler(
 }
 
 pub(crate) async fn create_extension_installation_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateExtensionInstallationRequest>,
 ) -> Result<(StatusCode, Json<ExtensionInstallation>), StatusCode> {
@@ -26,6 +26,15 @@ pub(crate) async fn create_extension_installation_handler(
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "extension_installation.create",
+        "extension_installation",
+        installation.installation_id.clone(),
+        audit::APPROVAL_SCOPE_RUNTIME_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(installation)))
 }
 
@@ -50,7 +59,7 @@ pub(crate) async fn list_extension_packages_handler(
 }
 
 pub(crate) async fn create_extension_instance_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateExtensionInstanceRequest>,
 ) -> Result<(StatusCode, Json<ExtensionInstance>), StatusCode> {
@@ -68,6 +77,15 @@ pub(crate) async fn create_extension_instance_handler(
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "extension_instance.create",
+        "extension_instance",
+        instance.instance_id.clone(),
+        audit::APPROVAL_SCOPE_RUNTIME_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(instance)))
 }
 
@@ -81,7 +99,7 @@ pub(crate) async fn list_extension_runtime_statuses_handler(
 }
 
 pub(crate) async fn reload_extension_runtimes_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     body: Bytes,
 ) -> Result<Json<ExtensionRuntimeReloadResponse>, StatusCode> {
@@ -92,7 +110,7 @@ pub(crate) async fn reload_extension_runtimes_handler(
     let runtime_statuses =
         list_extension_runtime_statuses().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(ExtensionRuntimeReloadResponse {
+    let response = ExtensionRuntimeReloadResponse {
         scope: resolved.scope,
         requested_extension_id: resolved.requested_extension_id,
         requested_instance_id: resolved.requested_instance_id,
@@ -102,7 +120,24 @@ pub(crate) async fn reload_extension_runtimes_handler(
         active_runtime_count: runtime_statuses.len(),
         reloaded_at_ms: unix_timestamp_ms(),
         runtime_statuses,
-    }))
+    };
+
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "extension_runtime.reload",
+        "extension_runtime_scope",
+        extension_runtime_scope_resource_id(
+            &response.scope,
+            response.requested_extension_id.as_deref(),
+            response.requested_instance_id.as_deref(),
+            response.resolved_extension_id.as_deref(),
+        ),
+        audit::APPROVAL_SCOPE_RUNTIME_CONTROL,
+    )
+    .await?;
+
+    Ok(Json(response))
 }
 
 pub(crate) async fn create_extension_runtime_rollout_handler(
@@ -133,6 +168,15 @@ pub(crate) async fn create_extension_runtime_rollout_handler(
     )
     .await
     .map_err(map_extension_runtime_rollout_creation_error)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "extension_runtime_rollout.create",
+        "extension_runtime_rollout",
+        rollout.rollout_id.clone(),
+        audit::APPROVAL_SCOPE_RUNTIME_CONTROL,
+    )
+    .await?;
 
     Ok((StatusCode::CREATED, Json(rollout.into())))
 }
@@ -154,6 +198,15 @@ pub(crate) async fn create_standalone_config_rollout_handler(
     )
     .await
     .map_err(map_standalone_config_rollout_creation_error)?;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "standalone_config_rollout.create",
+        "standalone_config_rollout",
+        rollout.rollout_id.clone(),
+        audit::APPROVAL_SCOPE_RUNTIME_CONTROL,
+    )
+    .await?;
 
     Ok((StatusCode::CREATED, Json(rollout.into())))
 }
@@ -226,6 +279,27 @@ fn parse_extension_runtime_reload_request(
     }
 
     serde_json::from_slice(body).map_err(|_| StatusCode::BAD_REQUEST)
+}
+
+fn extension_runtime_scope_resource_id(
+    scope: &ExtensionRuntimeReloadScope,
+    requested_extension_id: Option<&str>,
+    requested_instance_id: Option<&str>,
+    resolved_extension_id: Option<&str>,
+) -> String {
+    match scope {
+        ExtensionRuntimeReloadScope::All => "scope:all".to_owned(),
+        ExtensionRuntimeReloadScope::Extension => format!(
+            "scope:extension:{}",
+            resolved_extension_id
+                .or(requested_extension_id)
+                .unwrap_or("unknown_extension")
+        ),
+        ExtensionRuntimeReloadScope::Instance => format!(
+            "scope:instance:{}",
+            requested_instance_id.unwrap_or("unknown_instance")
+        ),
+    }
 }
 
 fn parse_extension_runtime_rollout_create_request(

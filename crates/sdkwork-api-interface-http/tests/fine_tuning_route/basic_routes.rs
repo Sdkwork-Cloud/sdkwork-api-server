@@ -190,9 +190,7 @@ async fn fine_tuning_checkpoint_permission_delete_route_returns_ok() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(
-                    "/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions/perm_1",
-                )
+                .uri("/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions/perm_1")
                 .body(Body::empty())
                 .unwrap(),
         )

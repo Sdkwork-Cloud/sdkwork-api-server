@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 
     #[utoipa::path(
         get,
@@ -11,7 +11,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load assistants.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn assistants_list() {}
+    pub(crate) async fn assistants_list() {}
 
     #[utoipa::path(
         post,
@@ -26,7 +26,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the assistant.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn assistants_create() {}
+    pub(crate) async fn assistants_create() {}
 
     #[utoipa::path(
         get,
@@ -41,7 +41,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load assistant metadata.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn assistants_get() {}
+    pub(crate) async fn assistants_get() {}
 
     #[utoipa::path(
         get,
@@ -54,7 +54,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load conversations.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversations_list() {}
+    pub(crate) async fn conversations_list() {}
 
     #[utoipa::path(
         post,
@@ -69,7 +69,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the conversation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversations_create() {}
+    pub(crate) async fn conversations_create() {}
 
     #[utoipa::path(
         get,
@@ -84,7 +84,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the conversation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_get() {}
+    pub(crate) async fn conversation_get() {}
 
     #[utoipa::path(
         post,
@@ -101,7 +101,7 @@ use super::*;
             (status = 500, description = "Gateway failed to update the conversation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_update() {}
+    pub(crate) async fn conversation_update() {}
 
     #[utoipa::path(
         delete,
@@ -116,7 +116,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the conversation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_delete() {}
+    pub(crate) async fn conversation_delete() {}
 
     #[utoipa::path(
         get,
@@ -131,7 +131,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load conversation items.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_items_list() {}
+    pub(crate) async fn conversation_items_list() {}
 
     #[utoipa::path(
         post,
@@ -148,7 +148,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create conversation items.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_items_create() {}
+    pub(crate) async fn conversation_items_create() {}
 
     #[utoipa::path(
         get,
@@ -166,7 +166,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the conversation item.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_item_get() {}
+    pub(crate) async fn conversation_item_get() {}
 
     #[utoipa::path(
         delete,
@@ -184,7 +184,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the conversation item.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn conversation_item_delete() {}
+    pub(crate) async fn conversation_item_delete() {}
 
     #[utoipa::path(
         post,
@@ -199,7 +199,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the thread.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn threads_create() {}
+    pub(crate) async fn threads_create() {}
 
     #[utoipa::path(
         get,
@@ -214,7 +214,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the thread.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_get() {}
+    pub(crate) async fn thread_get() {}
 
     #[utoipa::path(
         post,
@@ -231,7 +231,7 @@ use super::*;
             (status = 500, description = "Gateway failed to update the thread.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_update() {}
+    pub(crate) async fn thread_update() {}
 
     #[utoipa::path(
         delete,
@@ -246,7 +246,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the thread.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_delete() {}
+    pub(crate) async fn thread_delete() {}
 
     #[utoipa::path(
         get,
@@ -261,7 +261,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load thread messages.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_messages_list() {}
+    pub(crate) async fn thread_messages_list() {}
 
     #[utoipa::path(
         post,
@@ -278,7 +278,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the thread message.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_messages_create() {}
+    pub(crate) async fn thread_messages_create() {}
 
     #[utoipa::path(
         get,
@@ -296,7 +296,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the thread message.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_message_get() {}
+    pub(crate) async fn thread_message_get() {}
 
     #[utoipa::path(
         post,
@@ -316,7 +316,7 @@ use super::*;
             (status = 500, description = "Gateway failed to update the thread message.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_message_update() {}
+    pub(crate) async fn thread_message_update() {}
 
     #[utoipa::path(
         delete,
@@ -334,7 +334,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the thread message.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_message_delete() {}
+    pub(crate) async fn thread_message_delete() {}
 
     #[utoipa::path(
         post,
@@ -349,7 +349,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the thread and run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_and_run_create() {}
+    pub(crate) async fn thread_and_run_create() {}
 
     #[utoipa::path(
         get,
@@ -364,7 +364,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load thread runs.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_runs_list() {}
+    pub(crate) async fn thread_runs_list() {}
 
     #[utoipa::path(
         post,
@@ -381,7 +381,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the thread run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_runs_create() {}
+    pub(crate) async fn thread_runs_create() {}
 
     #[utoipa::path(
         get,
@@ -399,7 +399,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_get() {}
+    pub(crate) async fn thread_run_get() {}
 
     #[utoipa::path(
         post,
@@ -419,7 +419,7 @@ use super::*;
             (status = 500, description = "Gateway failed to update the run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_update() {}
+    pub(crate) async fn thread_run_update() {}
 
     #[utoipa::path(
         post,
@@ -437,7 +437,7 @@ use super::*;
             (status = 500, description = "Gateway failed to cancel the run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_cancel() {}
+    pub(crate) async fn thread_run_cancel() {}
 
     #[utoipa::path(
         post,
@@ -457,7 +457,7 @@ use super::*;
             (status = 500, description = "Gateway failed to submit tool outputs to the run.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_submit_tool_outputs() {}
+    pub(crate) async fn thread_run_submit_tool_outputs() {}
 
     #[utoipa::path(
         get,
@@ -475,7 +475,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load run steps.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_steps_list() {}
+    pub(crate) async fn thread_run_steps_list() {}
 
     #[utoipa::path(
         get,
@@ -494,7 +494,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the run step.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn thread_run_step_get() {}
+    pub(crate) async fn thread_run_step_get() {}
 
     #[utoipa::path(
         post,
@@ -509,4 +509,5 @@ use super::*;
             (status = 500, description = "Gateway failed to create the realtime session.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn realtime_sessions() {}
+    pub(crate) async fn realtime_sessions() {}
+

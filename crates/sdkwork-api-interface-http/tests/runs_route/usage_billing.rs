@@ -259,12 +259,12 @@ async fn stateful_thread_run_usage_uses_thread_route_key_for_provider_selection(
     let logs_json = read_json(logs).await;
     let routing_logs = logs_json.as_array().unwrap();
     assert_eq!(routing_logs.len(), 2);
-    assert!(routing_logs.iter().all(|entry| entry["route_key"] == "thread_1"));
-    assert!(
-        routing_logs
-            .iter()
-            .all(|entry| entry["selected_provider_id"] == "provider-thread")
-    );
+    assert!(routing_logs
+        .iter()
+        .all(|entry| entry["route_key"] == "thread_1"));
+    assert!(routing_logs
+        .iter()
+        .all(|entry| entry["selected_provider_id"] == "provider-thread"));
 }
 
 #[tokio::test]
@@ -275,7 +275,10 @@ async fn stateful_thread_run_create_usage_uses_thread_route_key_for_provider_sel
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let upstream = Router::new()
-        .route("/v1/threads/thread_1/runs", post(upstream_thread_runs_handler))
+        .route(
+            "/v1/threads/thread_1/runs",
+            post(upstream_thread_runs_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {

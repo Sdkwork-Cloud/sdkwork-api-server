@@ -22,6 +22,10 @@ fn local_image_generation_response(tenant_id: &str, project_id: &str, model: &st
     }
 }
 
+fn local_image_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_image_request")
+}
+
 fn local_chat_completion_retrieve_result(
     tenant_id: &str,
     project_id: &str,
@@ -46,8 +50,14 @@ fn local_chat_completion_update_result(
     tenant_id: &str,
     project_id: &str,
     completion_id: &str,
-    metadata: Value,
+    metadata: Option<Value>,
 ) -> std::result::Result<ChatCompletionResponse, Response> {
+    let metadata = metadata.ok_or_else(|| {
+        invalid_request_openai_response(
+            "Chat completion metadata is required for local fallback updates.",
+            "invalid_chat_completion_request",
+        )
+    })?;
     update_chat_completion(tenant_id, project_id, completion_id, metadata)
         .map_err(local_chat_completion_not_found_response)
 }
@@ -56,7 +66,7 @@ fn local_chat_completion_update_response(
     tenant_id: &str,
     project_id: &str,
     completion_id: &str,
-    metadata: Value,
+    metadata: Option<Value>,
 ) -> Response {
     match local_chat_completion_update_result(tenant_id, project_id, completion_id, metadata) {
         Ok(response) => Json(response).into_response(),
@@ -84,23 +94,14 @@ fn local_chat_completion_delete_response(
     }
 }
 
-fn local_chat_completion_stream_body_response() -> Response {
-    let body = format!(
-        "{}{}",
-        SseFrame::data("{\"id\":\"chatcmpl_1\",\"object\":\"chat.completion.chunk\"}"),
-        SseFrame::data("[DONE]")
-    );
-    ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
-}
-
 fn local_chat_completion_messages_result(
     tenant_id: &str,
     project_id: &str,
     completion_id: &str,
 ) -> std::result::Result<ListChatCompletionMessagesResponse, Response> {
-    list_chat_completion_messages(tenant_id, project_id, completion_id).map_err(|error| {
-        local_gateway_error_response(error, "Requested chat completion was not found.")
-    })
+    list_chat_completion_messages(tenant_id, project_id, completion_id).map_err(
+        local_chat_completion_not_found_response,
+    )
 }
 
 fn local_chat_completion_messages_response(
@@ -115,6 +116,11 @@ fn local_chat_completion_messages_response(
 }
 
 fn local_conversation_not_found_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_conversation_request");
+    }
+
     local_gateway_error_response(error, "Requested conversation was not found.")
 }
 
@@ -142,7 +148,7 @@ fn local_conversation_update_result(
     tenant_id: &str,
     project_id: &str,
     conversation_id: &str,
-    metadata: Value,
+    metadata: Option<Value>,
 ) -> std::result::Result<ConversationObject, Response> {
     update_conversation(tenant_id, project_id, conversation_id, metadata)
         .map_err(local_conversation_not_found_response)
@@ -152,7 +158,7 @@ fn local_conversation_update_response(
     tenant_id: &str,
     project_id: &str,
     conversation_id: &str,
-    metadata: Value,
+    metadata: Option<Value>,
 ) -> Response {
     match local_conversation_update_result(tenant_id, project_id, conversation_id, metadata) {
         Ok(response) => Json(response).into_response(),
@@ -269,6 +275,11 @@ fn local_conversation_item_delete_response(
 }
 
 fn local_thread_not_found_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_request");
+    }
+
     local_gateway_error_response(error, "Requested thread was not found.")
 }
 
@@ -329,6 +340,70 @@ fn local_thread_message_not_found_response(error: anyhow::Error) -> Response {
     local_thread_not_found_response(error)
 }
 
+fn local_thread_message_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_request");
+    }
+
+    if message
+        .to_ascii_lowercase()
+        .contains("thread message not found")
+    {
+        return not_found_openai_response("Requested thread message was not found.");
+    }
+
+    local_thread_not_found_response(error)
+}
+
+fn local_thread_message_text<'a>(
+    content: &'a Value,
+) -> Result<std::borrow::Cow<'a, str>, Response> {
+    if let Some(text) = content.as_str() {
+        return Ok(std::borrow::Cow::Borrowed(text));
+    }
+
+    let Some(parts) = content.as_array() else {
+        return Err(invalid_request_openai_response(
+            "Thread message content must be a string or an array of text parts.",
+            "invalid_thread_request",
+        ));
+    };
+
+    let mut texts = Vec::with_capacity(parts.len());
+    for part in parts {
+        if part.get("type").and_then(Value::as_str) != Some("text") {
+            return Err(invalid_request_openai_response(
+                "Local thread fallback only supports text content parts.",
+                "invalid_thread_request",
+            ));
+        }
+
+        let text = part.get("text").and_then(Value::as_str).or_else(|| {
+            part.get("text")
+                .and_then(Value::as_object)
+                .and_then(|text| text.get("value"))
+                .and_then(Value::as_str)
+        });
+        let Some(text) = text else {
+            return Err(invalid_request_openai_response(
+                "Text content parts must include a text value.",
+                "invalid_thread_request",
+            ));
+        };
+        texts.push(text);
+    }
+
+    if texts.is_empty() {
+        return Err(invalid_request_openai_response(
+            "Thread message content must include at least one text part.",
+            "invalid_thread_request",
+        ));
+    }
+
+    Ok(std::borrow::Cow::Owned(texts.join("\n")))
+}
+
 fn local_thread_messages_create_result(
     tenant_id: &str,
     project_id: &str,
@@ -337,7 +412,7 @@ fn local_thread_messages_create_result(
     text: &str,
 ) -> std::result::Result<ThreadMessageObject, Response> {
     create_thread_message(tenant_id, project_id, thread_id, role, text)
-        .map_err(local_thread_not_found_response)
+        .map_err(local_thread_message_error_response)
 }
 
 fn local_thread_messages_list_result(
@@ -345,7 +420,7 @@ fn local_thread_messages_list_result(
     project_id: &str,
     thread_id: &str,
 ) -> std::result::Result<ListThreadMessagesResponse, Response> {
-    list_thread_messages(tenant_id, project_id, thread_id).map_err(local_thread_not_found_response)
+    list_thread_messages(tenant_id, project_id, thread_id).map_err(local_thread_message_error_response)
 }
 
 fn local_thread_messages_list_response(
@@ -426,11 +501,11 @@ fn local_thread_message_delete_response(
 }
 
 fn local_thread_run_not_found_response(error: anyhow::Error) -> Response {
-    if error
-        .to_string()
-        .to_ascii_lowercase()
-        .contains("run not found")
-    {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_run_request");
+    }
+    if message.to_ascii_lowercase().contains("run not found") {
         return not_found_openai_response("Requested run was not found.");
     }
 
@@ -438,11 +513,11 @@ fn local_thread_run_not_found_response(error: anyhow::Error) -> Response {
 }
 
 fn local_thread_run_step_not_found_response(error: anyhow::Error) -> Response {
-    if error
-        .to_string()
-        .to_ascii_lowercase()
-        .contains("run step not found")
-    {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_run_request");
+    }
+    if message.to_ascii_lowercase().contains("run step not found") {
         return not_found_openai_response("Requested run step was not found.");
     }
 
@@ -457,7 +532,7 @@ fn local_thread_runs_create_result(
     model: Option<&str>,
 ) -> std::result::Result<RunObject, Response> {
     create_thread_run(tenant_id, project_id, thread_id, assistant_id, model)
-        .map_err(local_thread_not_found_response)
+        .map_err(local_thread_run_not_found_response)
 }
 
 fn local_thread_runs_list_result(
@@ -465,7 +540,7 @@ fn local_thread_runs_list_result(
     project_id: &str,
     thread_id: &str,
 ) -> std::result::Result<ListRunsResponse, Response> {
-    list_thread_runs(tenant_id, project_id, thread_id).map_err(local_thread_not_found_response)
+    list_thread_runs(tenant_id, project_id, thread_id).map_err(local_thread_run_not_found_response)
 }
 
 fn local_thread_runs_list_response(tenant_id: &str, project_id: &str, thread_id: &str) -> Response {
@@ -735,12 +810,14 @@ async fn image_edits_with_state_handler(
         }
     }
 
-    let response = create_image_edit(
+    let response = match create_image_edit(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("image edit");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_image_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_media_and_reference_id(
         state.store.as_ref(),
@@ -822,12 +899,14 @@ async fn image_variations_with_state_handler(
         }
     }
 
-    let response = create_image_variation(
+    let response = match create_image_variation(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("image variation");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_image_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_media_and_reference_id(
         state.store.as_ref(),

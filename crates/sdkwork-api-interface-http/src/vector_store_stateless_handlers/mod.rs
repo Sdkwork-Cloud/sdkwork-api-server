@@ -4,6 +4,6 @@ mod batches;
 mod files;
 mod stores;
 
-pub(super) use self::batches::*;
-pub(super) use self::files::*;
-pub(super) use self::stores::*;
+pub(crate) use self::batches::*;
+pub(crate) use self::files::*;
+pub(crate) use self::stores::*;

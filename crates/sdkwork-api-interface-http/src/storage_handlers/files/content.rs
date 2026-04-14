@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn file_content_with_state_handler(
+pub(crate) async fn file_content_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(file_id): Path<String>,
@@ -42,6 +42,15 @@ pub(super) async fn file_content_with_state_handler(
         }
     }
 
+    let response = local_file_content_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &file_id,
+    );
+    if !response.status().is_success() {
+        return response;
+    }
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,9 +70,5 @@ pub(super) async fn file_content_with_state_handler(
             .into_response();
     }
 
-    local_file_content_response(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &file_id,
-    )
+    response
 }

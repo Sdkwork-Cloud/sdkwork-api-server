@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 
     #[utoipa::path(
         get,
@@ -11,7 +11,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load vector stores.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_stores_list() {}
+    pub(crate) async fn vector_stores_list() {}
 
     #[utoipa::path(
         post,
@@ -26,7 +26,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the vector store.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_stores_create() {}
+    pub(crate) async fn vector_stores_create() {}
 
     #[utoipa::path(
         get,
@@ -41,7 +41,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the vector store.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_get() {}
+    pub(crate) async fn vector_store_get() {}
 
     #[utoipa::path(
         post,
@@ -58,7 +58,7 @@ use super::*;
             (status = 500, description = "Gateway failed to update the vector store.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_update() {}
+    pub(crate) async fn vector_store_update() {}
 
     #[utoipa::path(
         delete,
@@ -73,7 +73,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the vector store.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_delete() {}
+    pub(crate) async fn vector_store_delete() {}
 
     #[utoipa::path(
         post,
@@ -90,7 +90,7 @@ use super::*;
             (status = 500, description = "Gateway failed to search the vector store.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_search() {}
+    pub(crate) async fn vector_store_search() {}
 
     #[utoipa::path(
         get,
@@ -105,7 +105,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load vector store files.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_files_list() {}
+    pub(crate) async fn vector_store_files_list() {}
 
     #[utoipa::path(
         post,
@@ -122,7 +122,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the vector store file link.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_files_create() {}
+    pub(crate) async fn vector_store_files_create() {}
 
     #[utoipa::path(
         get,
@@ -140,7 +140,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the vector store file.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_get() {}
+    pub(crate) async fn vector_store_file_get() {}
 
     #[utoipa::path(
         delete,
@@ -158,7 +158,7 @@ use super::*;
             (status = 500, description = "Gateway failed to delete the vector store file link.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_delete() {}
+    pub(crate) async fn vector_store_file_delete() {}
 
     #[utoipa::path(
         post,
@@ -175,7 +175,7 @@ use super::*;
             (status = 500, description = "Gateway failed to create the vector store file batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_batches_create() {}
+    pub(crate) async fn vector_store_file_batches_create() {}
 
     #[utoipa::path(
         get,
@@ -193,7 +193,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load the vector store file batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_batch_get() {}
+    pub(crate) async fn vector_store_file_batch_get() {}
 
     #[utoipa::path(
         post,
@@ -211,7 +211,7 @@ use super::*;
             (status = 500, description = "Gateway failed to cancel the vector store file batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_batch_cancel() {}
+    pub(crate) async fn vector_store_file_batch_cancel() {}
 
     #[utoipa::path(
         get,
@@ -229,7 +229,7 @@ use super::*;
             (status = 500, description = "Gateway failed to load vector store file batch files.", body = OpenAiErrorResponse)
         )
     )]
-    pub(super) async fn vector_store_file_batch_files_list() {}
+    pub(crate) async fn vector_store_file_batch_files_list() {}
 
     #[utoipa::path(
         post,
@@ -244,7 +244,7 @@ use super::*;
             (status = 500, description = "Gateway failed to serve the Anthropic compatibility route.", body = Value)
         )
     )]
-    pub(super) async fn anthropic_messages() {}
+    pub(crate) async fn anthropic_messages() {}
 
     #[utoipa::path(
         post,
@@ -259,7 +259,7 @@ use super::*;
             (status = 500, description = "Gateway failed to serve the Anthropic token count route.", body = Value)
         )
     )]
-    pub(super) async fn anthropic_count_tokens() {}
+    pub(crate) async fn anthropic_count_tokens() {}
 
     #[utoipa::path(
         post,
@@ -275,4 +275,5 @@ use super::*;
             (status = 500, description = "Gateway failed to serve the Gemini compatibility route.", body = Value)
         )
     )]
-    pub(super) async fn gemini_models_compat() {}
+    pub(crate) async fn gemini_models_compat() {}
+

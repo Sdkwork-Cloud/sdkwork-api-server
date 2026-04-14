@@ -13,12 +13,12 @@ use tower::ServiceExt;
 #[path = "../support/mod.rs"]
 mod support;
 
-mod stateless;
-mod stateful_core;
 mod failover_policy;
-mod retry_and_skip;
-mod stream_and_timing;
 mod relay_tests;
+mod retry_and_skip;
+mod stateful_core;
+mod stateless;
+mod stream_and_timing;
 mod upstream_fixtures;
 
 use upstream_fixtures::*;

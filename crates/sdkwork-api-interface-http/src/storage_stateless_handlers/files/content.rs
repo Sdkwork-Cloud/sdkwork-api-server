@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn file_content_handler(
+pub(crate) async fn file_content_handler(
     request_context: StatelessGatewayRequest,
     Path(file_id): Path<String>,
 ) -> Response {

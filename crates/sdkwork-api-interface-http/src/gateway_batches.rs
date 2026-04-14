@@ -10,16 +10,14 @@ async fn batches_handler(
         }
     }
 
-    Json(
-        create_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.endpoint,
-            &request.input_file_id,
-        )
-        .expect("batch"),
-    )
-    .into_response()
+    match create_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_batch_not_found_response(error),
+    }
 }
 
 async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -31,15 +29,18 @@ async fn batches_list_handler(request_context: StatelessGatewayRequest) -> Respo
         }
     }
 
-    Json(
-        list_batches(request_context.tenant_id(), request_context.project_id())
-            .expect("batches list"),
-    )
-    .into_response()
+    match list_batches(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_batch_not_found_response(error),
+    }
 }
 
 fn local_batch_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested batch was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_batch_request",
+        "Requested batch was not found.",
+    )
 }
 
 fn local_batch_retrieve_result(
@@ -133,10 +134,9 @@ async fn batches_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let batch_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.endpoint.as_str());
+            let Some(batch_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream batch response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -165,13 +165,14 @@ async fn batches_with_state_handler(
         }
     }
 
-    let response = create_batch(
+    let response = match create_batch(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.endpoint,
-        &request.input_file_id,
-    )
-    .expect("batch");
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_batch_not_found_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -255,11 +256,10 @@ async fn batches_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_batches(request_context.tenant_id(), request_context.project_id())
-            .expect("batches list"),
-    )
-    .into_response()
+    match list_batches(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_batch_not_found_response(error),
+    }
 }
 
 async fn batch_retrieve_with_state_handler(

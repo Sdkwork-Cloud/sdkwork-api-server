@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn apply_request_routing_region(request: Request<Body>, next: Next) -> Response {
+pub(crate) async fn apply_request_routing_region(request: Request<Body>, next: Next) -> Response {
     let requested_region = request
         .headers()
         .get("x-sdkwork-region")

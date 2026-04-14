@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn responses_handler(
+fn local_response_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
+}
+
+pub(crate) async fn responses_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
@@ -18,26 +22,31 @@ pub(super) async fn responses_handler(
             }
         }
 
-        return local_response_stream_response("resp_1", &request.model);
+        return invalid_request_openai_response(
+            "Local response streaming fallback is not supported without an upstream provider.",
+            "invalid_model",
+        );
     }
 
     match relay_stateless_json_request(&request_context, ProviderRequest::Responses(&request)).await
     {
         Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => Json(
-            create_response(
+        Ok(None) => {
+            let response = match create_response(
                 request_context.tenant_id(),
                 request_context.project_id(),
                 &request.model,
-            )
-            .expect("response"),
-        )
-        .into_response(),
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_response_error_response(error),
+            };
+            Json(response).into_response()
+        }
         Err(_) => bad_gateway_openai_response("failed to relay upstream response"),
     }
 }
 
-pub(super) async fn response_input_tokens_handler(
+pub(crate) async fn response_input_tokens_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CountResponseInputTokensRequest>,
 ) -> Response {
@@ -54,18 +63,19 @@ pub(super) async fn response_input_tokens_handler(
         }
     }
 
-    Json(
-        count_response_input_tokens(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("response input tokens"),
-    )
-    .into_response()
+    let response = match count_response_input_tokens(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn response_compact_handler(
+pub(crate) async fn response_compact_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CompactResponseRequest>,
 ) -> Response {
@@ -82,13 +92,14 @@ pub(super) async fn response_compact_handler(
         }
     }
 
-    Json(
-        compact_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("response compact"),
-    )
-    .into_response()
+    let response = match compact_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_error_response(error),
+    };
+
+    Json(response).into_response()
 }

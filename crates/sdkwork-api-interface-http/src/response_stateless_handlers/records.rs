@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn response_retrieve_handler(
+fn local_response_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_response_request",
+        "Requested response was not found.",
+    )
+}
+
+pub(crate) async fn response_retrieve_handler(
     request_context: StatelessGatewayRequest,
     Path(response_id): Path<String>,
 ) -> Response {
@@ -17,18 +25,19 @@ pub(super) async fn response_retrieve_handler(
         }
     }
 
-    Json(
-        get_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response retrieve"),
-    )
-    .into_response()
+    let response = match get_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn response_input_items_list_handler(
+pub(crate) async fn response_input_items_list_handler(
     request_context: StatelessGatewayRequest,
     Path(response_id): Path<String>,
 ) -> Response {
@@ -45,18 +54,19 @@ pub(super) async fn response_input_items_list_handler(
         }
     }
 
-    Json(
-        list_response_input_items(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response input items"),
-    )
-    .into_response()
+    let response = match list_response_input_items(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn response_delete_handler(
+pub(crate) async fn response_delete_handler(
     request_context: StatelessGatewayRequest,
     Path(response_id): Path<String>,
 ) -> Response {
@@ -73,18 +83,19 @@ pub(super) async fn response_delete_handler(
         }
     }
 
-    Json(
-        delete_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response delete"),
-    )
-    .into_response()
+    let response = match delete_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn response_cancel_handler(
+pub(crate) async fn response_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(response_id): Path<String>,
 ) -> Response {
@@ -101,13 +112,14 @@ pub(super) async fn response_cancel_handler(
         }
     }
 
-    Json(
-        cancel_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &response_id,
-        )
-        .expect("response cancel"),
-    )
-    .into_response()
+    let response = match cancel_response(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &response_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_response_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }

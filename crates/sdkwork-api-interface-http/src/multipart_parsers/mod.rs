@@ -5,6 +5,6 @@ mod files;
 mod images;
 mod uploads;
 
-pub(super) use self::files::*;
-pub(super) use self::images::*;
-pub(super) use self::uploads::*;
+pub(crate) use self::files::*;
+pub(crate) use self::images::*;
+pub(crate) use self::uploads::*;

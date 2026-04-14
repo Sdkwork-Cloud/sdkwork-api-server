@@ -1,6 +1,8 @@
 use super::*;
 
-pub(super) fn apply_stateless_video_and_upload_routes(router: Router) -> Router {
+pub(crate) fn apply_stateless_video_and_upload_routes(
+    router: Router<StatelessGatewayContext>,
+) -> Router<StatelessGatewayContext> {
     router
         .route("/v1/videos", get(videos_list_handler).post(videos_handler))
         .route(

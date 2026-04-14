@@ -1,3 +1,7 @@
+fn local_music_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_music_request")
+}
+
 async fn music_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateMusicRequest>,
@@ -10,15 +14,14 @@ async fn music_handler(
         }
     }
 
-    Json(
-        create_music(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("music create"),
-    )
-    .into_response()
+    match create_music(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_music_error_response(error),
+    }
 }
 
 async fn music_list_handler(request_context: StatelessGatewayRequest) -> Response {
@@ -30,8 +33,12 @@ async fn music_list_handler(request_context: StatelessGatewayRequest) -> Respons
         }
     }
 
-    Json(list_music(request_context.tenant_id(), request_context.project_id()).expect("music list"))
-        .into_response()
+    let response = match list_music(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_music_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn music_retrieve_handler(
@@ -111,15 +118,14 @@ async fn music_lyrics_handler(
         }
     }
 
-    Json(
-        create_music_lyrics(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("music lyrics"),
-    )
-    .into_response()
+    match create_music_lyrics(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_music_error_response(error),
+    }
 }
 
 
@@ -172,11 +178,14 @@ fn local_music_content_response(tenant_id: &str, project_id: &str, music_id: &st
         Ok(bytes) => bytes,
         Err(response) => return response,
     };
-    Response::builder()
+    match Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(header::CONTENT_TYPE, "audio/mpeg")
         .body(Body::from(bytes))
-        .expect("valid local music content response")
+    {
+        Ok(response) => response,
+        Err(_) => bad_gateway_openai_response("failed to process local music content fallback"),
+    }
 }
 
 
@@ -195,8 +204,9 @@ async fn music_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.model.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response("upstream music response missing usage id");
+            };
             let music_seconds = request
                 .duration_seconds
                 .unwrap_or_else(|| music_seconds_from_response(&response));
@@ -232,12 +242,14 @@ async fn music_with_state_handler(
         }
     }
 
-    let response = create_music(
+    let response = match create_music(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("music create");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_music_error_response(error),
+    };
     let usage_model = match response.data.as_slice() {
         [track] => track.id.as_str(),
         _ => request.model.as_str(),
@@ -316,6 +328,11 @@ async fn music_list_with_state_handler(
         }
     }
 
+    let response = match list_music(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_music_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -335,8 +352,7 @@ async fn music_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_music(request_context.tenant_id(), request_context.project_id()).expect("music list"))
-        .into_response()
+    Json(response).into_response()
 }
 
 async fn music_retrieve_with_state_handler(
@@ -527,14 +543,14 @@ async fn music_content_with_state_handler(
         }
     }
 
-    let bytes = match local_music_content_result(
+    let response = local_music_content_response(
         request_context.tenant_id(),
         request_context.project_id(),
         &music_id,
-    ) {
-        Ok(bytes) => bytes,
-        Err(response) => return response,
-    };
+    );
+    if !response.status().is_success() {
+        return response;
+    }
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
@@ -555,11 +571,7 @@ async fn music_content_with_state_handler(
             .into_response();
     }
 
-    Response::builder()
-        .status(axum::http::StatusCode::OK)
-        .header(header::CONTENT_TYPE, "audio/mpeg")
-        .body(Body::from(bytes))
-        .expect("valid local music content response")
+    response
 }
 
 async fn music_lyrics_with_state_handler(
@@ -577,10 +589,9 @@ async fn music_lyrics_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("lyrics");
+            let Some(usage_model) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream music lyrics response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -609,12 +620,14 @@ async fn music_lyrics_with_state_handler(
         }
     }
 
-    let response = create_music_lyrics(
+    let response = match create_music_lyrics(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("music lyrics");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_music_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),

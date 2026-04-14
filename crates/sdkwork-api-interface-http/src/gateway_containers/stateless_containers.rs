@@ -18,7 +18,9 @@ async fn containers_handler(
         &request,
     ) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => bad_gateway_openai_response(error.to_string()),
+        Err(error) => {
+            local_gateway_invalid_or_bad_gateway_response(error, "invalid_container_request")
+        }
     }
 }
 
@@ -36,7 +38,9 @@ async fn containers_list_handler(request_context: StatelessGatewayRequest) -> Re
         request_context.project_id(),
     ) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => bad_gateway_openai_response(error.to_string()),
+        Err(error) => {
+            local_gateway_invalid_or_bad_gateway_response(error, "invalid_container_request")
+        }
     }
 }
 

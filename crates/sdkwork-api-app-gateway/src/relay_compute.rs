@@ -370,7 +370,7 @@ pub fn create_completion(
         bail!("Completion model is required.");
     }
 
-    Ok(CompletionObject::new("cmpl_1", "SDKWork completion"))
+    bail!("Local completion fallback is not supported without a text generation backend.")
 }
 
 pub fn create_embedding(
@@ -382,7 +382,7 @@ pub fn create_embedding(
         bail!("Embedding model is required.");
     }
 
-    Ok(CreateEmbeddingResponse::empty(model))
+    bail!("Local embedding fallback is not supported without an embedding backend.")
 }
 
 pub fn create_moderation(
@@ -394,14 +394,7 @@ pub fn create_moderation(
         bail!("Moderation model is required.");
     }
 
-    Ok(ModerationResponse {
-        id: "modr_1".to_owned(),
-        model: model.to_owned(),
-        results: vec![ModerationResult {
-            flagged: false,
-            category_scores: ModerationCategoryScores { violence: 0.0 },
-        }],
-    })
+    bail!("Local moderation fallback is not supported without a moderation backend.")
 }
 
 pub fn create_image_generation(
@@ -413,51 +406,59 @@ pub fn create_image_generation(
         bail!("Image generation model is required.");
     }
 
-    Ok(ImagesResponse::new(vec![ImageObject::base64(
-        "sdkwork-image",
-    )]))
+    bail!("Local image generation fallback is not supported without an image backend.")
 }
 
 pub fn create_image_edit(
     _tenant_id: &str,
     _project_id: &str,
-    _request: &CreateImageEditRequest,
+    request: &CreateImageEditRequest,
 ) -> Result<ImagesResponse> {
-    Ok(ImagesResponse::new(vec![ImageObject::base64(
-        "sdkwork-image",
-    )]))
+    if request.prompt.trim().is_empty() {
+        bail!("Image edit prompt is required.");
+    }
+
+    bail!("Local image edit fallback is not supported without an image backend.")
 }
 
 pub fn create_image_variation(
     _tenant_id: &str,
     _project_id: &str,
-    _request: &CreateImageVariationRequest,
+    request: &CreateImageVariationRequest,
 ) -> Result<ImagesResponse> {
-    Ok(ImagesResponse::new(vec![ImageObject::base64(
-        "sdkwork-image",
-    )]))
+    if request.image.bytes.is_empty() {
+        bail!("Image input is required.");
+    }
+
+    bail!("Local image variation fallback is not supported without an image backend.")
 }
 
 pub fn create_transcription(
     _tenant_id: &str,
     _project_id: &str,
-    _model: &str,
+    model: &str,
 ) -> Result<TranscriptionObject> {
-    Ok(TranscriptionObject::new("sdkwork transcription"))
+    if model.trim().is_empty() {
+        bail!("Transcription model is required.");
+    }
+
+    bail!("Local transcription fallback is not supported without a transcription backend.")
 }
 
 pub fn create_translation(
     _tenant_id: &str,
     _project_id: &str,
-    _model: &str,
+    model: &str,
 ) -> Result<TranslationObject> {
-    Ok(TranslationObject::new("sdkwork translation"))
+    if model.trim().is_empty() {
+        bail!("Translation model is required.");
+    }
+
+    bail!("Local translation fallback is not supported without a translation backend.")
 }
 
 pub fn list_audio_voices(_tenant_id: &str, _project_id: &str) -> Result<ListVoicesResponse> {
-    Ok(ListVoicesResponse::new(vec![VoiceObject::new(
-        "voice_1", "Alloy",
-    )]))
+    bail!("Local audio voice listing fallback is not supported without an upstream provider.")
 }
 
 pub fn create_audio_voice_consent(
@@ -465,11 +466,17 @@ pub fn create_audio_voice_consent(
     _project_id: &str,
     request: &CreateVoiceConsentRequest,
 ) -> Result<VoiceConsentObject> {
-    Ok(VoiceConsentObject::approved(
-        "voice_consent_1",
-        &request.voice,
-        &request.name,
-    ))
+    if request.voice.trim().is_empty() {
+        bail!("Voice id is required.");
+    }
+    if request.name.trim().is_empty() {
+        bail!("Voice consent name is required.");
+    }
+    if request.consent_text.trim().is_empty() {
+        bail!("Voice consent text is required.");
+    }
+
+    bail!("Local voice consent fallback is not supported without a consent backend.")
 }
 
 pub fn create_speech_response(
@@ -477,9 +484,16 @@ pub fn create_speech_response(
     _project_id: &str,
     request: &CreateSpeechRequest,
 ) -> Result<SpeechResponse> {
-    let format =
-        normalize_local_speech_format(request.response_format.as_deref().unwrap_or("wav"))?
-            .to_owned();
-    let bytes = fallback_speech_bytes(&format);
-    Ok(SpeechResponse::new(format, STANDARD.encode(bytes)))
+    if request.model.trim().is_empty() {
+        bail!("Speech model is required.");
+    }
+    if request.voice.trim().is_empty() {
+        bail!("Speech voice is required.");
+    }
+    if request.input.trim().is_empty() {
+        bail!("Speech input is required.");
+    }
+
+    normalize_local_speech_format(request.response_format.as_deref().unwrap_or("wav"))?;
+    bail!("Local speech fallback is not supported without a speech synthesis backend.")
 }

@@ -11,7 +11,7 @@ pub(crate) async fn list_payment_methods_handler(
 }
 
 pub(crate) async fn put_payment_method_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(payment_method_id): Path<String>,
     State(state): State<AdminApiState>,
     Json(mut payment_method): Json<PaymentMethodRecord>,
@@ -35,14 +35,29 @@ pub(crate) async fn put_payment_method_handler(
         ));
     }
 
-    persist_admin_payment_method(state.store.as_ref(), &payment_method)
+    let payment_method = persist_admin_payment_method(state.store.as_ref(), &payment_method)
         .await
-        .map(Json)
-        .map_err(admin_commerce_error_response)
+        .map_err(admin_commerce_error_response)?;
+    crate::audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_method.upsert",
+        "payment_method",
+        payment_method.payment_method_id.clone(),
+        crate::audit::APPROVAL_SCOPE_COMMERCE_CONTROL,
+    )
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
+    Ok(Json(payment_method))
 }
 
 pub(crate) async fn delete_payment_method_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(payment_method_id): Path<String>,
     State(state): State<AdminApiState>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
@@ -50,7 +65,24 @@ pub(crate) async fn delete_payment_method_handler(
         .await
         .map_err(admin_commerce_error_response)?
     {
-        true => Ok(StatusCode::NO_CONTENT),
+        true => {
+            crate::audit::record_admin_audit_event(
+                &state,
+                &claims,
+                "payment_method.delete",
+                "payment_method",
+                payment_method_id,
+                crate::audit::APPROVAL_SCOPE_COMMERCE_CONTROL,
+            )
+            .await
+            .map_err(|_| {
+                error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to record admin audit event",
+                )
+            })?;
+            Ok(StatusCode::NO_CONTENT)
+        }
         false => Err(error_response(
             StatusCode::NOT_FOUND,
             format!("payment method {payment_method_id} not found"),
@@ -70,7 +102,7 @@ pub(crate) async fn list_payment_method_credential_bindings_handler(
 }
 
 pub(crate) async fn replace_payment_method_credential_bindings_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(payment_method_id): Path<String>,
     State(state): State<AdminApiState>,
     Json(mut bindings): Json<Vec<PaymentMethodCredentialBindingRecord>>,
@@ -96,14 +128,29 @@ pub(crate) async fn replace_payment_method_credential_bindings_handler(
         }
     }
 
-    replace_admin_payment_method_credential_bindings(
+    let bindings = replace_admin_payment_method_credential_bindings(
         state.store.as_ref(),
         normalized_payment_method_id,
         &bindings,
     )
     .await
-    .map(Json)
-    .map_err(admin_commerce_error_response)
+    .map_err(admin_commerce_error_response)?;
+    crate::audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "payment_method_credential_bindings.replace",
+        "payment_method",
+        payment_method_id,
+        crate::audit::APPROVAL_SCOPE_COMMERCE_CONTROL,
+    )
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
+    Ok(Json(bindings))
 }
 
 pub(crate) async fn list_commerce_payment_events_handler(
@@ -147,12 +194,12 @@ pub(crate) async fn list_commerce_refunds_handler(
 }
 
 pub(crate) async fn create_commerce_refund_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     Path(order_id): Path<String>,
     State(state): State<AdminApiState>,
     Json(request): Json<AdminCommerceRefundCreateRequest>,
 ) -> Result<Json<CommerceRefundRecord>, (StatusCode, Json<ErrorResponse>)> {
-    create_admin_commerce_refund(
+    let refund = create_admin_commerce_refund(
         state.store.as_ref(),
         state.commercial_billing.as_deref(),
         &state.secret_manager,
@@ -160,6 +207,21 @@ pub(crate) async fn create_commerce_refund_handler(
         &request,
     )
     .await
-    .map(Json)
-    .map_err(admin_commerce_error_response)
+    .map_err(admin_commerce_error_response)?;
+    crate::audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "commerce_refund.create",
+        "commerce_refund",
+        refund.refund_id.clone(),
+        crate::audit::APPROVAL_SCOPE_COMMERCE_CONTROL,
+    )
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record admin audit event",
+        )
+    })?;
+    Ok(Json(refund))
 }

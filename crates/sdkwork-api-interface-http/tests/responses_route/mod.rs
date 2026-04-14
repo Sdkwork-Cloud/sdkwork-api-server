@@ -8,8 +8,8 @@ use serde_json::Value;
 use serial_test::serial;
 use sqlx::SqlitePool;
 use std::sync::{
-    Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
 };
 use std::time::{Duration, Instant};
 use tower::ServiceExt;

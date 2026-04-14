@@ -172,15 +172,13 @@ async fn stateless_images_routes_relay_to_openai_compatible_provider() {
     assert_eq!(edit_response.status(), StatusCode::OK);
     let edit_json = read_json(edit_response).await;
     assert_eq!(edit_json["data"][0]["b64_json"], "upstream-image");
-    assert!(
-        upstream_state
-            .content_type
-            .lock()
-            .unwrap()
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with("multipart/form-data; boundary=")
-    );
+    assert!(upstream_state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
     let edit_body = upstream_state.raw_body.lock().unwrap().clone().unwrap();
     let edit_body = String::from_utf8_lossy(&edit_body);
     assert!(edit_body.contains("relay edit"));
@@ -360,15 +358,13 @@ async fn stateful_images_edit_route_relays_multipart_to_openai_compatible_provid
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
-    assert!(
-        upstream_state
-            .content_type
-            .lock()
-            .unwrap()
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with("multipart/form-data; boundary=")
-    );
+    assert!(upstream_state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
     let raw_body = upstream_state.raw_body.lock().unwrap().clone().unwrap();
     let body = String::from_utf8_lossy(&raw_body);
     assert!(body.contains("relay edit"));
@@ -415,15 +411,13 @@ async fn stateful_images_variation_route_relays_multipart_to_openai_compatible_p
         upstream_state.authorization.lock().unwrap().as_deref(),
         Some("Bearer sk-upstream-openai")
     );
-    assert!(
-        upstream_state
-            .content_type
-            .lock()
-            .unwrap()
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with("multipart/form-data; boundary=")
-    );
+    assert!(upstream_state
+        .content_type
+        .lock()
+        .unwrap()
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("multipart/form-data; boundary="));
     let raw_body = upstream_state.raw_body.lock().unwrap().clone().unwrap();
     let body = String::from_utf8_lossy(&raw_body);
     assert!(body.contains("source.png"));

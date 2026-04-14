@@ -286,25 +286,15 @@ pub fn create_file(
     if request.filename.trim().is_empty() {
         bail!("File filename is required.");
     }
-    Ok(FileObject::with_bytes(
-        "file_1",
-        &request.filename,
-        &request.purpose,
-        request.bytes.len() as u64,
-    ))
+    bail!("Local file fallback is not supported without an upstream provider.")
 }
 
 pub fn list_files(_tenant_id: &str, _project_id: &str) -> Result<ListFilesResponse> {
-    Ok(ListFilesResponse::new(vec![FileObject::with_bytes(
-        "file_1",
-        "train.jsonl",
-        "fine-tune",
-        2,
-    )]))
+    bail!("Local file listing fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_file_exists(file_id: &str) -> Result<()> {
-    if file_id != "file_1" {
+    if !local_object_id_matches(file_id, "file") {
         bail!("file not found");
     }
 
@@ -313,12 +303,7 @@ fn ensure_local_file_exists(file_id: &str) -> Result<()> {
 
 pub fn get_file(_tenant_id: &str, _project_id: &str, file_id: &str) -> Result<FileObject> {
     ensure_local_file_exists(file_id)?;
-    Ok(FileObject::with_bytes(
-        file_id,
-        "train.jsonl",
-        "fine-tune",
-        2,
-    ))
+    bail!("file not found")
 }
 
 pub fn delete_file(
@@ -327,12 +312,12 @@ pub fn delete_file(
     file_id: &str,
 ) -> Result<DeleteFileResponse> {
     ensure_local_file_exists(file_id)?;
-    Ok(DeleteFileResponse::deleted(file_id))
+    bail!("file not found")
 }
 
 pub fn file_content(_tenant_id: &str, _project_id: &str, _file_id: &str) -> Result<Vec<u8>> {
     ensure_local_file_exists(_file_id)?;
-    Ok(b"{}".to_vec())
+    bail!("file not found")
 }
 
 pub fn create_upload(
@@ -340,14 +325,17 @@ pub fn create_upload(
     _project_id: &str,
     request: &CreateUploadRequest,
 ) -> Result<UploadObject> {
-    Ok(UploadObject::with_details(
-        "upload_1",
-        &request.filename,
-        &request.purpose,
-        &request.mime_type,
-        request.bytes,
-        vec![],
-    ))
+    if request.purpose.trim().is_empty() {
+        bail!("Upload purpose is required.");
+    }
+    if request.filename.trim().is_empty() {
+        bail!("Upload filename is required.");
+    }
+    if request.mime_type.trim().is_empty() {
+        bail!("Upload MIME type is required.");
+    }
+
+    bail!("Local upload fallback is not supported without an upstream provider.")
 }
 
 pub fn create_upload_part(
@@ -356,11 +344,11 @@ pub fn create_upload_part(
     request: &AddUploadPartRequest,
 ) -> Result<UploadPartObject> {
     ensure_local_upload_exists(&request.upload_id)?;
-    Ok(UploadPartObject::new("part_1", &request.upload_id))
+    bail!("Persisted local upload part state is required for local part creation.")
 }
 
 fn ensure_local_upload_exists(upload_id: &str) -> Result<()> {
-    if upload_id != "upload_1" {
+    if !local_object_id_matches(upload_id, "upload") {
         bail!("upload not found");
     }
 
@@ -373,24 +361,10 @@ pub fn complete_upload(
     request: &CompleteUploadRequest,
 ) -> Result<UploadObject> {
     ensure_local_upload_exists(&request.upload_id)?;
-    Ok(UploadObject::completed(
-        &request.upload_id,
-        "input.jsonl",
-        "batch",
-        "application/jsonl",
-        0,
-        request.part_ids.clone(),
-    ))
+    bail!("upload not found")
 }
 
 pub fn cancel_upload(_tenant_id: &str, _project_id: &str, upload_id: &str) -> Result<UploadObject> {
     ensure_local_upload_exists(upload_id)?;
-    Ok(UploadObject::cancelled(
-        upload_id,
-        "input.jsonl",
-        "batch",
-        "application/jsonl",
-        0,
-        vec![],
-    ))
+    bail!("upload not found")
 }

@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) async fn completions_handler(
+fn local_inference_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
+}
+
+pub(crate) async fn completions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateCompletionRequest>,
 ) -> Response {
@@ -8,20 +12,22 @@ pub(super) async fn completions_handler(
         .await
     {
         Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => Json(
-            create_completion(
+        Ok(None) => {
+            let response = match create_completion(
                 request_context.tenant_id(),
                 request_context.project_id(),
                 &request.model,
-            )
-            .expect("completion"),
-        )
-        .into_response(),
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_inference_error_response(error),
+            };
+            Json(response).into_response()
+        }
         Err(_) => bad_gateway_openai_response("failed to relay upstream completion"),
     }
 }
 
-pub(super) async fn embeddings_handler(
+pub(crate) async fn embeddings_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateEmbeddingRequest>,
 ) -> Response {
@@ -29,20 +35,22 @@ pub(super) async fn embeddings_handler(
         .await
     {
         Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => Json(
-            create_embedding(
+        Ok(None) => {
+            let response = match create_embedding(
                 request_context.tenant_id(),
                 request_context.project_id(),
                 &request.model,
-            )
-            .expect("embedding"),
-        )
-        .into_response(),
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_inference_error_response(error),
+            };
+            Json(response).into_response()
+        }
         Err(_) => bad_gateway_openai_response("failed to relay upstream embedding"),
     }
 }
 
-pub(super) async fn moderations_handler(
+pub(crate) async fn moderations_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateModerationRequest>,
 ) -> Response {
@@ -56,13 +64,14 @@ pub(super) async fn moderations_handler(
         }
     }
 
-    Json(
-        create_moderation(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        )
-        .expect("moderation"),
-    )
-    .into_response()
+    let response = match create_moderation(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_inference_error_response(error),
+    };
+
+    Json(response).into_response()
 }

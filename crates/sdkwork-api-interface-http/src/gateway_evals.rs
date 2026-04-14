@@ -13,10 +13,10 @@ async fn evals_handler(
     match create_eval(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.name,
+        &request,
     ) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => bad_gateway_openai_response(error.to_string()),
+        Err(error) => local_eval_not_found_response(error),
     }
 }
 
@@ -31,20 +31,24 @@ async fn evals_list_handler(request_context: StatelessGatewayRequest) -> Respons
 
     match list_evals(request_context.tenant_id(), request_context.project_id()) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => bad_gateway_openai_response(error.to_string()),
+        Err(error) => local_gateway_invalid_or_bad_gateway_response(error, "invalid_eval_request"),
     }
 }
 
 fn local_eval_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested eval was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_eval_request",
+        "Requested eval was not found.",
+    )
 }
 
 fn local_eval_run_not_found_response(error: anyhow::Error) -> Response {
-    if error
-        .to_string()
-        .to_ascii_lowercase()
-        .contains("eval run not found")
-    {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_eval_request");
+    }
+    if message.to_ascii_lowercase().contains("eval run not found") {
         return not_found_openai_response("Requested eval run was not found.");
     }
 
@@ -52,8 +56,11 @@ fn local_eval_run_not_found_response(error: anyhow::Error) -> Response {
 }
 
 fn local_eval_run_output_item_not_found_response(error: anyhow::Error) -> Response {
-    if error
-        .to_string()
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_eval_request");
+    }
+    if message
         .to_ascii_lowercase()
         .contains("eval run output item not found")
     {
@@ -130,10 +137,9 @@ async fn evals_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let eval_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.name.as_str());
+            let Some(eval_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream eval response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -165,10 +171,10 @@ async fn evals_with_state_handler(
     let response = match create_eval(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.name,
+        &request,
     ) {
         Ok(response) => response,
-        Err(error) => return bad_gateway_openai_response(error.to_string()),
+        Err(error) => return local_eval_not_found_response(error),
     };
 
     if record_gateway_usage_for_project_with_route_key(
@@ -236,7 +242,9 @@ async fn evals_list_with_state_handler(
 
     let response = match list_evals(request_context.tenant_id(), request_context.project_id()) {
         Ok(response) => response,
-        Err(error) => return bad_gateway_openai_response(error.to_string()),
+        Err(error) => {
+            return local_gateway_invalid_or_bad_gateway_response(error, "invalid_eval_request");
+        }
     };
 
     if record_gateway_usage_for_project(

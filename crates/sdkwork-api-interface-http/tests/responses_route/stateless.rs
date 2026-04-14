@@ -52,7 +52,9 @@ async fn responses_stream_route_returns_invalid_request_for_missing_model() {
                 .method("POST")
                 .uri("/v1/responses")
                 .header("content-type", "application/json")
-                .body(Body::from("{\"model\":\"\",\"input\":\"hi\",\"stream\":true}"))
+                .body(Body::from(
+                    "{\"model\":\"\",\"input\":\"hi\",\"stream\":true}",
+                ))
                 .unwrap(),
         )
         .await
@@ -102,7 +104,10 @@ async fn response_retrieve_route_returns_not_found_for_unknown_response() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested response was not found.");
+    assert_eq!(
+        json["error"]["message"],
+        "Requested response was not found."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
 }
@@ -144,7 +149,10 @@ async fn response_input_items_route_returns_not_found_for_unknown_response() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested response was not found.");
+    assert_eq!(
+        json["error"]["message"],
+        "Requested response was not found."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
 }
@@ -184,7 +192,10 @@ async fn response_delete_route_returns_not_found_for_unknown_response() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested response was not found.");
+    assert_eq!(
+        json["error"]["message"],
+        "Requested response was not found."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
 }
@@ -251,7 +262,10 @@ async fn response_cancel_route_returns_not_found_for_unknown_response() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested response was not found.");
+    assert_eq!(
+        json["error"]["message"],
+        "Requested response was not found."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "not_found");
 }
@@ -314,7 +328,10 @@ async fn response_compact_route_returns_invalid_request_for_missing_model() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Response compaction model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Response compaction model is required."
+    );
     assert_eq!(json["error"]["type"], "invalid_request_error");
     assert_eq!(json["error"]["code"], "invalid_model");
 }

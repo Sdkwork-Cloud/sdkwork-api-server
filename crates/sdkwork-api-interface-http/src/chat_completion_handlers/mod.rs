@@ -3,5 +3,5 @@ use super::*;
 mod completions;
 mod messages;
 
-pub(super) use self::completions::*;
-pub(super) use self::messages::*;
+pub(crate) use self::completions::*;
+pub(crate) use self::messages::*;

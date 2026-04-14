@@ -1,4 +1,4 @@
-#[path = "gateway_openapi_paths_models_chat.rs"]
+﻿#[path = "gateway_openapi_paths_models_chat.rs"]
 mod paths_models_chat;
 #[path = "gateway_openapi_paths_media.rs"]
 mod paths_media;
@@ -68,12 +68,12 @@ impl Modify for GatewayApiDocModifier {
 
 
 mod openapi_paths {
-    pub(super) use super::paths_assistants_threads::*;
-    pub(super) use super::paths_files_batches::*;
-    pub(super) use super::paths_market_commercial::*;
-    pub(super) use super::paths_media::*;
-    pub(super) use super::paths_models_chat::*;
-    pub(super) use super::paths_vector_compat::*;
+    pub(crate) use super::paths_assistants_threads::*;
+    pub(crate) use super::paths_files_batches::*;
+    pub(crate) use super::paths_market_commercial::*;
+    pub(crate) use super::paths_media::*;
+    pub(crate) use super::paths_models_chat::*;
+    pub(crate) use super::paths_vector_compat::*;
 }
 
 fn gateway_openapi() -> utoipa::openapi::OpenApi {
@@ -292,4 +292,5 @@ where
             SwaggerUiUrl::with_primary("SDKWORK Gateway API", "/openapi.json", true),
         ])))
 }
+
 

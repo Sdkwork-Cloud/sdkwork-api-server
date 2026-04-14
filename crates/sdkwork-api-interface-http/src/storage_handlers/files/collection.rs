@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn files_with_state_handler(
+fn local_file_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_file",
+        "Requested file was not found.",
+    )
+}
+
+pub(crate) async fn files_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     multipart: Multipart,
@@ -20,10 +28,9 @@ pub(super) async fn files_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let file_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.purpose.as_str());
+            let Some(file_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream file response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -52,12 +59,14 @@ pub(super) async fn files_with_state_handler(
         }
     }
 
-    let response = create_file(
+    let response = match create_file(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("file");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -82,7 +91,7 @@ pub(super) async fn files_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn files_list_with_state_handler(
+pub(crate) async fn files_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
@@ -122,6 +131,11 @@ pub(super) async fn files_list_with_state_handler(
         }
     }
 
+    let response = match list_files(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_file_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -141,6 +155,5 @@ pub(super) async fn files_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_files(request_context.tenant_id(), request_context.project_id()).expect("files list"))
-        .into_response()
+    Json(response).into_response()
 }

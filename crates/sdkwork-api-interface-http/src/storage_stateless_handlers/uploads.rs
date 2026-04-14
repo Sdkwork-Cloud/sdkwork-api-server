@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn uploads_handler(
+fn local_upload_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_upload_request",
+        "Requested upload was not found.",
+    )
+}
+
+pub(crate) async fn uploads_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateUploadRequest>,
 ) -> Response {
@@ -12,18 +20,19 @@ pub(super) async fn uploads_handler(
         }
     }
 
-    Json(
-        create_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("upload"),
-    )
-    .into_response()
+    let response = match create_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn upload_parts_handler(
+pub(crate) async fn upload_parts_handler(
     request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
     multipart: Multipart,
@@ -43,21 +52,22 @@ pub(super) async fn upload_parts_handler(
                 }
             }
 
-            Json(
-                create_upload_part(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request,
-                )
-                .expect("upload part"),
-            )
-            .into_response()
+            let response = match create_upload_part(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_upload_error_response(error),
+            };
+
+            Json(response).into_response()
         }
         Err(response) => response,
     }
 }
 
-pub(super) async fn upload_complete_handler(
+pub(crate) async fn upload_complete_handler(
     request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
     ExtractJson(mut request): ExtractJson<CompleteUploadRequest>,
@@ -73,18 +83,19 @@ pub(super) async fn upload_complete_handler(
         }
     }
 
-    Json(
-        complete_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("upload complete"),
-    )
-    .into_response()
+    let response = match complete_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn upload_cancel_handler(
+pub(crate) async fn upload_cancel_handler(
     request_context: StatelessGatewayRequest,
     Path(upload_id): Path<String>,
 ) -> Response {
@@ -98,13 +109,14 @@ pub(super) async fn upload_cancel_handler(
         }
     }
 
-    Json(
-        cancel_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &upload_id,
-        )
-        .expect("upload cancel"),
-    )
-    .into_response()
+    let response = match cancel_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &upload_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+
+    Json(response).into_response()
 }

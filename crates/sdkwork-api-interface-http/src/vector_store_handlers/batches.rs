@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn vector_store_file_batches_with_state_handler(
+fn local_vector_store_file_batch_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store file batch was not found.",
+    )
+}
+
+pub(crate) async fn vector_store_file_batches_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(vector_store_id): Path<String>,
@@ -17,10 +25,11 @@ pub(super) async fn vector_store_file_batches_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let batch_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(vector_store_id.as_str());
+            let Some(batch_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream vector store file batch response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,13 +56,15 @@ pub(super) async fn vector_store_file_batches_with_state_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store file batch");
         }
     }
-    let response = create_vector_store_file_batch(
+    let response = match create_vector_store_file_batch(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
         &request.file_ids,
-    )
-    .expect("vector store file batch");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_batch_error_response(error),
+    };
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -76,7 +87,7 @@ pub(super) async fn vector_store_file_batches_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn vector_store_file_batch_retrieve_with_state_handler(
+pub(crate) async fn vector_store_file_batch_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
@@ -120,6 +131,16 @@ pub(super) async fn vector_store_file_batch_retrieve_with_state_handler(
             );
         }
     }
+    let response = match get_vector_store_file_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_batch_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -139,19 +160,11 @@ pub(super) async fn vector_store_file_batch_retrieve_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        get_vector_store_file_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &batch_id,
-        )
-        .expect("vector store file batch retrieve"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }
 
-pub(super) async fn vector_store_file_batch_cancel_with_state_handler(
+pub(crate) async fn vector_store_file_batch_cancel_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
@@ -195,6 +208,16 @@ pub(super) async fn vector_store_file_batch_cancel_with_state_handler(
             );
         }
     }
+    let response = match cancel_vector_store_file_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_batch_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -214,19 +237,11 @@ pub(super) async fn vector_store_file_batch_cancel_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        cancel_vector_store_file_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &batch_id,
-        )
-        .expect("vector store file batch cancel"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }
 
-pub(super) async fn vector_store_file_batch_files_with_state_handler(
+pub(crate) async fn vector_store_file_batch_files_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path((vector_store_id, batch_id)): Path<(String, String)>,
@@ -270,6 +285,16 @@ pub(super) async fn vector_store_file_batch_files_with_state_handler(
             );
         }
     }
+    let response = match list_vector_store_file_batch_files(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &batch_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_batch_error_response(error),
+    };
+
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -289,14 +314,6 @@ pub(super) async fn vector_store_file_batch_files_with_state_handler(
         )
             .into_response();
     }
-    Json(
-        list_vector_store_file_batch_files(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &batch_id,
-        )
-        .expect("vector store file batch files"),
-    )
-    .into_response()
+
+    Json(response).into_response()
 }

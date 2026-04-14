@@ -16,16 +16,15 @@ async fn vector_store_files_handler(
         }
     }
 
-    Json(
-        create_vector_store_file(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &request.file_id,
-        )
-        .expect("vector store file"),
-    )
-    .into_response()
+    match create_vector_store_file(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &request.file_id,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_file_not_found_response(error),
+    }
 }
 
 async fn vector_store_files_list_handler(
@@ -45,15 +44,14 @@ async fn vector_store_files_list_handler(
         }
     }
 
-    Json(
-        list_vector_store_files(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-        )
-        .expect("vector store files list"),
-    )
-    .into_response()
+    match list_vector_store_files(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_file_not_found_response(error),
+    }
 }
 
 async fn vector_store_file_retrieve_handler(
@@ -128,16 +126,15 @@ async fn vector_store_file_batches_handler(
         }
     }
 
-    Json(
-        create_vector_store_file_batch(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-            &request.file_ids,
-        )
-        .expect("vector store file batch"),
-    )
-    .into_response()
+    match create_vector_store_file_batch(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+        &request.file_ids,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => local_vector_store_file_batch_not_found_response(error),
+    }
 }
 
 async fn vector_store_file_batch_retrieve_handler(
@@ -223,7 +220,11 @@ async fn vector_store_file_batch_files_handler(
 
 
 fn local_vector_store_file_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested vector store file was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store file was not found.",
+    )
 }
 
 fn local_vector_store_file_retrieve_result(
@@ -271,7 +272,11 @@ fn local_vector_store_file_delete_response(
 }
 
 fn local_vector_store_file_batch_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested vector store file batch was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_vector_store_request",
+        "Requested vector store file batch was not found.",
+    )
 }
 
 fn local_vector_store_file_batch_retrieve_result(
@@ -373,8 +378,11 @@ async fn vector_store_files_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let usage_model = response_usage_id_or_single_data_item_id(&response)
-                .unwrap_or(request.file_id.as_str());
+            let Some(usage_model) = response_usage_id_or_single_data_item_id(&response) else {
+                return bad_gateway_openai_response(
+                    "upstream vector store file response missing usage id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -403,13 +411,15 @@ async fn vector_store_files_with_state_handler(
         }
     }
 
-    let response = create_vector_store_file(
+    let response = match create_vector_store_file(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
         &request.file_id,
-    )
-    .expect("vector store file");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_not_found_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -495,15 +505,16 @@ async fn vector_store_files_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_vector_store_files(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &vector_store_id,
-        )
-        .expect("vector store files list"),
-    )
-    .into_response()
+    let response = match list_vector_store_files(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &vector_store_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_not_found_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn vector_store_file_retrieve_with_state_handler(
@@ -681,10 +692,11 @@ async fn vector_store_file_batches_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let batch_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(vector_store_id.as_str());
+            let Some(batch_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response(
+                    "upstream vector store file batch response missing id",
+                );
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -713,13 +725,15 @@ async fn vector_store_file_batches_with_state_handler(
         }
     }
 
-    let response = create_vector_store_file_batch(
+    let response = match create_vector_store_file_batch(
         request_context.tenant_id(),
         request_context.project_id(),
         &vector_store_id,
         &request.file_ids,
-    )
-    .expect("vector store file batch");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_vector_store_file_batch_not_found_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),

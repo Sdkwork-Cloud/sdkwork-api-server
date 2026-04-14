@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn containers_with_state_handler(
+fn local_container_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_container_request",
+        "Requested container was not found.",
+    )
+}
+
+pub(crate) async fn containers_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateContainerRequest>,
@@ -15,10 +23,9 @@ pub(super) async fn containers_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let container_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.name.as_str());
+            let Some(container_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream container response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,12 +54,14 @@ pub(super) async fn containers_with_state_handler(
         }
     }
 
-    let response = sdkwork_api_app_gateway::create_container(
+    let response = match sdkwork_api_app_gateway::create_container(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("container");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -77,7 +86,7 @@ pub(super) async fn containers_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn containers_list_with_state_handler(
+pub(crate) async fn containers_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
@@ -117,6 +126,14 @@ pub(super) async fn containers_list_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::list_containers(
+        request_context.tenant_id(),
+        request_context.project_id(),
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -136,17 +153,10 @@ pub(super) async fn containers_list_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::list_containers(
-            request_context.tenant_id(),
-            request_context.project_id(),
-        )
-        .expect("containers list"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn container_retrieve_with_state_handler(
+pub(crate) async fn container_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(container_id): Path<String>,
@@ -188,6 +198,15 @@ pub(super) async fn container_retrieve_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::get_container(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -207,18 +226,10 @@ pub(super) async fn container_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::get_container(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-        )
-        .expect("container retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn container_delete_with_state_handler(
+pub(crate) async fn container_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(container_id): Path<String>,
@@ -260,6 +271,15 @@ pub(super) async fn container_delete_with_state_handler(
         }
     }
 
+    let response = match sdkwork_api_app_gateway::delete_container(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &container_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_container_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -279,13 +299,5 @@ pub(super) async fn container_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        sdkwork_api_app_gateway::delete_container(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &container_id,
-        )
-        .expect("container delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

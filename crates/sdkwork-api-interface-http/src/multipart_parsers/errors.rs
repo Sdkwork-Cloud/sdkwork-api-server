@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn bad_multipart(error: axum::extract::multipart::MultipartError) -> Response {
+pub(crate) fn bad_multipart(error: axum::extract::multipart::MultipartError) -> Response {
     (
         axum::http::StatusCode::BAD_REQUEST,
         format!("invalid multipart payload: {error}"),
@@ -8,7 +8,7 @@ pub(super) fn bad_multipart(error: axum::extract::multipart::MultipartError) -> 
         .into_response()
 }
 
-pub(super) fn missing_multipart_field() -> Response {
+pub(crate) fn missing_multipart_field() -> Response {
     (
         axum::http::StatusCode::BAD_REQUEST,
         "missing multipart field",

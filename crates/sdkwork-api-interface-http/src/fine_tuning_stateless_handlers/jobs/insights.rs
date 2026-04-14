@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn fine_tuning_job_events_handler(
+fn local_fine_tuning_job_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning job was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_job_events_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
@@ -17,18 +25,19 @@ pub(super) async fn fine_tuning_job_events_handler(
         }
     }
 
-    Json(
-        list_fine_tuning_job_events(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning job events"),
-    )
-    .into_response()
+    let response = match list_fine_tuning_job_events(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_checkpoints_handler(
+pub(crate) async fn fine_tuning_job_checkpoints_handler(
     request_context: StatelessGatewayRequest,
     Path(fine_tuning_job_id): Path<String>,
 ) -> Response {
@@ -47,13 +56,14 @@ pub(super) async fn fine_tuning_job_checkpoints_handler(
         }
     }
 
-    Json(
-        list_fine_tuning_job_checkpoints(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning job checkpoints"),
-    )
-    .into_response()
+    let response = match list_fine_tuning_job_checkpoints(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
+    Json(response).into_response()
 }

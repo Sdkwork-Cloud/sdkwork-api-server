@@ -1,8 +1,11 @@
-use super::auth_utils::{enforce_gateway_request_rate_limit, extract_compat_gateway_token};
+use super::auth_utils::{
+    enforce_gateway_request_rate_limit, extract_compat_gateway_token,
+    resolve_authenticated_gateway_request_context,
+};
 use super::*;
 
 #[derive(Clone, Debug)]
-pub(super) struct AuthenticatedGatewayRequest(IdentityGatewayRequestContext);
+pub(crate) struct AuthenticatedGatewayRequest(IdentityGatewayRequestContext);
 
 impl AuthenticatedGatewayRequest {
     pub(crate) fn tenant_id(&self) -> &str {
@@ -11,6 +14,10 @@ impl AuthenticatedGatewayRequest {
 
     pub(crate) fn project_id(&self) -> &str {
         self.0.project_id()
+    }
+
+    pub(crate) fn context(&self) -> &IdentityGatewayRequestContext {
+        &self.0
     }
 }
 
@@ -41,7 +48,7 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
 
-            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), token)
+            let Some(context) = resolve_authenticated_gateway_request_context(state, token)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
             else {
@@ -62,7 +69,7 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct CompatAuthenticatedGatewayRequest(IdentityGatewayRequestContext);
+pub(crate) struct CompatAuthenticatedGatewayRequest(IdentityGatewayRequestContext);
 
 impl CompatAuthenticatedGatewayRequest {
     pub(crate) fn tenant_id(&self) -> &str {
@@ -71,6 +78,10 @@ impl CompatAuthenticatedGatewayRequest {
 
     pub(crate) fn project_id(&self) -> &str {
         self.0.project_id()
+    }
+
+    pub(crate) fn context(&self) -> &IdentityGatewayRequestContext {
+        &self.0
     }
 }
 
@@ -92,7 +103,7 @@ impl FromRequestParts<GatewayApiState> for CompatAuthenticatedGatewayRequest {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
 
-            let Some(context) = resolve_gateway_request_context(state.store.as_ref(), &token)
+            let Some(context) = resolve_authenticated_gateway_request_context(state, &token)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?
             else {

@@ -4,6 +4,6 @@ mod binary;
 mod errors;
 mod streams;
 
-pub(super) use self::binary::*;
-pub(super) use self::errors::*;
-pub(super) use self::streams::*;
+pub(crate) use self::binary::*;
+pub(crate) use self::errors::*;
+pub(crate) use self::streams::*;

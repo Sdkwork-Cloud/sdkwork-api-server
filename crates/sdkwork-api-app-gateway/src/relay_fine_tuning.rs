@@ -336,13 +336,20 @@ pub async fn relay_delete_fine_tuning_checkpoint_permission_from_store(
 pub fn create_fine_tuning_job(
     _tenant_id: &str,
     _project_id: &str,
-    model: &str,
+    request: &CreateFineTuningJobRequest,
 ) -> Result<FineTuningJobObject> {
-    Ok(FineTuningJobObject::new("ftjob_1", model))
+    if request.model.trim().is_empty() {
+        bail!("Fine tuning model is required.");
+    }
+    if !local_object_id_matches(&request.training_file, "file") {
+        bail!("A local training file id is required for local fine tuning fallback.");
+    }
+
+    bail!("Local fine-tuning job fallback is not supported without an upstream provider.")
 }
 
 fn ensure_local_fine_tuning_job_exists(job_id: &str) -> Result<()> {
-    if job_id != "ftjob_1" {
+    if !local_object_id_matches(job_id, "ftjob") {
         bail!("fine tuning job not found");
     }
 
@@ -350,7 +357,7 @@ fn ensure_local_fine_tuning_job_exists(job_id: &str) -> Result<()> {
 }
 
 fn ensure_local_fine_tuning_checkpoint_exists(checkpoint_id: &str) -> Result<()> {
-    if checkpoint_id != "ft:gpt-4.1-mini:checkpoint-1" {
+    if !local_object_id_matches(checkpoint_id, "ftckpt") {
         bail!("fine tuning checkpoint not found");
     }
 
@@ -362,7 +369,7 @@ fn ensure_local_fine_tuning_checkpoint_permission_exists(
     permission_id: &str,
 ) -> Result<()> {
     ensure_local_fine_tuning_checkpoint_exists(checkpoint_id)?;
-    if permission_id != "perm_1" {
+    if !local_object_id_matches(permission_id, "perm") {
         bail!("fine tuning checkpoint permission not found");
     }
 
@@ -373,9 +380,7 @@ pub fn list_fine_tuning_jobs(
     _tenant_id: &str,
     _project_id: &str,
 ) -> Result<ListFineTuningJobsResponse> {
-    Ok(ListFineTuningJobsResponse::new(vec![
-        FineTuningJobObject::new("ftjob_1", "gpt-4.1-mini"),
-    ]))
+    bail!("Local fine-tuning job listing fallback is not supported without an upstream provider.")
 }
 
 pub fn get_fine_tuning_job(
@@ -384,7 +389,7 @@ pub fn get_fine_tuning_job(
     job_id: &str,
 ) -> Result<FineTuningJobObject> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(FineTuningJobObject::new(job_id, "gpt-4.1-mini"))
+    bail!("fine tuning job not found")
 }
 
 pub fn cancel_fine_tuning_job(
@@ -393,7 +398,7 @@ pub fn cancel_fine_tuning_job(
     job_id: &str,
 ) -> Result<FineTuningJobObject> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(FineTuningJobObject::cancelled(job_id, "gpt-4.1-mini"))
+    bail!("fine tuning job not found")
 }
 
 pub fn list_fine_tuning_job_events(
@@ -402,9 +407,7 @@ pub fn list_fine_tuning_job_events(
     job_id: &str,
 ) -> Result<ListFineTuningJobEventsResponse> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(ListFineTuningJobEventsResponse::new(vec![
-        FineTuningJobEventObject::new("ftevent_1", "info", "job queued"),
-    ]))
+    bail!("Persisted local fine tuning job event state is required for local event listing.")
 }
 
 pub fn list_fine_tuning_job_checkpoints(
@@ -413,9 +416,7 @@ pub fn list_fine_tuning_job_checkpoints(
     job_id: &str,
 ) -> Result<ListFineTuningJobCheckpointsResponse> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(ListFineTuningJobCheckpointsResponse::new(vec![
-        FineTuningJobCheckpointObject::new("ftckpt_1", "ft:gpt-4.1-mini:checkpoint-1"),
-    ]))
+    bail!("Persisted local fine tuning checkpoint state is required for local checkpoint listing.")
 }
 
 pub fn pause_fine_tuning_job(
@@ -424,7 +425,7 @@ pub fn pause_fine_tuning_job(
     job_id: &str,
 ) -> Result<FineTuningJobObject> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(FineTuningJobObject::paused(job_id, "gpt-4.1-mini"))
+    bail!("fine tuning job not found")
 }
 
 pub fn resume_fine_tuning_job(
@@ -433,7 +434,7 @@ pub fn resume_fine_tuning_job(
     job_id: &str,
 ) -> Result<FineTuningJobObject> {
     ensure_local_fine_tuning_job_exists(job_id)?;
-    Ok(FineTuningJobObject::running(job_id, "gpt-4.1-mini"))
+    bail!("fine tuning job not found")
 }
 
 pub fn create_fine_tuning_checkpoint_permissions(
@@ -443,14 +444,19 @@ pub fn create_fine_tuning_checkpoint_permissions(
     request: &CreateFineTuningCheckpointPermissionsRequest,
 ) -> Result<ListFineTuningCheckpointPermissionsResponse> {
     ensure_local_fine_tuning_checkpoint_exists(checkpoint_id)?;
-    let project_id = request
+    let project_ids = request
         .project_ids
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "project-2".to_owned());
-    Ok(ListFineTuningCheckpointPermissionsResponse::new(vec![
-        FineTuningCheckpointPermissionObject::new("perm_1", project_id),
-    ]))
+        .iter()
+        .map(|project_id| project_id.trim())
+        .filter(|project_id| !project_id.is_empty())
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if project_ids.is_empty() {
+        bail!("At least one project id is required.");
+    }
+
+    let _ = project_ids;
+    bail!("Persisted local fine tuning checkpoint permission state is required for local permission creation.")
 }
 
 pub fn list_fine_tuning_checkpoint_permissions(
@@ -459,9 +465,7 @@ pub fn list_fine_tuning_checkpoint_permissions(
     checkpoint_id: &str,
 ) -> Result<ListFineTuningCheckpointPermissionsResponse> {
     ensure_local_fine_tuning_checkpoint_exists(checkpoint_id)?;
-    Ok(ListFineTuningCheckpointPermissionsResponse::new(vec![
-        FineTuningCheckpointPermissionObject::new("perm_1", "project-2"),
-    ]))
+    bail!("Persisted local fine tuning checkpoint permission state is required for local permission listing.")
 }
 
 pub fn delete_fine_tuning_checkpoint_permission(
@@ -471,7 +475,5 @@ pub fn delete_fine_tuning_checkpoint_permission(
     permission_id: &str,
 ) -> Result<DeleteFineTuningCheckpointPermissionResponse> {
     ensure_local_fine_tuning_checkpoint_permission_exists(checkpoint_id, permission_id)?;
-    Ok(DeleteFineTuningCheckpointPermissionResponse::deleted(
-        permission_id,
-    ))
+    bail!("fine tuning checkpoint permission not found")
 }

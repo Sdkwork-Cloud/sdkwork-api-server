@@ -7,9 +7,9 @@ use sdkwork_api_app_credential::{
 use sdkwork_api_app_gateway::{
     planned_execution_provider_context_for_route_without_log,
     relay_chat_completion_from_planned_execution_context_with_options,
-    relay_chat_completion_from_store_with_execution_context, with_request_routing_region,
+    relay_chat_completion_from_store_with_execution_context,
     relay_count_response_input_tokens_from_planned_execution_context,
-    relay_response_from_store_with_execution_context,
+    relay_response_from_store_with_execution_context, with_request_routing_region,
 };
 use sdkwork_api_app_routing::persist_routing_policy;
 use sdkwork_api_contract_openai::chat_completions::{
@@ -410,7 +410,12 @@ async fn planned_chat_execution_uses_selected_provider_account_runtime_binding()
     .expect("planned relay response");
 
     assert_eq!(response["id"], "chatcmpl_us_east_account");
-    assert!(default_upstream.state.authorization.lock().unwrap().is_none());
+    assert!(default_upstream
+        .state
+        .authorization
+        .lock()
+        .unwrap()
+        .is_none());
     assert_eq!(
         us_east_upstream
             .state
@@ -456,7 +461,12 @@ async fn direct_chat_relay_uses_selected_provider_account_runtime_binding() {
 
     let response = result.response.expect("direct relay response");
     assert_eq!(response["id"], "chatcmpl_us_east_account");
-    assert!(default_upstream.state.authorization.lock().unwrap().is_none());
+    assert!(default_upstream
+        .state
+        .authorization
+        .lock()
+        .unwrap()
+        .is_none());
     assert_eq!(
         us_east_upstream
             .state
@@ -501,7 +511,12 @@ async fn direct_response_relay_uses_selected_provider_account_runtime_binding() 
 
     let response = result.response.expect("direct response relay");
     assert_eq!(response["id"], "resp_us_east_account");
-    assert!(default_upstream.state.authorization.lock().unwrap().is_none());
+    assert!(default_upstream
+        .state
+        .authorization
+        .lock()
+        .unwrap()
+        .is_none());
     assert_eq!(
         us_east_upstream
             .state
@@ -559,7 +574,12 @@ async fn planned_response_input_tokens_uses_selected_provider_account_runtime_bi
 
     assert_eq!(response["object"], "response.input_tokens");
     assert_eq!(response["input_tokens"], 21);
-    assert!(default_upstream.state.authorization.lock().unwrap().is_none());
+    assert!(default_upstream
+        .state
+        .authorization
+        .lock()
+        .unwrap()
+        .is_none());
     assert_eq!(
         us_east_upstream
             .state

@@ -1,5 +1,17 @@
+fn local_upload_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_upload_request",
+        "Requested upload was not found.",
+    )
+}
+
 fn local_upload_not_found_response(error: anyhow::Error) -> Response {
-    local_gateway_error_response(error, "Requested upload session was not found.")
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_upload_request",
+        "Requested upload session was not found.",
+    )
 }
 
 fn local_upload_part_result(
@@ -67,15 +79,16 @@ async fn uploads_handler(
         }
     }
 
-    Json(
-        create_upload(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request,
-        )
-        .expect("upload"),
-    )
-    .into_response()
+    let response = match create_upload(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
 async fn upload_parts_handler(
@@ -168,10 +181,9 @@ async fn uploads_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let upload_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.purpose.as_str());
+            let Some(upload_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream upload response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -200,12 +212,14 @@ async fn uploads_with_state_handler(
         }
     }
 
-    let response = create_upload(
+    let response = match create_upload(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
-    )
-    .expect("upload");
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_upload_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -251,10 +265,9 @@ async fn upload_parts_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let part_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.upload_id.as_str());
+            let Some(part_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream upload part response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),

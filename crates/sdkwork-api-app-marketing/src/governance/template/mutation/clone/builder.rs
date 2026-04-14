@@ -1,7 +1,7 @@
 use super::super::super::super::{normalize_optional_display_name, unix_timestamp_ms};
 use super::super::super::lookup::{coupon_template_root_id, next_coupon_template_revision};
 use super::super::super::types::CloneCouponTemplateRevisionInput;
-use super::super::super::MarketingGovernanceError;
+use crate::MarketingGovernanceError;
 use sdkwork_api_domain_marketing::{
     CouponTemplateApprovalState, CouponTemplateRecord, CouponTemplateStatus,
 };

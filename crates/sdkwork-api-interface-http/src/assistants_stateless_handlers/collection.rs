@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn assistants_handler(
+fn local_assistant_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_assistant_request",
+        "Requested assistant was not found.",
+    )
+}
+
+pub(crate) async fn assistants_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateAssistantRequest>,
 ) -> Response {
@@ -14,19 +22,20 @@ pub(super) async fn assistants_handler(
         }
     }
 
-    Json(
-        create_assistant(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.name,
-            &request.model,
-        )
-        .expect("assistant"),
-    )
-    .into_response()
+    let response = match create_assistant(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &request.name,
+        &request.model,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_assistant_error_response(error),
+    };
+
+    Json(response).into_response()
 }
 
-pub(super) async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Response {
+pub(crate) async fn assistants_list_handler(request_context: StatelessGatewayRequest) -> Response {
     match relay_stateless_json_request(&request_context, ProviderRequest::AssistantsList).await {
         Ok(Some(response)) => return Json(response).into_response(),
         Ok(None) => {}
@@ -35,9 +44,11 @@ pub(super) async fn assistants_list_handler(request_context: StatelessGatewayReq
         }
     }
 
-    Json(
-        list_assistants(request_context.tenant_id(), request_context.project_id())
-            .expect("assistants list"),
-    )
-    .into_response()
+    let response = match list_assistants(request_context.tenant_id(), request_context.project_id())
+    {
+        Ok(response) => response,
+        Err(error) => return local_assistant_error_response(error),
+    };
+
+    Json(response).into_response()
 }

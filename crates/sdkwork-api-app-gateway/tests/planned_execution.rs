@@ -423,12 +423,16 @@ async fn planned_chat_execution_fails_over_when_selected_provider_is_missing() {
         .await
         .unwrap();
 
-    let policy = RoutingPolicy::new("policy-priority-missing-provider", "chat_completion", "gpt-4.1")
-        .with_priority(100)
-        .with_ordered_provider_ids(vec![
-            "provider-primary-missing".to_owned(),
-            "provider-backup".to_owned(),
-        ]);
+    let policy = RoutingPolicy::new(
+        "policy-priority-missing-provider",
+        "chat_completion",
+        "gpt-4.1",
+    )
+    .with_priority(100)
+    .with_ordered_provider_ids(vec![
+        "provider-primary-missing".to_owned(),
+        "provider-backup".to_owned(),
+    ]);
     persist_routing_policy(&store, &policy).await.unwrap();
 
     let planned = planned_execution_provider_context_for_route_without_log(

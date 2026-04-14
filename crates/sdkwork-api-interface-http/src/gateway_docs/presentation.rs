@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn gateway_tag_for_path(path: &str) -> String {
+pub(crate) fn gateway_tag_for_path(path: &str) -> String {
     match path {
         "/metrics" | "/health" => "system".to_owned(),
         "/docs" | "/openapi.json" => "docs".to_owned(),
@@ -15,11 +15,11 @@ pub(super) fn gateway_tag_for_path(path: &str) -> String {
     }
 }
 
-pub(super) fn gateway_route_requires_bearer_auth(path: &str, _method: HttpMethod) -> bool {
-    path.starts_with("/v1/") || path.starts_with("/v1beta/")
+pub(crate) fn gateway_route_requires_bearer_auth(path: &str, _method: HttpMethod) -> bool {
+    path == "/metrics" || path.starts_with("/v1/") || path.starts_with("/v1beta/")
 }
 
-pub(super) fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
+pub(crate) fn gateway_operation_summary(path: &str, method: HttpMethod) -> String {
     match path {
         "/metrics" => "Prometheus metrics".to_owned(),
         "/health" => "Health check".to_owned(),
@@ -42,7 +42,7 @@ pub(super) fn gateway_operation_summary(path: &str, method: HttpMethod) -> Strin
     }
 }
 
-pub(super) fn browser_cors_layer() -> CorsLayer {
+pub(crate) fn browser_cors_layer() -> CorsLayer {
     CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)

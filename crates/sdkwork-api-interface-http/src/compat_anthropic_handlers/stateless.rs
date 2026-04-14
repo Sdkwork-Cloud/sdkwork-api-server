@@ -1,6 +1,19 @@
 use super::*;
 
-pub(super) async fn anthropic_messages_handler(
+fn local_anthropic_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return anthropic_invalid_request_response(message);
+    }
+
+    anthropic_bad_gateway_response("failed to process local anthropic fallback")
+}
+
+fn local_anthropic_encoding_error_response() -> Response {
+    anthropic_bad_gateway_response("failed to encode local anthropic response")
+}
+
+pub(crate) async fn anthropic_messages_handler(
     request_context: StatelessGatewayRequest,
     headers: HeaderMap,
     ExtractJson(payload): ExtractJson<Value>,
@@ -22,7 +35,11 @@ pub(super) async fn anthropic_messages_handler(
             Ok(Some(response)) => {
                 return upstream_passthrough_response(anthropic_stream_from_openai(response));
             }
-            Ok(None) => return local_anthropic_stream_response(&request.model),
+            Ok(None) => {
+                return anthropic_invalid_request_response(
+                    "Local anthropic message streaming fallback is not supported without an upstream provider.",
+                );
+            }
             Err(_) => {
                 return anthropic_bad_gateway_response(
                     "failed to relay upstream anthropic message stream",
@@ -39,23 +56,26 @@ pub(super) async fn anthropic_messages_handler(
     .await
     {
         Ok(Some(response)) => Json(openai_chat_response_to_anthropic(&response)).into_response(),
-        Ok(None) => Json(openai_chat_response_to_anthropic(
-            &serde_json::to_value(
-                create_chat_completion(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request.model,
-                )
-                .expect("chat completion"),
-            )
-            .expect("chat completion value"),
-        ))
-        .into_response(),
+        Ok(None) => {
+            let response = match create_chat_completion(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_anthropic_error_response(error),
+            };
+            let response_value = match serde_json::to_value(response) {
+                Ok(value) => value,
+                Err(_) => return local_anthropic_encoding_error_response(),
+            };
+            Json(openai_chat_response_to_anthropic(&response_value)).into_response()
+        }
         Err(_) => anthropic_bad_gateway_response("failed to relay upstream anthropic message"),
     }
 }
 
-pub(super) async fn anthropic_count_tokens_handler(
+pub(crate) async fn anthropic_count_tokens_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(payload): ExtractJson<Value>,
 ) -> Response {
@@ -71,18 +91,21 @@ pub(super) async fn anthropic_count_tokens_handler(
     .await
     {
         Ok(Some(response)) => Json(openai_count_tokens_to_anthropic(&response)).into_response(),
-        Ok(None) => Json(openai_count_tokens_to_anthropic(
-            &serde_json::to_value(
-                count_response_input_tokens(
-                    request_context.tenant_id(),
-                    request_context.project_id(),
-                    &request.model,
-                )
-                .expect("response input tokens"),
-            )
-            .expect("response input token value"),
-        ))
-        .into_response(),
+        Ok(None) => {
+            let response = match count_response_input_tokens(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            ) {
+                Ok(response) => response,
+                Err(error) => return local_anthropic_error_response(error),
+            };
+            let response_value = match serde_json::to_value(response) {
+                Ok(value) => value,
+                Err(_) => return local_anthropic_encoding_error_response(),
+            };
+            Json(openai_count_tokens_to_anthropic(&response_value)).into_response()
+        }
         Err(_) => anthropic_bad_gateway_response(
             "failed to relay upstream anthropic count tokens request",
         ),

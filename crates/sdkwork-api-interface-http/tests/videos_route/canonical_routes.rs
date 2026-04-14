@@ -16,7 +16,10 @@ async fn stateless_videos_canonical_routes_relay_to_openai_compatible_provider()
             get(upstream_video_character_canonical_retrieve_handler),
         )
         .route("/v1/videos/edits", post(upstream_video_edit_handler))
-        .route("/v1/videos/extensions", post(upstream_video_extensions_handler))
+        .route(
+            "/v1/videos/extensions",
+            post(upstream_video_extensions_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {
@@ -120,7 +123,10 @@ async fn stateful_videos_canonical_routes_relay_to_openai_compatible_provider() 
             get(upstream_video_character_canonical_retrieve_handler),
         )
         .route("/v1/videos/edits", post(upstream_video_edit_handler))
-        .route("/v1/videos/extensions", post(upstream_video_extensions_handler))
+        .route(
+            "/v1/videos/extensions",
+            post(upstream_video_extensions_handler),
+        )
         .with_state(upstream_state.clone());
 
     tokio::spawn(async move {

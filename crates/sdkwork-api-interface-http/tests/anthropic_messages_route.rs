@@ -146,7 +146,10 @@ async fn stateless_anthropic_messages_route_returns_invalid_request_for_missing_
     let json = read_json(response).await;
     assert_eq!(json["type"], "error");
     assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 }
 
 #[serial]
@@ -305,7 +308,8 @@ async fn stateless_anthropic_messages_route_passthroughs_native_anthropic_protoc
 #[tokio::test]
 async fn stateless_anthropic_messages_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime(
 ) {
-    let _fixture = support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stateless");
+    let _fixture =
+        support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stateless");
 
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
@@ -900,12 +904,15 @@ async fn stateful_anthropic_messages_route_fails_closed_for_missing_explicit_nat
 
 #[serial]
 #[tokio::test]
-async fn stateful_anthropic_messages_route_returns_invalid_request_for_missing_model_without_usage(
-) {
+async fn stateful_anthropic_messages_route_returns_invalid_request_for_missing_model_without_usage()
+{
     let pool = memory_pool().await;
-    let api_key =
-        support::issue_gateway_api_key(&pool, "tenant-anthropic-invalid", "project-anthropic-invalid")
-            .await;
+    let api_key = support::issue_gateway_api_key(
+        &pool,
+        "tenant-anthropic-invalid",
+        "project-anthropic-invalid",
+    )
+    .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
@@ -938,7 +945,10 @@ async fn stateful_anthropic_messages_route_returns_invalid_request_for_missing_m
     let json = read_json(response).await;
     assert_eq!(json["type"], "error");
     assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }
@@ -1012,7 +1022,8 @@ async fn stateless_anthropic_messages_stream_route_returns_anthropic_sse_events(
 #[tokio::test]
 async fn stateless_anthropic_messages_stream_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime(
 ) {
-    let _fixture = support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stream-stateless");
+    let _fixture =
+        support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stream-stateless");
 
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
@@ -1097,7 +1108,10 @@ async fn stateless_anthropic_messages_stream_route_returns_invalid_request_for_m
     let json = read_json(response).await;
     assert_eq!(json["type"], "error");
     assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 }
 
 #[serial]
@@ -1144,7 +1158,10 @@ async fn stateful_anthropic_messages_stream_route_returns_invalid_request_for_mi
     let json = read_json(response).await;
     assert_eq!(json["type"], "error");
     assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["message"], "Chat completion model is required.");
+    assert_eq!(
+        json["error"]["message"],
+        "Chat completion model is required."
+    );
 
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }
@@ -1153,7 +1170,8 @@ async fn stateful_anthropic_messages_stream_route_returns_invalid_request_for_mi
 #[tokio::test]
 async fn stateful_anthropic_messages_stream_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime_and_records_usage(
 ) {
-    let fixture = support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stream-stateful");
+    let fixture =
+        support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-stream-stateful");
 
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
@@ -1249,7 +1267,8 @@ async fn anthropic_count_tokens_route_returns_input_token_count() {
 #[tokio::test]
 async fn stateless_anthropic_count_tokens_route_prefers_native_dynamic_raw_plugin_for_explicit_custom_runtime(
 ) {
-    let _fixture = support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-count-stateless");
+    let _fixture =
+        support::prepare_native_dynamic_mock_package("anthropic-native-dynamic-count-stateless");
 
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
@@ -1329,7 +1348,12 @@ async fn anthropic_count_tokens_route_returns_invalid_request_for_missing_model(
 async fn stateful_anthropic_count_tokens_route_returns_invalid_request_for_missing_model_without_usage(
 ) {
     let pool = memory_pool().await;
-    let api_key = support::issue_gateway_api_key(&pool, "tenant-anthropic-count-invalid", "project-anthropic-count-invalid").await;
+    let api_key = support::issue_gateway_api_key(
+        &pool,
+        "tenant-anthropic-count-invalid",
+        "project-anthropic-count-invalid",
+    )
+    .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let admin_token = support::issue_admin_token(admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);

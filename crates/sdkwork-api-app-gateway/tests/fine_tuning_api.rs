@@ -1,32 +1,40 @@
 use sdkwork_api_app_gateway::create_fine_tuning_job;
+use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 
 #[test]
 fn returns_fine_tuning_job_object() {
-    let response = create_fine_tuning_job("tenant-1", "project-1", "gpt-4.1-mini").unwrap();
+    let request = CreateFineTuningJobRequest::new("file_local_0000000000000001", "gpt-4.1-mini");
+    let response = create_fine_tuning_job("tenant-1", "project-1", &request).unwrap();
     assert_eq!(response.object, "fine_tuning.job");
     assert_eq!(response.model, "gpt-4.1-mini");
+    assert!(response.id.starts_with("ftjob_local_"));
 }
 
 #[test]
 fn lists_fine_tuning_jobs() {
     let response = sdkwork_api_app_gateway::list_fine_tuning_jobs("tenant-1", "project-1").unwrap();
     assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "fine_tuning.job");
+    assert!(response.data.is_empty());
 }
 
 #[test]
-fn retrieves_fine_tuning_job() {
-    let response =
-        sdkwork_api_app_gateway::get_fine_tuning_job("tenant-1", "project-1", "ftjob_1").unwrap();
-    assert_eq!(response.id, "ftjob_1");
-    assert_eq!(response.object, "fine_tuning.job");
+fn retrieve_requires_persisted_fine_tuning_job_state() {
+    let error = sdkwork_api_app_gateway::get_fine_tuning_job(
+        "tenant-1",
+        "project-1",
+        "ftjob_local_0000000000000001",
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("not found"));
 }
 
 #[test]
-fn cancels_fine_tuning_job() {
-    let response =
-        sdkwork_api_app_gateway::cancel_fine_tuning_job("tenant-1", "project-1", "ftjob_1")
-            .unwrap();
-    assert_eq!(response.id, "ftjob_1");
-    assert_eq!(response.status, "cancelled");
+fn cancel_requires_persisted_fine_tuning_job_state() {
+    let error = sdkwork_api_app_gateway::cancel_fine_tuning_job(
+        "tenant-1",
+        "project-1",
+        "ftjob_local_0000000000000001",
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("not found"));
 }

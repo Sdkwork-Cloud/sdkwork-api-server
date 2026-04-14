@@ -29,7 +29,10 @@ pub fn openai_chat_response_to_anthropic(response: &Value) -> Value {
         .unwrap_or(0);
 
     json!({
-        "id": response.get("id").cloned().unwrap_or_else(|| Value::String("msg_1".to_owned())),
+        "id": response
+            .get("id")
+            .cloned()
+            .unwrap_or_else(|| Value::String(String::new())),
         "type": "message",
         "role": "assistant",
         "model": response.get("model").cloned().unwrap_or_else(|| Value::String(String::new())),
@@ -56,7 +59,7 @@ pub fn openai_count_tokens_to_anthropic(response: &Value) -> Value {
     })
 }
 
-pub(super) fn openai_finish_reason_to_anthropic(finish_reason: &str) -> Value {
+pub(crate) fn openai_finish_reason_to_anthropic(finish_reason: &str) -> Value {
     match finish_reason {
         "stop" => Value::String("end_turn".to_owned()),
         "length" => Value::String("max_tokens".to_owned()),

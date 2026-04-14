@@ -4,6 +4,7 @@ mod config;
 mod middleware;
 mod request;
 
+pub(crate) use self::config::StatelessGatewayContext;
 pub use self::config::{StatelessGatewayConfig, StatelessGatewayUpstream};
-pub(super) use self::middleware::*;
-pub(super) use self::request::*;
+pub(crate) use self::middleware::*;
+pub(crate) use self::request::*;

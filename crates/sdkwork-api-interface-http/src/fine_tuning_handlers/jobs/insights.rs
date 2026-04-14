@@ -1,6 +1,14 @@
 use super::*;
 
-pub(super) async fn fine_tuning_job_events_with_state_handler(
+fn local_fine_tuning_job_error_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_fine_tuning_request",
+        "Requested fine tuning job was not found.",
+    )
+}
+
+pub(crate) async fn fine_tuning_job_events_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
@@ -42,6 +50,15 @@ pub(super) async fn fine_tuning_job_events_with_state_handler(
         }
     }
 
+    let response = match list_fine_tuning_job_events(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -61,18 +78,10 @@ pub(super) async fn fine_tuning_job_events_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_fine_tuning_job_events(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning job events"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn fine_tuning_job_checkpoints_with_state_handler(
+pub(crate) async fn fine_tuning_job_checkpoints_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(fine_tuning_job_id): Path<String>,
@@ -116,6 +125,15 @@ pub(super) async fn fine_tuning_job_checkpoints_with_state_handler(
         }
     }
 
+    let response = match list_fine_tuning_job_checkpoints(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &fine_tuning_job_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_fine_tuning_job_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -135,13 +153,5 @@ pub(super) async fn fine_tuning_job_checkpoints_with_state_handler(
             .into_response();
     }
 
-    Json(
-        list_fine_tuning_job_checkpoints(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &fine_tuning_job_id,
-        )
-        .expect("fine tuning job checkpoints"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

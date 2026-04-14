@@ -18,7 +18,7 @@ fn blocked_marketing_campaign_action(reason: impl Into<String>) -> MarketingCamp
     }
 }
 
-pub(super) fn build_marketing_campaign_actionability(
+pub(in crate::governance::campaign) fn build_marketing_campaign_actionability(
     campaign: &MarketingCampaignRecord,
     coupon_template: &CouponTemplateRecord,
     now_ms: u64,

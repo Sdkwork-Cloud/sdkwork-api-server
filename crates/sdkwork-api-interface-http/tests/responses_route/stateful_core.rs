@@ -290,7 +290,9 @@ async fn stateful_responses_stream_route_returns_invalid_request_for_missing_mod
                 .uri("/v1/responses")
                 .header("authorization", format!("Bearer {api_key}"))
                 .header("content-type", "application/json")
-                .body(Body::from("{\"model\":\"\",\"input\":\"hi\",\"stream\":true}"))
+                .body(Body::from(
+                    "{\"model\":\"\",\"input\":\"hi\",\"stream\":true}",
+                ))
                 .unwrap(),
         )
         .await

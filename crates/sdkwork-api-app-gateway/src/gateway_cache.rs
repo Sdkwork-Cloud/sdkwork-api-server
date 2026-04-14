@@ -105,7 +105,7 @@ fn gateway_provider_in_flight_counters_handle() -> &'static Mutex<HashMap<String
 pub(crate) fn gateway_provider_in_flight_counter(provider_id: &str) -> Arc<AtomicUsize> {
     gateway_provider_in_flight_counters_handle()
         .lock()
-        .expect("gateway provider in-flight counter lock")
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
         .entry(provider_id.to_owned())
         .or_insert_with(|| Arc::new(AtomicUsize::new(0)))
         .clone()

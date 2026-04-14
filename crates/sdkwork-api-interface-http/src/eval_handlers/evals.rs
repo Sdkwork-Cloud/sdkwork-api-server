@@ -1,6 +1,19 @@
 use super::*;
 
-pub(super) async fn evals_with_state_handler(
+fn local_eval_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_error_response(error, "Requested eval was not found.")
+}
+
+fn local_eval_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_eval_request");
+    }
+
+    local_eval_not_found_response(error)
+}
+
+pub(crate) async fn evals_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateEvalRequest>,
@@ -15,10 +28,9 @@ pub(super) async fn evals_with_state_handler(
     .await
     {
         Ok(Some(response)) => {
-            let eval_id = response
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(request.name.as_str());
+            let Some(eval_id) = response.get("id").and_then(Value::as_str) else {
+                return bad_gateway_openai_response("upstream eval response missing id");
+            };
             if record_gateway_usage_for_project_with_route_key(
                 state.store.as_ref(),
                 request_context.tenant_id(),
@@ -47,12 +59,14 @@ pub(super) async fn evals_with_state_handler(
         }
     }
 
-    let response = create_eval(
+    let response = match create_eval(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.name,
-    )
-    .expect("eval");
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_error_response(error),
+    };
 
     if record_gateway_usage_for_project_with_route_key(
         state.store.as_ref(),
@@ -77,7 +91,7 @@ pub(super) async fn evals_with_state_handler(
     Json(response).into_response()
 }
 
-pub(super) async fn evals_list_with_state_handler(
+pub(crate) async fn evals_list_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
 ) -> Response {
@@ -117,6 +131,11 @@ pub(super) async fn evals_list_with_state_handler(
         }
     }
 
+    let response = match list_evals(request_context.tenant_id(), request_context.project_id()) {
+        Ok(response) => response,
+        Err(error) => return local_eval_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -136,11 +155,10 @@ pub(super) async fn evals_list_with_state_handler(
             .into_response();
     }
 
-    Json(list_evals(request_context.tenant_id(), request_context.project_id()).expect("eval list"))
-        .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_retrieve_with_state_handler(
+pub(crate) async fn eval_retrieve_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(eval_id): Path<String>,
@@ -182,6 +200,15 @@ pub(super) async fn eval_retrieve_with_state_handler(
         }
     }
 
+    let response = match get_eval(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -201,18 +228,10 @@ pub(super) async fn eval_retrieve_with_state_handler(
             .into_response();
     }
 
-    Json(
-        get_eval(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-        )
-        .expect("eval retrieve"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_update_with_state_handler(
+pub(crate) async fn eval_update_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(eval_id): Path<String>,
@@ -256,6 +275,16 @@ pub(super) async fn eval_update_with_state_handler(
         }
     }
 
+    let response = match update_eval(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -275,19 +304,10 @@ pub(super) async fn eval_update_with_state_handler(
             .into_response();
     }
 
-    Json(
-        update_eval(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-            &request,
-        )
-        .expect("eval update"),
-    )
-    .into_response()
+    Json(response).into_response()
 }
 
-pub(super) async fn eval_delete_with_state_handler(
+pub(crate) async fn eval_delete_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(eval_id): Path<String>,
@@ -329,6 +349,15 @@ pub(super) async fn eval_delete_with_state_handler(
         }
     }
 
+    let response = match delete_eval(
+        request_context.tenant_id(),
+        request_context.project_id(),
+        &eval_id,
+    ) {
+        Ok(response) => response,
+        Err(error) => return local_eval_error_response(error),
+    };
+
     if record_gateway_usage_for_project(
         state.store.as_ref(),
         request_context.tenant_id(),
@@ -348,13 +377,5 @@ pub(super) async fn eval_delete_with_state_handler(
             .into_response();
     }
 
-    Json(
-        delete_eval(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &eval_id,
-        )
-        .expect("eval delete"),
-    )
-    .into_response()
+    Json(response).into_response()
 }

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) async fn relay_stateless_json_request(
+pub(crate) async fn relay_stateless_json_request(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
 ) -> anyhow::Result<Option<Value>> {
@@ -8,7 +8,7 @@ pub(super) async fn relay_stateless_json_request(
     relay_stateless_json_request_with_options(request_context, request, &options).await
 }
 
-pub(super) async fn relay_stateless_json_request_with_options(
+pub(crate) async fn relay_stateless_json_request_with_options(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
     options: &ProviderRequestOptions,
@@ -27,7 +27,7 @@ pub(super) async fn relay_stateless_json_request_with_options(
     .await
 }
 
-pub(super) async fn relay_stateless_stream_request(
+pub(crate) async fn relay_stateless_stream_request(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
 ) -> anyhow::Result<Option<ProviderStreamOutput>> {
@@ -35,7 +35,7 @@ pub(super) async fn relay_stateless_stream_request(
     relay_stateless_stream_request_with_options(request_context, request, &options).await
 }
 
-pub(super) async fn relay_stateless_stream_request_with_options(
+pub(crate) async fn relay_stateless_stream_request_with_options(
     request_context: &StatelessGatewayRequest,
     request: ProviderRequest<'_>,
     options: &ProviderRequestOptions,
