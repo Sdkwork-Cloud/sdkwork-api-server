@@ -23,6 +23,10 @@ pub(crate) async fn responses_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response("Response model is required.", "invalid_model");
+    }
+
     let commercial_admission = match begin_gateway_commercial_admission(
         &state,
         request_context.context(),

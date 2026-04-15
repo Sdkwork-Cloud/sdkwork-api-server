@@ -482,6 +482,7 @@ pub fn create_provider_with_bindings(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_provider_with_bindings_and_extension_id(
     id: &str,
     channel_id: &str,

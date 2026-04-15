@@ -378,7 +378,7 @@ pub(crate) async fn execute_json_provider_request_for_descriptor_with_options(
     }
 
     let host = build_extension_host_from_store(store).await?;
-    let adapter = resolve_execution_adapter_for_descriptor(&host, &descriptor)?;
+    let adapter = resolve_execution_adapter_for_descriptor(&host, descriptor)?;
     let request = rewrite_provider_request_for_execution(store, provider, request).await?;
 
     let capability = provider_request_metric_capability(&request.as_request());
@@ -399,7 +399,7 @@ pub(crate) async fn execute_json_provider_request_for_descriptor_with_options(
                 record_gateway_upstream_outcome(capability, &descriptor.provider_id, "success");
                 persist_gateway_execution_health_snapshot(
                     store,
-                    &descriptor,
+                    descriptor,
                     true,
                     capability,
                     None,
@@ -446,7 +446,7 @@ pub(crate) async fn execute_json_provider_request_for_descriptor_with_options(
                 if gateway_error_impacts_provider_health(&error) {
                     persist_gateway_execution_health_snapshot(
                         store,
-                        &descriptor,
+                        descriptor,
                         false,
                         capability,
                         Some(&error),
@@ -627,6 +627,7 @@ fn resolve_execution_adapter_for_descriptor(
     Ok(adapter)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_raw_json_provider_operation_for_descriptor_with_options(
     store: &dyn AdminStore,
     descriptor: &ProviderExecutionDescriptor,
@@ -737,6 +738,7 @@ async fn execute_raw_json_provider_operation_for_descriptor_with_options(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_raw_stream_provider_operation_for_descriptor_with_options(
     store: &dyn AdminStore,
     descriptor: &ProviderExecutionDescriptor,
@@ -1259,6 +1261,7 @@ pub async fn execute_raw_stream_provider_operation_with_runtime(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_raw_json_provider_operation_from_planned_execution_context_with_options(
     store: &dyn AdminStore,
     planned: &PlannedExecutionProviderContext,
@@ -1290,6 +1293,7 @@ pub async fn execute_raw_json_provider_operation_from_planned_execution_context_
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_raw_stream_provider_operation_from_planned_execution_context_with_options(
     store: &dyn AdminStore,
     planned: &PlannedExecutionProviderContext,

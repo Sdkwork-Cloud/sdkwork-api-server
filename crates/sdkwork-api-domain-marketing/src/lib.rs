@@ -40,19 +40,16 @@ pub enum CouponTemplateStatus {
     Archived,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CouponTemplateApprovalState {
     Draft,
     InReview,
+    #[default]
     Approved,
     Rejected,
-}
-
-impl Default for CouponTemplateApprovalState {
-    fn default() -> Self {
-        Self::Approved
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -74,19 +71,16 @@ pub enum MarketingCampaignStatus {
     Archived,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum MarketingCampaignApprovalState {
     Draft,
     InReview,
+    #[default]
     Approved,
     Rejected,
-}
-
-impl Default for MarketingCampaignApprovalState {
-    fn default() -> Self {
-        Self::Approved
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -195,6 +189,7 @@ pub struct CouponTemplateLifecycleAuditRecord {
 }
 
 impl CouponTemplateLifecycleAuditRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         audit_id: impl Into<String>,
         coupon_template_id: impl Into<String>,
@@ -364,6 +359,7 @@ pub struct MarketingCampaignLifecycleAuditRecord {
 }
 
 impl MarketingCampaignLifecycleAuditRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         audit_id: impl Into<String>,
         marketing_campaign_id: impl Into<String>,
@@ -515,6 +511,7 @@ pub struct CampaignBudgetLifecycleAuditRecord {
 }
 
 impl CampaignBudgetLifecycleAuditRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         audit_id: impl Into<String>,
         campaign_budget_id: impl Into<String>,
@@ -638,6 +635,7 @@ pub struct CouponCodeLifecycleAuditRecord {
 }
 
 impl CouponCodeLifecycleAuditRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         audit_id: impl Into<String>,
         coupon_code_id: impl Into<String>,
@@ -1056,8 +1054,8 @@ impl MarketingCampaignRecord {
             return false;
         }
 
-        let after_start = self.start_at_ms.is_none_or(|value| now_ms >= value);
-        let before_end = self.end_at_ms.is_none_or(|value| now_ms <= value);
+        let after_start = self.start_at_ms.map_or(true, |value| now_ms >= value);
+        let before_end = self.end_at_ms.map_or(true, |value| now_ms <= value);
         after_start && before_end
     }
 }
@@ -1199,7 +1197,7 @@ impl CouponCodeRecord {
 
     pub fn is_redeemable_at(&self, now_ms: u64) -> bool {
         self.status == CouponCodeStatus::Available
-            && self.expires_at_ms.is_none_or(|value| now_ms <= value)
+            && self.expires_at_ms.map_or(true, |value| now_ms <= value)
     }
 }
 

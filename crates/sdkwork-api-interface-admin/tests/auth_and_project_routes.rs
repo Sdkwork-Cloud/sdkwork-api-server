@@ -12,9 +12,22 @@ async fn read_json(response: axum::response::Response) -> Value {
 }
 
 async fn memory_pool() -> SqlitePool {
-    sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
+    let pool = sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
-        .unwrap()
+        .unwrap();
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    sdkwork_api_app_identity::upsert_admin_user(
+        &store,
+        Some("admin_local_default"),
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(sdkwork_api_domain_identity::AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+    pool
 }
 
 async fn login_token(app: Router) -> String {

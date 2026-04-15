@@ -6,7 +6,6 @@
   useState,
   type ReactNode,
 } from 'react';
-import { ADMIN_TRANSLATIONS as BASE_ADMIN_TRANSLATIONS } from './i18nTranslations';
 
 // BEGIN CONTRACT TRANSLATIONS
 
@@ -508,24 +507,6 @@ const ADMIN_ZH_MISC_CONTRACT_TRANSLATIONS: Record<string, string> = {
 
 type AdminTranslationLocale = 'en-US' | 'zh-CN';
 
-const ADMIN_TRANSLATIONS: Record<AdminTranslationLocale, Record<string, string>> = {
-  'en-US': BASE_ADMIN_TRANSLATIONS['en-US'],
-  'zh-CN': {
-    ...BASE_ADMIN_TRANSLATIONS['zh-CN'],
-    ...ADMIN_ZH_MISC_CONTRACT_TRANSLATIONS,
-    ...ADMIN_ZH_ROUTING_ACCESS_TRANSLATIONS,
-    ...ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS,
-    ...ADMIN_ZH_APIROUTER_DETAIL_TRANSLATIONS,
-    ...ADMIN_ZH_TRAFFIC_TRANSLATIONS,
-    ...ADMIN_ZH_COMMERCIAL_ACCOUNT_TRANSLATIONS,
-    ...ADMIN_ZH_COMMERCIAL_SURFACE_TRANSLATIONS,
-    ...ADMIN_ZH_COMMERCIAL_DETAIL_TRANSLATIONS,
-    ...ADMIN_ZH_MARKETING_TRANSLATIONS,
-    ...ADMIN_ZH_BILLING_SETTLEMENT_TRANSLATIONS,
-    ...ADMIN_ZH_PRICING_TRANSLATIONS,
-  },
-};
-
 // END CONTRACT TRANSLATIONS
 
 export type AdminLocale = 'en-US' | 'zh-CN';
@@ -550,6 +531,11 @@ export const ADMIN_LOCALE_OPTIONS: Array<{ id: AdminLocale; label: string }> = [
 ];
 
 let activeAdminLocale: AdminLocale = 'en-US';
+const runtimeTranslationsByLocale: Record<AdminTranslationLocale, Record<string, string>> = {
+  'en-US': {},
+  'zh-CN': {},
+};
+const pendingLocalePreloads = new Map<AdminLocale, Promise<void>>();
 
 
 function interpolate(text: string, values?: TranslationValues) {
@@ -564,7 +550,7 @@ function interpolate(text: string, values?: TranslationValues) {
 }
 
 function resolveTranslation(locale: AdminLocale, text: string) {
-  return ADMIN_TRANSLATIONS[locale][text] ?? text;
+  return runtimeTranslationsByLocale[locale][text] ?? text;
 }
 
 function normalizeLocale(value: string | null | undefined): AdminLocale {
@@ -583,13 +569,43 @@ function resolveInitialLocale(): AdminLocale {
   try {
     const persisted = window.localStorage.getItem(ADMIN_I18N_STORAGE_KEY);
     if (persisted) {
-      return normalizeLocale(persisted);
+      const locale = normalizeLocale(persisted);
+      activeAdminLocale = locale;
+      return locale;
     }
   } catch {
     // Ignore storage access failures and fall back to browser locale.
   }
 
-  return normalizeLocale(window.navigator.language);
+  const locale = normalizeLocale(window.navigator.language);
+  activeAdminLocale = locale;
+  return locale;
+}
+
+export async function preloadAdminLocale(locale: AdminLocale) {
+  if (locale === 'en-US' || Object.keys(runtimeTranslationsByLocale[locale]).length > 0) {
+    return;
+  }
+
+  const existingPending = pendingLocalePreloads.get(locale);
+  if (existingPending) {
+    await existingPending;
+    return;
+  }
+
+  const pending = (async () => {
+    const { ADMIN_TRANSLATIONS } = await import('./i18nTranslations');
+    runtimeTranslationsByLocale[locale] = ADMIN_TRANSLATIONS[locale] ?? {};
+  })().finally(() => {
+    pendingLocalePreloads.delete(locale);
+  });
+
+  pendingLocalePreloads.set(locale, pending);
+  await pending;
+}
+
+export async function preloadPreferredAdminLocale() {
+  await preloadAdminLocale(resolveInitialLocale());
 }
 
 export function translateAdminText(text: string, values?: TranslationValues) {
@@ -622,6 +638,25 @@ export function formatAdminCurrency(value: number, fractionDigits = 2) {
 
 export function AdminI18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<AdminLocale>(resolveInitialLocale);
+  const [translationRevision, setTranslationRevision] = useState(0);
+
+  useEffect(() => {
+    if (locale !== 'zh-CN') {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    void preloadAdminLocale(locale).then(() => {
+      if (!cancelled) {
+        setTranslationRevision((current) => current + 1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   useEffect(() => {
     activeAdminLocale = locale;
@@ -663,7 +698,7 @@ export function AdminI18nProvider({ children }: { children: ReactNode }) {
       setLocale,
       t: (text, values) => interpolate(resolveTranslation(locale, text), values),
     }),
-    [locale],
+    [locale, translationRevision],
   );
 
   return <AdminI18nContext.Provider value={value}>{children}</AdminI18nContext.Provider>;

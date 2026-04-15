@@ -8,10 +8,10 @@ fn local_thread_run_step_error_response(error: anyhow::Error) -> Response {
 
     let lower = message.to_ascii_lowercase();
     if lower.contains("run step not found") {
-        return local_gateway_error_response(error, "Requested thread run step was not found.");
+        return local_gateway_error_response(error, "Requested run step was not found.");
     }
     if lower.contains("run not found") {
-        return local_gateway_error_response(error, "Requested thread run was not found.");
+        return local_gateway_error_response(error, "Requested run was not found.");
     }
 
     local_gateway_error_response(error, "Requested thread was not found.")

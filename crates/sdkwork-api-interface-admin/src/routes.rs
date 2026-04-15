@@ -107,6 +107,7 @@ pub fn try_admin_router() -> anyhow::Result<Router> {
             "/admin/auth/change-password",
             post(|| async { "change-password" }),
         )
+        .route("/admin/audit/events", get(|| async { "audit-events" }))
         .route("/admin/tenants", get(|| async { "tenants" }))
         .route(
             "/admin/tenants/{tenant_id}/providers/readiness",
@@ -503,6 +504,7 @@ pub fn admin_router_with_state_and_http_exposure(
         "/admin/auth/change-password",
         post(auth::change_password_handler),
     )
+    .route("/admin/audit/events", get(audit::list_admin_audit_events_handler))
     .route(
         "/admin/users/operators",
         get(users::list_operator_users_handler).post(users::upsert_operator_user_handler),

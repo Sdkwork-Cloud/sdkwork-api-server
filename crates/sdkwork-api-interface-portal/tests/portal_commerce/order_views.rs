@@ -223,6 +223,70 @@ async fn portal_commerce_order_center_aggregates_order_payment_and_checkout_view
 }
 
 #[tokio::test]
+async fn portal_commerce_reuses_existing_pending_payable_order_for_repeat_create() {
+    let pool = memory_pool().await;
+    let app = portal_lab_app(pool.clone());
+    let token = portal_token(app.clone()).await;
+    let workspace = portal_workspace(app.clone(), &token).await;
+    let project_id = workspace["project"]["id"].as_str().unwrap().to_owned();
+
+    seed_portal_recharge_capacity_fixture(&pool, &project_id).await;
+
+    let first_order_id = create_portal_recharge_order(
+        app.clone(),
+        &token,
+        "{\"target_kind\":\"recharge_pack\",\"target_id\":\"pack-100k\"}",
+    )
+    .await;
+    let second_order_id = create_portal_recharge_order(
+        app.clone(),
+        &token,
+        "{\"target_kind\":\"recharge_pack\",\"target_id\":\"pack-100k\"}",
+    )
+    .await;
+
+    assert_eq!(second_order_id, first_order_id);
+
+    let orders_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/portal/commerce/orders")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(orders_response.status(), StatusCode::OK);
+    let orders_json = read_json(orders_response).await;
+    assert_eq!(orders_json.as_array().unwrap().len(), 1);
+    assert_eq!(orders_json[0]["order_id"], first_order_id);
+
+    let order_center_response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/portal/commerce/order-center")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(order_center_response.status(), StatusCode::OK);
+    let order_center_json = read_json(order_center_response).await;
+    assert_eq!(order_center_json["orders"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        order_center_json["orders"][0]["order"]["order_id"],
+        first_order_id
+    );
+}
+
+#[tokio::test]
 async fn portal_commerce_order_center_reports_reconciliation_backlog_for_workspace_account() {
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool.clone());

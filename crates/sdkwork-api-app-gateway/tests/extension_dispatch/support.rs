@@ -67,6 +67,10 @@ pub(super) fn serve_connector_compatible_upstream(
             }
             Err(error) => panic!("connector-compatible upstream accept failed: {error}"),
         };
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
         handled_requests += 1;
         let mut buffer = [0_u8; 4096];
         let bytes_read = stream.read(&mut buffer).unwrap();

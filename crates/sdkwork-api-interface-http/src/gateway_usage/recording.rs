@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use super::*;
 
 pub(crate) async fn record_gateway_usage_for_project(

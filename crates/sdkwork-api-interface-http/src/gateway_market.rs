@@ -1,3 +1,6 @@
+use crate::gateway_prelude::*;
+use crate::GatewayApiState;
+use axum::extract::Query;
 use sdkwork_api_app_billing::{
     resolve_payable_account_for_gateway_request_context, summarize_account_balance,
     AccountBalanceSnapshot,
@@ -25,29 +28,49 @@ use sdkwork_api_domain_marketing::{
     CouponRollbackType, CouponTemplateRecord, MarketingCampaignRecord, MarketingSubjectScope,
 };
 use sdkwork_api_storage_core::AccountKernelStore;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[path = "gateway_market_support.rs"]
 mod support;
 
 use support::*;
 
+pub(crate) fn apply_stateful_market_and_commercial_routes(
+    router: Router<GatewayApiState>,
+) -> Router<GatewayApiState> {
+    router
+        .route("/market/products", get(list_market_products_handler))
+        .route("/market/offers", get(list_market_offers_handler))
+        .route("/market/quotes", post(create_market_quote_handler))
+        .route("/marketing/coupons/validate", post(validate_coupon_handler))
+        .route("/marketing/coupons/reserve", post(reserve_coupon_handler))
+        .route("/marketing/coupons/confirm", post(confirm_coupon_handler))
+        .route("/marketing/coupons/rollback", post(rollback_coupon_handler))
+        .route("/commercial/account", get(get_commercial_account_handler))
+        .route(
+            "/commercial/account/benefit-lots",
+            get(list_commercial_account_benefit_lots_handler),
+        )
+}
+
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayApiErrorBody {
+pub(crate) struct GatewayApiErrorBody {
     message: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayApiErrorResponse {
+pub(crate) struct GatewayApiErrorResponse {
     error: GatewayApiErrorBody,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayMarketProductsResponse {
+pub(crate) struct GatewayMarketProductsResponse {
     items: Vec<PortalApiProduct>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayMarketOffersResponse {
+pub(crate) struct GatewayMarketOffersResponse {
     items: Vec<PortalProductOffer>,
 }
 
@@ -76,7 +99,7 @@ struct GatewayCouponEffectSummary {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-struct GatewayCouponValidationRequest {
+pub(crate) struct GatewayCouponValidationRequest {
     coupon_code: String,
     subject_scope: MarketingSubjectScope,
     target_kind: String,
@@ -93,7 +116,7 @@ struct GatewayCouponValidationDecisionResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCouponValidationResponse {
+pub(crate) struct GatewayCouponValidationResponse {
     decision: GatewayCouponValidationDecisionResponse,
     template: CouponTemplateRecord,
     campaign: MarketingCampaignRecord,
@@ -104,7 +127,7 @@ struct GatewayCouponValidationResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-struct GatewayCouponReservationRequest {
+pub(crate) struct GatewayCouponReservationRequest {
     coupon_code: String,
     subject_scope: MarketingSubjectScope,
     target_kind: String,
@@ -117,7 +140,7 @@ struct GatewayCouponReservationRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCouponReservationResponse {
+pub(crate) struct GatewayCouponReservationResponse {
     reservation: sdkwork_api_domain_marketing::CouponReservationRecord,
     template: CouponTemplateRecord,
     campaign: MarketingCampaignRecord,
@@ -128,7 +151,7 @@ struct GatewayCouponReservationResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-struct GatewayCouponRedemptionConfirmRequest {
+pub(crate) struct GatewayCouponRedemptionConfirmRequest {
     coupon_reservation_id: String,
     subsidy_amount_minor: u64,
     #[serde(default)]
@@ -140,7 +163,7 @@ struct GatewayCouponRedemptionConfirmRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCouponRedemptionConfirmResponse {
+pub(crate) struct GatewayCouponRedemptionConfirmResponse {
     reservation: sdkwork_api_domain_marketing::CouponReservationRecord,
     redemption: CouponRedemptionRecord,
     template: CouponTemplateRecord,
@@ -152,7 +175,7 @@ struct GatewayCouponRedemptionConfirmResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-struct GatewayCouponRedemptionRollbackRequest {
+pub(crate) struct GatewayCouponRedemptionRollbackRequest {
     coupon_redemption_id: String,
     rollback_type: CouponRollbackType,
     restored_budget_minor: u64,
@@ -162,7 +185,7 @@ struct GatewayCouponRedemptionRollbackRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCouponRedemptionRollbackResponse {
+pub(crate) struct GatewayCouponRedemptionRollbackResponse {
     redemption: CouponRedemptionRecord,
     rollback: CouponRollbackRecord,
     template: CouponTemplateRecord,
@@ -174,7 +197,7 @@ struct GatewayCouponRedemptionRollbackResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCommercialAccountResponse {
+pub(crate) struct GatewayCommercialAccountResponse {
     account: AccountRecord,
     balance: AccountBalanceSnapshot,
 }
@@ -219,7 +242,7 @@ struct GatewayCommercialBenefitLotPage {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-struct GatewayCommercialBenefitLotsResponse {
+pub(crate) struct GatewayCommercialBenefitLotsResponse {
     account: AccountRecord,
     balance: AccountBalanceSnapshot,
     page: GatewayCommercialBenefitLotPage,
@@ -505,7 +528,6 @@ async fn rollback_coupon_handler(
     .await?;
     let redemption_code_value = redemption_view.code.code_value.clone();
     let reservation = redemption_view.reservation;
-    let redemption = redemption_view.redemption;
     let subject_id = subjects
         .subject_id_for_scope(reservation.subject_scope)
         .ok_or_else(|| gateway_error_response(StatusCode::NOT_FOUND, "coupon subject not found"))?;

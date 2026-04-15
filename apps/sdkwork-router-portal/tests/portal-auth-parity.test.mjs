@@ -92,10 +92,12 @@ test('portal auth visuals follow the claw-style split card layout instead of the
   assert.match(authPage, /Smartphone/);
   assert.match(authPage, /Button/);
   assert.match(authPage, /Input/);
-  assert.match(authPage, /DEV_PORTAL_CREDENTIALS/);
   assert.match(authPage, /import\.meta\.env\.DEV/);
-  assert.match(authPage, /portal@sdkwork\.local/);
-  assert.match(authPage, /ChangeMe123!/);
+  assert.match(authPage, /VITE_PORTAL_LOGIN_HINT_EMAIL/);
+  assert.doesNotMatch(authPage, /DEV_PORTAL_CREDENTIALS/);
+  assert.doesNotMatch(authPage, /portal@sdkwork\.local/);
+  assert.doesNotMatch(authPage, /ChangeMe123!/);
+  assert.doesNotMatch(authPage, /Local dev credentials are prefilled/);
   assert.match(authPage, /Label/);
   assert.match(authPage, /max-w-4xl/);
   assert.match(authPage, /rounded-3xl/);
@@ -120,11 +122,27 @@ test('portal auth localizes qr guidance and field placeholders through the share
     authPage,
     /t\('Open the desktop app and scan this code to continue without typing credentials\.'\)/,
   );
+  assert.match(
+    authPage,
+    /Local development uses identities from the active bootstrap profile\. Email hint: \{email\}\. Enter the matching password from your runtime configuration\./,
+  );
+  assert.match(
+    authPage,
+    /Local development uses identities from the active bootstrap profile\. Enter the portal email and password provisioned by your runtime configuration\./,
+  );
   assert.match(authPage, /placeholder=\{t\('Workspace owner'\)\}/);
   assert.match(authPage, /placeholder=\{t\('name@example\.com'\)\}/);
   assert.match(authPage, /placeholder=\{mode === 'register' \? t\('Create a password'\) : t\('Enter your password'\)\}/);
 
   assert.match(commons, /'Open the desktop app and scan this code to continue without typing credentials\.'/);
+  assert.match(
+    commons,
+    /'Local development uses identities from the active bootstrap profile\. Email hint: \{email\}\. Enter the matching password from your runtime configuration\.'/,
+  );
+  assert.match(
+    commons,
+    /'Local development uses identities from the active bootstrap profile\. Enter the portal email and password provisioned by your runtime configuration\.'/,
+  );
   assert.match(commons, /'Workspace owner'/);
   assert.match(commons, /'name@example\.com'/);
   assert.match(commons, /'Create a password'/);

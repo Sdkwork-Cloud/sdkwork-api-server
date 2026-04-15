@@ -5,6 +5,10 @@ pub(crate) fn apply_stateful_management_routes(
 ) -> Router<GatewayApiState> {
     router
         .route(
+            "/_sdkwork/payments/providers/{provider_code}/gateway-accounts/{gateway_account_id}/callbacks",
+            post(crate::gateway_payments::payment_callbacks_with_state_handler),
+        )
+        .route(
             "/v1/fine_tuning/jobs",
             get(fine_tuning_jobs_list_with_state_handler).post(fine_tuning_jobs_with_state_handler),
         )

@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt::Write as _;
 use std::sync::Arc;
 
 mod auth;
@@ -45,10 +44,9 @@ use sdkwork_api_app_commerce::{
     load_portal_commerce_catalog, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_portal_commerce_payment_attempt, load_project_membership,
     portal_commerce_product_kind, portal_commerce_transaction_kind, preview_portal_commerce_quote,
-    process_portal_stripe_webhook, reclaim_expired_coupon_reservations_for_code_if_needed,
-    settle_portal_commerce_order_with_billing, submit_portal_commerce_order, CommerceError,
-    CommercePaymentAttemptRecord, PaymentMethodRecord, PortalCommerceCatalog,
-    PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
+    process_portal_stripe_webhook, settle_portal_commerce_order_with_billing,
+    submit_portal_commerce_order, CommerceError, CommercePaymentAttemptRecord, PaymentMethodRecord,
+    PortalCommerceCatalog, PortalCommerceCheckoutSession, PortalCommerceOrderRecord,
     PortalCommercePaymentAttemptCreateRequest, PortalCommercePaymentEventRecord,
     PortalCommercePaymentEventRequest, PortalCommerceQuote, PortalCommerceQuoteRequest,
     PortalCommerceWebhookAck, PortalProjectMembershipRecord,
@@ -67,20 +65,17 @@ use sdkwork_api_app_jobs::{
     find_async_job, list_async_job_assets, list_async_job_attempts, list_async_jobs,
 };
 use sdkwork_api_app_marketing::{
-    confirm_coupon_for_subject, confirm_coupon_redemption,
-    list_coupon_code_views_for_subjects, list_coupon_redemptions_for_subjects,
-    list_coupon_reward_history_views_for_subjects,
+    confirm_coupon_for_subject, list_coupon_code_views_for_subjects,
+    list_coupon_redemptions_for_subjects, list_coupon_reward_history_views_for_subjects,
     load_coupon_redemption_context_owned_by_subject,
     load_coupon_reservation_context_owned_by_subject, marketing_subject_scope_token,
-    reserve_coupon_for_subject, reserve_coupon_redemption,
-    resolve_idempotency_key as resolve_shared_idempotency_key, rollback_coupon_for_subject,
-    rollback_coupon_redemption, summarize_coupon_codes, summarize_coupon_redemptions,
-    validate_coupon_for_subject, validate_coupon_stack, ConfirmCouponInput,
-    CouponValidationDecision, MarketingCodeSummary, MarketingCodeView,
-    MarketingOperationError, MarketingRedemptionOwnershipView,
-    MarketingRedemptionSummary, MarketingReservationOwnershipView,
-    MarketingRewardHistoryView, MarketingSubjectSet, ReserveCouponInput,
-    RollbackCouponInput, ValidatedCouponResult,
+    reserve_coupon_for_subject, resolve_idempotency_key as resolve_shared_idempotency_key,
+    rollback_coupon_for_subject, summarize_coupon_codes, summarize_coupon_redemptions,
+    validate_coupon_for_subject, ConfirmCouponInput, CouponValidationDecision,
+    MarketingCodeSummary, MarketingCodeView, MarketingOperationError,
+    MarketingRedemptionOwnershipView, MarketingRedemptionSummary,
+    MarketingReservationOwnershipView, MarketingRewardHistoryView, MarketingSubjectSet,
+    ReserveCouponInput, RollbackCouponInput, ValidatedCouponResult,
 };
 use sdkwork_api_app_payment::{
     ensure_commerce_payment_checkout, ensure_portal_payment_subject_scope,
@@ -108,10 +103,9 @@ use sdkwork_api_domain_catalog::ProxyProvider;
 use sdkwork_api_domain_identity::{ApiKeyGroupRecord, GatewayApiKeyRecord, PortalUserProfile};
 use sdkwork_api_domain_jobs::{AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobRecord};
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CampaignBudgetStatus, CouponCodeRecord, CouponCodeStatus,
-    CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
-    CouponReservationRecord, CouponRollbackRecord, CouponRollbackType, CouponTemplateRecord,
-    MarketingCampaignRecord, MarketingSubjectScope,
+    CampaignBudgetRecord, CouponCodeRecord, CouponCodeStatus, CouponRedemptionRecord,
+    CouponRedemptionStatus, CouponReservationRecord, CouponRollbackRecord, CouponRollbackType,
+    CouponTemplateRecord, MarketingCampaignRecord, MarketingSubjectScope,
 };
 use sdkwork_api_domain_payment::{
     PaymentCallbackEventRecord, PaymentOrderRecord, PaymentSessionRecord, PaymentTransactionRecord,
@@ -125,12 +119,10 @@ use sdkwork_api_domain_routing::{
 use sdkwork_api_domain_usage::{UsageRecord, UsageSummary};
 use sdkwork_api_observability::{observe_http_metrics, observe_http_tracing, HttpMetricsRegistry};
 use sdkwork_api_storage_core::{
-    AdminStore, AtomicCouponConfirmationCommand, AtomicCouponReservationCommand,
-    AtomicCouponRollbackCommand, CommercialKernelStore, IdentityKernelStore, Reloadable,
+    AdminStore, CommercialKernelStore, IdentityKernelStore, Reloadable,
 };
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 #[derive(Debug, Deserialize)]
@@ -1408,18 +1400,6 @@ fn portal_error_response(error: PortalIdentityError) -> (StatusCode, Json<ErrorR
         },
     };
     (status, Json(body))
-}
-
-fn marketing_atomic_status(error: anyhow::Error) -> StatusCode {
-    let message = error.to_string();
-    if message.contains("changed concurrently")
-        || message.contains("already exists with different state")
-        || message.contains(" is missing")
-    {
-        StatusCode::CONFLICT
-    } else {
-        StatusCode::INTERNAL_SERVER_ERROR
-    }
 }
 
 fn commercial_billing_kernel(

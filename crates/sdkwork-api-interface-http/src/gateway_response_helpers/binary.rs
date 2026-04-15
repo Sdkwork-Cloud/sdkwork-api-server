@@ -52,24 +52,6 @@ pub(crate) fn local_container_file_content_response(
     }
 }
 
-pub(crate) fn local_video_content_response(
-    tenant_id: &str,
-    project_id: &str,
-    video_id: &str,
-) -> Response {
-    match video_content(tenant_id, project_id, video_id) {
-        Ok(bytes) => match Response::builder()
-            .status(axum::http::StatusCode::OK)
-            .header(header::CONTENT_TYPE, "video/mp4")
-            .body(Body::from(bytes))
-        {
-            Ok(response) => response,
-            Err(_) => local_binary_response_build_error_response("video content"),
-        },
-        Err(error) => local_gateway_error_response(error, "Requested video was not found."),
-    }
-}
-
 pub(crate) fn local_music_content_response(
     tenant_id: &str,
     project_id: &str,

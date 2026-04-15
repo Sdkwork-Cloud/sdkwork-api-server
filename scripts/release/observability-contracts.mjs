@@ -78,7 +78,7 @@ export async function assertObservabilityContracts({
     /\.header\("x-request-id", "gateway-caller-id"\)/,
     /\.uri\("\/metrics"\)/,
     /sdkwork_service_info\{service=\\"gateway\\"\} 1/,
-    /sdkwork_http_requests_total\{service=\\"gateway\\",method=\\"GET\\",route=\\"\/health\\",status=\\"200\\"\} 2/,
+    /sdkwork_http_requests_total\{service=\\"gateway\\",method=\\"GET\\",route=\\"\/health\\",status=\\"200\\",tenant=\\"none\\",model=\\"none\\",provider=\\"none\\",billing_mode=\\"none\\",retry_outcome=\\"none\\",failover_outcome=\\"none\\",payment_outcome=\\"none\\"\} 2/,
   ]);
 
   const adminRoutes = read(repoRoot, 'crates/sdkwork-api-interface-admin/src/routes.rs');
@@ -106,7 +106,7 @@ export async function assertObservabilityContracts({
 
   const portalRoutes = read(repoRoot, 'crates/sdkwork-api-interface-portal/src/lib.rs');
   assertPatterns(portalRoutes, 'portal observability routes', [
-    /\.route\("\/metrics", http::metrics_route\(metrics\.clone\(\), &http_exposure\)\)/,
+    /\.route\(\s*"\/metrics",\s*http::metrics_route\(metrics\.clone\(\), &http_exposure\),\s*\)/,
     /\.route\("\/portal\/health", get\(\|\| async \{ "ok" \}\)\)/,
     /"\/portal\/billing\/events"/,
     /"\/portal\/billing\/events\/summary"/,

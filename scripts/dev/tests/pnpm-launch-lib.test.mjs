@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  ensureFrontendDependenciesReady,
   frontendDistReady,
   frontendInstallRequired,
   frontendInstallStatus,
@@ -13,6 +14,7 @@ import {
   pnpmExecutable,
   pnpmProcessSpec,
   pnpmSpawnOptions,
+  strictFrontendInstallsEnabled,
   shouldReuseExistingFrontendDist,
 } from '../pnpm-launch-lib.mjs';
 
@@ -151,21 +153,63 @@ test('dev launchers use the shared pnpm helper for Windows-safe process spawning
 });
 
 test('frontend launchers repair installs in place without deleting node_modules first', () => {
-  const scriptPaths = [
+  const repairScriptPaths = [
     path.join(repoRoot, 'scripts', 'dev', 'start-admin.mjs'),
     path.join(repoRoot, 'scripts', 'dev', 'start-portal.mjs'),
     path.join(repoRoot, 'scripts', 'dev', 'start-web.mjs'),
     path.join(repoRoot, 'scripts', 'dev', 'start-console.mjs'),
-    path.join(repoRoot, 'scripts', 'build-router-desktop-assets.mjs'),
-    path.join(repoRoot, 'scripts', 'check-router-product.mjs'),
   ];
 
-  for (const scriptPath of scriptPaths) {
+  for (const scriptPath of repairScriptPaths) {
     const script = readFileSync(scriptPath, 'utf8');
     assert.doesNotMatch(script, /removeFrontendNodeModules/);
     assert.match(script, /frontendInstallStatus/);
     assert.match(script, /['"]install['"]/);
   }
+
+  for (const scriptPath of [
+    path.join(repoRoot, 'scripts', 'build-router-desktop-assets.mjs'),
+    path.join(repoRoot, 'scripts', 'check-router-product.mjs'),
+  ]) {
+    const script = readFileSync(scriptPath, 'utf8');
+    assert.doesNotMatch(script, /removeFrontendNodeModules/);
+    assert.match(script, /ensureFrontendDependenciesReady/);
+  }
+});
+
+test('strictFrontendInstallsEnabled only enables strict mode for explicit truthy env values', () => {
+  assert.equal(strictFrontendInstallsEnabled({}), false);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: '' }), false);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: '0' }), false);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: 'false' }), false);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: '1' }), true);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: 'true' }), true);
+  assert.equal(strictFrontendInstallsEnabled({ SDKWORK_STRICT_FRONTEND_INSTALLS: 'TRUE' }), true);
+});
+
+test('ensureFrontendDependenciesReady refuses to auto-install when strict mode is enabled', () => {
+  withTempApp((appRoot) => {
+    let installAttempted = false;
+
+    assert.throws(
+      () => ensureFrontendDependenciesReady({
+        appRoot,
+        env: {
+          SDKWORK_STRICT_FRONTEND_INSTALLS: '1',
+        },
+        requiredPackages: ['vite'],
+        requiredBinCommands: ['vite'],
+        verifyInstalled: () => false,
+        spawnInstall: () => {
+          installAttempted = true;
+          return { status: 0 };
+        },
+      }),
+      /strict frontend install mode requires a prior frozen install/i,
+    );
+
+    assert.equal(installAttempted, false);
+  });
 });
 
 test('preview installs can reuse existing dist on Windows spawn EPERM when explicitly allowed', () => {

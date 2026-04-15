@@ -112,15 +112,15 @@ impl RateLimitPolicy {
             && self
                 .api_key_hash
                 .as_deref()
-                .is_none_or(|value| api_key_hash == Some(value))
+                .map_or(true, |value| api_key_hash == Some(value))
             && self
                 .route_key
                 .as_deref()
-                .is_none_or(|value| value == route_key)
+                .map_or(true, |value| value == route_key)
             && self
                 .model_name
                 .as_deref()
-                .is_none_or(|value| model_name == Some(value))
+                .map_or(true, |value| model_name == Some(value))
     }
 }
 
@@ -395,19 +395,19 @@ impl CommercialAdmissionPolicy {
             && self
                 .api_key_hash
                 .as_deref()
-                .is_none_or(|value| value == api_key_hash)
+                .map_or(true, |value| value == api_key_hash)
             && self
                 .api_key_group_id
                 .as_deref()
-                .is_none_or(|value| api_key_group_id == Some(value))
+                .map_or(true, |value| api_key_group_id == Some(value))
             && self
                 .route_key
                 .as_deref()
-                .is_none_or(|value| value == route_key)
+                .map_or(true, |value| value == route_key)
             && self
                 .model_name
                 .as_deref()
-                .is_none_or(|value| model_name == Some(value))
+                .map_or(true, |value| model_name == Some(value))
     }
 
     pub fn matches_provider_scope(
@@ -428,7 +428,7 @@ impl CommercialAdmissionPolicy {
         ) && self
             .provider_id
             .as_deref()
-            .is_none_or(|value| value == provider_id)
+            .map_or(true, |value| value == provider_id)
     }
 
     pub fn request_specificity_score(&self) -> u8 {

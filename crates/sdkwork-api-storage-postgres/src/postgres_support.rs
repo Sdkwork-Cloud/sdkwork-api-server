@@ -423,16 +423,7 @@ pub(crate) fn decode_portal_user_row(
 
 pub(crate) fn decode_admin_user_row(row: Option<AdminUserRow>) -> Result<Option<AdminUserRecord>> {
     row.map(
-        |(
-            id,
-            email,
-            display_name,
-            password_salt,
-            password_hash,
-            role,
-            active,
-            created_at_ms,
-        )| {
+        |(id, email, display_name, password_salt, password_hash, role, active, created_at_ms)| {
             Ok(AdminUserRecord {
                 id,
                 email,
@@ -750,20 +741,6 @@ pub(crate) async fn postgres_relation_kind(
     Ok(row.map(|(kind,)| kind))
 }
 
-pub(crate) async fn postgres_table_columns(pool: &PgPool, table_name: &str) -> Result<Vec<String>> {
-    let rows = sqlx::query_as::<_, (String,)>(
-        "SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = current_schema()
-           AND table_name = $1
-         ORDER BY ordinal_position",
-    )
-    .bind(table_name)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.into_iter().map(|(column_name,)| column_name).collect())
-}
-
 pub(crate) async fn ensure_postgres_column_if_table_exists(
     pool: &PgPool,
     table_name: &str,
@@ -772,62 +749,5 @@ pub(crate) async fn ensure_postgres_column_if_table_exists(
     if postgres_relation_kind(pool, table_name).await?.as_deref() == Some("r") {
         sqlx::query(alter_statement).execute(pool).await?;
     }
-    Ok(())
-}
-
-pub(crate) async fn migrate_postgres_legacy_table_with_common_columns(
-    pool: &PgPool,
-    legacy_table_name: &str,
-    canonical_table_name: &str,
-) -> Result<()> {
-    if postgres_relation_kind(pool, legacy_table_name)
-        .await?
-        .as_deref()
-        != Some("r")
-    {
-        return Ok(());
-    }
-
-    let legacy_columns = postgres_table_columns(pool, legacy_table_name).await?;
-    let canonical_columns = postgres_table_columns(pool, canonical_table_name).await?;
-    let common_columns: Vec<String> = canonical_columns
-        .into_iter()
-        .filter(|column_name| legacy_columns.contains(column_name))
-        .collect();
-
-    if !common_columns.is_empty() {
-        let column_list = common_columns.join(", ");
-        let insert = format!(
-            "INSERT INTO {canonical_table_name} ({column_list})
-             SELECT {column_list} FROM {legacy_table_name}
-             ON CONFLICT DO NOTHING"
-        );
-        sqlx::query(&insert).execute(pool).await?;
-    }
-
-    let drop_table = format!("DROP TABLE {legacy_table_name}");
-    sqlx::query(&drop_table).execute(pool).await?;
-    Ok(())
-}
-
-pub(crate) async fn recreate_postgres_compatibility_view(
-    pool: &PgPool,
-    legacy_name: &str,
-    select_sql: &str,
-) -> Result<()> {
-    match postgres_relation_kind(pool, legacy_name).await?.as_deref() {
-        Some("r") => {
-            let drop_table = format!("DROP TABLE {legacy_name}");
-            sqlx::query(&drop_table).execute(pool).await?;
-        }
-        Some("v") => {
-            let drop_view = format!("DROP VIEW {legacy_name}");
-            sqlx::query(&drop_view).execute(pool).await?;
-        }
-        _ => {}
-    }
-
-    let create_view = format!("CREATE VIEW {legacy_name} AS {select_sql}");
-    sqlx::query(&create_view).execute(pool).await?;
     Ok(())
 }

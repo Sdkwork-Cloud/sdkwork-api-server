@@ -54,15 +54,10 @@ impl FromRequestParts<GatewayApiState> for AuthenticatedGatewayRequest {
             else {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
+            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
+                .await?;
             context
         };
-
-        if let Err(response) =
-            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
-                .await
-        {
-            return Err(response);
-        }
 
         Ok(Self(context))
     }
@@ -109,15 +104,10 @@ impl FromRequestParts<GatewayApiState> for CompatAuthenticatedGatewayRequest {
             else {
                 return Err(StatusCode::UNAUTHORIZED.into_response());
             };
+            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
+                .await?;
             context
         };
-
-        if let Err(response) =
-            enforce_gateway_request_rate_limit(state.store.as_ref(), &context, parts.uri.path())
-                .await
-        {
-            return Err(response);
-        }
 
         Ok(Self(context))
     }

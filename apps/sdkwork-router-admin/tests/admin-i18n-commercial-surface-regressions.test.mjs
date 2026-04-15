@@ -34,6 +34,7 @@ function buildTranslationUsagePattern(key) {
 test('commercial workspace summary and order-audit shell copy are overridden by a dedicated zh-CN surface slice', () => {
   const commercialSource = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const commercialSurfaceTranslations = extractMap(i18n, 'ADMIN_ZH_COMMERCIAL_SURFACE_TRANSLATIONS');
 
   const expectedKeys = [
@@ -82,5 +83,5 @@ test('commercial workspace summary and order-audit shell copy are overridden by 
   }
 
   assert.match(i18n, /const ADMIN_ZH_COMMERCIAL_SURFACE_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_COMMERCIAL_SURFACE_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_COMMERCIAL_SURFACE_TRANSLATIONS,/);
 });

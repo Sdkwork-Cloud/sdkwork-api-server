@@ -139,6 +139,7 @@ async fn relay_chat_completion_fails_over_and_records_provider_health_evidence()
 
     let policy = RoutingPolicy::new("policy-failover", "chat_completion", "gpt-4.1")
         .with_priority(100)
+        .with_upstream_retry_max_attempts(1)
         .with_ordered_provider_ids(vec![
             "provider-primary".to_owned(),
             "provider-secondary".to_owned(),
@@ -309,6 +310,7 @@ async fn relay_chat_completion_records_provider_telemetry_for_retry_and_failover
 
     let policy = RoutingPolicy::new("policy-failover", "chat_completion", "gpt-4.1")
         .with_priority(100)
+        .with_upstream_retry_max_attempts(1)
         .with_ordered_provider_ids(vec![
             "provider-primary".to_owned(),
             "provider-secondary".to_owned(),

@@ -7,16 +7,6 @@ pub(crate) struct PortalBillingAccountResponse {
     balance: AccountBalanceSnapshot,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct PortalBillingAccountHistoryResponse {
-    account: AccountRecord,
-    balance: AccountBalanceSnapshot,
-    benefit_lots: Vec<AccountBenefitLotRecord>,
-    holds: Vec<AccountHoldRecord>,
-    request_settlements: Vec<RequestSettlementRecord>,
-    ledger: Vec<AccountLedgerHistoryEntry>,
-}
-
 pub(crate) async fn billing_account_handler(
     claims: AuthenticatedPortalClaims,
     State(state): State<PortalApiState>,
@@ -31,54 +21,6 @@ pub(crate) async fn billing_account_balance_handler(
 ) -> Result<Json<AccountBalanceSnapshot>, (StatusCode, Json<ErrorResponse>)> {
     let (_, balance) = load_portal_billing_account_context(&state, &claims).await?;
     Ok(Json(balance))
-}
-
-pub(crate) async fn billing_account_history_handler(
-    claims: AuthenticatedPortalClaims,
-    State(state): State<PortalApiState>,
-) -> Result<Json<PortalBillingAccountHistoryResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let (account, balance) = load_portal_billing_account_context(&state, &claims).await?;
-    let commercial_billing = commercial_billing_kernel(&state)?.clone();
-    let mut benefit_lots = commercial_billing
-        .list_account_benefit_lots()
-        .await
-        .map_err(commercial_billing_error_response)?
-        .into_iter()
-        .filter(|lot| lot.account_id == account.account_id)
-        .collect::<Vec<_>>();
-    benefit_lots.sort_by_key(|lot| lot.lot_id);
-
-    let mut holds = commercial_billing
-        .list_account_holds()
-        .await
-        .map_err(commercial_billing_error_response)?
-        .into_iter()
-        .filter(|hold| hold.account_id == account.account_id)
-        .collect::<Vec<_>>();
-    holds.sort_by_key(|hold| hold.hold_id);
-
-    let mut request_settlements = commercial_billing
-        .list_request_settlement_records()
-        .await
-        .map_err(commercial_billing_error_response)?
-        .into_iter()
-        .filter(|settlement| settlement.account_id == account.account_id)
-        .collect::<Vec<_>>();
-    request_settlements.sort_by_key(|settlement| settlement.request_settlement_id);
-
-    let ledger = commercial_billing
-        .list_account_ledger_history(account.account_id)
-        .await
-        .map_err(commercial_billing_error_response)?;
-
-    Ok(Json(PortalBillingAccountHistoryResponse {
-        account,
-        balance,
-        benefit_lots,
-        holds,
-        request_settlements,
-        ledger,
-    }))
 }
 
 pub(crate) async fn list_billing_account_benefit_lots_handler(

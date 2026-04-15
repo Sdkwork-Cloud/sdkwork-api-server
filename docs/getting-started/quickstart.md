@@ -6,8 +6,8 @@ It follows a straightforward onboarding flow:
 
 1. start the runtime
 2. verify the control plane
-3. sign in as the seeded admin
-4. sign in as the seeded portal user
+3. sign in as an operator
+4. sign in as a portal user
 5. create a gateway API key
 6. make the first authenticated gateway call
 
@@ -29,7 +29,7 @@ The recommended quickstart path uses the managed development scripts because the
 
 - avoid common `808x` conflicts by default
 - bring up the built-in unified web host automatically
-- print the clickable URLs and seeded credentials after startup
+- print the clickable URLs and bootstrap identity guidance after startup
 
 Linux or macOS:
 
@@ -52,10 +52,11 @@ Default managed development URLs:
 - direct admin health: `http://127.0.0.1:9981/admin/health`
 - direct portal health: `http://127.0.0.1:9982/portal/health`
 
-Seeded local credentials:
+Development identity bootstrap guidance:
 
-- admin: `admin@sdkwork.local / ChangeMe123!`
-- portal: `portal@sdkwork.local / ChangeMe123!`
+- development identities come from the active bootstrap profile
+- review `data/identities/dev.json` before sharing a local environment
+- the default `prod` bootstrap profile does not seed development identities
 
 If you specifically want the standalone Vite frontends instead of the unified web host, use:
 
@@ -74,17 +75,19 @@ Expected result: each endpoint returns `ok`.
 
 ## Step 3: Log In To The Admin Control Plane
 
-The admin API seeds a default local operator account on first use:
+Use an operator identity provisioned by the active bootstrap profile or your runtime config.
 
-- email: `admin@sdkwork.local`
-- password: `ChangeMe123!`
+For the local `dev` bootstrap profile:
+
+- review `data/identities/dev.json`
+- replace `<admin-email>` and `<admin-password>` below with that provisioned identity
 
 ```bash
 curl -X POST http://127.0.0.1:9981/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 
@@ -102,17 +105,19 @@ In the browser, the admin UI is available at:
 
 ## Step 4: Log In To The Portal
 
-The public portal seeds a demo local account:
+Use a portal identity provisioned by the active bootstrap profile, or register one through `/portal/auth/register`.
 
-- email: `portal@sdkwork.local`
-- password: `ChangeMe123!`
+For the local `dev` bootstrap profile:
+
+- review `data/identities/dev.json`
+- replace `<portal-email>` and `<portal-password>` below with that provisioned identity
 
 ```bash
 curl -X POST http://127.0.0.1:9982/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 

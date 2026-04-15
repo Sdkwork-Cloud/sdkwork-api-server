@@ -5,7 +5,7 @@
       "coupon_template_id": "template-provider-mix-15",
       "template_key": "provider-mix-15",
       "display_name": "Provider Mix 15 Percent",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "percentage_off",
@@ -32,7 +32,7 @@
       "coupon_template_id": "template-china-direct-888",
       "template_key": "china-direct-888",
       "display_name": "China Direct 888",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "fixed_amount_off",
@@ -61,7 +61,7 @@
       "marketing_campaign_id": "campaign-provider-mix-2026",
       "coupon_template_id": "template-provider-mix-15",
       "display_name": "Provider Mix 2026",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710000490000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710000490000,
@@ -71,7 +71,7 @@
       "marketing_campaign_id": "campaign-china-direct-2026",
       "coupon_template_id": "template-china-direct-888",
       "display_name": "China Direct 2026",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710000491000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710000491000,
@@ -82,7 +82,7 @@
     {
       "campaign_budget_id": "budget-provider-mix-2026",
       "marketing_campaign_id": "campaign-provider-mix-2026",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 4000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,
@@ -92,7 +92,7 @@
     {
       "campaign_budget_id": "budget-china-direct-2026",
       "marketing_campaign_id": "campaign-china-direct-2026",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 8000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,

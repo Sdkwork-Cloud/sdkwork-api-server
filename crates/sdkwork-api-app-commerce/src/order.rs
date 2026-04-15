@@ -159,6 +159,17 @@ pub async fn submit_portal_commerce_order(
     }
 
     let (quote, resolved_coupon) = preview_portal_commerce_quote_internal(store, request).await?;
+    if let Some(existing_order) = find_reusable_pending_payable_order(
+        store,
+        normalized_user_id,
+        normalized_project_id,
+        &quote,
+    )
+    .await?
+    {
+        return Ok(existing_order);
+    }
+
     let status = initial_order_status(&quote);
     let order_id = generate_entity_id("commerce_order")?;
     let reserved_coupon = reserve_order_coupon_if_needed(
@@ -343,7 +354,19 @@ pub(crate) async fn settle_portal_commerce_order_with_payment_event(
             .await?;
             return Ok(order);
         }
-        "pending_payment" => {}
+        "pending_payment" => {
+            if settlement_side_effects_already_applied(&order) {
+                let order = persist_fulfilled_order(store, &mut order).await?;
+                sync_fulfilled_commerce_order_account_state(
+                    store,
+                    commercial_billing,
+                    normalized_project_id,
+                    &order,
+                )
+                .await?;
+                return Ok(order);
+            }
+        }
         other => {
             return Err(CommerceError::Conflict(format!(
                 "order {normalized_order_id} cannot be settled from status {other}"
@@ -365,20 +388,7 @@ pub(crate) async fn settle_portal_commerce_order_with_payment_event(
         )
         .await?;
         confirm_order_coupon_if_needed(store, &mut order, payment_event_id).await?;
-
-        order.status = "fulfilled".to_owned();
-        order.settlement_status = if order.payable_price_cents == 0 {
-            "not_required".to_owned()
-        } else {
-            "settled".to_owned()
-        };
-        order.refundable_amount_minor = order.payable_price_cents;
-        order.refunded_amount_minor = 0;
-        order.updated_at_ms = current_time_ms()?;
-        store
-            .insert_commerce_order(&order)
-            .await
-            .map_err(CommerceError::from)
+        persist_fulfilled_order(store, &mut order).await
     }
     .await;
 
@@ -750,6 +760,121 @@ fn commerce_order_credit_quantity(order: &CommerceOrderRecord) -> f64 {
 
 fn commerce_order_payable_amount(order: &CommerceOrderRecord) -> f64 {
     order.payable_price_cents as f64 / 100.0
+}
+
+async fn find_reusable_pending_payable_order(
+    store: &dyn AdminStore,
+    user_id: &str,
+    project_id: &str,
+    quote: &PortalCommerceQuote,
+) -> CommerceResult<Option<CommerceOrderRecord>> {
+    if quote.payable_price_cents == 0 {
+        return Ok(None);
+    }
+
+    let applied_coupon_code = quote
+        .applied_coupon
+        .as_ref()
+        .map(|coupon| coupon.code.as_str());
+    let now_ms = current_time_ms()?;
+    let orders = store
+        .list_commerce_orders_for_project(project_id)
+        .await
+        .map_err(CommerceError::from)?;
+
+    let mut reusable_orders = Vec::new();
+    for order in orders {
+        if !pending_order_matches_quote_intent(&order, user_id, quote, applied_coupon_code) {
+            continue;
+        }
+        if !pending_order_has_reusable_coupon_reservation(store, &order, now_ms).await? {
+            continue;
+        }
+        reusable_orders.push(order);
+    }
+
+    Ok(reusable_orders.into_iter().max_by_key(|order| {
+        (
+            order.updated_at_ms,
+            order.created_at_ms,
+            order.order_id.clone(),
+        )
+    }))
+}
+
+fn pending_order_matches_quote_intent(
+    order: &CommerceOrderRecord,
+    user_id: &str,
+    quote: &PortalCommerceQuote,
+    applied_coupon_code: Option<&str>,
+) -> bool {
+    order.user_id == user_id
+        && order.status == "pending_payment"
+        && matches!(
+            order.settlement_status.as_str(),
+            "pending" | "requires_action"
+        )
+        && order.target_kind == quote.target_kind
+        && order.target_id == quote.target_id
+        && order.list_price_cents == quote.list_price_cents
+        && order.payable_price_cents == quote.payable_price_cents
+        && order.granted_units == quote.granted_units
+        && order.bonus_units == quote.bonus_units
+        && order.applied_coupon_code.as_deref() == applied_coupon_code
+}
+
+async fn pending_order_has_reusable_coupon_reservation(
+    store: &dyn AdminStore,
+    order: &CommerceOrderRecord,
+    now_ms: u64,
+) -> CommerceResult<bool> {
+    let Some(coupon_code) = order.applied_coupon_code.as_deref() else {
+        return Ok(true);
+    };
+    let Some(coupon_reservation_id) = order.coupon_reservation_id.as_deref() else {
+        return Ok(false);
+    };
+    let Some(reservation) = store
+        .find_coupon_reservation_record(coupon_reservation_id)
+        .await
+        .map_err(CommerceError::from)?
+    else {
+        return Ok(false);
+    };
+
+    Ok(reservation.subject_id == order.project_id
+        && order.applied_coupon_code.as_deref() == Some(coupon_code)
+        && reservation.reservation_status
+            == sdkwork_api_domain_marketing::CouponReservationStatus::Reserved
+        && reservation.is_active_at(now_ms))
+}
+
+fn settlement_side_effects_already_applied(order: &CommerceOrderRecord) -> bool {
+    matches!(order.settlement_status.as_str(), "settled" | "not_required")
+        || order.coupon_redemption_id.is_some()
+}
+
+async fn persist_fulfilled_order(
+    store: &dyn AdminStore,
+    order: &mut CommerceOrderRecord,
+) -> CommerceResult<CommerceOrderRecord> {
+    order.status = "fulfilled".to_owned();
+    order.settlement_status = fulfilled_order_settlement_status(order).to_owned();
+    order.refundable_amount_minor = order.payable_price_cents;
+    order.refunded_amount_minor = 0;
+    order.updated_at_ms = current_time_ms()?;
+    store
+        .insert_commerce_order(order)
+        .await
+        .map_err(CommerceError::from)
+}
+
+fn fulfilled_order_settlement_status(order: &CommerceOrderRecord) -> &'static str {
+    if order.payable_price_cents == 0 {
+        "not_required"
+    } else {
+        "settled"
+    }
 }
 
 pub async fn load_portal_commerce_checkout_session(

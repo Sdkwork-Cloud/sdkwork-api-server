@@ -1,5 +1,3 @@
-use super::*;
-
 #[utoipa::path(
     get,
     path = "/admin/health",

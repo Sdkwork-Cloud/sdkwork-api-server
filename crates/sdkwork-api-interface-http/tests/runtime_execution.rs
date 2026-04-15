@@ -25,7 +25,7 @@ async fn local_fallback_usage_is_recorded_as_sdkwork_local_provider() {
     let api_key = support::issue_gateway_api_key(&pool, "tenant-runtime", "project-runtime").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
 
     let channel = admin_app
         .clone()

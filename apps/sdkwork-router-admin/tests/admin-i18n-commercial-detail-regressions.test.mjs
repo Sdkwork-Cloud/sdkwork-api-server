@@ -34,6 +34,7 @@ function buildTranslationUsagePattern(key) {
 test('commercial ledger and audit detail labels are overridden by a dedicated zh-CN detail slice', () => {
   const commercialSource = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const commercialDetailTranslations = extractMap(
     i18n,
     'ADMIN_ZH_COMMERCIAL_DETAIL_TRANSLATIONS',
@@ -102,5 +103,5 @@ test('commercial ledger and audit detail labels are overridden by a dedicated zh
   }
 
   assert.match(i18n, /const ADMIN_ZH_COMMERCIAL_DETAIL_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_COMMERCIAL_DETAIL_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_COMMERCIAL_DETAIL_TRANSLATIONS,/);
 });

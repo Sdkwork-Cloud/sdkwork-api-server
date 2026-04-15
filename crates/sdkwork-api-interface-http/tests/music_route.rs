@@ -15,6 +15,7 @@ mod support;
 #[tokio::test]
 async fn local_music_routes_follow_truthful_fallback_contract() {
     let app = sdkwork_api_interface_http::gateway_router();
+    let track_id = "music_local_0000000000000001";
 
     let create_response = app
         .clone()
@@ -30,11 +31,11 @@ async fn local_music_routes_follow_truthful_fallback_contract() {
         )
         .await
         .unwrap();
-    assert_eq!(create_response.status(), StatusCode::OK);
-    let create_json = read_json(create_response).await;
-    let track_id = create_json["data"][0]["id"].as_str().unwrap().to_owned();
-    assert!(track_id.starts_with("music_local_"));
-    assert_eq!(create_json["data"][0]["status"], "queued");
+    assert_invalid_music_request(
+        create_response,
+        "Local music fallback is not supported without an upstream provider.",
+    )
+    .await;
 
     let list_response = app
         .clone()
@@ -47,9 +48,11 @@ async fn local_music_routes_follow_truthful_fallback_contract() {
         )
         .await
         .unwrap();
-    assert_eq!(list_response.status(), StatusCode::OK);
-    let list_json = read_json(list_response).await;
-    assert_eq!(list_json["data"], Value::Array(Vec::new()));
+    assert_invalid_music_request(
+        list_response,
+        "Local music listing fallback is not supported without an upstream provider.",
+    )
+    .await;
 
     let retrieve_response = app
         .clone()
@@ -107,10 +110,7 @@ async fn local_music_routes_follow_truthful_fallback_contract() {
         )
         .await
         .unwrap();
-    assert_eq!(delete_response.status(), StatusCode::OK);
-    let delete_json = read_json(delete_response).await;
-    assert_eq!(delete_json["deleted"], true);
-    assert_eq!(delete_json["id"], track_id);
+    assert_music_not_found(delete_response, "Requested music was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -334,7 +334,7 @@ async fn stateful_music_create_records_music_seconds_in_billing_events() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_channel(&admin_app, &admin_token).await;
@@ -663,7 +663,7 @@ struct LocalMusicTestContext {
 async fn local_music_test_context(tenant_id: &str, project_id: &str) -> LocalMusicTestContext {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

@@ -24,9 +24,9 @@ export function LandingApp() {
           </div>
         </div>
         <aside className="landing-callout">
-          <span>Admin default: admin@sdkwork.local</span>
-          <span>Portal default: portal@sdkwork.local</span>
-          <span>Bootstrap password: ChangeMe123!</span>
+          <span>Development identities come from the active bootstrap profile.</span>
+          <span>Use the operator or portal email provisioned by your runtime configuration.</span>
+          <span>Passwords stay in runtime configuration and are never prefilled in the UI.</span>
         </aside>
       </section>
 

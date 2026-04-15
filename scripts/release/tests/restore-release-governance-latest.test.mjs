@@ -224,6 +224,33 @@ function cleanupGovernedReleaseArtifacts() {
   }
 }
 
+async function withCleanedGovernedReleaseArtifacts(callback) {
+  const originals = [
+    releaseWindowSnapshotPath,
+    releaseSyncAuditPath,
+    releaseTelemetryExportPath,
+    releaseTelemetrySnapshotPath,
+    sloGovernanceEvidencePath,
+  ].map((filePath) => ({
+    filePath,
+    hadOriginalFile: existsSync(filePath),
+    originalContent: existsSync(filePath) ? readFileSync(filePath, 'utf8') : null,
+  }));
+
+  cleanupGovernedReleaseArtifacts();
+
+  try {
+    return await callback();
+  } finally {
+    cleanupGovernedReleaseArtifacts();
+    for (const entry of originals) {
+      if (entry.hadOriginalFile) {
+        writeFileSync(entry.filePath, entry.originalContent, 'utf8');
+      }
+    }
+  }
+}
+
 function writeArtifact(root, directoryName, relativePath, payload) {
   const targetPath = path.join(root, directoryName, relativePath);
   mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -411,74 +438,72 @@ test('restore release governance latest materializer rejects conflicting duplica
 });
 
 test('restore release governance latest materializer enables blocked-host governance replay when real latest artifacts are restored', async () => {
-  cleanupGovernedReleaseArtifacts();
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    const restoreModule = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'restore-release-governance-latest.mjs'),
+      ).href,
+    );
+    const governanceModule = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const restoreModule = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'restore-release-governance-latest.mjs'),
-    ).href,
-  );
-  const governanceModule = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+    const artifactRoot = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-release-governance-restore-'));
 
-  const artifactRoot = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-release-governance-restore-'));
+    writeArtifact(
+      artifactRoot,
+      'release-governance-window-snapshot-web',
+      path.join('docs', 'release', 'release-window-snapshot-latest.json'),
+      createReleaseWindowSnapshotArtifactPayload(),
+    );
+    writeArtifact(
+      artifactRoot,
+      'release-governance-sync-audit-web',
+      path.join('docs', 'release', 'release-sync-audit-latest.json'),
+      createReleaseSyncAuditArtifactPayload(),
+    );
+    writeArtifact(
+      artifactRoot,
+      'release-governance-telemetry-export-web',
+      path.join('docs', 'release', 'release-telemetry-export-latest.json'),
+      createTelemetryExportPayload(),
+    );
+    writeArtifact(
+      artifactRoot,
+      'release-governance-telemetry-snapshot-web',
+      path.join('docs', 'release', 'release-telemetry-snapshot-latest.json'),
+      createTelemetrySnapshotPayload(),
+    );
+    writeArtifact(
+      artifactRoot,
+      'release-governance-slo-evidence-web',
+      path.join('docs', 'release', 'slo-governance-latest.json'),
+      createSloGovernancePayload(),
+    );
 
-  writeArtifact(
-    artifactRoot,
-    'release-governance-window-snapshot-web',
-    path.join('docs', 'release', 'release-window-snapshot-latest.json'),
-    createReleaseWindowSnapshotArtifactPayload(),
-  );
-  writeArtifact(
-    artifactRoot,
-    'release-governance-sync-audit-web',
-    path.join('docs', 'release', 'release-sync-audit-latest.json'),
-    createReleaseSyncAuditArtifactPayload(),
-  );
-  writeArtifact(
-    artifactRoot,
-    'release-governance-telemetry-export-web',
-    path.join('docs', 'release', 'release-telemetry-export-latest.json'),
-    createTelemetryExportPayload(),
-  );
-  writeArtifact(
-    artifactRoot,
-    'release-governance-telemetry-snapshot-web',
-    path.join('docs', 'release', 'release-telemetry-snapshot-latest.json'),
-    createTelemetrySnapshotPayload(),
-  );
-  writeArtifact(
-    artifactRoot,
-    'release-governance-slo-evidence-web',
-    path.join('docs', 'release', 'slo-governance-latest.json'),
-    createSloGovernancePayload(),
-  );
+    restoreModule.restoreReleaseGovernanceLatestArtifacts({
+      artifactDir: artifactRoot,
+      repoRoot,
+    });
 
-  restoreModule.restoreReleaseGovernanceLatestArtifacts({
-    artifactDir: artifactRoot,
-    repoRoot,
+    const summary = await governanceModule.runReleaseGovernanceChecks({
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+      fallbackSpawnSyncImpl() {
+        throw new Error('live git replay should not run after latest governance artifacts are restored');
+      },
+    });
+
+    assert.equal(summary.ok, true);
+    assert.equal(summary.blocked, false);
+    assert.deepEqual(summary.blockedIds, []);
   });
-
-  const summary = await governanceModule.runReleaseGovernanceChecks({
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
-    fallbackSpawnSyncImpl() {
-      throw new Error('live git replay should not run after latest governance artifacts are restored');
-    },
-  });
-
-  assert.equal(summary.ok, true);
-  assert.equal(summary.blocked, false);
-  assert.deepEqual(summary.blockedIds, []);
-
-  cleanupGovernedReleaseArtifacts();
 });

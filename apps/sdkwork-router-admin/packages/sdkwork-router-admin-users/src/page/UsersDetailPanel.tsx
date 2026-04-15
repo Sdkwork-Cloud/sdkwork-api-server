@@ -160,10 +160,10 @@ export function UsersDetailPanel({
       ) : (
         <InlineAlert
           description={t(
-            'Bootstrap operators and the current active session should not be removed from the directory.',
+            'The operator attached to the current session cannot be removed from this console. Any broader identity protection must be enforced by the backend.',
           )}
           showIcon
-          title={t('Protected identities')}
+          title={t('Current session guard')}
           tone="info"
         />
       )}

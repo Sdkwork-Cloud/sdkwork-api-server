@@ -11,6 +11,24 @@ router_die() {
   exit 1
 }
 
+router_active_bootstrap_profile() {
+  if [ -n "${SDKWORK_BOOTSTRAP_PROFILE:-}" ]; then
+    printf '%s' "$SDKWORK_BOOTSTRAP_PROFILE"
+    return 0
+  fi
+
+  printf '%s' 'runtime configuration'
+}
+
+router_bootstrap_identity_hint_path() {
+  if [ -z "${SDKWORK_BOOTSTRAP_DATA_DIR:-}" ] || [ -z "${SDKWORK_BOOTSTRAP_PROFILE:-}" ]; then
+    printf '%s' ''
+    return 0
+  fi
+
+  printf '%s/identities/%s.json' "$(router_portable_path "$SDKWORK_BOOTSTRAP_DATA_DIR")" "$SDKWORK_BOOTSTRAP_PROFILE"
+}
+
 router_script_dir() {
   CDPATH= cd -- "$(dirname -- "$1")" && pwd
 }
@@ -901,22 +919,6 @@ router_validate_dir() {
   fi
 }
 
-router_default_admin_email() {
-  printf '%s' 'admin@sdkwork.local'
-}
-
-router_default_admin_password() {
-  printf '%s' 'ChangeMe123!'
-}
-
-router_default_portal_email() {
-  printf '%s' 'portal@sdkwork.local'
-}
-
-router_default_portal_password() {
-  printf '%s' 'ChangeMe123!'
-}
-
 router_log_detail() {
   LABEL="$1"
   VALUE="$2"
@@ -944,6 +946,8 @@ router_startup_summary() {
   GATEWAY_DIRECT_URL=$(router_resolve_loopback_url "$GATEWAY_BIND" "/health")
   ADMIN_DIRECT_URL=$(router_resolve_loopback_url "$ADMIN_BIND" "/admin/health")
   PORTAL_DIRECT_URL=$(router_resolve_loopback_url "$PORTAL_BIND" "/portal/health")
+  BOOTSTRAP_PROFILE=$(router_active_bootstrap_profile)
+  BOOTSTRAP_IDENTITY_HINT_PATH=$(router_bootstrap_identity_hint_path)
 
   router_log '------------------------------------------------------------'
   router_log "Mode: $MODE"
@@ -967,9 +971,14 @@ router_startup_summary() {
   router_log_detail 'Admin Service' "$ADMIN_DIRECT_URL"
   router_log_detail 'Portal Service' "$PORTAL_DIRECT_URL"
 
-  router_log 'Initial Credentials'
-  router_log_detail 'Admin Console' "$(router_default_admin_email) / $(router_default_admin_password)"
-  router_log_detail 'Portal Console' "$(router_default_portal_email) / $(router_default_portal_password)"
+  router_log 'Identity Bootstrap'
+  router_log_detail 'Local access' "uses the active bootstrap profile: $BOOTSTRAP_PROFILE"
+  if [ -n "$BOOTSTRAP_IDENTITY_HINT_PATH" ]; then
+    router_log_detail 'Identity source' "review your runtime configuration and provisioned identities in $BOOTSTRAP_IDENTITY_HINT_PATH before sharing the environment."
+  else
+    router_log_detail 'Identity source' 'review your runtime configuration and provisioned identity store before sharing the environment.'
+  fi
+  router_log_detail 'Portal sign-in' 'use a provisioned portal user or register through /portal/auth/register.'
   router_log_detail 'Gateway API' 'sign in through the portal and create an API key.'
 
   router_log 'Logs'

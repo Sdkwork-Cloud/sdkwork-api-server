@@ -1,5 +1,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use axum::routing::{get, post};
+use axum::{Json, Router};
 use sdkwork_api_app_identity::{
     gateway_auth_subject_from_request_context, hash_gateway_api_key, GatewayRequestContext,
 };
@@ -9,6 +11,7 @@ use sdkwork_api_domain_billing::{
 };
 use sdkwork_api_storage_core::AccountKernelStore;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
+use serde_json::Value;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
@@ -32,7 +35,7 @@ async fn seed_platform_credit_account(
         tenant_id: tenant_id.to_owned(),
         project_id: project_id.to_owned(),
         environment: "live".to_owned(),
-        api_key_hash: hash_gateway_api_key(&api_key),
+        api_key_hash: hash_gateway_api_key(api_key),
         api_key_group_id: None,
         canonical_tenant_id: None,
         canonical_organization_id: None,
@@ -122,6 +125,208 @@ async fn response_body_text(response: axum::response::Response) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+async fn configure_stateful_openai_upstream(pool: &SqlitePool, tenant_id: &str, models: &[&str]) {
+    let base_url = start_openai_mock_server().await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(pool, admin_app.clone()).await;
+
+    let channel = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/channels")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"id\":\"openai\",\"name\":\"OpenAI\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(channel.status(), StatusCode::CREATED);
+
+    let provider = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/providers")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"id\":\"provider-openai-official\",\"channel_id\":\"openai\",\"adapter_kind\":\"openai\",\"base_url\":\"{base_url}\",\"display_name\":\"OpenAI Official\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(provider.status(), StatusCode::CREATED);
+
+    let credential = admin_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/credentials")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    "{{\"tenant_id\":\"{tenant_id}\",\"provider_id\":\"provider-openai-official\",\"key_reference\":\"cred-openai\",\"secret_value\":\"sk-upstream-openai\"}}"
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(credential.status(), StatusCode::CREATED);
+
+    for model_name in models {
+        let model = admin_app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/models")
+                    .header("authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        "{{\"external_name\":\"{model_name}\",\"provider_id\":\"provider-openai-official\"}}"
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(model.status(), StatusCode::CREATED);
+    }
+}
+
+async fn start_openai_mock_server() -> String {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let app = Router::new()
+        .route("/health", get(upstream_health_handler))
+        .route("/v1/chat/completions", post(upstream_chat_handler))
+        .route("/v1/responses", post(upstream_responses_handler))
+        .route("/v1/completions", post(upstream_completions_handler))
+        .route("/v1/embeddings", post(upstream_embeddings_handler));
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let base_url = format!("http://{address}");
+    support::wait_for_http_health(&base_url).await;
+    base_url
+}
+
+async fn upstream_health_handler() -> (StatusCode, Json<Value>) {
+    (StatusCode::OK, Json(serde_json::json!({ "status": "ok" })))
+}
+
+async fn upstream_chat_handler(Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let model = body
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or("gpt-4.1");
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"chatcmpl_upstream",
+            "object":"chat.completion",
+            "model":model,
+            "choices":[{
+                "index":0,
+                "message":{
+                    "role":"assistant",
+                    "content":"Hello from upstream"
+                },
+                "finish_reason":"stop"
+            }],
+            "usage":{
+                "prompt_tokens":11,
+                "completion_tokens":7,
+                "total_tokens":18
+            }
+        })),
+    )
+}
+
+async fn upstream_responses_handler(Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let model = body
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or("gpt-4.1");
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"resp_upstream",
+            "object":"response",
+            "status":"completed",
+            "model":model,
+            "output":[{
+                "id":"msg_resp_upstream",
+                "type":"message",
+                "role":"assistant",
+                "content":[{
+                    "type":"output_text",
+                    "text":"Hello from responses upstream"
+                }]
+            }],
+            "usage":{
+                "input_tokens":12,
+                "output_tokens":6,
+                "total_tokens":18
+            }
+        })),
+    )
+}
+
+async fn upstream_completions_handler(Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let model = body
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or("gpt-3.5-turbo-instruct");
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id":"cmpl_upstream",
+            "object":"text_completion",
+            "model":model,
+            "choices":[{
+                "index":0,
+                "text":"relay completion",
+                "finish_reason":"stop"
+            }]
+        })),
+    )
+}
+
+async fn upstream_embeddings_handler(Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let model = body
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or("text-embedding-3-large");
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "object":"list",
+            "model":model,
+            "data":[{
+                "object":"embedding",
+                "embedding":[0.42, 0.11],
+                "index":0
+            }],
+            "usage":{
+                "prompt_tokens":1,
+                "total_tokens":1
+            }
+        })),
+    )
+}
+
 #[tokio::test]
 async fn stateful_chat_route_captures_platform_credit_hold_into_request_settlement() {
     let tenant_id = "tenant-commercial-admission";
@@ -131,6 +336,7 @@ async fn stateful_chat_route_captures_platform_credit_hold_into_request_settleme
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8801, 9901).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["gpt-4.1"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app
@@ -163,6 +369,7 @@ async fn stateful_responses_route_captures_platform_credit_hold_into_request_set
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8802, 9902).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["gpt-4.1"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app
@@ -193,6 +400,7 @@ async fn stateful_completions_route_captures_platform_credit_hold_into_request_s
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8803, 9903).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["gpt-3.5-turbo-instruct"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app
@@ -223,6 +431,7 @@ async fn stateful_embeddings_route_captures_platform_credit_hold_into_request_se
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8804, 9904).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["text-embedding-3-large"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app
@@ -289,6 +498,7 @@ async fn stateful_anthropic_messages_route_captures_platform_credit_hold_into_re
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8805, 9905).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["gpt-4.1"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app
@@ -331,6 +541,7 @@ async fn stateful_gemini_generate_content_route_captures_platform_credit_hold_in
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let account =
         seed_platform_credit_account(&store, tenant_id, project_id, &api_key, 8806, 9906).await;
+    configure_stateful_openai_upstream(&pool, tenant_id, &["gemini-2.5-pro"]).await;
 
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let response = app

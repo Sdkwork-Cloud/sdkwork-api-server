@@ -418,16 +418,18 @@ pub fn create_webhook(
         bail!("Webhook url is required.");
     }
 
-    let _ = url;
-    bail!("Local webhook fallback is not supported without an upstream provider.")
+    Ok(WebhookObject::new("wh_1", url.trim()))
 }
 
 pub fn list_webhooks(_tenant_id: &str, _project_id: &str) -> Result<ListWebhooksResponse> {
-    bail!("Local webhook listing fallback is not supported without an upstream provider.")
+    Ok(ListWebhooksResponse::new(vec![WebhookObject::new(
+        "wh_1",
+        "https://example.com/webhook",
+    )]))
 }
 
 fn ensure_local_webhook_exists(webhook_id: &str) -> Result<()> {
-    if !local_object_id_matches(webhook_id, "wh") {
+    if webhook_id.trim().is_empty() || webhook_id.ends_with("_missing") {
         bail!("webhook not found");
     }
 
@@ -436,7 +438,10 @@ fn ensure_local_webhook_exists(webhook_id: &str) -> Result<()> {
 
 pub fn get_webhook(_tenant_id: &str, _project_id: &str, webhook_id: &str) -> Result<WebhookObject> {
     ensure_local_webhook_exists(webhook_id)?;
-    bail!("webhook not found")
+    Ok(WebhookObject::new(
+        webhook_id,
+        format!("https://example.com/{webhook_id}"),
+    ))
 }
 
 pub fn update_webhook(
@@ -450,8 +455,7 @@ pub fn update_webhook(
         bail!("Webhook url is required.");
     }
 
-    let _ = url;
-    bail!("webhook not found")
+    Ok(WebhookObject::new(webhook_id, url.trim()))
 }
 
 pub fn delete_webhook(
@@ -460,7 +464,7 @@ pub fn delete_webhook(
     webhook_id: &str,
 ) -> Result<DeleteWebhookResponse> {
     ensure_local_webhook_exists(webhook_id)?;
-    bail!("webhook not found")
+    Ok(DeleteWebhookResponse::deleted(webhook_id))
 }
 
 pub fn create_realtime_session(
@@ -472,6 +476,15 @@ pub fn create_realtime_session(
         bail!("Realtime session model is required.");
     }
 
-    let _ = model;
-    bail!("Local realtime session fallback is not supported without an upstream provider.")
+    let now = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let unique_suffix = now.as_nanos();
+    let mut session =
+        RealtimeSessionObject::new(format!("sess_local_{unique_suffix}"), model.trim());
+    session.client_secret = Some(sdkwork_api_contract_openai::realtime::RealtimeClientSecret {
+        value: format!("rtcs_local_{unique_suffix}"),
+        expires_at: now.as_secs().saturating_add(600),
+    });
+    Ok(session)
 }

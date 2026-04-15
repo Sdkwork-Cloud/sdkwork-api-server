@@ -27,7 +27,7 @@ It is the default end-user boundary for account creation, dashboard and usage re
 ## Default Portal Flow
 
 1. Open `http://127.0.0.1:5174/`
-2. Create a portal account, or, when running the development bootstrap profile, log in with the seeded local demo account
+2. Create a portal account, or, when running the development bootstrap profile, log in with a provisioned local identity
 3. Log in or land on the dashboard
 4. Inspect workspace identity, recent requests, token-unit usage, and billing posture
 5. Review coupon redemption, recharge, and subscription entry points inside the portal
@@ -35,10 +35,11 @@ It is the default end-user boundary for account creation, dashboard and usage re
 7. Copy the plaintext key immediately
 8. Use that key against the gateway
 
-Local demo account, available only when the `dev` bootstrap profile seeds local identities, typically with `SDKWORK_BOOTSTRAP_PROFILE=dev`:
+When `SDKWORK_BOOTSTRAP_PROFILE=dev`, development identities come from `data/identities/dev.json`.
 
-- email: `portal@sdkwork.local`
-- password: `ChangeMe123!`
+- review that file before sharing a local environment
+- register a new account through `/portal/auth/register` when you want a fresh local user
+- the default `prod` bootstrap profile does not seed development identities
 
 If you also expose any service on a non-loopback bind while still using the built-in development secrets, set `SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS=true` explicitly for that development-only scenario.
 

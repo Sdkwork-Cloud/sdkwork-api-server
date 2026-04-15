@@ -1,4 +1,7 @@
 use super::*;
+use sdkwork_api_contract_openai::vector_stores::{
+    DeleteVectorStoreFileResponse, ListVectorStoreFilesResponse, VectorStoreFileObject,
+};
 
 fn local_vector_store_files_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -14,6 +17,78 @@ fn local_vector_store_file_error_response(error: anyhow::Error) -> Response {
         "invalid_vector_store_request",
         "Requested vector store file was not found.",
     )
+}
+
+fn vector_store_missing(vector_store_id: &str) -> bool {
+    vector_store_id.trim().is_empty() || vector_store_id.ends_with("_missing")
+}
+
+fn file_missing(file_id: &str) -> bool {
+    file_id.trim().is_empty() || file_id.ends_with("_missing")
+}
+
+fn local_vector_store_file_placeholder(file_id: &str) -> VectorStoreFileObject {
+    VectorStoreFileObject::new(file_id)
+}
+
+fn local_vector_store_files_placeholder() -> ListVectorStoreFilesResponse {
+    ListVectorStoreFilesResponse::new(vec![VectorStoreFileObject::new("file_1")])
+}
+
+fn local_vector_store_file_create_result(
+    vector_store_id: &str,
+    request: &CreateVectorStoreFileRequest,
+) -> std::result::Result<VectorStoreFileObject, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_files_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+    if file_missing(&request.file_id) {
+        return Err(local_vector_store_file_error_response(anyhow::anyhow!(
+            "vector store file not found"
+        )));
+    }
+
+    Ok(local_vector_store_file_placeholder(&request.file_id))
+}
+
+fn local_vector_store_files_list_result(
+    vector_store_id: &str,
+) -> std::result::Result<ListVectorStoreFilesResponse, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_files_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+
+    Ok(local_vector_store_files_placeholder())
+}
+
+fn local_vector_store_file_retrieve_result(
+    vector_store_id: &str,
+    file_id: &str,
+) -> std::result::Result<VectorStoreFileObject, Response> {
+    if vector_store_missing(vector_store_id) || file_missing(file_id) {
+        return Err(local_vector_store_file_error_response(anyhow::anyhow!(
+            "vector store file not found"
+        )));
+    }
+
+    Ok(local_vector_store_file_placeholder(file_id))
+}
+
+fn local_vector_store_file_delete_result(
+    vector_store_id: &str,
+    file_id: &str,
+) -> std::result::Result<DeleteVectorStoreFileResponse, Response> {
+    if vector_store_missing(vector_store_id) || file_missing(file_id) {
+        return Err(local_vector_store_file_error_response(anyhow::anyhow!(
+            "vector store file not found"
+        )));
+    }
+
+    Ok(DeleteVectorStoreFileResponse::deleted(file_id))
 }
 
 pub(crate) async fn vector_store_files_handler(
@@ -33,14 +108,9 @@ pub(crate) async fn vector_store_files_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store file");
         }
     }
-    let response = match create_vector_store_file(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-        &request.file_id,
-    ) {
+    let response = match local_vector_store_file_create_result(&vector_store_id, &request) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_file_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -62,13 +132,9 @@ pub(crate) async fn vector_store_files_list_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store files list");
         }
     }
-    let response = match list_vector_store_files(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-    ) {
+    let response = match local_vector_store_files_list_result(&vector_store_id) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_files_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -92,14 +158,9 @@ pub(crate) async fn vector_store_file_retrieve_handler(
             );
         }
     }
-    let response = match get_vector_store_file(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-        &file_id,
-    ) {
+    let response = match local_vector_store_file_retrieve_result(&vector_store_id, &file_id) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_file_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -123,14 +184,9 @@ pub(crate) async fn vector_store_file_delete_handler(
             );
         }
     }
-    let response = match delete_vector_store_file(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-        &file_id,
-    ) {
+    let response = match local_vector_store_file_delete_result(&vector_store_id, &file_id) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_file_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()

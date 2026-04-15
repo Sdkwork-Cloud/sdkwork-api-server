@@ -20,6 +20,7 @@ function translationEntry(key, value) {
 test('commercial coupon order-audit copy is overridden by a dedicated zh-CN marketing translation slice', () => {
   const source = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
 
   assert.match(source, /t\('Payment, coupon, and campaign evidence is being loaded for the selected order\.'\)/);
   assert.match(source, /t\('No coupon applied'\)/);
@@ -121,5 +122,5 @@ test('commercial coupon order-audit copy is overridden by a dedicated zh-CN mark
       '\\u8be5\\u8ba2\\u5355\\u5c1a\\u672a\\u8bb0\\u5f55\\u4f18\\u60e0\\u5238\\u56de\\u6eda\\u8bc1\\u636e\\u3002',
     ),
   );
-  assert.match(i18n, /\.\.\.ADMIN_ZH_MARKETING_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_MARKETING_TRANSLATIONS,/);
 });

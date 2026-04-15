@@ -406,7 +406,11 @@ impl PostgresAdminStore {
         match insert_result {
             Ok(_) => Ok(refund.clone()),
             Err(error) if postgres_webhook_error_is_unique_violation(&error) => {
-                if self.find_commerce_refund(&refund.refund_id).await?.is_some() {
+                if self
+                    .find_commerce_refund(&refund.refund_id)
+                    .await?
+                    .is_some()
+                {
                     self.update_commerce_refund_row(refund).await?;
                     return Ok(refund.clone());
                 }
@@ -415,7 +419,8 @@ impl PostgresAdminStore {
                     .find_commerce_refund_by_idempotency_key(&refund.idempotency_key)
                     .await?
                 {
-                    if existing.order_id == refund.order_id && existing.provider == refund.provider {
+                    if existing.order_id == refund.order_id && existing.provider == refund.provider
+                    {
                         return Ok(existing);
                     }
                     return Err(anyhow!(

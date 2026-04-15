@@ -45,6 +45,7 @@ test('apirouter rate-limit labels localize ui copy while protocol literals remai
     'packages/sdkwork-router-admin-apirouter/src/pages/access/GatewayApiKeyUsageDialog.tsx',
   );
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const apirouterSurfaceTranslations = extractMap(i18n, 'ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS');
 
   const localizedUiKeys = [
@@ -94,5 +95,5 @@ test('apirouter rate-limit labels localize ui copy while protocol literals remai
     'expected authorization header example to remain a protocol literal',
   );
 
-  assert.match(i18n, /\.\.\.ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS,/);
 });

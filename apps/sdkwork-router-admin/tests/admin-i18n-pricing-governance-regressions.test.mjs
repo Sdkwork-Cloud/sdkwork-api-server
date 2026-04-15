@@ -22,6 +22,7 @@ test('pricing governance operator copy is overridden by a dedicated zh-CN pricin
   const pricingSource = read('packages/sdkwork-router-admin-pricing/src/index.tsx');
   const gatewayAccessSource = read('packages/sdkwork-router-admin-apirouter/src/pages/GatewayAccessPage.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
 
   assert.match(
     commercialSource,
@@ -80,5 +81,5 @@ test('pricing governance operator copy is overridden by a dedicated zh-CN pricin
       '\\u5b9a\\u4ef7\\u8ba1\\u5212\\u548c\\u8d39\\u7387\\u5171\\u540c\\u5b9a\\u4e49\\u4e86\\u7f51\\u5173\\u8bbf\\u95ee\\u7b56\\u7565\\u5fc5\\u987b\\u9075\\u5faa\\u7684\\u5546\\u4e1a\\u9762\\u89c4\\u3002',
     ),
   );
-  assert.match(i18n, /\.\.\.ADMIN_ZH_PRICING_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_PRICING_TRANSLATIONS,/);
 });

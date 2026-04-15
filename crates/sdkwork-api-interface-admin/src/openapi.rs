@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::*;
 
 #[derive(OpenApi)]
@@ -8,6 +10,96 @@ use super::*;
         description = "OpenAPI 3.1 schema generated directly from the current admin router implementation."
     ),
     modifiers(&AdminApiDocModifier),
+    paths(
+        system_paths::health,
+        auth_paths::auth_login,
+        auth_paths::auth_change_password,
+        tenant_paths::tenants_list,
+        tenant_paths::tenants_create,
+        catalog_paths::tenant_provider_readiness_list,
+        tenant_paths::projects_list,
+        tenant_paths::projects_create,
+        catalog_paths::providers_list,
+        catalog_paths::providers_create,
+        user_paths::operator_users_list,
+        user_paths::operator_users_upsert,
+        user_paths::operator_user_status_update,
+        user_paths::portal_users_list,
+        user_paths::portal_users_upsert,
+        user_paths::portal_user_status_update,
+        marketing_template_paths::marketing_coupon_templates_list,
+        marketing_template_paths::marketing_coupon_templates_create,
+        marketing_template_paths::marketing_coupon_templates_status_update,
+        marketing_template_paths::marketing_coupon_templates_clone,
+        marketing_template_paths::marketing_coupon_templates_compare,
+        marketing_template_paths::marketing_coupon_templates_submit_for_approval,
+        marketing_template_paths::marketing_coupon_templates_approve,
+        marketing_template_paths::marketing_coupon_templates_reject,
+        marketing_template_paths::marketing_coupon_templates_publish,
+        marketing_template_paths::marketing_coupon_templates_schedule,
+        marketing_template_paths::marketing_coupon_templates_retire,
+        marketing_template_paths::marketing_coupon_template_lifecycle_audits_list,
+        marketing_campaign_paths::marketing_campaigns_list,
+        marketing_campaign_paths::marketing_campaigns_create,
+        marketing_campaign_paths::marketing_campaigns_status_update,
+        marketing_campaign_paths::marketing_campaigns_clone,
+        marketing_campaign_paths::marketing_campaigns_compare,
+        marketing_campaign_paths::marketing_campaigns_submit_for_approval,
+        marketing_campaign_paths::marketing_campaigns_approve,
+        marketing_campaign_paths::marketing_campaigns_reject,
+        marketing_campaign_paths::marketing_campaigns_publish,
+        marketing_campaign_paths::marketing_campaigns_schedule,
+        marketing_campaign_paths::marketing_campaigns_retire,
+        marketing_campaign_paths::marketing_campaign_lifecycle_audits_list,
+        marketing_budget_paths::marketing_budgets_list,
+        marketing_budget_paths::marketing_budgets_create,
+        marketing_budget_paths::marketing_budgets_status_update,
+        marketing_budget_paths::marketing_budgets_activate,
+        marketing_budget_paths::marketing_budgets_close,
+        marketing_budget_paths::marketing_budget_lifecycle_audits_list,
+        marketing_code_paths::marketing_codes_list,
+        marketing_code_paths::marketing_codes_create,
+        marketing_code_paths::marketing_codes_status_update,
+        marketing_code_paths::marketing_codes_disable,
+        marketing_code_paths::marketing_codes_restore,
+        marketing_code_paths::marketing_code_lifecycle_audits_list,
+        marketing_runtime_paths::marketing_reservations_list,
+        marketing_runtime_paths::marketing_redemptions_list,
+        marketing_runtime_paths::marketing_rollbacks_list,
+        gateway_paths::api_keys_list,
+        gateway_paths::api_keys_create,
+        gateway_paths::api_key_update,
+        gateway_paths::api_key_groups_list,
+        gateway_paths::api_key_groups_create,
+        gateway_paths::api_key_group_update,
+        billing_paths::billing_ledger_list,
+        billing_paths::billing_events_list,
+        billing_paths::billing_events_summary,
+        billing_paths::billing_summary,
+        billing_paths::billing_pricing_lifecycle_synchronize,
+        billing_paths::billing_account_ledger,
+        commerce_paths::commerce_orders_recent,
+        commerce_paths::commerce_catalog_publications_list,
+        commerce_paths::commerce_catalog_publication_detail,
+        commerce_paths::commerce_catalog_publication_publish,
+        commerce_paths::commerce_catalog_publication_schedule,
+        commerce_paths::commerce_catalog_publication_retire,
+        commerce_paths::commerce_payment_methods_list,
+        commerce_paths::commerce_payment_method_put,
+        commerce_paths::commerce_payment_method_delete,
+        commerce_paths::commerce_payment_method_bindings_list,
+        commerce_paths::commerce_payment_method_bindings_replace,
+        commerce_paths::commerce_order_payment_events,
+        commerce_paths::commerce_order_payment_attempts,
+        commerce_paths::commerce_order_refunds_list,
+        commerce_paths::commerce_order_refunds_create,
+        commerce_paths::commerce_order_audit,
+        commerce_paths::commerce_webhook_inbox_list,
+        commerce_paths::commerce_webhook_delivery_attempts_list,
+        commerce_paths::commerce_reconciliation_runs_list,
+        commerce_paths::commerce_reconciliation_runs_create,
+        commerce_paths::commerce_reconciliation_items_list
+    ),
     tags(
         (name = "system", description = "Admin health and system-facing routes."),
         (name = "auth", description = "Admin authentication and session management routes."),
@@ -42,175 +134,35 @@ impl Modify for AdminApiDocModifier {
     }
 }
 
+#[allow(dead_code)]
 mod auth_paths;
+#[allow(dead_code)]
 mod billing_paths;
+#[allow(dead_code)]
 mod catalog_paths;
+#[allow(dead_code)]
 mod commerce_paths;
+#[allow(dead_code)]
 mod gateway_paths;
+#[allow(dead_code)]
 mod marketing_budget_paths;
+#[allow(dead_code)]
 mod marketing_campaign_paths;
+#[allow(dead_code)]
 mod marketing_code_paths;
+#[allow(dead_code)]
 mod marketing_runtime_paths;
+#[allow(dead_code)]
 mod marketing_template_paths;
+#[allow(dead_code)]
 mod system_paths;
+#[allow(dead_code)]
 mod tenant_paths;
+#[allow(dead_code)]
 mod user_paths;
 
 fn admin_openapi() -> utoipa::openapi::OpenApi {
-    OpenApiRouter::<()>::with_openapi(AdminApiDoc::openapi())
-        .routes(routes!(system_paths::health))
-        .routes(routes!(auth_paths::auth_login))
-        .routes(routes!(auth_paths::auth_change_password))
-        .routes(routes!(tenant_paths::tenants_list))
-        .routes(routes!(tenant_paths::tenants_create))
-        .routes(routes!(catalog_paths::tenant_provider_readiness_list))
-        .routes(routes!(tenant_paths::projects_list))
-        .routes(routes!(tenant_paths::projects_create))
-        .routes(routes!(catalog_paths::providers_list))
-        .routes(routes!(catalog_paths::providers_create))
-        .routes(routes!(user_paths::operator_users_list))
-        .routes(routes!(user_paths::operator_users_upsert))
-        .routes(routes!(user_paths::operator_user_status_update))
-        .routes(routes!(user_paths::portal_users_list))
-        .routes(routes!(user_paths::portal_users_upsert))
-        .routes(routes!(user_paths::portal_user_status_update))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_list
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_create
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_status_update
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_clone
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_compare
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_submit_for_approval
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_approve
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_reject
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_publish
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_schedule
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_templates_retire
-        ))
-        .routes(routes!(
-            marketing_template_paths::marketing_coupon_template_lifecycle_audits_list
-        ))
-        .routes(routes!(marketing_campaign_paths::marketing_campaigns_list))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_create
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_status_update
-        ))
-        .routes(routes!(marketing_campaign_paths::marketing_campaigns_clone))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_compare
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_submit_for_approval
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_approve
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_reject
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_publish
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_schedule
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaigns_retire
-        ))
-        .routes(routes!(
-            marketing_campaign_paths::marketing_campaign_lifecycle_audits_list
-        ))
-        .routes(routes!(marketing_budget_paths::marketing_budgets_list))
-        .routes(routes!(marketing_budget_paths::marketing_budgets_create))
-        .routes(routes!(
-            marketing_budget_paths::marketing_budgets_status_update
-        ))
-        .routes(routes!(marketing_budget_paths::marketing_budgets_activate))
-        .routes(routes!(marketing_budget_paths::marketing_budgets_close))
-        .routes(routes!(
-            marketing_budget_paths::marketing_budget_lifecycle_audits_list
-        ))
-        .routes(routes!(marketing_code_paths::marketing_codes_list))
-        .routes(routes!(marketing_code_paths::marketing_codes_create))
-        .routes(routes!(marketing_code_paths::marketing_codes_status_update))
-        .routes(routes!(marketing_code_paths::marketing_codes_disable))
-        .routes(routes!(marketing_code_paths::marketing_codes_restore))
-        .routes(routes!(
-            marketing_code_paths::marketing_code_lifecycle_audits_list
-        ))
-        .routes(routes!(
-            marketing_runtime_paths::marketing_reservations_list
-        ))
-        .routes(routes!(marketing_runtime_paths::marketing_redemptions_list))
-        .routes(routes!(marketing_runtime_paths::marketing_rollbacks_list))
-        .routes(routes!(gateway_paths::api_keys_list))
-        .routes(routes!(gateway_paths::api_keys_create))
-        .routes(routes!(gateway_paths::api_key_update))
-        .routes(routes!(gateway_paths::api_key_groups_list))
-        .routes(routes!(gateway_paths::api_key_groups_create))
-        .routes(routes!(gateway_paths::api_key_group_update))
-        .routes(routes!(billing_paths::billing_ledger_list))
-        .routes(routes!(billing_paths::billing_events_list))
-        .routes(routes!(billing_paths::billing_events_summary))
-        .routes(routes!(billing_paths::billing_summary))
-        .routes(routes!(
-            billing_paths::billing_pricing_lifecycle_synchronize
-        ))
-        .routes(routes!(billing_paths::billing_account_ledger))
-        .routes(routes!(commerce_paths::commerce_orders_recent))
-        .routes(routes!(commerce_paths::commerce_catalog_publications_list))
-        .routes(routes!(commerce_paths::commerce_catalog_publication_detail))
-        .routes(routes!(
-            commerce_paths::commerce_catalog_publication_publish
-        ))
-        .routes(routes!(
-            commerce_paths::commerce_catalog_publication_schedule
-        ))
-        .routes(routes!(commerce_paths::commerce_catalog_publication_retire))
-        .routes(routes!(commerce_paths::commerce_payment_methods_list))
-        .routes(routes!(commerce_paths::commerce_payment_method_put))
-        .routes(routes!(commerce_paths::commerce_payment_method_delete))
-        .routes(routes!(
-            commerce_paths::commerce_payment_method_bindings_list
-        ))
-        .routes(routes!(
-            commerce_paths::commerce_payment_method_bindings_replace
-        ))
-        .routes(routes!(commerce_paths::commerce_order_payment_events))
-        .routes(routes!(commerce_paths::commerce_order_payment_attempts))
-        .routes(routes!(commerce_paths::commerce_order_refunds_list))
-        .routes(routes!(commerce_paths::commerce_order_refunds_create))
-        .routes(routes!(commerce_paths::commerce_order_audit))
-        .routes(routes!(commerce_paths::commerce_webhook_inbox_list))
-        .routes(routes!(
-            commerce_paths::commerce_webhook_delivery_attempts_list
-        ))
-        .routes(routes!(commerce_paths::commerce_reconciliation_runs_list))
-        .routes(routes!(commerce_paths::commerce_reconciliation_runs_create))
-        .routes(routes!(commerce_paths::commerce_reconciliation_items_list))
-        .into_openapi()
+    AdminApiDoc::openapi()
 }
 
 async fn admin_openapi_handler() -> Json<utoipa::openapi::OpenApi> {

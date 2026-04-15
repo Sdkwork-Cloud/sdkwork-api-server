@@ -20,6 +20,7 @@ pub fn record_usage(
     record_usage_with_tokens(project_id, model, provider, units, amount, 0, 0, 0)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn record_usage_with_tokens(
     project_id: &str,
     model: &str,
@@ -35,6 +36,7 @@ pub fn record_usage_with_tokens(
         .with_token_usage(input_tokens, output_tokens, total_tokens))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn record_usage_with_tokens_and_facts(
     project_id: &str,
     model: &str,
@@ -74,6 +76,7 @@ pub async fn persist_usage_record(
     store.insert_usage_record(&usage).await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn persist_usage_record_with_tokens(
     store: &dyn AdminStore,
     project_id: &str,
@@ -98,6 +101,7 @@ pub async fn persist_usage_record_with_tokens(
     store.insert_usage_record(&usage).await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn persist_usage_record_with_tokens_and_facts(
     store: &dyn AdminStore,
     project_id: &str,

@@ -221,9 +221,7 @@ pub(crate) fn pricing_plan_ownership_scope_as_str(
     }
 }
 
-pub(crate) fn parse_pricing_plan_ownership_scope(
-    value: &str,
-) -> Result<PricingPlanOwnershipScope> {
+pub(crate) fn parse_pricing_plan_ownership_scope(value: &str) -> Result<PricingPlanOwnershipScope> {
     match value {
         "workspace" => Ok(PricingPlanOwnershipScope::Workspace),
         "platform_shared" => Ok(PricingPlanOwnershipScope::PlatformShared),

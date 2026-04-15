@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Request, StatusCode};
@@ -169,7 +171,7 @@ async fn stateful_anthropic_messages_route_accepts_x_api_key_and_records_usage()
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_openai_provider(&admin_app, &admin_token, &address.to_string()).await;
@@ -381,7 +383,7 @@ async fn stateful_anthropic_messages_route_passthroughs_native_anthropic_protoco
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_anthropic_provider(&admin_app, &admin_token, &address.to_string()).await;
@@ -466,7 +468,7 @@ async fn stateful_anthropic_messages_route_derives_protocol_kind_for_legacy_blan
     .await;
 
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let payload = serde_json::json!({
@@ -554,7 +556,7 @@ async fn stateful_anthropic_messages_route_fails_over_before_execution_when_prim
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let channel = admin_app
@@ -717,7 +719,7 @@ async fn stateful_anthropic_messages_route_prefers_native_dynamic_raw_plugin_for
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_native_dynamic_anthropic_provider(&admin_app, &admin_token, &fixture).await;
@@ -792,7 +794,7 @@ async fn stateful_anthropic_messages_route_uses_connector_runtime_translated_fal
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_connector_anthropic_provider(&admin_app, &admin_token, &fixture, &address.to_string())
@@ -853,7 +855,7 @@ async fn stateful_anthropic_messages_route_fails_closed_for_missing_explicit_nat
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_broken_native_dynamic_anthropic_provider(&admin_app, &admin_token).await;
@@ -914,7 +916,7 @@ async fn stateful_anthropic_messages_route_returns_invalid_request_for_missing_m
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -1126,7 +1128,7 @@ async fn stateful_anthropic_messages_stream_route_returns_invalid_request_for_mi
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -1176,7 +1178,7 @@ async fn stateful_anthropic_messages_stream_route_prefers_native_dynamic_raw_plu
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_native_dynamic_anthropic_provider(&admin_app, &admin_token, &fixture).await;
@@ -1233,7 +1235,7 @@ async fn stateful_anthropic_messages_stream_route_prefers_native_dynamic_raw_plu
 
 #[serial]
 #[tokio::test]
-async fn anthropic_count_tokens_route_returns_input_token_count() {
+async fn anthropic_count_tokens_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -1258,9 +1260,14 @@ async fn anthropic_count_tokens_route_returns_input_token_count() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let json = read_json(response).await;
-    assert_eq!(json["input_tokens"], 42);
+    assert_eq!(json["type"], "error");
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(
+        json["error"]["message"],
+        "Response input token counting is not supported in local fallback."
+    );
 }
 
 #[serial(extension_env)]
@@ -1355,7 +1362,7 @@ async fn stateful_anthropic_count_tokens_route_returns_invalid_request_for_missi
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app

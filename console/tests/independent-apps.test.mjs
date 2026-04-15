@@ -35,6 +35,32 @@ test('admin and portal apps expose different product roots', () => {
   assert.match(portalApp, /className="portal-app"/);
 });
 
+test('console product surfaces do not expose fixed bootstrap credentials in UI copy', () => {
+  const landingApp = read('src/LandingApp.tsx');
+  const adminApp = read('src/admin/App.tsx');
+  const portalAuth = read('packages/sdkwork-api-portal-auth/src/index.tsx');
+  const portalUser = read('packages/sdkwork-api-portal-user/src/index.tsx');
+
+  for (const source of [landingApp, adminApp, portalAuth, portalUser]) {
+    assert.doesNotMatch(source, /admin@sdkwork\.local/);
+    assert.doesNotMatch(source, /portal@sdkwork\.local/);
+    assert.doesNotMatch(source, /ChangeMe123!/);
+  }
+
+  assert.match(landingApp, /active bootstrap profile/);
+
+  assert.match(adminApp, /VITE_ADMIN_LOGIN_HINT_EMAIL/);
+  assert.match(adminApp, /active bootstrap profile/);
+  assert.match(adminApp, /runtime configuration/);
+
+  assert.match(portalAuth, /VITE_PORTAL_LOGIN_HINT_EMAIL/);
+  assert.match(portalAuth, /active bootstrap profile/);
+  assert.match(portalAuth, /runtime configuration/);
+
+  assert.match(portalUser, /active bootstrap profile/);
+  assert.match(portalUser, /runtime configuration/);
+});
+
 test('admin and portal SDKs keep isolated storage keys and API prefixes', () => {
   const adminSdk = read('packages/sdkwork-api-admin-sdk/src/index.ts');
   const portalSdk = read('packages/sdkwork-api-portal-sdk/src/index.ts');

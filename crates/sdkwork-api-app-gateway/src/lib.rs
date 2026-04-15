@@ -499,6 +499,7 @@ pub async fn execute_raw_stream_provider_operation_with_runtime(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_raw_json_provider_operation_from_planned_execution_context_with_options(
     store: &dyn AdminStore,
     planned: &PlannedExecutionProviderContext,
@@ -522,6 +523,7 @@ pub async fn execute_raw_json_provider_operation_from_planned_execution_context_
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_raw_stream_provider_operation_from_planned_execution_context_with_options(
     store: &dyn AdminStore,
     planned: &PlannedExecutionProviderContext,

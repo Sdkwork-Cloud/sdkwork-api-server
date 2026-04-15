@@ -1,0 +1,33 @@
+name: release-governance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/release-governance.yml'
+      - 'scripts/release/**'
+      - 'scripts/release-governance-workflow-contracts.mjs'
+      - 'scripts/release-governance-workflow.test.mjs'
+      - 'bin/**'
+      - 'docs/架构/135-可观测性与SLO治理设计-2026-04-07.md'
+      - 'docs/架构/143-全局架构对齐与收口计划-2026-04-08.md'
+      - 'docs/release/**'
+  workflow_dispatch:
+
+jobs:
+  release-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run release governance runner self-test
+        run: node --test --experimental-test-isolation=none scripts/release/tests/release-governance-runner.test.mjs
+
+      - name: Run release governance checks
+        run: node scripts/release/run-release-governance-checks.mjs --profile preflight --format json

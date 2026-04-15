@@ -2,7 +2,7 @@ use super::*;
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn containers_create_route_returns_ok() {
+async fn containers_create_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -17,12 +17,17 @@ async fn containers_create_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local container fallback is not supported without an upstream provider.",
+        "invalid_container_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn containers_list_route_returns_ok() {
+async fn containers_list_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -36,12 +41,17 @@ async fn containers_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local container listing fallback is not supported without an upstream provider.",
+        "invalid_container_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_retrieve_route_returns_ok() {
+async fn container_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -55,7 +65,7 @@ async fn container_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -79,7 +89,7 @@ async fn container_retrieve_route_returns_not_found_for_unknown_container() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_delete_route_returns_ok() {
+async fn container_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -93,7 +103,7 @@ async fn container_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -117,7 +127,7 @@ async fn container_delete_route_returns_not_found_for_unknown_container() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_file_create_route_returns_ok() {
+async fn container_file_create_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -132,7 +142,7 @@ async fn container_file_create_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container file was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -152,12 +162,12 @@ async fn container_file_create_route_returns_not_found_for_unknown_container() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested container was not found.").await;
+    assert_openai_not_found(response, "Requested container file was not found.").await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_files_list_route_returns_ok() {
+async fn container_files_list_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -171,7 +181,7 @@ async fn container_files_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -195,7 +205,7 @@ async fn container_files_list_route_returns_not_found_for_unknown_container() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_file_retrieve_route_returns_ok() {
+async fn container_file_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -209,7 +219,7 @@ async fn container_file_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container file was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -233,7 +243,7 @@ async fn container_file_retrieve_route_returns_not_found_for_unknown_file() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_file_delete_route_returns_ok() {
+async fn container_file_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -247,7 +257,7 @@ async fn container_file_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container file was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -271,7 +281,7 @@ async fn container_file_delete_route_returns_not_found_for_unknown_file() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn container_file_content_route_returns_ok() {
+async fn container_file_content_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -285,7 +295,7 @@ async fn container_file_content_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested container file was not found.").await;
 }
 
 #[serial(extension_env)]

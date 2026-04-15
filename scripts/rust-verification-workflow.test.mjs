@@ -30,7 +30,23 @@ test('repository exposes a cached package-group Rust verification workflow', () 
   assert.match(workflow, /group:\s*product-runtime/);
   assert.match(workflow, /vendor\/\*\*/);
   assert.match(workflow, /scripts\/check-rust-dependency-audit\.mjs/);
+  assert.match(workflow, /scripts\/check-rust-dependency-audit\.policy\.json/);
   assert.match(workflow, /scripts\/check-rust-dependency-audit\.test\.mjs/);
+  assert.match(
+    workflow,
+    /scripts\/run-tauri-cli\.mjs/,
+    'rust verification workflow must watch the shared Windows runtime helper',
+  );
+  assert.match(
+    workflow,
+    /scripts\/workspace-target-dir\.mjs/,
+    'rust verification workflow must watch the shared workspace target-dir helper',
+  );
+  assert.match(
+    workflow,
+    /scripts\/release\/desktop-targets\.mjs/,
+    'rust verification workflow must watch transitive desktop target helpers loaded by the matrix runner',
+  );
   assert.match(workflow, /Install cargo-audit/);
   assert.match(workflow, /taiki-e\/install-action@cargo-audit/);
   assert.match(workflow, /Run rust governance node tests/);

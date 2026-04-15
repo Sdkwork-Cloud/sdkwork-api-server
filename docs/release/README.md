@@ -118,7 +118,7 @@
 在执行 `commit -> push -> GitHub release` 之前，必须额外验证：
 
 - `sdkwork-api-router` 的远端 `origin` 可访问，且目标分支 / tag 的真实状态可被验证
-- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase`、`sdkwork-im-sdk` 的本地仓库边界清晰、工作区干净，且与各自 GitHub 目标版本一致
+- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase` 与 `sdkwork-craw-chat-sdk`（发布 Git 根为 `apps/craw-chat`）的本地仓库边界清晰、工作区干净，且与各自 GitHub 目标版本一致
 - 如果任一依赖仓库处于 dirty、ahead / behind 未确认、或远端不可验证状态，则不得提交和 push 当前 release
 - 必须明确区分“本地开发依赖模型”和“release 环境依赖模型”，不能为了发布而破坏本地相对路径开发体验
 

@@ -436,6 +436,7 @@ struct MarketingBundle {
     coupon_codes: Vec<CouponCodeRecord>,
 }
 
+#[allow(clippy::field_reassign_with_default)]
 pub(crate) fn load_bootstrap_profile_pack(
     data_root: &Path,
     profile_id: &str,
@@ -1341,7 +1342,7 @@ fn validate_bootstrap_profile_pack(pack: &BootstrapProfilePack) -> Result<()> {
     ensure_unique(
         "provider_health_snapshots.provider_id+runtime+instance_id",
         &data.provider_health_snapshots,
-        |record| provider_health_snapshot_key(record),
+        provider_health_snapshot_key,
     )?;
     ensure_unique("billing_events.event_id", &data.billing_events, |record| {
         record.event_id.clone()
@@ -5346,6 +5347,7 @@ fn validate_bootstrap_profile_pack(pack: &BootstrapProfilePack) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_account_kernel_bootstrap_data(
     data: &BootstrapDataPack,
     account_ids: &HashSet<String>,
@@ -6003,7 +6005,7 @@ fn validate_account_kernel_bootstrap_data(
             "request_meter_facts.provider_code",
             &record_id,
             &record.provider_code,
-            &executable_provider_account_provider_ids,
+            executable_provider_account_provider_ids,
         )?;
         ensure_active_model_price_coverage(
             "request_meter_facts.model_code",
@@ -7117,6 +7119,7 @@ fn ensure_provider_has_any_active_model_price_coverage(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ensure_provider_has_any_active_model_price_capability_coverage(
     label: &str,
     record_id: &str,
@@ -7345,9 +7348,9 @@ fn ensure_compiled_snapshot_default_provider_matches_deterministic_priority(
     )
 }
 
-fn collect_selected_provider_assessments<'a>(
-    record: &'a RoutingDecisionLog,
-) -> Vec<&'a RoutingCandidateAssessment> {
+fn collect_selected_provider_assessments(
+    record: &RoutingDecisionLog,
+) -> Vec<&RoutingCandidateAssessment> {
     record
         .assessments
         .iter()
@@ -7513,7 +7516,7 @@ fn ensure_provider_health_snapshot_runtime_posture(record: &ProviderHealthSnapsh
         && record
             .message
             .as_deref()
-            .is_none_or(|message| message.trim().is_empty())
+            .map_or(true, |message| message.trim().is_empty())
     {
         bail!(
             "provider health snapshot {} healthy state requires a message",
@@ -7919,7 +7922,7 @@ fn billing_event_matches_catalog(
             && record
                 .channel_id
                 .as_deref()
-                .is_none_or(|channel_id| provider_model.channel_id == channel_id)
+                .map_or(true, |channel_id| provider_model.channel_id == channel_id)
             && provider_model.model_id == record.route_key
             && (provider_model.provider_model_id == record.usage_model
                 || provider_model.model_id == record.usage_model)

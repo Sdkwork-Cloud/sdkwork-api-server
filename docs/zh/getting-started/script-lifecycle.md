@@ -42,7 +42,7 @@
 - 自动创建并复用运行时目录
 - 维护 PID、日志、配置文件
 - 支持 dry-run、foreground 和 service manager
-- 启动成功后输出统一入口、独立端口、默认账号密码和日志位置
+- 启动成功后输出统一入口、独立端口、bootstrap 身份引导和日志位置
 
 ## 脚本功能总表
 
@@ -125,9 +125,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\start-dev.ps1
   - `http://127.0.0.1:9980/health`
   - `http://127.0.0.1:9981/admin/health`
   - `http://127.0.0.1:9982/portal/health`
-- 默认账号密码：
-  - admin：`admin@sdkwork.local / ChangeMe123!`
-  - portal：`portal@sdkwork.local / ChangeMe123!`
+- 开发身份 bootstrap 指引：
+  - 身份来自当前激活的 bootstrap profile
+  - 在共享本地环境前先检查 `data/identities/dev.json`
 
 ### 3. 如需切回独立前端端口
 

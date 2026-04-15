@@ -57,39 +57,16 @@ pub async fn planned_execution_usage_context_for_route(
     capability: &str,
     route_key: &str,
 ) -> Result<PlannedExecutionUsageContext> {
-    let requested_region = current_request_routing_region();
     let api_key_group_id = current_request_api_key_group_id();
-    let decision = match take_cached_routing_decision(
+    let decision = planned_execution_decision_for_route_without_log_with_selection_seed(
+        store,
         tenant_id,
-        Some(project_id),
-        api_key_group_id.as_deref(),
+        project_id,
         capability,
         route_key,
-        requested_region.as_deref(),
+        None,
     )
-    .await
-    {
-        Some(decision) => decision,
-        None => {
-            let recovery_probe_lock_store = routing_recovery_probe_lock_store();
-            let decision = select_route_with_store_context(
-                store,
-                capability,
-                route_key,
-                RouteSelectionContext::new(RoutingDecisionSource::Gateway)
-                    .with_tenant_id_option(Some(tenant_id))
-                    .with_project_id_option(Some(project_id))
-                    .with_api_key_group_id_option(api_key_group_id.as_deref())
-                    .with_requested_region_option(requested_region.as_deref())
-                    .with_recovery_probe_lock_store_option(Some(
-                        recovery_probe_lock_store.as_ref(),
-                    )),
-            )
-            .await?;
-            record_gateway_recovery_probe_from_decision(&decision);
-            decision
-        }
-    };
+    .await?;
     gateway_usage_context_for_decision_provider(
         store,
         tenant_id,
@@ -156,12 +133,15 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
             store, &decision,
         )
         .await?;
-    if let Some(descriptor) = provider_execution_descriptor_for_provider_account_context(
+    let mut first_resolution_error = None;
+    if let Some(descriptor) = resolve_provider_execution_descriptor_for_failover_candidate(
         store,
         secret_manager,
         tenant_id,
         &provider,
-        requested_region.as_deref(),
+        decision.requested_region.as_deref(),
+        failover_enabled,
+        &mut first_resolution_error,
     )
     .await?
     {
@@ -188,12 +168,14 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
             continue;
         };
         let Some(candidate_descriptor) =
-            provider_execution_descriptor_for_provider_account_context(
+            resolve_provider_execution_descriptor_for_failover_candidate(
                 store,
                 secret_manager,
                 tenant_id,
                 &candidate_provider,
-                requested_region.as_deref(),
+                decision.requested_region.as_deref(),
+                true,
+                &mut first_resolution_error,
             )
             .await?
         else {
@@ -213,7 +195,56 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
         .map(Some);
     }
 
+    if let Some(error) = first_resolution_error {
+        return Err(error);
+    }
+
     Ok(None)
+}
+
+async fn planned_execution_decision_for_route_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    selection_seed: Option<u64>,
+) -> Result<RoutingDecision> {
+    let requested_region = current_request_routing_region();
+    let api_key_group_id = current_request_api_key_group_id();
+
+    if selection_seed.is_none() {
+        if let Some(decision) = take_cached_routing_decision(
+            tenant_id,
+            Some(project_id),
+            api_key_group_id.as_deref(),
+            capability,
+            route_key,
+            requested_region.as_deref(),
+        )
+        .await
+        {
+            return Ok(decision);
+        }
+    }
+
+    let recovery_probe_lock_store = routing_recovery_probe_lock_store();
+    let decision = simulate_route_with_store_selection_context(
+        store,
+        capability,
+        route_key,
+        RouteSelectionContext::new(RoutingDecisionSource::Gateway)
+            .with_tenant_id_option(Some(tenant_id))
+            .with_project_id_option(Some(project_id))
+            .with_api_key_group_id_option(api_key_group_id.as_deref())
+            .with_requested_region_option(requested_region.as_deref())
+            .with_selection_seed_option(selection_seed)
+            .with_recovery_probe_lock_store_option(Some(recovery_probe_lock_store.as_ref())),
+    )
+    .await?;
+    record_gateway_recovery_probe_from_decision(&decision);
+
+    Ok(decision)
 }
 
 pub(crate) async fn resolve_store_relay_provider_for_decision(
@@ -227,12 +258,15 @@ pub(crate) async fn resolve_store_relay_provider_for_decision(
         return Ok(None);
     };
 
-    if let Some(descriptor) = provider_execution_descriptor_for_provider_account_context(
+    let mut first_resolution_error = None;
+    if let Some(descriptor) = resolve_provider_execution_descriptor_for_failover_candidate(
         store,
         secret_manager,
         tenant_id,
         &provider,
         decision.requested_region.as_deref(),
+        failover_enabled,
+        &mut first_resolution_error,
     )
     .await?
     {
@@ -252,12 +286,14 @@ pub(crate) async fn resolve_store_relay_provider_for_decision(
             continue;
         };
         let Some(candidate_descriptor) =
-            provider_execution_descriptor_for_provider_account_context(
+            resolve_provider_execution_descriptor_for_failover_candidate(
                 store,
                 secret_manager,
                 tenant_id,
                 &candidate_provider,
                 decision.requested_region.as_deref(),
+                true,
+                &mut first_resolution_error,
             )
             .await?
         else {
@@ -271,7 +307,40 @@ pub(crate) async fn resolve_store_relay_provider_for_decision(
         )));
     }
 
+    if let Some(error) = first_resolution_error {
+        return Err(error);
+    }
+
     Ok(None)
+}
+
+async fn resolve_provider_execution_descriptor_for_failover_candidate(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    provider: &ProxyProvider,
+    requested_region: Option<&str>,
+    suppress_errors_for_failover: bool,
+    first_resolution_error: &mut Option<anyhow::Error>,
+) -> Result<Option<ProviderExecutionDescriptor>> {
+    match provider_execution_descriptor_for_provider_account_context(
+        store,
+        secret_manager,
+        tenant_id,
+        provider,
+        requested_region,
+    )
+    .await
+    {
+        Ok(descriptor) => Ok(descriptor),
+        Err(error) if suppress_errors_for_failover => {
+            if first_resolution_error.is_none() {
+                *first_resolution_error = Some(error);
+            }
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 async fn build_planned_execution_provider_context(

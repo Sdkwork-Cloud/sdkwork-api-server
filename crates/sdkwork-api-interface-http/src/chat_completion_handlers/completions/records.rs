@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use super::*;
 
 fn local_chat_completion_not_found_response(error: anyhow::Error) -> Response {

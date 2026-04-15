@@ -60,7 +60,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\start-dev.ps1
 
 - 默认模式是 preview，内置 Pingora Web Host 会成为主要统一浏览器入口
 - 运行时状态写入 `artifacts/runtime/dev/`
-- 启动日志会打印统一入口、独立服务地址、默认账号密码和日志文件路径
+- 启动日志会打印统一入口、独立服务地址、bootstrap 身份引导和日志文件路径
 - 使用 `./bin/stop-dev.sh` 或 `.\bin\stop-dev.ps1` 停止
 
 启动后的主要地址：
@@ -148,7 +148,7 @@ node scripts/dev/start-workspace.mjs --tauri
 - 当前模式
 - 前端访问入口
 - 独立服务访问入口
-- 默认本地账号密码
+- 当前激活的 bootstrap 身份引导
 
 ## 分面启动
 
@@ -276,12 +276,15 @@ pnpm --dir apps/sdkwork-router-portal dev
 SDKWORK_WEB_BIND=0.0.0.0:9983 cargo run -p router-web-service
 ```
 
-## 默认本地账号
+## 开发身份引导
 
-本地开发流程会自动写入：
+本地开发流程不再依赖固定内建邮箱和密码。
 
-- admin：`admin@sdkwork.local / ChangeMe123!`
-- portal：`portal@sdkwork.local / ChangeMe123!`
+当前约定是：
+
+- 开发身份来自当前激活的 bootstrap profile
+- 本地 `dev` profile 数据位于 `data/identities/dev.json`
+- 默认的 `prod` bootstrap profile 不会注入开发身份
 
 gateway 本身没有默认用户名密码。需要使用 portal 签发的 API key 去访问鉴权后的 gateway 接口。
 

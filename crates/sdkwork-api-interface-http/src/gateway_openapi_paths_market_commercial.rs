@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 #[utoipa::path(
     get,
@@ -146,4 +146,3 @@ pub(crate) async fn commercial_account() {}
     )
 )]
 pub(crate) async fn commercial_account_benefit_lots() {}
-

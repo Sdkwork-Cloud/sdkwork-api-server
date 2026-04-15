@@ -18,7 +18,7 @@ mod support;
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn chat_stream_route_accepts_requests() {
+async fn chat_stream_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -32,7 +32,12 @@ async fn chat_stream_route_accepts_requests() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local chat completion streaming fallback is not supported without an upstream provider.",
+        "invalid_chat_completion_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -69,6 +74,19 @@ async fn read_body(response: axum::response::Response) -> String {
     String::from_utf8(bytes.to_vec()).unwrap()
 }
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = read_body(response).await;
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
 async fn memory_pool() -> SqlitePool {
     sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
@@ -91,7 +109,7 @@ async fn stateful_chat_stream_route_returns_invalid_request_for_missing_model_wi
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -195,7 +213,7 @@ async fn stateful_chat_stream_route_relays_to_openai_compatible_provider() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let _ = admin_app
@@ -330,7 +348,7 @@ async fn stateful_chat_stream_route_relays_to_native_dynamic_provider() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let _ = admin_app

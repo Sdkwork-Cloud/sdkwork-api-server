@@ -93,7 +93,7 @@
 
 - `/docs/release` 与 Git 历史能回溯到最近一次成功发布
 - 未成功发布版本的 changelog 已并入当前 release 说明
-- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase`、`sdkwork-im-sdk` 的本地、远端、计划发布引用一致
+- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase` 与 `sdkwork-craw-chat-sdk`（发布 Git 根为 `apps/craw-chat`）的本地、远端、计划发布引用一致
 - Release 产物未携带本地 sibling 相对路径依赖
 
 ### 4.6 架构能力兑现总表

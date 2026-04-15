@@ -6,9 +6,11 @@ fn postgres_storage_sources() -> (String, String) {
         "/src/account_kernel_store.rs"
     ))
     .expect("postgres account kernel store source");
-    let account_support =
-        fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/account_support.rs"))
-            .expect("postgres account support source");
+    let account_support = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/account_support.rs"
+    ))
+    .expect("postgres account support source");
     (account_kernel_store, account_support)
 }
 
@@ -37,11 +39,13 @@ fn postgres_store_implements_account_kernel_pricing_surface() {
         "expected postgres store pricing rate list implementation",
     );
     assert!(
-        account_support.contains("fn decode_pricing_plan_row(row: PgRow) -> Result<PricingPlanRecord>"),
+        account_support
+            .contains("fn decode_pricing_plan_row(row: PgRow) -> Result<PricingPlanRecord>"),
         "expected postgres pricing plan row decoder",
     );
     assert!(
-        account_support.contains("fn decode_pricing_rate_row(row: PgRow) -> Result<PricingRateRecord>"),
+        account_support
+            .contains("fn decode_pricing_rate_row(row: PgRow) -> Result<PricingRateRecord>"),
         "expected postgres pricing rate row decoder",
     );
     assert!(

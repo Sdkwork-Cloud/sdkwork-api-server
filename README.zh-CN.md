@@ -1,4 +1,4 @@
-# sdkwork-api-server
+﻿# sdkwork-api-server
 
 [English Guide](./README.md)
 
@@ -335,9 +335,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\start.ps1 -DryRun
 - 托管启动脚本现在会在 pid 文件旁边维护一个 `.state.env` 状态文件，记录当前实例的绑定地址、前端模式和进程指纹，用来区分“健康运行中的托管实例”和“残留 pid / pid 被系统复用”的情况。
 - 如果当前已经有一套健康的托管运行时使用了另一组端口，再次执行 `bin/start-dev.*` 或 `bin/start.*` 时会直接打印这套已运行实例的真实地址，而不会再落成模糊的 health-check 失败。
 - Windows 下 `.sh` wrapper 属于兼容入口，实际会转交给对应的 `.ps1` 脚本执行。这样既保留 Git Bash 的命令习惯，也避免 `/d/...` 这类 MSYS 路径直接进入 Windows Node / cargo 进程。
-- 托管启动脚本会打印本地默认账号：
-  - admin：`admin@sdkwork.local / ChangeMe123!`
-  - portal：`portal@sdkwork.local / ChangeMe123!`
+- 托管启动脚本现在会打印 bootstrap profile 身份指引，而不是固定演示账号密码
+  - 启动摘要现在会指向当前的 bootstrap profile 身份，而不会再显示固定演示账户
+  - 如果你在本地使用 `dev` bootstrap profile，请先检查 `data/identities/dev.json`，并使用实际注入的身份登录
 - gateway 没有默认用户名密码，它面向 portal 生成的 API key
 - `bin/install.*` 会写出原生 service / daemon 描述文件，但不会在通用安装步骤里自动注册
 - 安装目录故意只保留生产运行相关脚本和服务管理资产

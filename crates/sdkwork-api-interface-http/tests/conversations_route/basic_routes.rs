@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn conversations_route_returns_ok() {
+async fn conversations_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -16,11 +16,16 @@ async fn conversations_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local conversation fallback is not supported without an upstream provider.",
+        "invalid_conversation_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn conversations_list_route_returns_ok() {
+async fn conversations_list_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -34,11 +39,16 @@ async fn conversations_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local conversation listing fallback is not supported without an upstream provider.",
+        "invalid_conversation_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn conversation_retrieve_update_delete_routes_return_ok() {
+async fn conversation_retrieve_update_delete_routes_return_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
 
     let retrieve = app
@@ -52,7 +62,7 @@ async fn conversation_retrieve_update_delete_routes_return_ok() {
         )
         .await
         .unwrap();
-    assert_eq!(retrieve.status(), StatusCode::OK);
+    assert_openai_not_found(retrieve, "Requested conversation was not found.").await;
 
     let update = app
         .clone()
@@ -66,7 +76,7 @@ async fn conversation_retrieve_update_delete_routes_return_ok() {
         )
         .await
         .unwrap();
-    assert_eq!(update.status(), StatusCode::OK);
+    assert_openai_not_found(update, "Requested conversation was not found.").await;
 
     let delete = app
         .clone()
@@ -79,7 +89,7 @@ async fn conversation_retrieve_update_delete_routes_return_ok() {
         )
         .await
         .unwrap();
-    assert_eq!(delete.status(), StatusCode::OK);
+    assert_openai_not_found(delete, "Requested conversation was not found.").await;
 }
 
 #[tokio::test]
@@ -138,7 +148,7 @@ async fn conversation_delete_route_returns_not_found_for_unknown_conversation() 
 }
 
 #[tokio::test]
-async fn conversation_item_routes_return_ok() {
+async fn conversation_item_routes_surface_local_fallback_contract() {
     let app = sdkwork_api_interface_http::gateway_router();
 
     let create = app
@@ -146,7 +156,7 @@ async fn conversation_item_routes_return_ok() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/conversations/conv_1/items")
+                .uri("/v1/conversations/conv_local_1/items")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     "{\"items\":[{\"id\":\"item_1\",\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"hello\"}]}]}",
@@ -155,45 +165,55 @@ async fn conversation_item_routes_return_ok() {
         )
         .await
         .unwrap();
-    assert_eq!(create.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        create,
+        "Persisted local conversation item state is required for local item creation.",
+        "invalid_conversation_request",
+    )
+    .await;
 
     let list = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/conversations/conv_1/items")
+                .uri("/v1/conversations/conv_local_1/items")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(list.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        list,
+        "Persisted local conversation item state is required for local item listing.",
+        "invalid_conversation_request",
+    )
+    .await;
 
     let retrieve = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/conversations/conv_1/items/item_1")
+                .uri("/v1/conversations/conv_local_1/items/item_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(retrieve.status(), StatusCode::OK);
+    assert_openai_not_found(retrieve, "Requested conversation item was not found.").await;
 
     let delete = app
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/conversations/conv_1/items/item_1")
+                .uri("/v1/conversations/conv_local_1/items/item_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(delete.status(), StatusCode::OK);
+    assert_openai_not_found(delete, "Requested conversation item was not found.").await;
 }
 
 #[tokio::test]
@@ -214,7 +234,7 @@ async fn conversation_items_create_route_returns_not_found_for_unknown_conversat
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested conversation was not found.").await;
+    assert_openai_not_found(response, "Requested conversation item was not found.").await;
 }
 
 #[tokio::test]
@@ -232,7 +252,7 @@ async fn conversation_items_list_route_returns_not_found_for_unknown_conversatio
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested conversation was not found.").await;
+    assert_openai_not_found(response, "Requested conversation item was not found.").await;
 }
 
 #[tokio::test]

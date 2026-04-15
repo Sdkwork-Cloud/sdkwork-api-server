@@ -1,6 +1,11 @@
 use super::*;
 
 fn local_thread_run_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.contains("assistant_id is required") {
+        return invalid_request_openai_response(message, "invalid_assistant_id");
+    }
+
     local_gateway_invalid_or_not_found_response(
         error,
         "invalid_thread_run_request",

@@ -3,37 +3,41 @@ use sdkwork_api_app_gateway::{
     update_vector_store,
 };
 
-#[test]
-fn returns_vector_store_object() {
-    let response = create_vector_store("tenant-1", "project-1", "kb-main").unwrap();
-    assert_eq!(response.object, "vector_store");
-    assert_eq!(response.name, "kb-main");
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
+    );
 }
 
 #[test]
-fn lists_vector_store_objects() {
-    let response = list_vector_stores("tenant-1", "project-1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "vector_store");
+fn local_vector_store_fallback_requires_upstream_provider() {
+    assert_error_contains(
+        create_vector_store("tenant-1", "project-1", "kb-main"),
+        "Local vector store fallback is not supported",
+    );
+    assert_error_contains(
+        list_vector_stores("tenant-1", "project-1"),
+        "Local vector store listing fallback is not supported",
+    );
 }
 
 #[test]
-fn retrieves_vector_store_object() {
-    let response = get_vector_store("tenant-1", "project-1", "vs_1").unwrap();
-    assert_eq!(response.id, "vs_1");
-    assert_eq!(response.object, "vector_store");
-}
-
-#[test]
-fn updates_vector_store_object() {
-    let response = update_vector_store("tenant-1", "project-1", "vs_1", "kb-updated").unwrap();
-    assert_eq!(response.id, "vs_1");
-    assert_eq!(response.name, "kb-updated");
-}
-
-#[test]
-fn deletes_vector_store_object() {
-    let response = delete_vector_store("tenant-1", "project-1", "vs_1").unwrap();
-    assert_eq!(response.id, "vs_1");
-    assert!(response.deleted);
+fn local_vector_store_fallback_requires_persisted_state() {
+    assert_error_contains(
+        get_vector_store("tenant-1", "project-1", "vs_local_1"),
+        "vector store not found",
+    );
+    assert_error_contains(
+        update_vector_store("tenant-1", "project-1", "vs_local_1", "kb-updated"),
+        "vector store not found",
+    );
+    assert_error_contains(
+        delete_vector_store("tenant-1", "project-1", "vs_local_1"),
+        "vector store not found",
+    );
 }

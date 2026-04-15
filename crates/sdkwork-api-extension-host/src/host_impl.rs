@@ -252,6 +252,7 @@ impl ExtensionHost {
         Ok(Some(runtime))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn execute_raw_provider_json(
         &self,
         runtime_key: &str,
@@ -304,6 +305,7 @@ impl ExtensionHost {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_raw_provider_stream(
         &self,
         runtime_key: &str,

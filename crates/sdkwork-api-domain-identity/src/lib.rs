@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AdminUserRole {
     SuperAdmin,
+    #[default]
     PlatformOperator,
     FinanceOperator,
     ReadOnlyOperator,
@@ -19,12 +20,6 @@ impl AdminUserRole {
             Self::FinanceOperator => "finance_operator",
             Self::ReadOnlyOperator => "read_only_operator",
         }
-    }
-}
-
-impl Default for AdminUserRole {
-    fn default() -> Self {
-        Self::PlatformOperator
     }
 }
 

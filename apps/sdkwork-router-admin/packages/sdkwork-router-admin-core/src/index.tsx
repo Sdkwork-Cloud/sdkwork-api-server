@@ -17,6 +17,8 @@ export {
   formatAdminCurrency,
   formatAdminDateTime,
   formatAdminNumber,
+  preloadAdminLocale,
+  preloadPreferredAdminLocale,
   translateAdminText,
   useAdminI18n,
 } from './i18n';

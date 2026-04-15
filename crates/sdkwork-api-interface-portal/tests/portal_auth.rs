@@ -251,9 +251,25 @@ async fn portal_login_rejects_invalid_password() {
 }
 
 #[tokio::test]
-async fn portal_default_login_bootstraps_the_demo_account() {
+async fn portal_login_works_for_a_registered_account() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+
+    let registration = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/auth/register")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPass123!\",\"display_name\":\"Portal Demo\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(registration.status(), StatusCode::CREATED);
 
     let response = app
         .clone()
@@ -263,7 +279,7 @@ async fn portal_default_login_bootstraps_the_demo_account() {
                 .uri("/portal/auth/login")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"email\":\"portal@sdkwork.local\",\"password\":\"ChangeMe123!\"}",
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPass123!\"}",
                 ))
                 .unwrap(),
         )
@@ -272,14 +288,30 @@ async fn portal_default_login_bootstraps_the_demo_account() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let json = read_json(response).await;
-    assert_eq!(json["user"]["email"], "portal@sdkwork.local");
+    assert_eq!(json["user"]["email"], "portal-demo@example.invalid");
     assert_eq!(json["user"]["display_name"], "Portal Demo");
 }
 
 #[tokio::test]
-async fn portal_password_change_rotates_the_login_secret() {
+async fn portal_password_change_rotates_the_login_secret_for_a_registered_account() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_portal::portal_router_with_pool(pool);
+
+    let registration = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/portal/auth/register")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPass123!\",\"display_name\":\"Portal Demo\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(registration.status(), StatusCode::CREATED);
 
     let login = app
         .clone()
@@ -289,7 +321,7 @@ async fn portal_password_change_rotates_the_login_secret() {
                 .uri("/portal/auth/login")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"email\":\"portal@sdkwork.local\",\"password\":\"ChangeMe123!\"}",
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPass123!\"}",
                 ))
                 .unwrap(),
         )
@@ -307,7 +339,7 @@ async fn portal_password_change_rotates_the_login_secret() {
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"current_password\":\"ChangeMe123!\",\"new_password\":\"PortalPassword456!\"}",
+                    "{\"current_password\":\"PortalPass123!\",\"new_password\":\"PortalPassword456!\"}",
                 ))
                 .unwrap(),
         )
@@ -323,7 +355,7 @@ async fn portal_password_change_rotates_the_login_secret() {
                 .uri("/portal/auth/login")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"email\":\"portal@sdkwork.local\",\"password\":\"ChangeMe123!\"}",
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPass123!\"}",
                 ))
                 .unwrap(),
         )
@@ -338,7 +370,7 @@ async fn portal_password_change_rotates_the_login_secret() {
                 .uri("/portal/auth/login")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"email\":\"portal@sdkwork.local\",\"password\":\"PortalPassword456!\"}",
+                    "{\"email\":\"portal-demo@example.invalid\",\"password\":\"PortalPassword456!\"}",
                 ))
                 .unwrap(),
         )

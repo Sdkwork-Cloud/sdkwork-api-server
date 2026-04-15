@@ -406,31 +406,31 @@ function PortalRechargeFlowTracker(input: {
             ? {
                 card: 'border-emerald-200/75 bg-emerald-50/82 dark:border-emerald-900/35 dark:bg-emerald-950/16',
                 badge: 'bg-emerald-600 text-white',
-                label: 'text-emerald-950 dark:text-emerald-50',
-                detail: 'text-emerald-800 dark:text-emerald-200',
+                labelClassName: 'text-emerald-950 dark:text-emerald-50',
+                detailClassName: 'text-emerald-800 dark:text-emerald-200',
                 eyebrow: t('Done'),
               }
             : step.status === 'current'
               ? {
                   card: 'border-primary-300/75 bg-primary-50/86 dark:border-primary-700/40 dark:bg-primary-950/22',
                   badge: 'bg-[linear-gradient(135deg,var(--theme-primary-900),var(--theme-primary-600))] text-white',
-                  label: 'text-primary-950 dark:text-primary-50',
-                  detail: 'text-primary-800 dark:text-primary-200',
+                  labelClassName: 'text-primary-950 dark:text-primary-50',
+                  detailClassName: 'text-primary-800 dark:text-primary-200',
                   eyebrow: t('Current'),
                 }
               : step.status === 'attention'
                 ? {
                     card: 'border-amber-200/75 bg-amber-50/82 dark:border-amber-900/35 dark:bg-amber-950/14',
                     badge: 'bg-amber-400 text-amber-950',
-                    label: 'text-amber-950 dark:text-amber-50',
-                    detail: 'text-amber-800 dark:text-amber-200',
+                    labelClassName: 'text-amber-950 dark:text-amber-50',
+                    detailClassName: 'text-amber-800 dark:text-amber-200',
                     eyebrow: t('Queue'),
                   }
                 : {
                     card: 'border-primary-200/60 bg-white/88 dark:border-primary-900/30 dark:bg-primary-950/12',
                     badge: 'border border-primary-300/70 bg-white text-primary-700 dark:border-primary-700/45 dark:bg-primary-950/24 dark:text-primary-200',
-                    label: 'text-primary-950 dark:text-primary-50',
-                    detail: 'text-zinc-600 dark:text-zinc-300',
+                    labelClassName: 'text-primary-950 dark:text-primary-50',
+                    detailClassName: 'text-zinc-600 dark:text-zinc-300',
                     eyebrow: t('Next'),
                   };
 
@@ -461,10 +461,10 @@ function PortalRechargeFlowTracker(input: {
                 </div>
 
                 <div className="space-y-1">
-                  <strong className={`block text-sm font-semibold ${tone.label}`}>
+                  <strong className={`block text-sm font-semibold ${tone.labelClassName}`}>
                     {step.label}
                   </strong>
-                  <p className={`text-sm leading-6 ${tone.detail}`}>
+                  <p className={`text-sm leading-6 ${tone.detailClassName}`}>
                     {step.detail}
                   </p>
                 </div>

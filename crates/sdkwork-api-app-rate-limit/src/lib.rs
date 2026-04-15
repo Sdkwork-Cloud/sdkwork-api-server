@@ -47,6 +47,7 @@ pub fn coupon_code_hash(code: &str) -> String {
         .collect::<String>()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_coupon_rate_limit_policy(
     policy_id: &str,
     project_id: &str,
@@ -77,6 +78,7 @@ pub fn create_coupon_rate_limit_policy(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_rate_limit_policy(
     policy_id: &str,
     project_id: &str,

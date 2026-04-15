@@ -332,7 +332,7 @@ async fn stateful_vector_stores_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -482,6 +482,116 @@ async fn stateful_vector_stores_route_relays_to_openai_compatible_provider() {
 }
 
 #[tokio::test]
+async fn stateful_vector_stores_route_returns_local_fallbacks_without_upstream_provider() {
+    let pool = memory_pool().await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
+    let api_key = support::issue_gateway_api_key(
+        &pool,
+        "tenant-vector-stores-local",
+        "project-vector-stores-local",
+    )
+    .await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let create_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/vector_stores")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"name\":\"kb-main\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(create_response.status(), StatusCode::OK);
+    let create_json = read_json(create_response).await;
+    assert_eq!(create_json["id"], "vs_1");
+
+    let list_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores")
+                .header("authorization", format!("Bearer {api_key}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(list_response.status(), StatusCode::OK);
+    let list_json = read_json(list_response).await;
+    assert_eq!(list_json["data"][0]["id"], "vs_1");
+
+    let retrieve_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/vector_stores/vs_1")
+                .header("authorization", format!("Bearer {api_key}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(retrieve_response.status(), StatusCode::OK);
+    let retrieve_json = read_json(retrieve_response).await;
+    assert_eq!(retrieve_json["id"], "vs_1");
+
+    let update_response = gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/vector_stores/vs_1")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"name\":\"kb-updated\"}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(update_response.status(), StatusCode::OK);
+    let update_json = read_json(update_response).await;
+    assert_eq!(update_json["name"], "kb-updated");
+
+    let delete_response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/vector_stores/vs_1")
+                .header("authorization", format!("Bearer {api_key}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(delete_response.status(), StatusCode::OK);
+    let delete_json = read_json(delete_response).await;
+    assert_eq!(delete_json["deleted"], true);
+
+    let usage = admin_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/usage/records")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(usage.status(), StatusCode::OK);
+    let usage_json = read_json(usage).await;
+    assert_eq!(usage_json.as_array().unwrap().len(), 5);
+}
+
+#[tokio::test]
 async fn stateful_vector_stores_create_usage_uses_created_vector_store_id_for_billing() {
     let tenant_id = "tenant-vector-stores-create";
     let project_id = "project-vector-stores-create";
@@ -498,7 +608,7 @@ async fn stateful_vector_stores_create_usage_uses_created_vector_store_id_for_bi
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -668,7 +778,7 @@ async fn stateful_vector_stores_create_usage_uses_created_vector_store_id_for_bi
 async fn stateful_vector_store_retrieve_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-vector-store-retrieve-missing",
@@ -706,7 +816,7 @@ async fn stateful_vector_store_retrieve_route_returns_not_found_without_usage() 
 async fn stateful_vector_store_update_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-vector-store-update-missing",
@@ -745,7 +855,7 @@ async fn stateful_vector_store_update_route_returns_not_found_without_usage() {
 async fn stateful_vector_store_delete_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-vector-store-delete-missing",

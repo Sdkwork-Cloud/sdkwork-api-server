@@ -8,6 +8,7 @@ pub(crate) use serial_test::serial;
 pub(crate) use sqlx::SqlitePool;
 pub(crate) use std::fs;
 pub(crate) use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 pub(crate) use std::time::{SystemTime, UNIX_EPOCH};
 pub(crate) use tower::ServiceExt;
 
@@ -24,15 +25,30 @@ pub(crate) use sdkwork_api_extension_host::{
 #[cfg(windows)]
 pub(crate) use std::net::TcpListener;
 
+static TEST_RESOURCE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
 pub(super) async fn read_json(response: axum::response::Response) -> Value {
     let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
 pub(super) async fn memory_pool() -> SqlitePool {
-    sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
+    let pool = sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
-        .unwrap()
+        .unwrap();
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    sdkwork_api_app_identity::upsert_admin_user(
+        &store,
+        Some("admin_local_default"),
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(sdkwork_api_domain_identity::AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+    pool
 }
 
 pub(super) async fn login_token(app: Router) -> String {
@@ -80,7 +96,11 @@ pub(super) fn temp_extension_root(suffix: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    path.push(format!("sdkwork-admin-routes-{suffix}-{millis}"));
+    let sequence = TEST_RESOURCE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    path.push(format!(
+        "sdkwork-admin-routes-{suffix}-{millis}-{}-{sequence}",
+        std::process::id()
+    ));
     path
 }
 
@@ -279,8 +299,10 @@ impl NativeDynamicLifecycleLogGuard {
             .duration_since(UNIX_EPOCH)
             .expect("unix time")
             .as_millis();
+        let sequence = TEST_RESOURCE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         path.push(format!(
-            "sdkwork-admin-native-dynamic-lifecycle-{millis}.log"
+            "sdkwork-admin-native-dynamic-lifecycle-{millis}-{}-{sequence}.log",
+            std::process::id()
         ));
 
         let previous = std::env::var("SDKWORK_NATIVE_MOCK_LIFECYCLE_LOG").ok();

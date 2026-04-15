@@ -117,8 +117,8 @@ async fn settle_checkout(
             PaymentProviderCode::Stripe,
             "stripe-main",
             "checkout.session.completed",
-            &format!("evt_settled_{order_id}"),
-            &format!("dedupe_evt_settled_{order_id}"),
+            format!("evt_settled_{order_id}"),
+            format!("dedupe_evt_settled_{order_id}"),
             created_at_ms.saturating_add(120),
         )
         .with_payment_order_id(Some(payment_order.payment_order_id.clone()))

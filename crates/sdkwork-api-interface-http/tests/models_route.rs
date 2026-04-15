@@ -37,7 +37,7 @@ fn capability_catalog_cache_reset_guard() -> CapabilityCatalogCacheResetGuard {
 }
 
 #[tokio::test]
-async fn models_route_returns_ok() {
+async fn models_route_returns_invalid_request_without_configured_model_store() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -49,11 +49,11 @@ async fn models_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_model_store_required(response).await;
 }
 
 #[tokio::test]
-async fn model_retrieve_route_returns_ok() {
+async fn model_retrieve_route_returns_invalid_request_without_configured_model_store() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -65,11 +65,12 @@ async fn model_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_model_store_required(response).await;
 }
 
 #[tokio::test]
-async fn model_retrieve_route_returns_not_found_for_unknown_model() {
+async fn model_retrieve_route_returns_invalid_request_for_unknown_model_without_configured_model_store(
+) {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -81,15 +82,11 @@ async fn model_retrieve_route_returns_not_found_for_unknown_model() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested model was not found.");
-    assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["code"], "not_found");
+    assert_model_store_required(response).await;
 }
 
 #[tokio::test]
-async fn model_delete_route_returns_ok() {
+async fn model_delete_route_returns_invalid_request_without_configured_model_store() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -102,11 +99,12 @@ async fn model_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_model_store_required(response).await;
 }
 
 #[tokio::test]
-async fn model_delete_route_returns_not_found_for_unknown_model() {
+async fn model_delete_route_returns_invalid_request_for_unknown_model_without_configured_model_store(
+) {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -119,11 +117,7 @@ async fn model_delete_route_returns_not_found_for_unknown_model() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    let json = read_json(response).await;
-    assert_eq!(json["error"]["message"], "Requested model was not found.");
-    assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["code"], "not_found");
+    assert_model_store_required(response).await;
 }
 
 #[derive(Clone, Default)]
@@ -191,7 +185,8 @@ async fn stateless_models_route_relays_to_openai_compatible_provider_when_config
 }
 
 #[tokio::test]
-async fn stateless_models_route_falls_back_when_runtime_key_is_unknown() {
+async fn stateless_models_route_returns_invalid_request_when_runtime_key_is_unknown_without_configured_model_store(
+) {
     let app = sdkwork_api_interface_http::gateway_router_with_stateless_config(
         sdkwork_api_interface_http::StatelessGatewayConfig::default().with_upstream(
             sdkwork_api_interface_http::StatelessGatewayUpstream::new(
@@ -212,10 +207,7 @@ async fn stateless_models_route_falls_back_when_runtime_key_is_unknown() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let json = read_json(response).await;
-    assert_eq!(json["object"], "list");
-    assert_eq!(json["data"][0]["object"], "model");
+    assert_model_store_required(response).await;
 }
 
 #[tokio::test]
@@ -255,6 +247,17 @@ async fn read_json(response: axum::response::Response) -> Value {
         .await
         .unwrap();
     serde_json::from_slice(&bytes).unwrap()
+}
+
+async fn assert_model_store_required(response: axum::response::Response) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "Local model catalog fallback is not supported without a configured model store."
+    );
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], "invalid_model");
 }
 
 async fn memory_pool() -> SqlitePool {
@@ -313,8 +316,8 @@ async fn models_route_reads_persisted_catalog_models() {
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let create = admin_app
         .oneshot(
             Request::builder()
@@ -377,8 +380,8 @@ async fn models_route_refreshes_after_admin_catalog_mutation_invalidates_capabil
     let initial_json = read_json(initial_response).await;
     assert_eq!(initial_json["data"], serde_json::json!([]));
 
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let create = admin_app
         .oneshot(
             Request::builder()
@@ -449,8 +452,8 @@ async fn models_route_refreshes_after_admin_catalog_mutation_invalidates_shared_
         Arc::new(RedisCacheStore::connect(&redis_url).await.unwrap());
     configure_capability_catalog_cache_store(admin_cache_store);
 
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let create = admin_app
         .oneshot(
             Request::builder()
@@ -540,8 +543,8 @@ async fn model_retrieve_route_reads_persisted_catalog_model() {
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let create = admin_app
         .oneshot(
             Request::builder()
@@ -582,8 +585,8 @@ async fn model_delete_route_removes_persisted_catalog_model() {
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
 
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let create = admin_app
         .oneshot(
             Request::builder()

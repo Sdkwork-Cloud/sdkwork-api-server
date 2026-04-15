@@ -68,11 +68,18 @@ const RELEASE_SYNC_REPOSITORY_SPECS = Object.freeze([
     defaultRef: 'main',
   }),
   Object.freeze({
-    id: 'sdkwork-im-sdk',
-    targetDir: path.resolve(rootDir, '..', 'openchat', 'sdkwork-im-sdk'),
-    expectedGitRoot: path.resolve(rootDir, '..', 'openchat', 'sdkwork-im-sdk'),
-    expectedRemoteUrl: 'https://github.com/Sdkwork-Cloud/sdkwork-im-sdk.git',
-    envRefKey: 'SDKWORK_IM_SDK_GIT_REF',
+    id: 'sdkwork-craw-chat-sdk',
+    targetDir: path.resolve(
+      rootDir,
+      '..',
+      'craw-chat',
+      'sdks',
+      'sdkwork-craw-chat-sdk',
+      'sdkwork-craw-chat-sdk-typescript',
+    ),
+    expectedGitRoot: path.resolve(rootDir, '..', 'craw-chat'),
+    expectedRemoteUrl: 'https://github.com/Sdkwork-Cloud/craw-chat.git',
+    envRefKey: 'SDKWORK_CRAW_CHAT_SDK_GIT_REF',
     defaultRef: 'main',
   }),
 ]);
@@ -189,6 +196,7 @@ function normalizeReleaseSyncAuditInputPayload(payload) {
 export function resolveReleaseSyncAuditInput({
   auditPath,
   auditJson,
+  preferDefaultArtifact = true,
   env = process.env,
   readFile = readFileSync,
 } = {}) {
@@ -220,7 +228,7 @@ export function resolveReleaseSyncAuditInput({
     };
   }
 
-  if (existsSync(defaultReleaseSyncAuditPath)) {
+  if (preferDefaultArtifact && existsSync(defaultReleaseSyncAuditPath)) {
     return {
       source: 'default-file',
       summary: normalizeReleaseSyncAuditInputPayload(
@@ -543,6 +551,7 @@ export function auditReleaseSyncRepositories({
   specs = listReleaseSyncRepositorySpecs(),
   auditPath,
   auditJson,
+  preferDefaultArtifact = true,
   env = process.env,
   readFile = readFileSync,
   spawnSyncImpl = spawnSync,
@@ -550,6 +559,7 @@ export function auditReleaseSyncRepositories({
   const resolvedInput = resolveReleaseSyncAuditInput({
     auditPath,
     auditJson,
+    preferDefaultArtifact,
     env,
     readFile,
   });
@@ -570,6 +580,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   let format = 'text';
   let auditPath = '';
   let auditJson = '';
+  let live = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -591,6 +602,11 @@ function parseArgs(argv = process.argv.slice(2)) {
       continue;
     }
 
+    if (token === '--live') {
+      live = true;
+      continue;
+    }
+
     throw new Error(`unknown argument: ${token}`);
   }
 
@@ -602,6 +618,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     format,
     auditPath,
     auditJson,
+    live,
   };
 }
 
@@ -614,10 +631,11 @@ export function formatReleaseSyncTextReport(reports = []) {
 }
 
 function main() {
-  const { format, auditPath, auditJson } = parseArgs();
+  const { format, auditPath, auditJson, live } = parseArgs();
   const summary = auditReleaseSyncRepositories({
     auditPath,
     auditJson,
+    preferDefaultArtifact: !live,
   });
 
   if (format === 'json') {

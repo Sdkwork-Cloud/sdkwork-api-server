@@ -28,6 +28,8 @@ async fn audio_transcriptions_route_returns_ok() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["text"], "sdkwork.local transcription unavailable");
 }
 
 #[tokio::test]
@@ -98,6 +100,33 @@ struct UpstreamCaptureState {
 }
 
 #[tokio::test]
+async fn stateful_audio_transcriptions_route_returns_local_fallback_without_transcription_backend()
+{
+    let pool = memory_pool().await;
+    let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
+    let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
+
+    let response = gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/transcriptions")
+                .header("authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"model\":\"gpt-4o-mini-transcribe\",\"file_id\":\"file_1\"}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let json = read_json(response).await;
+    assert_eq!(json["text"], "sdkwork.local transcription unavailable");
+}
+
+#[tokio::test]
 async fn stateful_audio_transcriptions_route_relays_to_openai_compatible_provider() {
     let upstream_state = UpstreamCaptureState::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -115,7 +144,7 @@ async fn stateful_audio_transcriptions_route_relays_to_openai_compatible_provide
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

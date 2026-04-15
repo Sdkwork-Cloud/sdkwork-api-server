@@ -46,9 +46,89 @@ jobs:
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "git_ref=$git_ref" >> "$GITHUB_OUTPUT"
 
+  rust-dependency-audit:
+    name: Rust dependency audit
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Run release Rust dependency audit
+        run: node scripts/check-rust-dependency-audit.mjs
+
+  product-verification:
+    name: Product verification
+    needs:
+      - prepare
+      - rust-dependency-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/sdkwork-router-admin/pnpm-lock.yaml
+            apps/sdkwork-router-portal/pnpm-lock.yaml
+            console/pnpm-lock.yaml
+            docs/pnpm-lock.yaml
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Install product verification workspace dependencies
+        shell: bash
+        run: |
+          pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+          pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
+
+      - name: Run release product verification
+        env:
+          SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
+        run: node scripts/check-router-product.mjs
+
   native-release:
     name: Native release (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: prepare
+    needs:
+      - prepare
+      - rust-dependency-audit
+      - product-verification
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -107,7 +187,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release window snapshot
@@ -131,7 +211,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-release-sync-audit.mjs
 
       - name: Upload release sync audit governance artifact
@@ -206,7 +286,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
           SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH: docs/release/release-window-snapshot-latest.json
           SDKWORK_RELEASE_SYNC_AUDIT_PATH: docs/release/release-sync-audit-latest.json
         run: node scripts/release/run-release-governance-checks.mjs --format json
@@ -315,7 +395,10 @@ jobs:
 
   web-release:
     name: Web release assets
-    needs: prepare
+    needs:
+      - prepare
+      - rust-dependency-audit
+      - product-verification
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release ref
@@ -346,7 +429,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release window snapshot
@@ -370,7 +453,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-release-sync-audit.mjs
 
       - name: Upload release sync audit governance artifact
@@ -456,7 +539,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: ${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: ${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
           SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH: docs/release/release-window-snapshot-latest.json
           SDKWORK_RELEASE_SYNC_AUDIT_PATH: docs/release/release-sync-audit-latest.json
         run: node scripts/release/run-release-governance-checks.mjs --format json
@@ -476,6 +559,10 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal build
           pnpm --dir console build
           pnpm --dir docs build
+
+      - name: Run frontend asset budget gate
+        shell: bash
+        run: node scripts/check-router-frontend-budgets.mjs
 
       - name: Package web release assets
         shell: bash

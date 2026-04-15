@@ -48,25 +48,27 @@ SDKWork 使用五种标签描述真实执行方式：
 
 ## 首个已鉴权请求
 
+请使用当前 bootstrap profile 已注入的身份，或使用注册流程创建的新身份。
+
 admin 登录：
 
 ```bash
 curl -X POST http://127.0.0.1:8081/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 
-portal 默认登录：
+portal 已注入身份登录：
 
 ```bash
 curl -X POST http://127.0.0.1:8082/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 

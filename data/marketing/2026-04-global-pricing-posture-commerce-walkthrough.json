@@ -28,7 +28,7 @@
       "coupon_template_id": "template-official-direct-100",
       "template_key": "official-direct-credit-100",
       "display_name": "Official Direct Credit 100",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "fixed_amount_off",
@@ -55,7 +55,7 @@
       "coupon_template_id": "template-edge-local-20",
       "template_key": "edge-local-credit-20",
       "display_name": "Edge Local Credit 20",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "fixed_amount_off",
@@ -84,7 +84,7 @@
       "marketing_campaign_id": "campaign-official-direct-2026",
       "coupon_template_id": "template-official-direct-100",
       "display_name": "Official Direct Activation 2026",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710000494000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710000494000,
@@ -94,7 +94,7 @@
       "marketing_campaign_id": "campaign-edge-local-2026",
       "coupon_template_id": "template-edge-local-20",
       "display_name": "Edge Local Launch 2026",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710000494100,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710000494100,
@@ -105,7 +105,7 @@
     {
       "campaign_budget_id": "budget-official-direct-2026",
       "marketing_campaign_id": "campaign-official-direct-2026",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 6000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,
@@ -115,7 +115,7 @@
     {
       "campaign_budget_id": "budget-edge-local-2026",
       "marketing_campaign_id": "campaign-edge-local-2026",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 3000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,

@@ -28,7 +28,7 @@
       "coupon_template_id": "template-dev-sandbox-50",
       "template_key": "dev-sandbox-credit-50",
       "display_name": "Developer Sandbox Credit 50",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "fixed_amount_off",
@@ -55,7 +55,7 @@
       "coupon_template_id": "template-partner-sandbox-30",
       "template_key": "partner-sandbox-30",
       "display_name": "Partner Sandbox 30 Percent",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "shared_code",
       "benefit": {
         "benefit_kind": "percentage_off",
@@ -84,7 +84,7 @@
       "marketing_campaign_id": "campaign-dev-onboarding",
       "coupon_template_id": "template-dev-sandbox-50",
       "display_name": "Developer Onboarding",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710001000000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710001000000,
@@ -94,7 +94,7 @@
       "marketing_campaign_id": "campaign-partner-sandbox",
       "coupon_template_id": "template-partner-sandbox-30",
       "display_name": "Partner Sandbox Launch",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710001000000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710001000000,
@@ -105,7 +105,7 @@
     {
       "campaign_budget_id": "budget-dev-onboarding",
       "marketing_campaign_id": "campaign-dev-onboarding",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 1000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,
@@ -115,7 +115,7 @@
     {
       "campaign_budget_id": "budget-partner-sandbox",
       "marketing_campaign_id": "campaign-partner-sandbox",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 2000000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,

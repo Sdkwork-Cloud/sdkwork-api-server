@@ -3,10 +3,7 @@ mod mode;
 mod normalize;
 mod relations;
 
-pub(crate) use errors::{
-    marketing_create_conflicting_existing_state, marketing_create_invalid_input,
-    marketing_create_storage,
-};
+pub(crate) use errors::{marketing_create_invalid_input, marketing_create_storage};
 pub(crate) use mode::PersistMode;
 pub(crate) use normalize::{
     normalize_optional_identifier, normalize_optional_text, normalize_required_identifier,

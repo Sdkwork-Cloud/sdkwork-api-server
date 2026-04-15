@@ -156,7 +156,7 @@ async fn stateful_gemini_generate_content_route_accepts_query_key_and_records_us
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_openai_provider(&admin_app, &admin_token, &address.to_string()).await;
@@ -357,7 +357,7 @@ async fn stateful_gemini_generate_content_route_passthroughs_native_gemini_proto
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_gemini_provider(&admin_app, &admin_token, &address.to_string()).await;
@@ -447,7 +447,7 @@ async fn stateful_gemini_generate_content_route_derives_protocol_kind_for_legacy
     .await;
 
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let payload = serde_json::json!({
@@ -509,7 +509,7 @@ async fn stateful_gemini_generate_content_route_prefers_native_dynamic_raw_plugi
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_native_dynamic_gemini_provider(&admin_app, &admin_token, &fixture).await;
@@ -567,7 +567,7 @@ async fn stateful_gemini_stream_generate_content_route_fails_closed_for_missing_
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_broken_native_dynamic_gemini_provider(&admin_app, &admin_token).await;
@@ -626,7 +626,7 @@ async fn stateful_gemini_generate_content_route_returns_invalid_request_for_miss
         support::issue_gateway_api_key(&pool, "tenant-gemini-invalid", "project-gemini-invalid")
             .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -837,7 +837,7 @@ async fn stateful_gemini_stream_generate_content_route_returns_invalid_request_f
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -888,7 +888,7 @@ async fn stateful_gemini_stream_generate_content_route_prefers_native_dynamic_ra
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_native_dynamic_gemini_provider(&admin_app, &admin_token, &fixture).await;
@@ -968,7 +968,7 @@ async fn stateful_gemini_stream_generate_content_route_uses_connector_runtime_tr
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     create_connector_gemini_provider(&admin_app, &admin_token, &fixture, &address.to_string())
@@ -1028,7 +1028,7 @@ async fn stateful_gemini_stream_generate_content_route_uses_connector_runtime_tr
 
 #[serial]
 #[tokio::test]
-async fn gemini_count_tokens_route_returns_total_tokens() {
+async fn gemini_count_tokens_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -1054,9 +1054,14 @@ async fn gemini_count_tokens_route_returns_total_tokens() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let json = read_json(response).await;
-    assert_eq!(json["totalTokens"], 42);
+    assert_eq!(json["error"]["code"], 400);
+    assert_eq!(json["error"]["status"], "INVALID_ARGUMENT");
+    assert_eq!(
+        json["error"]["message"],
+        "Response input token counting is not supported in local fallback."
+    );
 }
 
 #[serial(extension_env)]
@@ -1153,7 +1158,7 @@ async fn stateful_gemini_count_tokens_route_returns_invalid_request_for_missing_
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app

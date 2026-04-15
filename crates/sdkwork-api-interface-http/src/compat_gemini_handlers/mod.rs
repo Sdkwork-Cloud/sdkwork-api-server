@@ -1,8 +1,3 @@
-use super::*;
-
 mod shared;
-mod stateful;
-mod stateless;
 
-pub(crate) use self::stateful::*;
-pub(crate) use self::stateless::*;
+pub(crate) use self::shared::{parse_gemini_compat_tail, GeminiCompatAction};

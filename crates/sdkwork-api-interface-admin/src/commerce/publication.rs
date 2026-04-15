@@ -309,10 +309,10 @@ async fn load_commercial_catalog_publication_context(
     })
 }
 
-fn publication_mutation_decision<'a>(
-    detail: &'a CommercialCatalogPublicationDetail,
+fn publication_mutation_decision(
+    detail: &CommercialCatalogPublicationDetail,
     action: CatalogPublicationLifecycleAction,
-) -> &'a CommercialCatalogPublicationActionDecision {
+) -> &CommercialCatalogPublicationActionDecision {
     match action {
         CatalogPublicationLifecycleAction::Publish => &detail.actionability.publish,
         CatalogPublicationLifecycleAction::Schedule => &detail.actionability.schedule,
@@ -341,6 +341,7 @@ fn normalized_publication_mutation_reason(
     Ok(normalized.to_owned())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_catalog_publication_lifecycle_audit_record(
     before: &CommercialCatalogPublicationContext,
     after: Option<&CommercialCatalogPublicationContext>,
@@ -460,9 +461,7 @@ async fn apply_publish_commercial_catalog_publication(
         .map_err(commercial_billing_error_response)?;
 
     for archived_plan in context.pricing_plans.iter().filter(|plan| {
-        active_sibling_plan_ids
-            .iter()
-            .any(|sibling_id| *sibling_id == plan.pricing_plan_id)
+        active_sibling_plan_ids.contains(&plan.pricing_plan_id)
     }) {
         let archived_plan =
             crate::pricing::build_pricing_plan_with_status(archived_plan, "archived", now_ms);
@@ -481,9 +480,7 @@ async fn apply_publish_commercial_catalog_publication(
     }
 
     for rate in context.pricing_rates.iter().filter(|rate| {
-        active_sibling_plan_ids
-            .iter()
-            .any(|sibling_id| *sibling_id == rate.pricing_plan_id)
+        active_sibling_plan_ids.contains(&rate.pricing_plan_id)
     }) {
         let archived_rate =
             crate::pricing::build_pricing_rate_with_status(rate, "archived", now_ms);

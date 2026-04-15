@@ -86,11 +86,20 @@ test('release sync audit exposes repository specs and blocks non-standalone, dir
       'sdkwork-core',
       'sdkwork-ui',
       'sdkwork-appbase',
-      'sdkwork-im-sdk',
+      'sdkwork-craw-chat-sdk',
     ],
   );
   assert.equal(specs[0].envRefKey, 'SDKWORK_API_ROUTER_GIT_REF');
   assert.equal(specs[0].defaultRef, 'main');
+  assert.equal(specs[4].envRefKey, 'SDKWORK_CRAW_CHAT_SDK_GIT_REF');
+  assert.match(
+    specs[4].targetDir.replaceAll('\\', '/'),
+    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript$/,
+  );
+  assert.match(
+    specs[4].expectedGitRoot.replaceAll('\\', '/'),
+    /\/craw-chat$/,
+  );
 
   assert.equal(
     module.resolveReleaseSyncRepositoryRef({
@@ -307,6 +316,82 @@ test('release sync audit prefers the default latest artifact before live git col
 
       assert.equal(gitSpawned, false);
       assert.deepEqual(summary, artifact.summary);
+    },
+  );
+});
+
+test('release sync audit can bypass the default latest artifact in explicit live mode', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'verify-release-sync.mjs'),
+    ).href,
+  );
+
+  const artifact = createReleaseSyncAuditArtifactPayload();
+  const [spec] = module.listReleaseSyncRepositorySpecs();
+  let gitSpawnCount = 0;
+
+  withTemporaryFile(
+    releaseSyncAuditPath,
+    `${JSON.stringify(artifact, null, 2)}\n`,
+    () => {
+      const summary = module.auditReleaseSyncRepositories({
+        specs: [spec],
+        env: {},
+        preferDefaultArtifact: false,
+        spawnSyncImpl(command, args) {
+          gitSpawnCount += 1;
+
+          const key = args.join('\u0000');
+          if (key === 'rev-parse\u0000--show-toplevel') {
+            return {
+              status: 0,
+              stdout: `${spec.expectedGitRoot}\n`,
+              stderr: '',
+            };
+          }
+
+          if (key === 'status\u0000--short\u0000--branch') {
+            return {
+              status: 0,
+              stdout: '## main...origin/main\n',
+              stderr: '',
+            };
+          }
+
+          if (key === 'remote\u0000get-url\u0000origin') {
+            return {
+              status: 0,
+              stdout: `${spec.expectedRemoteUrl}\n`,
+              stderr: '',
+            };
+          }
+
+          if (key === 'rev-parse\u0000HEAD') {
+            return {
+              status: 0,
+              stdout: 'fed456\n',
+              stderr: '',
+            };
+          }
+
+          if (key === 'ls-remote\u0000origin\u0000main') {
+            return {
+              status: 0,
+              stdout: 'fed456\trefs/heads/main\n',
+              stderr: '',
+            };
+          }
+
+          throw new Error(`unexpected command: ${command} ${args.join(' ')}`);
+        },
+      });
+
+      assert.ok(gitSpawnCount > 0);
+      assert.equal(summary.releasable, true);
+      assert.equal(summary.reports[0].id, spec.id);
+      assert.equal(summary.reports[0].expectedGitRoot, spec.expectedGitRoot);
+      assert.equal(summary.reports[0].localHead, 'fed456');
     },
   );
 });

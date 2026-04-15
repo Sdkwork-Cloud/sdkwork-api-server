@@ -2,19 +2,15 @@ use super::*;
 
 fn local_thread_run_error_response(error: anyhow::Error) -> Response {
     let message = error.to_string();
-    if message.to_ascii_lowercase().contains("run not found") {
-        return local_gateway_invalid_or_not_found_response(
-            error,
-            "invalid_thread_run_request",
-            "Requested thread run was not found.",
-        );
+    if local_gateway_error_is_invalid_request(&message) {
+        return invalid_request_openai_response(message, "invalid_thread_run_request");
     }
 
-    local_gateway_invalid_or_not_found_response(
-        error,
-        "invalid_thread_run_request",
-        "Requested thread was not found.",
-    )
+    if message.to_ascii_lowercase().contains("run not found") {
+        return local_gateway_error_response(error, "Requested run was not found.");
+    }
+
+    local_gateway_error_response(error, "Requested thread was not found.")
 }
 
 pub(crate) async fn thread_runs_list_with_state_handler(

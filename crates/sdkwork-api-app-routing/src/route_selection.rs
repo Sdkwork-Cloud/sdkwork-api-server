@@ -117,6 +117,7 @@ pub async fn select_route_with_store_context(
     Ok(decision)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn simulate_route_with_store_inner(
     store: &dyn AdminStore,
     capability: &str,
@@ -423,6 +424,7 @@ fn resolved_compiled_snapshot_strategy(effective_policy: Option<&RoutingPolicy>)
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn persist_compiled_routing_snapshot(
     store: &dyn AdminStore,
     capability: &str,
@@ -513,9 +515,9 @@ fn sanitize_snapshot_segment(value: &str) -> String {
     sanitized.trim_matches('-').to_owned()
 }
 
-fn policy_candidate_unavailable_fallback_reason<'a>(
+fn policy_candidate_unavailable_fallback_reason(
     policy: &RoutingPolicy,
-    available_provider_ids: &'a HashSet<String>,
+    available_provider_ids: &HashSet<String>,
 ) -> Option<&'static str> {
     policy
         .declared_provider_ids()

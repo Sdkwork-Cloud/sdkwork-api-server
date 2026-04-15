@@ -6,10 +6,10 @@ fn local_thread_run_step_error_response(error: anyhow::Error) -> Response {
         return invalid_request_openai_response(message, "invalid_thread_run_request");
     }
     if message.to_ascii_lowercase().contains("run step not found") {
-        return local_gateway_error_response(error, "Requested thread run step was not found.");
+        return local_gateway_error_response(error, "Requested run step was not found.");
     }
     if message.to_ascii_lowercase().contains("run not found") {
-        return local_gateway_error_response(error, "Requested thread run was not found.");
+        return local_gateway_error_response(error, "Requested run was not found.");
     }
 
     local_gateway_error_response(error, "Requested thread was not found.")

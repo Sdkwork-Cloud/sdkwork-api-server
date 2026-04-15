@@ -64,6 +64,10 @@ pub(super) fn workspace_request_context(workspace: &Value) -> GatewayRequestCont
         environment: "portal".to_owned(),
         api_key_hash: "portal_workspace_scope".to_owned(),
         api_key_group_id: None,
+        canonical_tenant_id: None,
+        canonical_organization_id: None,
+        canonical_user_id: None,
+        canonical_api_key_id: None,
     }
 }
 
@@ -192,18 +196,15 @@ async fn seed_marketing_coupon_fixture(
     let budget_id = format!("budget_{template_key}");
     let created_at_ms = 1_710_000_000_000;
 
-    let template = CouponTemplateRecord::new(
-        coupon_template_id,
-        template_key,
-        benefit.benefit_kind,
-    )
-    .with_display_name(display_name)
-    .with_status(template_status)
-    .with_distribution_kind(CouponDistributionKind::UniqueCode)
-    .with_restriction(CouponRestrictionSpec::new(MarketingSubjectScope::Project))
-    .with_benefit(benefit)
-    .with_created_at_ms(created_at_ms)
-    .with_updated_at_ms(created_at_ms);
+    let template =
+        CouponTemplateRecord::new(coupon_template_id, template_key, benefit.benefit_kind)
+            .with_display_name(display_name)
+            .with_status(template_status)
+            .with_distribution_kind(CouponDistributionKind::UniqueCode)
+            .with_restriction(CouponRestrictionSpec::new(MarketingSubjectScope::Project))
+            .with_benefit(benefit)
+            .with_created_at_ms(created_at_ms)
+            .with_updated_at_ms(created_at_ms);
     store
         .insert_coupon_template_record(&template)
         .await
@@ -246,17 +247,18 @@ pub(super) async fn seed_marketing_catalog_coupon_code(
     let budget_id = format!("budget_{slug}");
     let code_id = format!("code_{slug}");
 
-    let template = CouponTemplateRecord::new(&template_id, slug, MarketingBenefitKind::PercentageOff)
-        .with_display_name(format!("{code_value} Campaign"))
-        .with_status(CouponTemplateStatus::Active)
-        .with_distribution_kind(CouponDistributionKind::UniqueCode)
-        .with_restriction(CouponRestrictionSpec::new(MarketingSubjectScope::Project))
-        .with_benefit(
-            CouponBenefitSpec::new(MarketingBenefitKind::PercentageOff)
-                .with_discount_percent(Some(20)),
-        )
-        .with_created_at_ms(created_at_ms)
-        .with_updated_at_ms(created_at_ms);
+    let template =
+        CouponTemplateRecord::new(&template_id, slug, MarketingBenefitKind::PercentageOff)
+            .with_display_name(format!("{code_value} Campaign"))
+            .with_status(CouponTemplateStatus::Active)
+            .with_distribution_kind(CouponDistributionKind::UniqueCode)
+            .with_restriction(CouponRestrictionSpec::new(MarketingSubjectScope::Project))
+            .with_benefit(
+                CouponBenefitSpec::new(MarketingBenefitKind::PercentageOff)
+                    .with_discount_percent(Some(20)),
+            )
+            .with_created_at_ms(created_at_ms)
+            .with_updated_at_ms(created_at_ms);
     store
         .insert_coupon_template_record(&template)
         .await

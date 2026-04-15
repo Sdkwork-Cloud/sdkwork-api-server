@@ -48,25 +48,27 @@ See [API Compatibility](/reference/api-compatibility) and the [Full Compatibilit
 
 ## First Authenticated Calls
 
+Use identities provisioned by the active bootstrap profile or the registration flow.
+
 Admin login:
 
 ```bash
 curl -X POST http://127.0.0.1:8081/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 
-Portal default login:
+Portal login with a provisioned identity:
 
 ```bash
 curl -X POST http://127.0.0.1:8082/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 

@@ -1,5 +1,6 @@
 use sdkwork_api_app_identity::{
-    change_admin_password, load_admin_user_profile, login_admin_user, verify_jwt,
+    change_admin_password, list_admin_user_profiles, load_admin_user_profile, login_admin_user,
+    upsert_admin_user, verify_jwt,
 };
 use sdkwork_api_domain_identity::AdminUserRole;
 use sdkwork_api_domain_tenant::{Project, Tenant};
@@ -10,9 +11,51 @@ async fn memory_store() -> SqliteAdminStore {
     SqliteAdminStore::new(pool)
 }
 
+async fn seed_admin_user(store: &SqliteAdminStore) {
+    upsert_admin_user(
+        store,
+        None,
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
-async fn default_admin_login_bootstraps_profile_and_jwt() {
+async fn empty_store_does_not_lazy_create_default_admin_user() {
     let store = memory_store().await;
+
+    let error = login_admin_user(
+        &store,
+        "admin@sdkwork.local",
+        "ChangeMe123!",
+        "admin-test-secret",
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(error.to_string(), "invalid email or password");
+    assert!(store.list_admin_users().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn listing_admin_users_does_not_materialize_default_identity_on_empty_store() {
+    let store = memory_store().await;
+
+    let users = list_admin_user_profiles(&store).await.unwrap();
+
+    assert!(users.is_empty());
+    assert!(store.list_admin_users().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn admin_login_returns_seeded_profile_and_jwt() {
+    let store = memory_store().await;
+    seed_admin_user(&store).await;
 
     let session = login_admin_user(
         &store,
@@ -44,6 +87,7 @@ async fn default_admin_login_bootstraps_profile_and_jwt() {
 #[tokio::test]
 async fn admin_password_change_rejects_old_password_and_accepts_new_password() {
     let store = memory_store().await;
+    seed_admin_user(&store).await;
 
     let session = login_admin_user(
         &store,
@@ -88,6 +132,7 @@ async fn admin_password_change_rejects_old_password_and_accepts_new_password() {
 #[tokio::test]
 async fn admin_password_change_rejects_weak_passwords() {
     let store = memory_store().await;
+    seed_admin_user(&store).await;
 
     let session = login_admin_user(
         &store,

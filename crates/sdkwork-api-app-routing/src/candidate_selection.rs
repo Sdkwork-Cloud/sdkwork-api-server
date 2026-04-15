@@ -200,6 +200,7 @@ pub(crate) fn generate_decision_id(created_at_ms: u64) -> String {
     format!("route-dec-{}-{}", created_at_ms, generate_selection_seed())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn assess_candidate(
     provider_id: &str,
     policy_rank: usize,

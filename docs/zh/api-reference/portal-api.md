@@ -20,14 +20,16 @@ curl -X POST http://127.0.0.1:8082/portal/auth/register \
   }'
 ```
 
-默认本地演示账号登录：
+本地开发时，如果 `SDKWORK_BOOTSTRAP_PROFILE=dev`，请先检查 `data/identities/dev.json`；或者直接通过 `/portal/auth/register` 注册账户。
+
+使用已注入的门户身份登录：
 
 ```bash
 curl -X POST http://127.0.0.1:8082/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 
@@ -38,8 +40,8 @@ curl -X POST http://127.0.0.1:8082/portal/auth/change-password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <portal-jwt>" \
   -d '{
-    "current_password":"ChangeMe123!",
-    "new_password":"PortalPassword456!"
+    "current_password":"<current-portal-password>",
+    "new_password":"<new-portal-password>"
   }'
 ```
 

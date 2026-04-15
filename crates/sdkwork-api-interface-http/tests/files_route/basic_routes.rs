@@ -3,7 +3,7 @@ use serial_test::serial;
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn files_route_returns_ok() {
+async fn files_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -22,7 +22,11 @@ async fn files_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_invalid_file_request(
+        response,
+        "Local file fallback is not supported without an upstream provider.",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -53,7 +57,7 @@ async fn files_route_returns_invalid_request_for_blank_purpose() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn files_list_route_returns_ok() {
+async fn files_list_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -67,26 +71,30 @@ async fn files_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_invalid_file_request(
+        response,
+        "Local file listing fallback is not supported without an upstream provider.",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn file_retrieve_route_returns_ok() {
+async fn file_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/files/file_1")
+                .uri("/v1/files/file_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_file_not_found(response, "Requested file was not found.").await;
 }
 
 #[serial(extension_env)]
@@ -110,39 +118,39 @@ async fn file_retrieve_route_returns_not_found_for_unknown_file() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn file_delete_route_returns_ok() {
+async fn file_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/files/file_1")
+                .uri("/v1/files/file_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_file_not_found(response, "Requested file was not found.").await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn file_content_route_returns_ok() {
+async fn file_content_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/files/file_1/content")
+                .uri("/v1/files/file_local_1/content")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_file_not_found(response, "Requested file was not found.").await;
 }
 
 #[serial(extension_env)]

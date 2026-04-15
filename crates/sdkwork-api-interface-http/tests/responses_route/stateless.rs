@@ -1,8 +1,31 @@
 use super::*;
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
+async fn assert_openai_not_found(response: axum::response::Response) {
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "Requested response was not found."
+    );
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], "not_found");
+}
+
 #[serial(extension_env)]
 #[tokio::test]
-async fn responses_route_returns_ok() {
+async fn responses_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -16,7 +39,12 @@ async fn responses_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local response fallback is not supported without an upstream provider.",
+        "invalid_model",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -69,7 +97,7 @@ async fn responses_stream_route_returns_invalid_request_for_missing_model() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_retrieve_route_returns_ok() {
+async fn response_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -83,7 +111,7 @@ async fn response_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[serial(extension_env)]
@@ -114,7 +142,7 @@ async fn response_retrieve_route_returns_not_found_for_unknown_response() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_input_items_route_returns_ok() {
+async fn response_input_items_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -128,7 +156,7 @@ async fn response_input_items_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[serial(extension_env)]
@@ -159,7 +187,7 @@ async fn response_input_items_route_returns_not_found_for_unknown_response() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_delete_route_returns_ok() {
+async fn response_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -172,7 +200,7 @@ async fn response_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[serial(extension_env)]
@@ -202,7 +230,7 @@ async fn response_delete_route_returns_not_found_for_unknown_response() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_input_tokens_route_returns_ok() {
+async fn response_input_tokens_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -217,7 +245,12 @@ async fn response_input_tokens_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Response input token counting is not supported in local fallback.",
+        "invalid_model",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -272,7 +305,7 @@ async fn response_cancel_route_returns_not_found_for_unknown_response() {
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_cancel_route_returns_ok() {
+async fn response_cancel_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -286,12 +319,12 @@ async fn response_cancel_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn response_compact_route_returns_ok() {
+async fn response_compact_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -306,7 +339,12 @@ async fn response_compact_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local response compaction fallback is not supported without an upstream provider.",
+        "invalid_model",
+    )
+    .await;
 }
 
 #[serial(extension_env)]

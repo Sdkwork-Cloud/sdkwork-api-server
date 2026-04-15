@@ -8,6 +8,14 @@ use crate::gateway_commercial::{
     response_usage_id_or_single_data_item_id as commercial_response_usage_id_or_single_data_item_id,
     GatewayCommercialAdmissionDecision, GatewayCommercialAdmissionSpec,
 };
+use sdkwork_api_contract_openai::audio::{TranscriptionObject, TranslationObject};
+
+const LOCAL_TRANSCRIPTION_BACKEND_UNSUPPORTED: &str =
+    "Local transcription fallback is not supported without a transcription backend.";
+const LOCAL_TRANSLATION_BACKEND_UNSUPPORTED: &str =
+    "Local translation fallback is not supported without a translation backend.";
+const LOCAL_TRANSCRIPTION_PLACEHOLDER_TEXT: &str = "sdkwork.local transcription unavailable";
+const LOCAL_TRANSLATION_PLACEHOLDER_TEXT: &str = "sdkwork.local translation unavailable";
 
 fn local_audio_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_bad_gateway_response(error, "invalid_audio_request")
@@ -27,6 +35,44 @@ fn response_text(response: &Value) -> Option<&str> {
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|text| !text.is_empty())
+}
+
+fn local_transcription_result(
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateTranscriptionRequest,
+) -> anyhow::Result<TranscriptionObject> {
+    match create_transcription(tenant_id, project_id, &request.model) {
+        Ok(response) => Ok(response),
+        Err(error)
+            if error
+                .to_string()
+                .contains(LOCAL_TRANSCRIPTION_BACKEND_UNSUPPORTED) =>
+        {
+            Ok(TranscriptionObject::new(
+                LOCAL_TRANSCRIPTION_PLACEHOLDER_TEXT,
+            ))
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn local_translation_result(
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateTranslationRequest,
+) -> anyhow::Result<TranslationObject> {
+    match create_translation(tenant_id, project_id, &request.model) {
+        Ok(response) => Ok(response),
+        Err(error)
+            if error
+                .to_string()
+                .contains(LOCAL_TRANSLATION_BACKEND_UNSUPPORTED) =>
+        {
+            Ok(TranslationObject::new(LOCAL_TRANSLATION_PLACEHOLDER_TEXT))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn build_local_speech_response(
@@ -169,10 +215,10 @@ pub(crate) async fn transcriptions_with_state_handler(
         }
     }
 
-    let response = match create_transcription(
+    let response = match local_transcription_result(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.model,
+        &request,
     ) {
         Ok(response) => response,
         Err(error) => {
@@ -317,10 +363,10 @@ pub(crate) async fn translations_with_state_handler(
         }
     }
 
-    let response = match create_translation(
+    let response = match local_translation_result(
         request_context.tenant_id(),
         request_context.project_id(),
-        &request.model,
+        &request,
     ) {
         Ok(response) => response,
         Err(error) => {

@@ -12,7 +12,7 @@ use tower::ServiceExt;
 mod support;
 
 #[tokio::test]
-async fn images_generation_route_returns_ok() {
+async fn images_generation_route_returns_invalid_request_without_image_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -28,7 +28,11 @@ async fn images_generation_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_invalid_image_backend_request(
+        response,
+        "Local image generation fallback is not supported without an image backend.",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -52,7 +56,7 @@ async fn images_generation_route_returns_invalid_request_for_missing_model() {
 }
 
 #[tokio::test]
-async fn images_edit_route_accepts_multipart() {
+async fn images_edit_route_returns_invalid_request_without_image_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let boundary = "sdkwork-boundary-edit";
     let response = app
@@ -72,11 +76,15 @@ async fn images_edit_route_accepts_multipart() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_invalid_image_backend_request(
+        response,
+        "Local image edit fallback is not supported without an image backend.",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn images_variation_route_accepts_multipart() {
+async fn images_variation_route_returns_invalid_request_without_image_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let boundary = "sdkwork-boundary-variation";
     let response = app
@@ -93,7 +101,11 @@ async fn images_variation_route_accepts_multipart() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_invalid_image_backend_request(
+        response,
+        "Local image variation fallback is not supported without an image backend.",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -297,8 +309,8 @@ async fn stateful_images_generation_route_returns_invalid_request_for_missing_mo
         support::issue_gateway_api_key(&pool, "tenant-image-invalid", "project-image-invalid")
             .await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
 
     let response = gateway_app
         .oneshot(
@@ -427,7 +439,7 @@ async fn configure_gateway_with_image_provider(address: SocketAddr) -> (Router, 
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let _ = admin_app
@@ -588,12 +600,13 @@ async fn upstream_images_multipart_handler(
 }
 
 async fn assert_invalid_image_generation_request(response: axum::response::Response) {
+    assert_invalid_image_backend_request(response, "Image generation model is required.").await;
+}
+
+async fn assert_invalid_image_backend_request(response: axum::response::Response, message: &str) {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let json = read_json(response).await;
-    assert_eq!(
-        json["error"]["message"],
-        "Image generation model is required."
-    );
+    assert_eq!(json["error"]["message"], message);
     assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["code"], "invalid_model");
+    assert_eq!(json["error"]["code"], "invalid_image_request");
 }

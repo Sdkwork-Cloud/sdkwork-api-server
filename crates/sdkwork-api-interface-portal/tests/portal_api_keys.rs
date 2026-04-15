@@ -677,7 +677,7 @@ async fn portal_routing_profiles_are_workspace_scoped_and_creatable_for_group_bi
     }));
     assert!(profiles.iter().any(|profile| {
         profile["profile_id"].as_str() == Some("profile-inactive")
-            && profile["active"].as_bool().unwrap_or(false) == false
+            && !profile["active"].as_bool().unwrap_or(false)
     }));
     assert!(profiles.iter().all(|profile| {
         profile["tenant_id"].as_str() == Some(tenant_id.as_str())

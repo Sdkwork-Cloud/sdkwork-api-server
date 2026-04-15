@@ -1,0 +1,81 @@
+name: product-verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/product-verification.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'README.md'
+      - 'README.zh-CN.md'
+      - 'apps/sdkwork-router-admin/**'
+      - 'apps/sdkwork-router-portal/**'
+      - 'bin/**'
+      - 'crates/**'
+      - 'data/**'
+      - 'docs/**'
+      - 'scripts/build-router-desktop-assets.mjs'
+      - 'scripts/build-router-desktop-assets.test.mjs'
+      - 'scripts/check-router-docs-safety.mjs'
+      - 'scripts/check-router-docs-safety.test.mjs'
+      - 'scripts/check-router-frontend-budgets.mjs'
+      - 'scripts/check-router-frontend-budgets.test.mjs'
+      - 'scripts/check-router-product.mjs'
+      - 'scripts/check-router-product.test.mjs'
+      - 'scripts/check-rust-dependency-audit.mjs'
+      - 'scripts/check-rust-dependency-audit.policy.json'
+      - 'scripts/check-rust-dependency-audit.test.mjs'
+      - 'scripts/dev/pnpm-launch-lib.mjs'
+      - 'scripts/dev/tests/pnpm-launch-lib.test.mjs'
+      - 'scripts/product-verification-workflow-contracts.mjs'
+      - 'scripts/product-verification-workflow.test.mjs'
+      - 'scripts/run-router-product-service.mjs'
+      - 'scripts/run-tauri-cli.mjs'
+      - 'scripts/release/desktop-targets.mjs'
+      - 'services/**'
+      - 'vendor/**'
+  workflow_dispatch:
+
+jobs:
+  product-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/sdkwork-router-admin/pnpm-lock.yaml
+            apps/sdkwork-router-portal/pnpm-lock.yaml
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Install product verification workspace dependencies
+        shell: bash
+        run: |
+          pnpm --dir apps/sdkwork-router-admin install --frozen-lockfile
+          pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
+
+      - name: Run product governance node tests
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+
+      - name: Run product verification gate
+        env:
+          SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
+        run: node scripts/check-router-product.mjs

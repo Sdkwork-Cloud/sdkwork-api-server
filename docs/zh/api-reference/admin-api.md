@@ -10,14 +10,16 @@
   - `GET /admin/auth/me`
   - `POST /admin/auth/change-password`
 
+请使用当前 bootstrap profile 或运行时存储中已存在的管理端身份。本地使用 `dev` bootstrap 数据时，登录前先检查 `data/identities/dev.json`。
+
 登录示例：
 
 ```bash
 curl -X POST http://127.0.0.1:8081/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 

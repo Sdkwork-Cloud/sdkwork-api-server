@@ -1,4 +1,6 @@
-﻿use super::*;
+use super::*;
+
+const PROTECTED_LOCAL_DEMO_PORTAL_USER_ID: &str = "user_local_demo";
 
 pub async fn register_portal_user(
     store: &dyn AdminStore,
@@ -62,7 +64,6 @@ pub async fn login_portal_user(
     signing_secret: &str,
 ) -> PortalResult<PortalAuthSession> {
     validate_login_password(password).map_err(PortalIdentityError::InvalidInput)?;
-    let _ = ensure_default_portal_user(store).await?;
 
     let normalized_email = normalize_email(email);
     let Some(user) = store
@@ -100,7 +101,6 @@ pub async fn load_portal_user_profile(
 pub async fn list_portal_user_profiles(
     store: &dyn AdminStore,
 ) -> PortalResult<Vec<PortalUserProfile>> {
-    let _ = ensure_default_portal_user(store).await?;
     store
         .list_portal_users()
         .await
@@ -160,26 +160,28 @@ pub async fn upsert_portal_user(
         None => generate_entity_id("user").map_err(PortalIdentityError::from)?,
     };
 
-    let (password_salt, password_hash) =
-        match input.password.map(str::trim).filter(|value| !value.is_empty()) {
-            Some(next_password) => {
-                validate_password_strength(next_password)
-                    .map_err(PortalIdentityError::InvalidInput)?;
-                hash_identity_password(next_password, "portal password")
-                    .map_err(PortalIdentityError::from)?
-            }
-            None => {
-                let Some(existing) = existing_by_id.as_ref() else {
-                    return Err(PortalIdentityError::InvalidInput(
-                        "password is required for new portal users".to_owned(),
-                    ));
-                };
-                (
-                    existing.password_salt.clone(),
-                    existing.password_hash.clone(),
-                )
-            }
-        };
+    let (password_salt, password_hash) = match input
+        .password
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(next_password) => {
+            validate_password_strength(next_password).map_err(PortalIdentityError::InvalidInput)?;
+            hash_identity_password(next_password, "portal password")
+                .map_err(PortalIdentityError::from)?
+        }
+        None => {
+            let Some(existing) = existing_by_id.as_ref() else {
+                return Err(PortalIdentityError::InvalidInput(
+                    "password is required for new portal users".to_owned(),
+                ));
+            };
+            (
+                existing.password_salt.clone(),
+                existing.password_hash.clone(),
+            )
+        }
+    };
 
     let created_at_ms = existing_by_id
         .as_ref()
@@ -274,8 +276,6 @@ pub async fn reset_portal_user_password(
 }
 
 pub async fn delete_portal_user(store: &dyn AdminStore, user_id: &str) -> PortalResult<bool> {
-    let _ = ensure_default_portal_user(store).await?;
-
     let Some(user) = store
         .find_portal_user_by_id(user_id)
         .await
@@ -284,9 +284,9 @@ pub async fn delete_portal_user(store: &dyn AdminStore, user_id: &str) -> Portal
         return Ok(false);
     };
 
-    if user.id == DEFAULT_PORTAL_USER_ID || user.email == DEFAULT_PORTAL_EMAIL {
+    if user.id == PROTECTED_LOCAL_DEMO_PORTAL_USER_ID {
         return Err(PortalIdentityError::Protected(
-            "default demo portal user cannot be deleted".to_owned(),
+            "default portal demo user cannot be deleted".to_owned(),
         ));
     }
 
@@ -383,4 +383,3 @@ pub async fn change_portal_password(
         .map_err(PortalIdentityError::from)?;
     Ok(PortalUserProfile::from(&saved))
 }
-

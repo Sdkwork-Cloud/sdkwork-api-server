@@ -78,6 +78,24 @@ export function CatalogModelPriceDialog({
       && record.channel_id === modelPriceDraft.channel_id
       && record.model_id === modelPriceDraft.model_id,
   );
+  const pricingTiersPlaceholder = JSON.stringify(
+    [
+      {
+        tier_id: 'default',
+        display_name: t('Default'),
+        condition_kind: 'default',
+        currency_code: 'USD',
+        price_unit: 'per_1m_tokens',
+        input_price: 2.5,
+        output_price: 10,
+        cache_read_price: 0.3,
+        cache_write_price: 1,
+        request_price: 0,
+      },
+    ],
+    null,
+    2,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,7 +105,7 @@ export function CatalogModelPriceDialog({
             {editingModelPriceKey ? t('Edit model pricing') : t('Add model pricing')}
           </DialogTitle>
           <DialogDescription>
-            {t('Provider-specific pricing rows stay aligned with provider-supported canonical publications and keep official, proxy, and local pricing posture explicit.')}
+            {t('Provider-specific pricing rows stay aligned with the selected publication.')}
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-6" onSubmit={onSubmit}>
@@ -299,20 +317,7 @@ export function CatalogModelPriceDialog({
                       pricing_tiers_json: event.target.value,
                     }))
                   }
-                  placeholder={`[
-  {
-    "tier_id": "default",
-    "display_name": "Default",
-    "condition_kind": "default",
-    "currency_code": "USD",
-    "price_unit": "per_1m_tokens",
-    "input_price": 2.5,
-    "output_price": 10,
-    "cache_read_price": 0.3,
-    "cache_write_price": 1,
-    "request_price": 0
-  }
-]`}
+                  placeholder={pricingTiersPlaceholder}
                   rows={10}
                   value={modelPriceDraft.pricing_tiers_json}
                 />

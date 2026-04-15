@@ -342,15 +342,15 @@ Environment: ${environment}`}</pre>
           </form>
 
           <article className="portal-card">
-            <h3>Quick-start demo account</h3>
+            <h3>Bootstrap identity guidance</h3>
             <ul className="portal-facts">
               <li>
-                <strong>Default email</strong>
-                <span>portal@sdkwork.local</span>
+                <strong>Identity source</strong>
+                <span>Use the active bootstrap profile or register a portal account.</span>
               </li>
               <li>
-                <strong>Default password</strong>
-                <span>ChangeMe123!</span>
+                <strong>Password source</strong>
+                <span>Use the password provisioned by your runtime configuration.</span>
               </li>
               <li>
                 <strong>Access boundary</strong>

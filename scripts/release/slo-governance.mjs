@@ -5,9 +5,30 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { materializeReleaseTelemetrySnapshot } from './materialize-release-telemetry-snapshot.mjs';
+import { materializeSloGovernanceEvidence } from './materialize-slo-governance-evidence.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
+const DEFAULT_SLO_GOVERNANCE_EVIDENCE_PATH = path.join(
+  rootDir,
+  'docs',
+  'release',
+  'slo-governance-latest.json',
+);
+const DEFAULT_RELEASE_TELEMETRY_SNAPSHOT_PATH = path.join(
+  rootDir,
+  'docs',
+  'release',
+  'release-telemetry-snapshot-latest.json',
+);
+const DEFAULT_RELEASE_TELEMETRY_EXPORT_PATH = path.join(
+  rootDir,
+  'docs',
+  'release',
+  'release-telemetry-export-latest.json',
+);
 
 const DEFAULT_BURN_RATE_WINDOWS = Object.freeze([
   Object.freeze({
@@ -310,17 +331,91 @@ export function evaluateSloGovernanceEvidence({
 }
 
 export function collectSloGovernanceResult({
-  evidencePath = path.join(rootDir, 'docs', 'release', 'slo-governance-latest.json'),
+  evidencePath = DEFAULT_SLO_GOVERNANCE_EVIDENCE_PATH,
+  telemetrySnapshotPath,
+  telemetrySnapshotJson,
+  telemetryExportPath,
+  telemetryExportJson,
+  env = process.env,
   baseline = SLO_GOVERNANCE_BASELINE,
 } = {}) {
   if (!existsSync(evidencePath)) {
-    return {
-      ok: false,
-      blocked: true,
-      reason: 'evidence-missing',
-      errorMessage: `missing ${path.relative(rootDir, evidencePath) || evidencePath}`,
-      summary: null,
-    };
+    try {
+      const explicitSnapshotPath = String(telemetrySnapshotPath ?? '').trim();
+      const explicitSnapshotJson = String(telemetrySnapshotJson ?? '').trim();
+      const explicitExportPath = String(telemetryExportPath ?? '').trim();
+      const explicitExportJson = String(telemetryExportJson ?? '').trim();
+      const envSnapshotPath = String(env.SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH ?? '').trim();
+      const envSnapshotJson = String(env.SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_JSON ?? '').trim();
+      const envExportPath = String(env.SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH ?? '').trim();
+      const envExportJson = String(env.SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON ?? '').trim();
+
+      const hasExplicitSnapshotFile = explicitSnapshotPath.length > 0 && existsSync(explicitSnapshotPath);
+      let resolvedTelemetrySnapshotPath = hasExplicitSnapshotFile
+        ? explicitSnapshotPath
+        : '';
+      if (!resolvedTelemetrySnapshotPath && existsSync(DEFAULT_RELEASE_TELEMETRY_SNAPSHOT_PATH)) {
+        resolvedTelemetrySnapshotPath = DEFAULT_RELEASE_TELEMETRY_SNAPSHOT_PATH;
+      }
+
+      const hasSnapshotInput = resolvedTelemetrySnapshotPath.length > 0
+        || explicitSnapshotJson.length > 0
+        || envSnapshotPath.length > 0
+        || envSnapshotJson.length > 0;
+      const hasExportInput = explicitExportPath.length > 0
+        || explicitExportJson.length > 0
+        || envExportPath.length > 0
+        || envExportJson.length > 0
+        || existsSync(DEFAULT_RELEASE_TELEMETRY_EXPORT_PATH);
+
+      if (!hasSnapshotInput && !hasExportInput) {
+        return {
+          ok: false,
+          blocked: true,
+          reason: 'evidence-missing',
+          errorMessage: `missing ${path.relative(rootDir, evidencePath) || evidencePath}`,
+          summary: null,
+        };
+      }
+
+      if (!resolvedTelemetrySnapshotPath || !existsSync(resolvedTelemetrySnapshotPath)) {
+        const snapshotResult = materializeReleaseTelemetrySnapshot({
+          snapshotPath: hasExplicitSnapshotFile ? explicitSnapshotPath : undefined,
+          snapshotJson: explicitSnapshotJson || undefined,
+          exportPath: explicitExportPath || undefined,
+          exportJson: explicitExportJson || undefined,
+          env,
+          outputPath: !hasExplicitSnapshotFile && explicitSnapshotPath
+            ? explicitSnapshotPath
+            : undefined,
+        });
+        resolvedTelemetrySnapshotPath = snapshotResult.outputPath;
+      }
+
+      materializeSloGovernanceEvidence({
+        telemetrySnapshotPath: resolvedTelemetrySnapshotPath,
+        outputPath: evidencePath,
+        env,
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        blocked: false,
+        reason: 'invalid-evidence',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        summary: null,
+      };
+    }
+
+    if (!existsSync(evidencePath)) {
+      return {
+        ok: false,
+        blocked: true,
+        reason: 'evidence-missing',
+        errorMessage: `missing ${path.relative(rootDir, evidencePath) || evidencePath}`,
+        summary: null,
+      };
+    }
   }
 
   try {
@@ -350,6 +445,10 @@ export function collectSloGovernanceResult({
 function parseArgs(argv = process.argv.slice(2)) {
   let format = 'text';
   let evidencePath;
+  let telemetrySnapshotPath;
+  let telemetrySnapshotJson;
+  let telemetryExportPath;
+  let telemetryExportJson;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -360,6 +459,26 @@ function parseArgs(argv = process.argv.slice(2)) {
     }
     if (token === '--evidence') {
       evidencePath = String(argv[index + 1] ?? '').trim();
+      index += 1;
+      continue;
+    }
+    if (token === '--snapshot') {
+      telemetrySnapshotPath = String(argv[index + 1] ?? '').trim();
+      index += 1;
+      continue;
+    }
+    if (token === '--snapshot-json') {
+      telemetrySnapshotJson = String(argv[index + 1] ?? '').trim();
+      index += 1;
+      continue;
+    }
+    if (token === '--export') {
+      telemetryExportPath = String(argv[index + 1] ?? '').trim();
+      index += 1;
+      continue;
+    }
+    if (token === '--export-json') {
+      telemetryExportJson = String(argv[index + 1] ?? '').trim();
       index += 1;
       continue;
     }
@@ -374,6 +493,10 @@ function parseArgs(argv = process.argv.slice(2)) {
   return {
     format,
     evidencePath,
+    telemetrySnapshotPath,
+    telemetrySnapshotJson,
+    telemetryExportPath,
+    telemetryExportJson,
   };
 }
 
@@ -399,9 +522,20 @@ function formatText(result) {
 }
 
 function main() {
-  const { format, evidencePath } = parseArgs();
+  const {
+    format,
+    evidencePath,
+    telemetrySnapshotPath,
+    telemetrySnapshotJson,
+    telemetryExportPath,
+    telemetryExportJson,
+  } = parseArgs();
   const result = collectSloGovernanceResult({
     evidencePath,
+    telemetrySnapshotPath,
+    telemetrySnapshotJson,
+    telemetryExportPath,
+    telemetryExportJson,
   });
   const payload = result.summary
     ? {

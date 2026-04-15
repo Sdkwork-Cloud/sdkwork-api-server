@@ -1,8 +1,5 @@
 use super::*;
 
-const DEFAULT_STATELESS_TENANT_ID: &str = "sdkwork-stateless";
-const DEFAULT_STATELESS_PROJECT_ID: &str = "sdkwork-stateless-default";
-
 pub struct GatewayApiState {
     live_store: Reloadable<Arc<dyn AdminStore>>,
     live_identity_store: Option<Reloadable<Arc<dyn IdentityKernelStore>>>,
@@ -176,6 +173,10 @@ impl GatewayApiState {
             live_commercial_billing,
             live_payment_store,
         }
+    }
+
+    pub(crate) fn payment_store_snapshot(&self) -> Option<Arc<dyn CommercialKernelStore>> {
+        self.live_payment_store.as_ref().map(Reloadable::snapshot)
     }
 }
 

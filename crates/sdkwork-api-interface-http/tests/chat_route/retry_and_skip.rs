@@ -33,7 +33,7 @@ async fn stateful_chat_route_skips_recently_failed_primary_provider_on_following
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app
@@ -207,7 +207,7 @@ async fn stateful_chat_route_retries_retryable_primary_failure_before_failing_ov
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app
@@ -379,7 +379,7 @@ async fn stateful_chat_route_does_not_retry_when_policy_limits_retry_attempts_to
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app
@@ -544,7 +544,7 @@ async fn stateful_chat_route_does_not_retry_non_retryable_primary_failure() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app

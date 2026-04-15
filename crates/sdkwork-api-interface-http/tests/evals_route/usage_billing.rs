@@ -46,7 +46,7 @@ async fn stateful_evals_routes_record_usage_and_billing_for_non_create_operation
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -315,7 +315,7 @@ async fn stateful_evals_create_usage_uses_created_eval_id_for_billing() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -503,7 +503,7 @@ async fn stateful_eval_run_create_usage_uses_eval_route_key_for_provider_selecti
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

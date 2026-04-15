@@ -19,7 +19,9 @@ pub async fn list_coupon_redemptions_for_subjects(
         .list_coupon_redemption_records_for_reservation_ids(&reservation_ids)
         .await?
         .into_iter()
-        .filter(|redemption| status.is_none_or(|expected| redemption.redemption_status == expected))
+        .filter(|redemption| {
+            status.map_or(true, |expected| redemption.redemption_status == expected)
+        })
         .collect::<Vec<_>>();
 
     redemptions.sort_by(|left, right| {

@@ -34,6 +34,7 @@ function buildTranslationUsagePattern(key) {
 test('traffic analytics shell copy is localized through the dedicated zh-CN traffic slice', () => {
   const trafficSource = read('packages/sdkwork-router-admin-traffic/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const trafficTranslations = extractMap(i18n, 'ADMIN_ZH_TRAFFIC_TRANSLATIONS');
 
   const expectedKeys = [
@@ -71,5 +72,5 @@ test('traffic analytics shell copy is localized through the dedicated zh-CN traf
   }
 
   assert.match(i18n, /const ADMIN_ZH_TRAFFIC_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_TRAFFIC_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_TRAFFIC_TRANSLATIONS,/);
 });

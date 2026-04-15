@@ -164,16 +164,9 @@ pub trait CacheDriverFactory: Send + Sync {
     async fn build(&self, cache_url: Option<&str>) -> Result<CacheRuntimeStores>;
 }
 
+#[derive(Default)]
 pub struct CacheDriverRegistry {
     factories: HashMap<CacheBackendKind, Arc<dyn CacheDriverFactory>>,
-}
-
-impl Default for CacheDriverRegistry {
-    fn default() -> Self {
-        Self {
-            factories: HashMap::new(),
-        }
-    }
 }
 
 impl CacheDriverRegistry {

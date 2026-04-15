@@ -1,14 +1,14 @@
-﻿use super::*;
+use super::*;
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/health",
         tag = "system",
         responses((status = 200, description = "Gateway health check."))
     )]
-    pub(crate) async fn health() {}
+pub(crate) async fn health() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/models",
         tag = "models",
@@ -19,9 +19,9 @@
             (status = 500, description = "Gateway failed to load model catalog.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn list_models() {}
+pub(crate) async fn list_models() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/models/{model_id}",
         tag = "models",
@@ -34,9 +34,9 @@
             (status = 500, description = "Gateway failed to load model metadata.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn get_model() {}
+pub(crate) async fn get_model() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/chat/completions",
         tag = "chat",
@@ -49,9 +49,9 @@
             (status = 500, description = "Gateway failed to create the chat completion.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn chat_completions() {}
+pub(crate) async fn chat_completions() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/completions",
         tag = "completions",
@@ -64,9 +64,9 @@
             (status = 500, description = "Gateway failed to create the completion.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn completions() {}
+pub(crate) async fn completions() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/responses",
         tag = "responses",
@@ -79,9 +79,9 @@
             (status = 500, description = "Gateway failed to create the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn responses() {}
+pub(crate) async fn responses() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/responses/input_tokens",
         tag = "responses",
@@ -94,9 +94,9 @@
             (status = 500, description = "Gateway failed to count response input tokens.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn responses_input_tokens() {}
+pub(crate) async fn responses_input_tokens() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/responses/compact",
         tag = "responses",
@@ -109,9 +109,9 @@
             (status = 500, description = "Gateway failed to compact the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn responses_compact() {}
+pub(crate) async fn responses_compact() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/responses/{response_id}",
         tag = "responses",
@@ -124,9 +124,9 @@
             (status = 500, description = "Gateway failed to load the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn response_get() {}
+pub(crate) async fn response_get() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         delete,
         path = "/v1/responses/{response_id}",
         tag = "responses",
@@ -139,9 +139,9 @@
             (status = 500, description = "Gateway failed to delete the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn response_delete() {}
+pub(crate) async fn response_delete() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/responses/{response_id}/input_items",
         tag = "responses",
@@ -154,9 +154,9 @@
             (status = 500, description = "Gateway failed to load response input items.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn response_input_items() {}
+pub(crate) async fn response_input_items() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/responses/{response_id}/cancel",
         tag = "responses",
@@ -169,9 +169,9 @@
             (status = 500, description = "Gateway failed to cancel the response.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn response_cancel() {}
+pub(crate) async fn response_cancel() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/embeddings",
         tag = "embeddings",
@@ -184,9 +184,9 @@
             (status = 500, description = "Gateway failed to create embeddings.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn embeddings() {}
+pub(crate) async fn embeddings() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/moderations",
         tag = "moderations",
@@ -199,5 +199,4 @@
             (status = 500, description = "Gateway failed to create the moderation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn moderations() {}
-
+pub(crate) async fn moderations() {}

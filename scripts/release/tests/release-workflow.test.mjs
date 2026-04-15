@@ -37,7 +37,7 @@ export function listExternalReleaseDependencySpecs() {
     { id: 'sdkwork-core', repository: 'Sdkwork-Cloud/sdkwork-core', envRefKey: 'SDKWORK_CORE_GIT_REF', defaultRef: 'main' },
     { id: 'sdkwork-ui', repository: 'Sdkwork-Cloud/sdkwork-ui', envRefKey: 'SDKWORK_UI_GIT_REF', defaultRef: 'main' },
     { id: 'sdkwork-appbase', repository: 'Sdkwork-Cloud/sdkwork-appbase', envRefKey: 'SDKWORK_APPBASE_GIT_REF', defaultRef: 'main' },
-    { id: 'sdkwork-im-sdk', repository: 'Sdkwork-Cloud/sdkwork-im-sdk', envRefKey: 'SDKWORK_IM_SDK_GIT_REF', defaultRef: 'main' },
+    { id: 'sdkwork-craw-chat-sdk', repository: 'Sdkwork-Cloud/craw-chat', envRefKey: 'SDKWORK_CRAW_CHAT_SDK_GIT_REF', defaultRef: 'main' },
   ];
 }
 
@@ -317,6 +317,58 @@ test('repository exposes a multi-platform GitHub release workflow for tagged and
   assert.match(workflow, /permissions:\s*[\s\S]*artifact-metadata:\s*write/);
 });
 
+test('release workflow blocks native and web publishing on a dedicated Rust dependency audit gate', () => {
+  const workflow = read('.github/workflows/release.yml');
+
+  assert.match(
+    workflow,
+    /rust-dependency-audit:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?actions\/setup-node@v5[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?node scripts\/check-rust-dependency-audit\.mjs/,
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit/,
+  );
+  assert.match(
+    workflow,
+    /web-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit/,
+  );
+});
+
+test('release workflow blocks native and web publishing on a dedicated product verification gate', () => {
+  const workflow = read('.github/workflows/release.yml');
+
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?pnpm\/action-setup@v4[\s\S]*?actions\/setup-node@v5[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?Swatinem\/rust-cache@v2[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?node scripts\/check-router-product\.mjs/,
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit[\r\n]+\s*-\s*product-verification/,
+  );
+  assert.match(
+    workflow,
+    /web-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit[\r\n]+\s*-\s*product-verification/,
+  );
+});
+
+test('product verification installs governed frontend dependencies with frozen lockfiles before running release checks', () => {
+  const workflow = read('.github/workflows/release.yml');
+
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?Setup Node\.js[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?Run release product verification[\s\S]*?node scripts\/check-router-product\.mjs/,
+  );
+});
+
+test('product verification exports strict frontend install mode before running release checks', () => {
+  const workflow = read('.github/workflows/release.yml');
+
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?Run release product verification[\s\S]*?env:[\s\S]*?SDKWORK_STRICT_FRONTEND_INSTALLS:\s*'1'[\s\S]*?run:\s*node scripts\/check-router-product\.mjs/,
+  );
+});
+
 test('release workflow materializes GitHub-backed external sibling dependencies before frontend installs', async () => {
   const workflow = read('.github/workflows/release.yml');
 
@@ -368,7 +420,7 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   assert.equal(specs.length, 4);
   assert.deepEqual(
     specs.map((spec) => spec.id),
-    ['sdkwork-core', 'sdkwork-ui', 'sdkwork-appbase', 'sdkwork-im-sdk'],
+    ['sdkwork-core', 'sdkwork-ui', 'sdkwork-appbase', 'sdkwork-craw-chat-sdk'],
   );
 
   const [sdkworkCoreSpec, sdkworkUiSpec, sdkworkAppbaseSpec, sdkworkImSdkSpec] = specs;
@@ -400,13 +452,21 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
     sdkworkAppbaseSpec.requiredPaths,
     ['package.json'],
   );
-  assert.equal(sdkworkImSdkSpec.id, 'sdkwork-im-sdk');
-  assert.equal(sdkworkImSdkSpec.repository, 'Sdkwork-Cloud/sdkwork-im-sdk');
-  assert.equal(sdkworkImSdkSpec.envRefKey, 'SDKWORK_IM_SDK_GIT_REF');
+  assert.equal(sdkworkImSdkSpec.id, 'sdkwork-craw-chat-sdk');
+  assert.equal(sdkworkImSdkSpec.repository, 'Sdkwork-Cloud/craw-chat');
+  assert.equal(sdkworkImSdkSpec.envRefKey, 'SDKWORK_CRAW_CHAT_SDK_GIT_REF');
   assert.equal(sdkworkImSdkSpec.defaultRef, 'main');
   assert.deepEqual(
     sdkworkImSdkSpec.requiredPaths,
-    ['README.md'],
+    ['package.json'],
+  );
+  assert.match(
+    sdkworkImSdkSpec.targetDir.replaceAll('\\', '/'),
+    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript$/,
+  );
+  assert.match(
+    sdkworkImSdkSpec.expectedGitRoot.replaceAll('\\', '/'),
+    /\/craw-chat$/,
   );
 
   const plan = helper.buildExternalReleaseClonePlan({
@@ -427,16 +487,34 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
     ],
   );
 
+  const crawChatPlan = helper.buildExternalReleaseClonePlan({
+    spec: sdkworkImSdkSpec,
+    env: {},
+  });
+  assert.equal(crawChatPlan.command, 'git');
+  assert.deepEqual(
+    crawChatPlan.args,
+    [
+      'clone',
+      '--depth',
+      '1',
+      '--branch',
+      'main',
+      'https://github.com/Sdkwork-Cloud/craw-chat.git',
+      sdkworkImSdkSpec.expectedGitRoot,
+    ],
+  );
+
   const coverage = helper.auditExternalReleaseDependencyCoverage();
   assert.equal(coverage.covered, true);
   assert.deepEqual(coverage.uncoveredReferences, []);
   assert.deepEqual(coverage.externalDependencyIds, ['sdkwork-ui']);
   assert.ok(
     coverage.references.some((reference) =>
-      reference.sourceFile === 'apps/sdkwork-router-admin/package.json'
-      && reference.name === '@sdkwork/ui-pc-react',
+      reference.sourceFile === 'apps/sdkwork-router-admin/pnpm-workspace.yaml'
+      && reference.kind === 'pnpm-workspace',
     ),
-    'expected admin package to contribute an external sibling dependency reference',
+    'expected admin workspace config to contribute an external sibling dependency reference',
   );
   assert.ok(
     coverage.references.some((reference) =>
@@ -494,12 +572,12 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     workflow,
-    /native-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
+    /native-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
     'native release job must materialize a governed release-sync audit artifact before the governance gate',
   );
   assert.match(
     workflow,
-    /web-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
+    /web-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
     'web release job must materialize a governed release-sync audit artifact before the governance gate',
   );
   assert.match(
@@ -645,8 +723,22 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     workflow,
+    /Build web release assets[\s\S]*Run frontend asset budget gate[\s\S]*Package web release assets/,
+    'web release workflow must enforce the frontend asset budget gate after building and before packaging release assets',
+  );
+  assert.match(
+    workflow,
     /Package web release assets[\s\S]*Upload web release assets[\s\S]*Generate web release assets attestation/,
     'web release assets must be packaged and uploaded before attestation generation',
+  );
+});
+
+test('web release workflow enforces the frontend asset budget gate before packaging release assets', () => {
+  const workflow = read('.github/workflows/release.yml');
+
+  assert.match(
+    workflow,
+    /Build web release assets[\s\S]*Run frontend asset budget gate[\s\S]*Package web release assets/,
   );
 });
 
@@ -692,7 +784,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -705,7 +797,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -723,7 +815,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies
@@ -735,6 +827,108 @@ jobs:
     contracts.assertReleaseWorkflowContracts({
       repoRoot: fixtureRoot,
     }),
+  );
+});
+
+test('release workflow contract helper rejects workflows that omit the dedicated Rust dependency audit gate', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const workflowWithoutDependencyAudit = read('.github/workflows/release.yml')
+    .replace(
+      /\r?\n  rust-dependency-audit:[\s\S]*?\r?\n  native-release:/,
+      '\n  native-release:',
+    )
+    .replace(/\r?\n\s*-\s*rust-dependency-audit/g, '');
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: workflowWithoutDependencyAudit,
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /dedicated Rust dependency audit gate/i,
+  );
+});
+
+test('release workflow contract helper rejects workflows that omit the dedicated product verification gate', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const workflowWithoutProductVerification = read('.github/workflows/release.yml')
+    .replace(
+      /\r?\n  product-verification:[\s\S]*?\r?\n  native-release:/,
+      '\n  native-release:',
+    )
+    .replace(/\r?\n\s*-\s*product-verification/g, '');
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: workflowWithoutProductVerification,
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /dedicated product verification gate/i,
+  );
+});
+
+test('release workflow contract helper rejects workflows that omit frozen installs before product verification', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const workflowWithoutFrozenProductInstalls = read('.github/workflows/release.yml')
+    .replace(
+      /\r?\n\s*- name: Install product verification workspace dependencies[\s\S]*?\r?\n\s*- name: Run release product verification/,
+      '\n      - name: Run release product verification',
+    );
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: workflowWithoutFrozenProductInstalls,
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /product verification frozen install/i,
+  );
+});
+
+test('release workflow contract helper rejects workflows that omit strict frontend install mode before product verification', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const workflowWithoutStrictFrontendEnv = read('.github/workflows/release.yml')
+    .replace(
+      /\r?\n\s*env:\r?\n\s*SDKWORK_STRICT_FRONTEND_INSTALLS: '1'/,
+      '',
+    );
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: workflowWithoutStrictFrontendEnv,
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /strict frontend install mode/i,
   );
 });
 
@@ -763,7 +957,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -777,7 +971,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -790,7 +984,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -804,7 +998,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies
@@ -844,7 +1038,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -869,7 +1063,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -882,7 +1076,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -907,7 +1101,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies
@@ -947,7 +1141,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -972,7 +1166,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -985,7 +1179,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1010,7 +1204,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies
@@ -1053,7 +1247,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1084,7 +1278,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -1106,7 +1300,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1137,7 +1331,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Package web release assets
@@ -1189,7 +1383,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1220,7 +1414,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Run installed native runtime smoke on Unix
@@ -1250,7 +1444,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1281,7 +1475,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Package web release assets
@@ -1327,7 +1521,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1346,7 +1540,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -1372,7 +1566,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1391,7 +1585,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies
@@ -1431,7 +1625,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1450,7 +1644,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install native workspace dependencies
@@ -1480,7 +1674,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Materialize release telemetry snapshot
@@ -1499,7 +1693,7 @@ jobs:
           SDKWORK_CORE_GIT_REF: \${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: \${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: \${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
-          SDKWORK_IM_SDK_GIT_REF: \${{ vars.SDKWORK_IM_SDK_GIT_REF || 'main' }}
+          SDKWORK_CRAW_CHAT_SDK_GIT_REF: \${{ vars.SDKWORK_CRAW_CHAT_SDK_GIT_REF || 'main' }}
         run: node scripts/release/run-release-governance-checks.mjs --format json
 
       - name: Install web workspace dependencies

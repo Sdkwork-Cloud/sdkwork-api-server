@@ -20,6 +20,7 @@ function translationEntry(key, value) {
 test('commercial account posture copy is overridden by a dedicated zh-CN account translation slice', () => {
   const source = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
 
   assert.match(source, /t\('Commercial accounts'\)/);
   assert.match(
@@ -110,5 +111,5 @@ test('commercial account posture copy is overridden by a dedicated zh-CN account
       '\\u8d26\\u6237\\u6001\\u52bf\\u4f1a\\u5728\\u540c\\u4e00\\u89c6\\u56fe\\u4e2d\\u5c55\\u793a\\u72b6\\u6001\\u3001\\u51bb\\u7ed3\\u4f59\\u989d\\u548c\\u51c6\\u5165\\u5c31\\u7eea\\u5ea6\\u3002',
     ),
   );
-  assert.match(i18n, /\.\.\.ADMIN_ZH_COMMERCIAL_ACCOUNT_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_COMMERCIAL_ACCOUNT_TRANSLATIONS,/);
 });

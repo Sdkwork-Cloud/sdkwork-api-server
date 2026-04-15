@@ -64,16 +64,9 @@ pub trait RoutingStrategyPlugin: Send + Sync {
     ) -> RoutingStrategyExecutionResult;
 }
 
+#[derive(Default)]
 pub struct RoutingStrategyPluginRegistry {
     plugins: HashMap<&'static str, Arc<dyn RoutingStrategyPlugin>>,
-}
-
-impl Default for RoutingStrategyPluginRegistry {
-    fn default() -> Self {
-        Self {
-            plugins: HashMap::new(),
-        }
-    }
 }
 
 impl RoutingStrategyPluginRegistry {

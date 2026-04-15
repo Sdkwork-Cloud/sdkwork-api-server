@@ -266,7 +266,7 @@ Rules:
 - if any of `gateway_bind`, `admin_bind`, or `portal_bind` is non-loopback, `SDKWORK_PORTAL_JWT_SIGNING_SECRET=local-dev-portal-jwt-secret` is rejected unless `SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS=true`
 - if any of `gateway_bind`, `admin_bind`, or `portal_bind` is non-loopback, `SDKWORK_CREDENTIAL_MASTER_KEY=local-dev-master-key` is rejected unless `SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS=true`
 - if any of `gateway_bind`, `admin_bind`, or `portal_bind` is non-loopback, `SDKWORK_METRICS_BEARER_TOKEN=local-dev-metrics-token` is rejected unless `SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS=true`
-- the built-in `admin@sdkwork.local` and `portal@sdkwork.local` demo accounts come from the `dev` bootstrap profile, for example `SDKWORK_BOOTSTRAP_PROFILE=dev`; the default `prod` bootstrap profile does not seed them
+- development identities come from the active bootstrap profile, for example `SDKWORK_BOOTSTRAP_PROFILE=dev`; review `data/identities/dev.json` before sharing a local environment, and note that the default `prod` bootstrap profile does not seed development identities
 
 Recommended production posture:
 

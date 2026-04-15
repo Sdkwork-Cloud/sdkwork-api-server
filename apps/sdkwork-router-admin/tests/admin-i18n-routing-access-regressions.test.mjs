@@ -29,6 +29,7 @@ test('routing and access policy-group copy is overridden by a dedicated zh-CN ro
     'packages/sdkwork-router-admin-apirouter/src/pages/routes/GatewayRoutingProfilesDialog.tsx',
   );
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
 
   assert.match(
     routesPageSource,
@@ -98,5 +99,5 @@ test('routing and access policy-group copy is overridden by a dedicated zh-CN ro
       '\\u8bf7\\u5148\\u521b\\u5efa\\u8def\\u7531\\u4f9b\\u5e94\\u5546\\uff0c\\u518d\\u56de\\u6765\\u6784\\u5efa\\u53ef\\u590d\\u7528\\u7684\\u8def\\u7531\\u914d\\u7f6e\\u3002',
     ),
   );
-  assert.match(i18n, /\.\.\.ADMIN_ZH_ROUTING_ACCESS_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_ROUTING_ACCESS_TRANSLATIONS,/);
 });

@@ -143,8 +143,7 @@ impl PostgresAdminStore {
         for (id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name) in
             rows
         {
-            let protocol_kind =
-                normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
+            let protocol_kind = normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
             let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
                 vec![ProviderChannelBinding::primary(
                     id.clone(),
@@ -189,8 +188,7 @@ impl PostgresAdminStore {
         for (id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name) in
             rows
         {
-            let protocol_kind =
-                normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
+            let protocol_kind = normalize_provider_protocol_kind(protocol_kind, &adapter_kind);
             let channel_bindings = bindings_by_provider.get(&id).cloned().unwrap_or_else(|| {
                 vec![ProviderChannelBinding::primary(
                     id.clone(),
@@ -221,8 +219,15 @@ impl PostgresAdminStore {
         .fetch_optional(&self.pool)
         .await?;
 
-        let Some((id, channel_id, extension_id, adapter_kind, protocol_kind, base_url, display_name)) =
-            row
+        let Some((
+            id,
+            channel_id,
+            extension_id,
+            adapter_kind,
+            protocol_kind,
+            base_url,
+            display_name,
+        )) = row
         else {
             return Ok(None);
         };
@@ -391,16 +396,16 @@ impl PostgresAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        rows.into_iter().map(decode_provider_account_pg_row).collect()
+        rows.into_iter()
+            .map(decode_provider_account_pg_row)
+            .collect()
     }
 
     pub async fn delete_provider_account(&self, provider_account_id: &str) -> Result<bool> {
-        let result = sqlx::query(
-            "DELETE FROM ai_provider_account WHERE provider_account_id = $1",
-        )
-        .bind(provider_account_id)
-        .execute(&self.pool)
-        .await?;
+        let result = sqlx::query("DELETE FROM ai_provider_account WHERE provider_account_id = $1")
+            .bind(provider_account_id)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -729,11 +734,14 @@ impl PostgresAdminStore {
             channel_model = channel_model.with_capability(capability.clone());
         }
         self.insert_channel_model(&channel_model).await?;
-        let mut provider_model =
-            ProviderModelRecord::new(&model.provider_id, &provider.channel_id, &model.external_name)
-                .with_provider_model_id(&model.external_name)
-                .with_streaming(model.streaming)
-                .with_context_window_option(model.context_window);
+        let mut provider_model = ProviderModelRecord::new(
+            &model.provider_id,
+            &provider.channel_id,
+            &model.external_name,
+        )
+        .with_provider_model_id(&model.external_name)
+        .with_streaming(model.streaming)
+        .with_context_window_option(model.context_window);
         for capability in &model.capabilities {
             provider_model = provider_model.with_capability(capability.clone());
         }

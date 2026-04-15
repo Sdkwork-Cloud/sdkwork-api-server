@@ -1,3 +1,5 @@
+#![allow(clippy::needless_borrows_for_generic_args)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use sdkwork_api_app_payment::{

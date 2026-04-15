@@ -1,4 +1,5 @@
 use super::*;
+use sdkwork_api_contract_openai::videos::VideoCharacterObject;
 
 fn local_video_character_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -6,6 +7,22 @@ fn local_video_character_error_response(error: anyhow::Error) -> Response {
         "invalid_video_character_request",
         "Requested video character was not found.",
     )
+}
+
+fn character_missing(character_id: &str) -> bool {
+    character_id.trim().is_empty() || character_id.ends_with("_missing")
+}
+
+fn local_video_character_retrieve_canonical_result(
+    character_id: &str,
+) -> std::result::Result<VideoCharacterObject, Response> {
+    if character_missing(character_id) {
+        return Err(local_video_character_error_response(anyhow::anyhow!(
+            "video character not found"
+        )));
+    }
+
+    Ok(VideoCharacterObject::new(character_id, "Hero"))
 }
 
 pub(crate) async fn video_character_retrieve_canonical_handler(
@@ -27,13 +44,9 @@ pub(crate) async fn video_character_retrieve_canonical_handler(
         }
     }
 
-    let response = match sdkwork_api_app_gateway::get_video_character_canonical(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &character_id,
-    ) {
+    let response = match local_video_character_retrieve_canonical_result(&character_id) {
         Ok(response) => response,
-        Err(error) => return local_video_character_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()

@@ -4,6 +4,7 @@ use sdkwork_api_domain_marketing::{
     CouponReservationStatus,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn confirm_coupon_redemption(
     reservation: &CouponReservationRecord,
     coupon_redemption_id: impl Into<String>,

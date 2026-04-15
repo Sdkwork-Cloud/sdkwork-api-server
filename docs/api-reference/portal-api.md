@@ -20,14 +20,16 @@ curl -X POST http://127.0.0.1:8082/portal/auth/register \
   }'
 ```
 
-Default local demo login:
+In local development, inspect `data/identities/dev.json` when `SDKWORK_BOOTSTRAP_PROFILE=dev`, or register an account through `/portal/auth/register`.
+
+Login with a provisioned portal identity:
 
 ```bash
 curl -X POST http://127.0.0.1:8082/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 
@@ -38,8 +40,8 @@ curl -X POST http://127.0.0.1:8082/portal/auth/change-password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <portal-jwt>" \
   -d '{
-    "current_password":"ChangeMe123!",
-    "new_password":"PortalPassword456!"
+    "current_password":"<current-portal-password>",
+    "new_password":"<new-portal-password>"
   }'
 ```
 

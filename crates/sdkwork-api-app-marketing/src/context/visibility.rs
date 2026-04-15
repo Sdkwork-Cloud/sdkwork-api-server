@@ -37,7 +37,7 @@ fn coupon_code_is_available_for_template(
             !matches!(
                 code.status,
                 CouponCodeStatus::Disabled | CouponCodeStatus::Expired
-            ) && code.expires_at_ms.is_none_or(|value| now_ms <= value)
+            ) && code.expires_at_ms.map_or(true, |value| now_ms <= value)
         }
         CouponDistributionKind::UniqueCode | CouponDistributionKind::AutoClaim => {
             code.is_redeemable_at(now_ms)

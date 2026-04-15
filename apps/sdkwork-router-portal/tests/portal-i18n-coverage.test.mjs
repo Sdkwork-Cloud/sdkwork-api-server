@@ -410,7 +410,7 @@ test('portal shared locale dictionaries expose real Simplified Chinese translati
   assert.match(commons, /'Choose the portal workspace language\.[^']*'/);
   assert.match(
     portalCore,
-    /PORTAL_ZH_CN_MESSAGES\[text\] \?\? translatePortalZhCnFallback\(text\) \?\? text/,
+    /runtimePortalMessagesByLocale\[locale\]\[text\][\s\S]*runtimePortalFallbackByLocale\[locale\]\?\.?\(text\)[\s\S]*\?\? text/,
   );
   assert.match(zhMessages, /'Predictable order': '[^']+'/);
   assert.match(zhMessages, /'Developer portal': '[^']+'/);

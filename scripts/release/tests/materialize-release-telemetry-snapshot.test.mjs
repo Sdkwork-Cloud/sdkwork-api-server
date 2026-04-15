@@ -1,16 +1,46 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..', '..');
+const defaultReleaseTelemetryExportPath = path.join(
+  repoRoot,
+  'docs',
+  'release',
+  'release-telemetry-export-latest.json',
+);
 const DIRECTLY_DERIVED_AVAILABILITY_TARGET_IDS = new Set([
   'gateway-availability',
   'admin-api-availability',
   'portal-api-availability',
 ]);
+
+function withTemporarilyMissingFiles(filePaths, callback) {
+  const originals = filePaths.map((filePath) => ({
+    filePath,
+    hadOriginalFile: existsSync(filePath),
+    originalContent: existsSync(filePath) ? readFileSync(filePath, 'utf8') : null,
+  }));
+
+  for (const entry of originals) {
+    if (entry.hadOriginalFile) {
+      rmSync(entry.filePath, { force: true });
+    }
+  }
+
+  try {
+    return callback();
+  } finally {
+    for (const entry of originals) {
+      if (entry.hadOriginalFile) {
+        writeFileSync(entry.filePath, entry.originalContent, 'utf8');
+      }
+    }
+  }
+}
 
 function createTelemetrySnapshotPayload() {
   return {
@@ -193,12 +223,15 @@ test('release telemetry snapshot materializer rejects missing snapshot input', a
     ).href,
   );
 
-  assert.throws(
-    () => module.materializeReleaseTelemetrySnapshot({
-      env: {},
-      outputPath: path.join(os.tmpdir(), 'unused.json'),
-    }),
-    /missing release telemetry input/i,
+  withTemporarilyMissingFiles(
+    [defaultReleaseTelemetryExportPath],
+    () => assert.throws(
+      () => module.materializeReleaseTelemetrySnapshot({
+        env: {},
+        outputPath: path.join(os.tmpdir(), 'unused.json'),
+      }),
+      /missing release telemetry input/i,
+    ),
   );
 });
 

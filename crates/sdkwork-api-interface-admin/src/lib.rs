@@ -145,15 +145,12 @@ use sdkwork_api_domain_jobs::{
     AsyncJobAssetRecord, AsyncJobAttemptRecord, AsyncJobCallbackRecord, AsyncJobRecord,
 };
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetLifecycleAction, CampaignBudgetLifecycleAuditOutcome,
-    CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord, CampaignBudgetStatus,
-    CouponCodeLifecycleAction, CouponCodeLifecycleAuditOutcome, CouponCodeLifecycleAuditRecord,
+    CampaignBudgetLifecycleAction, CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord,
+    CampaignBudgetStatus, CouponCodeLifecycleAction, CouponCodeLifecycleAuditRecord,
     CouponCodeRecord, CouponCodeStatus, CouponRedemptionRecord, CouponReservationRecord,
-    CouponRollbackRecord, CouponTemplateApprovalState, CouponTemplateLifecycleAction,
-    CouponTemplateLifecycleAuditOutcome, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingCampaignApprovalState, MarketingCampaignLifecycleAction,
-    MarketingCampaignLifecycleAuditOutcome, MarketingCampaignLifecycleAuditRecord,
-    MarketingCampaignRecord, MarketingCampaignStatus,
+    CouponRollbackRecord, CouponTemplateLifecycleAction, CouponTemplateLifecycleAuditRecord,
+    CouponTemplateRecord, CouponTemplateStatus, MarketingCampaignLifecycleAction,
+    MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord, MarketingCampaignStatus,
 };
 use sdkwork_api_domain_payment::{
     PaymentChannelPolicyRecord, PaymentGatewayAccountRecord, PaymentOrderRecord,
@@ -177,7 +174,6 @@ use sqlx::SqlitePool;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::openapi::Server;
 use utoipa::{Modify, OpenApi, ToSchema};
-use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::{Config as SwaggerUiConfig, SwaggerUi, Url as SwaggerUiUrl};
 
 use commerce::{
@@ -692,6 +688,10 @@ fn admin_route_access(method: &Method, path: &str) -> AdminRouteAccess {
         return AdminRouteAccess::Privileged(AdminPrivilege::CatalogRead);
     }
 
+    if path == "/admin/audit/events" {
+        return AdminRouteAccess::Privileged(AdminPrivilege::IdentityRead);
+    }
+
     if path.starts_with("/admin/users/")
         || path == "/admin/tenants"
         || path.starts_with("/admin/tenants/")
@@ -754,6 +754,14 @@ fn admin_route_access(method: &Method, path: &str) -> AdminRouteAccess {
         });
     }
 
+    if path == "/admin/model-prices" || path.starts_with("/admin/model-prices/") {
+        return AdminRouteAccess::Privileged(if read {
+            AdminPrivilege::CatalogRead
+        } else {
+            AdminPrivilege::FinanceWrite
+        });
+    }
+
     if path == "/admin/channels"
         || path.starts_with("/admin/channels/")
         || path == "/admin/providers"
@@ -766,8 +774,6 @@ fn admin_route_access(method: &Method, path: &str) -> AdminRouteAccess {
         || path.starts_with("/admin/provider-models/")
         || path == "/admin/models"
         || path.starts_with("/admin/models/")
-        || path == "/admin/model-prices"
-        || path.starts_with("/admin/model-prices/")
     {
         return AdminRouteAccess::Privileged(if read {
             AdminPrivilege::CatalogRead

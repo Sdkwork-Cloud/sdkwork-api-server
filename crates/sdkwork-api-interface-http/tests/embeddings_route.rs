@@ -11,7 +11,7 @@ use tower::ServiceExt;
 mod support;
 
 #[tokio::test]
-async fn embeddings_route_returns_ok() {
+async fn embeddings_route_returns_invalid_request_without_embedding_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -27,7 +27,14 @@ async fn embeddings_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "Local embedding fallback is not supported without an embedding backend."
+    );
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], "invalid_model");
 }
 
 #[tokio::test]
@@ -128,7 +135,7 @@ async fn stateful_embeddings_route_relays_to_openai_compatible_provider() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let _ = admin_app
@@ -233,7 +240,7 @@ async fn stateful_embeddings_route_returns_invalid_request_for_missing_model_wit
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app

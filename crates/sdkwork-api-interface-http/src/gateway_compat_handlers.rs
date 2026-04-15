@@ -1,4 +1,48 @@
+#![allow(clippy::result_large_err, clippy::too_many_arguments)]
+
+use crate::gateway_commercial::{
+    begin_gateway_commercial_admission, capture_gateway_commercial_admission,
+    extract_token_usage_metrics as extract_commercial_token_usage_metrics,
+    record_gateway_usage_for_project_with_context,
+    record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context,
+    release_gateway_commercial_admission, GatewayCommercialAdmissionDecision,
+    GatewayCommercialAdmissionSpec, TokenUsageMetrics as CommercialTokenUsageMetrics,
+};
+use crate::gateway_prelude::*;
+use crate::GatewayApiState;
 use std::sync::OnceLock;
+
+use crate::compat_gemini_handlers::{parse_gemini_compat_tail, GeminiCompatAction};
+use sdkwork_api_app_gateway::{
+    execute_raw_json_provider_operation_from_planned_execution_context_with_options,
+    execute_raw_json_provider_operation_with_runtime,
+    execute_raw_stream_provider_operation_from_planned_execution_context_with_options,
+    execute_raw_stream_provider_operation_with_runtime, persist_planned_execution_decision_log,
+    planned_execution_provider_context_for_route_without_log,
+    relay_chat_completion_from_planned_execution_context_with_options,
+    relay_chat_completion_from_store_with_execution_context,
+    relay_chat_completion_stream_from_planned_execution_context_with_options,
+    relay_chat_completion_stream_from_store_with_execution_context,
+    relay_count_response_input_tokens_from_planned_execution_context,
+    PlannedExecutionProviderContext, PlannedExecutionUsageContext,
+};
+use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
+
+fn local_chat_completion_gateway_result(
+    tenant_id: &str,
+    project_id: &str,
+    model: &str,
+) -> anyhow::Result<ChatCompletionResponse> {
+    if model.trim().is_empty() {
+        return Err(anyhow::anyhow!("Chat completion model is required."));
+    }
+
+    create_chat_completion(tenant_id, project_id, model)
+}
+
+fn json_u64(value: Option<&Value>) -> Option<u64> {
+    value.and_then(Value::as_u64)
+}
 
 fn local_anthropic_count_tokens_response(
     tenant_id: &str,
@@ -54,6 +98,215 @@ fn local_anthropic_stream_result(
     Err(anthropic_invalid_request_response(
         "Local anthropic message streaming fallback is not supported without an upstream provider.",
     ))
+}
+
+pub(crate) async fn anthropic_messages_handler(
+    request_context: StatelessGatewayRequest,
+    headers: HeaderMap,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_request_to_chat_completion(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+    if request.model.trim().is_empty() {
+        return anthropic_invalid_request_response("Chat completion model is required.");
+    }
+    let options = anthropic_request_options(&headers);
+
+    if request.stream.unwrap_or(false) {
+        match relay_standard_protocol_stream_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "/v1/messages",
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(StandardProtocolStreamRelayOutcome::Stream(response))) => {
+                return upstream_passthrough_response(response);
+            }
+            Ok(Some(StandardProtocolStreamRelayOutcome::Error(response))) => return response,
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+
+        match relay_raw_protocol_stream_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "anthropic.messages.create",
+            Vec::new(),
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(response)) => return upstream_passthrough_response(response),
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message stream",
+                );
+            }
+        }
+
+        match relay_stateless_stream_request_with_options(
+            &request_context,
+            ProviderRequest::ChatCompletionsStream(&request),
+            &options,
+        )
+        .await
+        {
+            Ok(Some(response)) => {
+                upstream_passthrough_response(anthropic_stream_from_openai(response))
+            }
+            Ok(None) => match local_anthropic_stream_result(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            ) {
+                Ok(response) | Err(response) => response,
+            },
+            Err(_) => {
+                anthropic_bad_gateway_response("failed to relay upstream anthropic message stream")
+            }
+        }
+    } else {
+        match relay_standard_protocol_json_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "/v1/messages",
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(StandardProtocolJsonRelayOutcome::Json(response))) => {
+                return Json(response).into_response();
+            }
+            Ok(Some(StandardProtocolJsonRelayOutcome::Error(response))) => return response,
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response(
+                    "failed to relay upstream anthropic message",
+                );
+            }
+        }
+
+        match relay_raw_protocol_json_request_stateless(
+            &request_context,
+            StandardProtocolKind::Anthropic,
+            "anthropic.messages.create",
+            Vec::new(),
+            &headers,
+            &payload,
+        )
+        .await
+        {
+            Ok(Some(response)) => return Json(response).into_response(),
+            Ok(None) => {}
+            Err(_) => {
+                return anthropic_bad_gateway_response("failed to relay upstream anthropic message")
+            }
+        }
+
+        match relay_stateless_json_request_with_options(
+            &request_context,
+            ProviderRequest::ChatCompletions(&request),
+            &options,
+        )
+        .await
+        {
+            Ok(Some(response)) => {
+                Json(openai_chat_response_to_anthropic(&response)).into_response()
+            }
+            Ok(None) => match local_anthropic_chat_completion_result(
+                request_context.tenant_id(),
+                request_context.project_id(),
+                &request.model,
+            ) {
+                Ok(response) => Json(response).into_response(),
+                Err(response) => response,
+            },
+            Err(_) => anthropic_bad_gateway_response("failed to relay upstream anthropic message"),
+        }
+    }
+}
+
+pub(crate) async fn anthropic_count_tokens_handler(
+    request_context: StatelessGatewayRequest,
+    headers: HeaderMap,
+    ExtractJson(payload): ExtractJson<Value>,
+) -> Response {
+    let request = match anthropic_count_tokens_request(&payload) {
+        Ok(request) => request,
+        Err(error) => return anthropic_invalid_request_response(error.to_string()),
+    };
+    if request.model.trim().is_empty() {
+        return anthropic_invalid_request_response("Response model is required.");
+    }
+
+    match relay_standard_protocol_json_request_stateless(
+        &request_context,
+        StandardProtocolKind::Anthropic,
+        "/v1/messages/count_tokens",
+        &headers,
+        &payload,
+    )
+    .await
+    {
+        Ok(Some(StandardProtocolJsonRelayOutcome::Json(response))) => {
+            return Json(response).into_response();
+        }
+        Ok(Some(StandardProtocolJsonRelayOutcome::Error(response))) => return response,
+        Ok(None) => {}
+        Err(_) => {
+            return anthropic_bad_gateway_response(
+                "failed to relay upstream anthropic count tokens request",
+            );
+        }
+    }
+
+    match relay_raw_protocol_json_request_stateless(
+        &request_context,
+        StandardProtocolKind::Anthropic,
+        "anthropic.messages.count_tokens",
+        Vec::new(),
+        &headers,
+        &payload,
+    )
+    .await
+    {
+        Ok(Some(response)) => return Json(response).into_response(),
+        Ok(None) => {}
+        Err(_) => {
+            return anthropic_bad_gateway_response(
+                "failed to relay upstream anthropic count tokens request",
+            );
+        }
+    }
+
+    match relay_stateless_json_request(
+        &request_context,
+        ProviderRequest::ResponsesInputTokens(&request),
+    )
+    .await
+    {
+        Ok(Some(response)) => Json(openai_count_tokens_to_anthropic(&response)).into_response(),
+        Ok(None) => local_anthropic_count_tokens_response(
+            request_context.tenant_id(),
+            request_context.project_id(),
+            &request.model,
+        ),
+        Err(_) => anthropic_bad_gateway_response(
+            "failed to relay upstream anthropic count tokens request",
+        ),
+    }
 }
 
 fn local_gemini_invalid_model_response(error: anyhow::Error) -> Response {
@@ -651,23 +904,11 @@ async fn relay_raw_protocol_stream_request_from_planned_context(
     }
 }
 
-fn extract_anthropic_token_usage_metrics(response: &Value) -> Option<TokenUsageMetrics> {
-    let usage = response.get("usage")?;
-    let input_tokens = json_u64(usage.get("input_tokens")).unwrap_or(0);
-    let output_tokens = json_u64(usage.get("output_tokens")).unwrap_or(0);
-    let total_tokens = input_tokens.saturating_add(output_tokens);
-    if input_tokens == 0 && output_tokens == 0 && total_tokens == 0 {
-        return None;
-    }
-
-    Some(TokenUsageMetrics {
-        input_tokens,
-        output_tokens,
-        total_tokens,
-    })
+fn extract_anthropic_token_usage_metrics(response: &Value) -> Option<CommercialTokenUsageMetrics> {
+    extract_commercial_token_usage_metrics(response)
 }
 
-fn extract_gemini_token_usage_metrics(response: &Value) -> Option<TokenUsageMetrics> {
+fn extract_gemini_token_usage_metrics(response: &Value) -> Option<CommercialTokenUsageMetrics> {
     let usage = response.get("usageMetadata")?;
     let input_tokens = json_u64(usage.get("promptTokenCount")).unwrap_or(0);
     let output_tokens = json_u64(usage.get("candidatesTokenCount")).unwrap_or(0);
@@ -677,171 +918,17 @@ fn extract_gemini_token_usage_metrics(response: &Value) -> Option<TokenUsageMetr
         return None;
     }
 
-    Some(TokenUsageMetrics {
-        input_tokens,
-        output_tokens,
-        total_tokens,
-    })
-}
-
-async fn completions_handler(
-    request_context: StatelessGatewayRequest,
-    ExtractJson(request): ExtractJson<CreateCompletionRequest>,
-) -> Response {
-    match relay_stateless_json_request(&request_context, ProviderRequest::Completions(&request))
-        .await
-    {
-        Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => local_completion_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        ),
-        Err(_) => bad_gateway_openai_response("failed to relay upstream completion"),
-    }
-}
-
-async fn embeddings_handler(
-    request_context: StatelessGatewayRequest,
-    ExtractJson(request): ExtractJson<CreateEmbeddingRequest>,
-) -> Response {
-    match relay_stateless_json_request(&request_context, ProviderRequest::Embeddings(&request))
-        .await
-    {
-        Ok(Some(response)) => Json(response).into_response(),
-        Ok(None) => local_embedding_response(
-            request_context.tenant_id(),
-            request_context.project_id(),
-            &request.model,
-        ),
-        Err(_) => bad_gateway_openai_response("failed to relay upstream embedding"),
-    }
-}
-
-async fn moderations_handler(
-    request_context: StatelessGatewayRequest,
-    ExtractJson(request): ExtractJson<CreateModerationRequest>,
-) -> Response {
-    match relay_stateless_json_request(&request_context, ProviderRequest::Moderations(&request))
-        .await
-    {
-        Ok(Some(response)) => return Json(response).into_response(),
-        Ok(None) => {
-            return local_moderation_response(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request.model,
-            );
+    let normalized = serde_json::json!({
+        "usage": {
+            "prompt_tokens": input_tokens,
+            "completion_tokens": output_tokens,
+            "total_tokens": total_tokens
         }
-        Err(_) => {
-            return bad_gateway_openai_response("failed to relay upstream moderation");
-        }
-    }
+    });
+    extract_commercial_token_usage_metrics(&normalized)
 }
 
-async fn image_generations_handler(
-    request_context: StatelessGatewayRequest,
-    ExtractJson(request): ExtractJson<CreateImageRequest>,
-) -> Response {
-    match relay_stateless_json_request(
-        &request_context,
-        ProviderRequest::ImagesGenerations(&request),
-    )
-    .await
-    {
-        Ok(Some(response)) => return Json(response).into_response(),
-        Ok(None) => {
-            return local_image_generation_response(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request.model,
-            );
-        }
-        Err(_) => {
-            return bad_gateway_openai_response("failed to relay upstream image generation");
-        }
-    }
-}
-
-async fn image_edits_handler(
-    request_context: StatelessGatewayRequest,
-    multipart: Multipart,
-) -> Response {
-    match parse_image_edit_request(multipart).await {
-        Ok(request) => {
-            match relay_stateless_json_request(
-                &request_context,
-                ProviderRequest::ImagesEdits(&request),
-            )
-            .await
-            {
-                Ok(Some(response)) => return Json(response).into_response(),
-                Ok(None) => {}
-                Err(_) => {
-                    return bad_gateway_openai_response("failed to relay upstream image edit");
-                }
-            }
-
-            let response = match create_image_edit(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
-            ) {
-                Ok(response) => response,
-                Err(error) => {
-                    return local_gateway_invalid_or_bad_gateway_response(
-                        error,
-                        "invalid_image_request",
-                    );
-                }
-            };
-
-            Json(response).into_response()
-        }
-        Err(response) => response,
-    }
-}
-
-async fn image_variations_handler(
-    request_context: StatelessGatewayRequest,
-    multipart: Multipart,
-) -> Response {
-    match parse_image_variation_request(multipart).await {
-        Ok(request) => {
-            match relay_stateless_json_request(
-                &request_context,
-                ProviderRequest::ImagesVariations(&request),
-            )
-            .await
-            {
-                Ok(Some(response)) => return Json(response).into_response(),
-                Ok(None) => {}
-                Err(_) => {
-                    return bad_gateway_openai_response("failed to relay upstream image variation");
-                }
-            }
-
-            let response = match create_image_variation(
-                request_context.tenant_id(),
-                request_context.project_id(),
-                &request,
-            ) {
-                Ok(response) => response,
-                Err(error) => {
-                    return local_gateway_invalid_or_bad_gateway_response(
-                        error,
-                        "invalid_image_request",
-                    );
-                }
-            };
-
-            Json(response).into_response()
-        }
-        Err(response) => response,
-    }
-}
-
-async fn anthropic_messages_with_state_handler(
+pub(crate) async fn anthropic_messages_with_state_handler(
     request_context: CompatAuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     headers: HeaderMap,
@@ -1353,7 +1440,7 @@ async fn anthropic_messages_with_state_handler(
                             return response;
                         }
                     }
-                    let token_usage = extract_token_usage_metrics(&response);
+                    let token_usage = extract_commercial_token_usage_metrics(&response);
                     if record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
                         state.store.as_ref(),
                         request_context.tenant_id(),
@@ -1414,7 +1501,7 @@ async fn anthropic_messages_with_state_handler(
                             return response;
                         }
                     }
-                    let token_usage = extract_token_usage_metrics(&response);
+                    let token_usage = extract_commercial_token_usage_metrics(&response);
                     if record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
                         state.store.as_ref(),
                         request_context.tenant_id(),
@@ -1493,7 +1580,7 @@ async fn anthropic_messages_with_state_handler(
     Json(local_response).into_response()
 }
 
-async fn anthropic_count_tokens_with_state_handler(
+pub(crate) async fn anthropic_count_tokens_with_state_handler(
     request_context: CompatAuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     headers: HeaderMap,
@@ -1614,7 +1701,7 @@ async fn anthropic_count_tokens_with_state_handler(
     }
 }
 
-async fn gemini_models_compat_handler(
+pub(crate) async fn gemini_models_compat_handler(
     request_context: StatelessGatewayRequest,
     Path(tail): Path<String>,
     ExtractJson(payload): ExtractJson<Value>,
@@ -1841,7 +1928,7 @@ async fn gemini_models_compat_handler(
     }
 }
 
-async fn gemini_models_compat_with_state_handler(
+pub(crate) async fn gemini_models_compat_with_state_handler(
     request_context: CompatAuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     Path(tail): Path<String>,
@@ -2074,7 +2161,7 @@ async fn gemini_models_compat_with_state_handler(
                                     return response;
                                 }
                             }
-                            let token_usage = extract_token_usage_metrics(&response);
+                            let token_usage = extract_commercial_token_usage_metrics(&response);
                             if record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
                                 state.store.as_ref(),
                                 request_context.tenant_id(),
@@ -2135,7 +2222,7 @@ async fn gemini_models_compat_with_state_handler(
                                     return response;
                                 }
                             }
-                            let token_usage = extract_token_usage_metrics(&response);
+                            let token_usage = extract_commercial_token_usage_metrics(&response);
                             if record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
                                 state.store.as_ref(),
                                 request_context.tenant_id(),

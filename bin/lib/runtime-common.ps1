@@ -1,11 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:RouterDefaultAdminEmail = 'admin@sdkwork.local'
-$script:RouterDefaultAdminPassword = 'ChangeMe123!'
-$script:RouterDefaultPortalEmail = 'portal@sdkwork.local'
-$script:RouterDefaultPortalPassword = 'ChangeMe123!'
-
 function Write-RouterInfo {
     param([Parameter(Mandatory = $true)][string]$Message)
     Write-Host "[sdkwork-router] $Message"
@@ -14,6 +9,27 @@ function Write-RouterInfo {
 function Throw-RouterError {
     param([Parameter(Mandatory = $true)][string]$Message)
     throw "[sdkwork-router] $Message"
+}
+
+function Get-RouterActiveBootstrapProfile {
+    $bootstrapProfile = [string]$env:SDKWORK_BOOTSTRAP_PROFILE
+    if ([string]::IsNullOrWhiteSpace($bootstrapProfile)) {
+        return 'runtime configuration'
+    }
+
+    return $bootstrapProfile.Trim()
+}
+
+function Get-RouterBootstrapIdentityHintPath {
+    $bootstrapDataDir = [string]$env:SDKWORK_BOOTSTRAP_DATA_DIR
+    $bootstrapProfile = [string]$env:SDKWORK_BOOTSTRAP_PROFILE
+
+    if ([string]::IsNullOrWhiteSpace($bootstrapDataDir) -or [string]::IsNullOrWhiteSpace($bootstrapProfile)) {
+        return ''
+    }
+
+    $identityFile = Join-Path (Join-Path $bootstrapDataDir 'identities') "$($bootstrapProfile.Trim()).json"
+    return Convert-ToRouterPortablePath -PathValue $identityFile
 }
 
 function Convert-ToRouterPortablePath {
@@ -1363,6 +1379,8 @@ function Get-RouterStartupSummaryLines {
     $gatewayDirectUrl = Resolve-RouterHealthUrl -BindAddress $GatewayBind -PathSuffix '/health'
     $adminDirectUrl = Resolve-RouterHealthUrl -BindAddress $AdminBind -PathSuffix '/admin/health'
     $portalDirectUrl = Resolve-RouterHealthUrl -BindAddress $PortalBind -PathSuffix '/portal/health'
+    $bootstrapProfile = Get-RouterActiveBootstrapProfile
+    $bootstrapIdentityHintPath = Get-RouterBootstrapIdentityHintPath
 
     $lines = @(
         '------------------------------------------------------------',
@@ -1392,9 +1410,18 @@ function Get-RouterStartupSummaryLines {
         "  Gateway Service: $gatewayDirectUrl",
         "  Admin Service: $adminDirectUrl",
         "  Portal Service: $portalDirectUrl",
-        'Initial Credentials',
-        "  Admin Console: $($script:RouterDefaultAdminEmail) / $($script:RouterDefaultAdminPassword)",
-        "  Portal Console: $($script:RouterDefaultPortalEmail) / $($script:RouterDefaultPortalPassword)",
+        'Identity Bootstrap',
+        "  Local access uses the active bootstrap profile: $bootstrapProfile"
+    )
+
+    if ($bootstrapIdentityHintPath) {
+        $lines += "  Review your runtime configuration and provisioned identities in $bootstrapIdentityHintPath before sharing the environment."
+    } else {
+        $lines += '  Review your runtime configuration and provisioned identity store before sharing the environment.'
+    }
+
+    $lines += @(
+        '  Portal sign-in: use a provisioned portal user or register through /portal/auth/register.',
         '  Gateway API: sign in through the portal and create an API key.',
         'Logs',
         "  STDOUT: $StdoutLog",

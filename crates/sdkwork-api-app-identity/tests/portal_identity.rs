@@ -1,7 +1,8 @@
 use sdkwork_api_app_identity::{
-    change_portal_password, create_portal_api_key, list_portal_api_keys,
-    load_portal_workspace_summary, login_portal_user, register_portal_user, verify_portal_jwt,
-    PortalIdentityError,
+    change_portal_password, create_portal_api_key, delete_portal_user, list_portal_api_keys,
+    list_portal_user_profiles, load_portal_workspace_summary, login_portal_user,
+    register_portal_user, upsert_portal_user, verify_portal_jwt, PortalIdentityError,
+    UpsertPortalUserInput,
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
@@ -9,6 +10,45 @@ use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
 async fn memory_store() -> SqliteAdminStore {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     SqliteAdminStore::new(pool)
+}
+
+async fn seed_portal_user(store: &SqliteAdminStore) {
+    let _ = register_portal_user(
+        store,
+        "portal@sdkwork.local",
+        "ChangeMe123!",
+        "Portal Demo",
+        "portal-test-secret",
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn empty_store_does_not_lazy_create_default_portal_user() {
+    let store = memory_store().await;
+
+    let error = login_portal_user(
+        &store,
+        "portal@sdkwork.local",
+        "ChangeMe123!",
+        "portal-test-secret",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(matches!(error, PortalIdentityError::InvalidCredentials));
+    assert!(store.list_portal_users().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn listing_portal_users_does_not_materialize_default_identity_on_empty_store() {
+    let store = memory_store().await;
+
+    let users = list_portal_user_profiles(&store).await.unwrap();
+
+    assert!(users.is_empty());
+    assert!(store.list_portal_users().await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -114,8 +154,9 @@ async fn portal_api_key_listing_is_workspace_scoped_and_login_rejects_invalid_pa
 }
 
 #[tokio::test]
-async fn default_portal_login_bootstraps_a_local_demo_user() {
+async fn portal_login_returns_explicitly_seeded_demo_user() {
     let store = memory_store().await;
+    seed_portal_user(&store).await;
 
     let session = login_portal_user(
         &store,
@@ -135,6 +176,7 @@ async fn default_portal_login_bootstraps_a_local_demo_user() {
 #[tokio::test]
 async fn portal_password_change_rejects_old_password_and_accepts_new_password() {
     let store = memory_store().await;
+    seed_portal_user(&store).await;
 
     let session = login_portal_user(
         &store,
@@ -204,7 +246,10 @@ async fn portal_registration_rejects_weak_passwords() {
 async fn production_bootstrap_workspace_does_not_lazy_create_default_portal_user() {
     let store = memory_store().await;
     store
-        .insert_tenant(&Tenant::new("tenant_global_default", "Global Default Workspace"))
+        .insert_tenant(&Tenant::new(
+            "tenant_global_default",
+            "Global Default Workspace",
+        ))
         .await
         .unwrap();
     store
@@ -227,4 +272,45 @@ async fn production_bootstrap_workspace_does_not_lazy_create_default_portal_user
 
     assert!(matches!(error, PortalIdentityError::InvalidCredentials));
     assert!(store.list_portal_users().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn explicit_local_demo_portal_user_is_protected_from_deletion() {
+    let store = memory_store().await;
+    store
+        .insert_tenant(&Tenant::new("tenant_local_demo", "Local Demo Workspace"))
+        .await
+        .unwrap();
+    store
+        .insert_project(&Project::new(
+            "tenant_local_demo",
+            "project_local_demo",
+            "default",
+        ))
+        .await
+        .unwrap();
+    upsert_portal_user(
+        &store,
+        UpsertPortalUserInput {
+            user_id: Some("user_local_demo"),
+            email: "portal@sdkwork.local",
+            display_name: "Portal Demo",
+            password: Some("ChangeMe123!"),
+            workspace_tenant_id: "tenant_local_demo",
+            workspace_project_id: "project_local_demo",
+            active: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    let error = delete_portal_user(&store, "user_local_demo")
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        PortalIdentityError::Protected(message)
+            if message == "default portal demo user cannot be deleted"
+    ));
 }

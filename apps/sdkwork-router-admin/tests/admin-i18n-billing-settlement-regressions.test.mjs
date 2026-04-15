@@ -20,6 +20,7 @@ function translationEntry(key, value) {
 test('commercial settlement and refund operator copy is overridden by a dedicated zh-CN billing translation slice', () => {
   const source = read('packages/sdkwork-router-admin-commercial/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
 
   assert.match(source, /t\('Settlement explorer'\)/);
   assert.match(
@@ -190,5 +191,5 @@ test('commercial settlement and refund operator copy is overridden by a dedicate
       '\\u9000\\u6b3e\\u72b6\\u6001\\u8ba9\\u7ea0\\u504f\\u6d41\\u7a0b\\u5728\\u7ed3\\u7b97\\u5206\\u6790\\u4e2d\\u4fdd\\u6301\\u53ef\\u89c1\\u3002',
     ),
   );
-  assert.match(i18n, /\.\.\.ADMIN_ZH_BILLING_SETTLEMENT_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_BILLING_SETTLEMENT_TRANSLATIONS,/);
 });

@@ -60,7 +60,7 @@ Characteristics:
 
 - default mode is preview, so the built-in Pingora host becomes the primary browser entrypoint
 - runtime state is written under `artifacts/runtime/dev/`
-- startup logs print unified URLs, direct service URLs, default credentials, and log file paths
+- startup logs print unified URLs, direct service URLs, bootstrap profile guidance, and log file paths
 - stop with `./bin/stop-dev.sh` or `.\bin\stop-dev.ps1`
 
 Primary URLs after startup:
@@ -148,7 +148,7 @@ The raw workspace launcher now also prints a startup summary showing:
 - mode
 - frontend access
 - direct service access
-- default local credentials
+- active bootstrap profile guidance
 
 ## Partial Startup
 
@@ -276,12 +276,15 @@ Run the Pingora public web host:
 SDKWORK_WEB_BIND=0.0.0.0:9983 cargo run -p router-web-service
 ```
 
-## Seeded Local Credentials
+## Development Identity Bootstrap
 
-The local development flows seed:
+The local development flows do not rely on fixed built-in emails or passwords.
 
-- admin: `admin@sdkwork.local / ChangeMe123!`
-- portal: `portal@sdkwork.local / ChangeMe123!`
+Instead:
+
+- development identities come from the active bootstrap profile
+- local `dev` profile data lives in `data/identities/dev.json`
+- the default `prod` bootstrap profile does not seed development identities
 
 The gateway itself does not use a seeded username and password. Use a portal-issued API key for authenticated gateway traffic.
 

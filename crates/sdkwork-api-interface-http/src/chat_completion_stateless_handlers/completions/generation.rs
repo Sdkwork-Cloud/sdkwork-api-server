@@ -8,6 +8,13 @@ pub(crate) async fn chat_completions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response(
+            "Chat completion model is required.",
+            "invalid_model",
+        );
+    }
+
     if request.stream.unwrap_or(false) {
         match relay_stateless_stream_request(
             &request_context,

@@ -10,8 +10,20 @@ use tower::ServiceExt;
 
 mod support;
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
 #[tokio::test]
-async fn audio_voices_route_returns_ok() {
+async fn audio_voices_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -24,9 +36,12 @@ async fn audio_voices_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let json = read_json(response).await;
-    assert_eq!(json["object"], "list");
+    assert_openai_invalid_request(
+        response,
+        "Local audio voice listing fallback is not supported without an upstream provider.",
+        "invalid_audio_request",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -87,7 +102,7 @@ async fn stateful_audio_voices_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

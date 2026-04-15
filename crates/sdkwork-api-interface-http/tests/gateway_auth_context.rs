@@ -33,8 +33,30 @@ async fn memory_pool() -> SqlitePool {
 
 #[tokio::test]
 async fn stateful_gateway_requires_api_key_and_uses_request_context() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new().route("/v1/chat/completions", post(upstream_chat_with_usage));
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool.clone());
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
+
+    create_tenant_and_project(&admin_app, &admin_token, "tenant-live", "project-live").await;
+    configure_openai_provider_with_price(
+        admin_app.clone(),
+        &admin_token,
+        &format!("http://{address}"),
+        "tenant-live",
+        0.01,
+        2.5,
+        10.0,
+    )
+    .await;
+
     let group = ApiKeyGroupRecord::new(
         "group-live",
         "tenant-live",
@@ -61,8 +83,6 @@ async fn stateful_gateway_requires_api_key_and_uses_request_context() {
     .unwrap();
 
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
 
     let unauthorized = gateway_app
         .clone()
@@ -191,7 +211,7 @@ async fn stateful_gateway_accepts_canonical_only_api_key_and_resolves_payable_ac
     let pool = memory_pool().await;
     let store = SqliteAdminStore::new(pool.clone());
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
 
     create_tenant_and_project(&admin_app, &admin_token, "1001", "project-canonical-1001").await;
     configure_openai_provider_with_price(

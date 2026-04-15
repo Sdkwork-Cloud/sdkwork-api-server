@@ -11,10 +11,13 @@ import { portalErrorMessage } from 'sdkwork-router-portal-portal-api';
 
 import type { PortalAuthMode, PortalAuthPageProps } from '../types';
 
-const DEV_PORTAL_CREDENTIALS = {
-  email: 'portal@sdkwork.local',
-  password: 'ChangeMe123!',
-};
+function resolveDevLoginEmailHint() {
+  if (!import.meta.env.DEV) {
+    return '';
+  }
+
+  return String(import.meta.env.VITE_PORTAL_LOGIN_HINT_EMAIL ?? '').trim();
+}
 
 function resolveAuthMode(pathname: string): PortalAuthMode {
   if (pathname === '/register') {
@@ -112,16 +115,13 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
   const mode = resolveAuthMode(location.pathname);
   const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
   const copy = authCopy(mode);
-  const [email, setEmail] = useState(
-    import.meta.env.DEV && mode === 'login' ? DEV_PORTAL_CREDENTIALS.email : '',
-  );
-  const [password, setPassword] = useState(
-    import.meta.env.DEV && mode === 'login' ? DEV_PORTAL_CREDENTIALS.password : '',
-  );
+  const devLoginEmailHint = resolveDevLoginEmailHint();
+  const [email, setEmail] = useState(mode === 'login' ? devLoginEmailHint : '');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const showDevCredentials = import.meta.env.DEV && mode === 'login';
+  const showDevAccessHint = import.meta.env.DEV && mode === 'login';
 
   useEffect(() => {
     const nextEmail = searchParams.get('email');
@@ -131,13 +131,12 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!showDevCredentials) {
+    if (!showDevAccessHint || !devLoginEmailHint) {
       return;
     }
 
-    setEmail((current) => current.trim() || DEV_PORTAL_CREDENTIALS.email);
-    setPassword((current) => current || DEV_PORTAL_CREDENTIALS.password);
-  }, [showDevCredentials]);
+    setEmail((current) => current.trim() || devLoginEmailHint);
+  }, [devLoginEmailHint, showDevAccessHint]);
 
   function withRedirect(pathname: string, extra: Record<string, string> = {}) {
     const params = new URLSearchParams();
@@ -284,9 +283,16 @@ export function AuthPage({ signIn, register }: PortalAuthPageProps) {
               </Button>
             </form>
 
-            {showDevCredentials ? (
+            {showDevAccessHint ? (
               <p className="mt-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {t('Local dev credentials are prefilled: {email} / {password}.', DEV_PORTAL_CREDENTIALS)}
+                {devLoginEmailHint
+                  ? t(
+                      'Local development uses identities from the active bootstrap profile. Email hint: {email}. Enter the matching password from your runtime configuration.',
+                      { email: devLoginEmailHint },
+                    )
+                  : t(
+                      'Local development uses identities from the active bootstrap profile. Enter the portal email and password provisioned by your runtime configuration.',
+                    )}
               </p>
             ) : null}
 

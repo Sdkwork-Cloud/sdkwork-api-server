@@ -10,8 +10,31 @@ use tower::ServiceExt;
 
 mod support;
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
+async fn assert_openai_not_found(response: axum::response::Response) {
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let json = read_json(response).await;
+    assert_eq!(
+        json["error"]["message"],
+        "Requested assistant was not found."
+    );
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], "not_found");
+}
+
 #[tokio::test]
-async fn assistants_route_returns_ok() {
+async fn assistants_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -25,11 +48,16 @@ async fn assistants_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local assistant fallback is not supported without an upstream provider.",
+        "invalid_assistant_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn assistants_list_route_returns_ok() {
+async fn assistants_list_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -43,11 +71,16 @@ async fn assistants_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local assistant listing fallback is not supported without an upstream provider.",
+        "invalid_assistant_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn assistant_retrieve_route_returns_ok() {
+async fn assistant_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -61,7 +94,7 @@ async fn assistant_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -90,7 +123,7 @@ async fn assistant_retrieve_route_returns_not_found_for_unknown_assistant() {
 }
 
 #[tokio::test]
-async fn assistant_update_route_returns_ok() {
+async fn assistant_update_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -105,7 +138,7 @@ async fn assistant_update_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -135,7 +168,7 @@ async fn assistant_update_route_returns_not_found_for_unknown_assistant() {
 }
 
 #[tokio::test]
-async fn assistant_delete_route_returns_ok() {
+async fn assistant_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -148,7 +181,7 @@ async fn assistant_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -365,7 +398,7 @@ async fn stateful_assistants_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -557,7 +590,7 @@ async fn stateful_assistants_create_usage_uses_created_assistant_id_for_billing(
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -727,7 +760,7 @@ async fn stateful_assistants_create_usage_uses_created_assistant_id_for_billing(
 async fn stateful_assistant_retrieve_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-assistant-retrieve-missing",
@@ -765,7 +798,7 @@ async fn stateful_assistant_retrieve_route_returns_not_found_without_usage() {
 async fn stateful_assistant_update_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-assistant-update-missing",
@@ -804,7 +837,7 @@ async fn stateful_assistant_update_route_returns_not_found_without_usage() {
 async fn stateful_assistant_delete_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-assistant-delete-missing",

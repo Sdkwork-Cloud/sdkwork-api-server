@@ -9,7 +9,7 @@ anyhow.workspace = true
 argon2.workspace = true
 hmac.workspace = true
 jsonwebtoken.workspace = true
-rand_core.workspace = true
+rand_core = { version = "0.6", features = ["getrandom"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

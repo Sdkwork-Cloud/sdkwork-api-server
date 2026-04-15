@@ -661,6 +661,25 @@ test('admin routes lazy-load workbench modules behind a loading boundary', () =>
   assert.doesNotMatch(routes, /import \{ UsersPage \} from 'sdkwork-router-admin-users';/);
 });
 
+test('admin auth package does not ship hardcoded dev credentials or password-prefill copy', () => {
+  const auth = read('packages/sdkwork-router-admin-auth/src/index.tsx');
+
+  assert.doesNotMatch(auth, /DEV_ADMIN_CREDENTIALS/);
+  assert.doesNotMatch(auth, /admin@sdkwork\.local/);
+  assert.doesNotMatch(auth, /ChangeMe123!/);
+  assert.doesNotMatch(auth, /Local dev credentials are prefilled/);
+});
+
+test('users package does not protect identities by fixed bootstrap email markers', () => {
+  const shared = read('packages/sdkwork-router-admin-users/src/page/shared.tsx');
+  const detailPanel = read('packages/sdkwork-router-admin-users/src/page/UsersDetailPanel.tsx');
+
+  assert.doesNotMatch(shared, /bootstrapOperatorEmail|bootstrapPortalEmail/);
+  assert.doesNotMatch(shared, /admin@sdkwork\.local|portal@sdkwork\.local/);
+  assert.match(shared, /user\.id === sessionUserId/);
+  assert.doesNotMatch(detailPanel, /Bootstrap operators/);
+});
+
 test('legacy commons package is removed and admin core owns shared localization', () => {
   const coreIndex = read('packages/sdkwork-router-admin-core/src/index.tsx');
   const coreI18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');

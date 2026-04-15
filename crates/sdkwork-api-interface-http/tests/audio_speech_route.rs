@@ -11,9 +11,21 @@ use tower::ServiceExt;
 
 mod support;
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
 #[serial(extension_env)]
 #[tokio::test]
-async fn audio_speech_route_returns_audio_content() {
+async fn audio_speech_route_returns_invalid_request_without_speech_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -29,24 +41,17 @@ async fn audio_speech_route_returns_audio_content() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response
-            .headers()
-            .get("content-type")
-            .and_then(|value| value.to_str().ok()),
-        Some("audio/wav")
-    );
-
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    assert!(!bytes.is_empty());
+    assert_openai_invalid_request(
+        response,
+        "Local speech fallback is not supported without a speech synthesis backend.",
+        "invalid_audio_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
 #[tokio::test]
-async fn audio_speech_route_returns_local_mp3_content_when_requested() {
+async fn audio_speech_route_returns_invalid_request_without_speech_backend_for_mp3() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -62,19 +67,12 @@ async fn audio_speech_route_returns_local_mp3_content_when_requested() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response
-            .headers()
-            .get("content-type")
-            .and_then(|value| value.to_str().ok()),
-        Some("audio/mpeg")
-    );
-
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    assert!(!bytes.is_empty());
+    assert_openai_invalid_request(
+        response,
+        "Local speech fallback is not supported without a speech synthesis backend.",
+        "invalid_audio_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -95,14 +93,12 @@ async fn audio_speech_route_returns_bad_request_for_unsupported_local_format() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let json = read_json(response).await;
-    assert_eq!(
-        json["error"]["message"],
-        "unsupported local speech response_format: mystery"
-    );
-    assert_eq!(json["error"]["type"], "invalid_request_error");
-    assert_eq!(json["error"]["code"], "invalid_response_format");
+    assert_openai_invalid_request(
+        response,
+        "unsupported local speech response_format: mystery",
+        "invalid_audio_request",
+    )
+    .await;
 }
 
 #[serial(extension_env)]
@@ -236,7 +232,7 @@ async fn stateful_audio_speech_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -345,7 +341,7 @@ async fn stateful_audio_speech_route_relays_to_native_dynamic_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

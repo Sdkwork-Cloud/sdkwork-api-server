@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use std::sync::{Mutex, OnceLock};
@@ -98,6 +100,42 @@ async fn openapi_routes_expose_portal_api_inventory_with_schema_components() {
     assert!(json["components"]["schemas"]["AsyncJobRecord"].is_object());
     assert!(json["components"]["schemas"]["AsyncJobAttemptRecord"].is_object());
     assert!(json["components"]["schemas"]["AsyncJobAssetRecord"].is_object());
+
+    let billing_history_schema =
+        &json["components"]["schemas"]["PortalBillingAccountHistoryResponse"];
+    assert_eq!(billing_history_schema["type"], "object");
+    assert_eq!(
+        billing_history_schema["properties"]["benefit_lots"]["type"],
+        "array"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["benefit_lots"]["items"]["$ref"],
+        "#/components/schemas/AccountBenefitLotRecord"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["holds"]["type"],
+        "array"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["holds"]["items"]["$ref"],
+        "#/components/schemas/AccountHoldRecord"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["request_settlements"]["type"],
+        "array"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["request_settlements"]["items"]["$ref"],
+        "#/components/schemas/RequestSettlementRecord"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["ledger"]["type"],
+        "array"
+    );
+    assert_eq!(
+        billing_history_schema["properties"]["ledger"]["items"]["$ref"],
+        "#/components/schemas/AccountLedgerHistoryEntry"
+    );
     assert_eq!(
         json["paths"]["/portal/auth/login"]["post"]["requestBody"]["content"]["application/json"]
             ["schema"]["$ref"],

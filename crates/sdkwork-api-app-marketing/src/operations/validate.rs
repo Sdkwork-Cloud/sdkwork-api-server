@@ -4,6 +4,7 @@ use crate::{load_marketing_coupon_context_by_value, validate_marketing_coupon_co
 use sdkwork_api_domain_marketing::MarketingSubjectScope;
 use sdkwork_api_storage_core::AdminStore;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn validate_coupon_for_subject(
     store: &dyn AdminStore,
     coupon_code: &str,

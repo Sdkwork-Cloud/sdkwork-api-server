@@ -26,7 +26,7 @@
 ## 默认使用流程
 
 1. 打开 `http://127.0.0.1:5174/`
-2. 注册一个 portal 用户，或使用本地演示账号登录
+2. 注册一个 portal 用户，或在启用开发 bootstrap profile 时使用已写入的本地身份登录
 3. 进入 dashboard
 4. 查看工作区身份、最近请求、token-unit 用量和计费态势
 5. 在 portal 内查看优惠券兑换、充值和订阅入口
@@ -34,10 +34,11 @@
 7. 立即复制返回的明文 key
 8. 用该 key 调用网关
 
-本地演示账号：
+当 `SDKWORK_BOOTSTRAP_PROFILE=dev` 时，开发身份来自 `data/identities/dev.json`。
 
-- 邮箱：`portal@sdkwork.local`
-- 密码：`ChangeMe123!`
+- 在共享本地环境前先检查该文件
+- 需要新的本地用户时，可通过 `/portal/auth/register` 自助注册
+- 默认的 `prod` bootstrap profile 不会注入开发身份
 
 示例：
 

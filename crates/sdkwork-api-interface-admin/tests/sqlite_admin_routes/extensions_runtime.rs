@@ -359,6 +359,8 @@ async fn extension_runtime_reload_endpoint_rebuilds_runtime_state() {
     let pool = memory_pool().await;
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
+    shutdown_all_native_dynamic_runtimes().unwrap();
+    fs::write(log_guard.path(), "").unwrap();
 
     let first = app
         .clone()
@@ -457,6 +459,8 @@ async fn extension_runtime_reload_endpoint_supports_targeted_scope() {
 
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
+    shutdown_all_native_dynamic_runtimes().unwrap();
+    fs::write(log_guard.path(), "").unwrap();
 
     let initial = app
         .clone()

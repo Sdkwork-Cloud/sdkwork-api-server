@@ -3,30 +3,33 @@ use sdkwork_api_app_gateway::{
     list_vector_store_files,
 };
 
-#[test]
-fn returns_vector_store_file_object() {
-    let response = create_vector_store_file("tenant-1", "project-1", "vs_1", "file_1").unwrap();
-    assert_eq!(response.id, "file_1");
-    assert_eq!(response.object, "vector_store.file");
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
+    );
 }
 
 #[test]
-fn lists_vector_store_file_objects() {
-    let response = list_vector_store_files("tenant-1", "project-1", "vs_1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "vector_store.file");
-}
-
-#[test]
-fn retrieves_vector_store_file_object() {
-    let response = get_vector_store_file("tenant-1", "project-1", "vs_1", "file_1").unwrap();
-    assert_eq!(response.id, "file_1");
-    assert_eq!(response.object, "vector_store.file");
-}
-
-#[test]
-fn deletes_vector_store_file_object() {
-    let response = delete_vector_store_file("tenant-1", "project-1", "vs_1", "file_1").unwrap();
-    assert_eq!(response.id, "file_1");
-    assert!(response.deleted);
+fn local_vector_store_file_fallback_requires_persisted_state() {
+    assert_error_contains(
+        create_vector_store_file("tenant-1", "project-1", "vs_local_1", "file_local_1"),
+        "Persisted local vector store file state is required",
+    );
+    assert_error_contains(
+        list_vector_store_files("tenant-1", "project-1", "vs_local_1"),
+        "Persisted local vector store file state is required",
+    );
+    assert_error_contains(
+        get_vector_store_file("tenant-1", "project-1", "vs_local_1", "file_local_1"),
+        "vector store file not found",
+    );
+    assert_error_contains(
+        delete_vector_store_file("tenant-1", "project-1", "vs_local_1", "file_local_1"),
+        "vector store file not found",
+    );
 }

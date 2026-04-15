@@ -1237,10 +1237,61 @@ const PORTAL_OPENAPI_DOCUMENT: &str = r##"{
         }
       },
       "PortalBillingAccountHistoryResponse": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "account": { "type": ["object", "null"] },
+          "balance": { "type": ["object", "null"] },
+          "benefit_lots": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AccountBenefitLotRecord" }
+          },
+          "holds": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AccountHoldRecord" }
+          },
+          "request_settlements": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RequestSettlementRecord" }
+          },
+          "ledger": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AccountLedgerHistoryEntry" }
+          },
+          "lots": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AccountBenefitLotRecord" }
+          },
+          "ledger_entries": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "ledger_allocations": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "refunds": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        },
+        "required": [
+          "benefit_lots",
+          "holds",
+          "request_settlements",
+          "ledger",
+          "lots",
+          "ledger_entries",
+          "ledger_allocations",
+          "refunds"
+        ]
       },
       "PortalBillingAccountResponse": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "account": { "type": "object" },
+          "balance": { "$ref": "#/components/schemas/AccountBalanceSnapshot" }
+        },
+        "required": ["account", "balance"]
       },
       "AccountBalanceSnapshot": {
         "type": "object"

@@ -6,6 +6,7 @@ use sdkwork_api_domain_marketing::{
 };
 use sdkwork_api_storage_core::AdminStore;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn build_coupon_template_lifecycle_audit_record(
     before: &CouponTemplateRecord,
     after: Option<&CouponTemplateRecord>,

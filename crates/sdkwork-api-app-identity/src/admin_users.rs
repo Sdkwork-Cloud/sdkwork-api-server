@@ -7,7 +7,6 @@ pub async fn login_admin_user(
     signing_secret: &str,
 ) -> AdminResult<AdminAuthSession> {
     validate_login_password(password).map_err(AdminIdentityError::InvalidInput)?;
-    let _ = ensure_default_admin_user(store).await?;
 
     let normalized_email = normalize_email(email);
     let Some(user) = store
@@ -45,7 +44,6 @@ pub async fn load_admin_user_profile(
 pub async fn list_admin_user_profiles(
     store: &dyn AdminStore,
 ) -> AdminResult<Vec<AdminUserProfile>> {
-    let _ = ensure_default_admin_user(store).await?;
     store
         .list_admin_users()
         .await
@@ -261,8 +259,6 @@ pub async fn change_admin_password(
 }
 
 pub async fn delete_admin_user(store: &dyn AdminStore, user_id: &str) -> AdminResult<bool> {
-    let _ = ensure_default_admin_user(store).await?;
-
     let Some(user) = store
         .find_admin_user_by_id(user_id)
         .await
@@ -270,12 +266,6 @@ pub async fn delete_admin_user(store: &dyn AdminStore, user_id: &str) -> AdminRe
     else {
         return Ok(false);
     };
-
-    if user.id == DEFAULT_ADMIN_USER_ID || user.email == DEFAULT_ADMIN_EMAIL {
-        return Err(AdminIdentityError::Protected(
-            "default bootstrap admin cannot be deleted".to_owned(),
-        ));
-    }
 
     store
         .delete_admin_user(&user.id)

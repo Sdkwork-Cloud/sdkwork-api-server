@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PaymentProviderCode {
+    #[default]
     Unspecified,
     Stripe,
     WeChatPay,
@@ -18,12 +19,6 @@ impl PaymentProviderCode {
             Self::WeChatPay => "wechat_pay",
             Self::Alipay => "alipay",
         }
-    }
-}
-
-impl Default for PaymentProviderCode {
-    fn default() -> Self {
-        Self::Unspecified
     }
 }
 
@@ -799,6 +794,7 @@ pub struct PaymentCallbackEventRecord {
 }
 
 impl PaymentCallbackEventRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         callback_event_id: impl Into<String>,
         tenant_id: u64,
@@ -1134,6 +1130,7 @@ pub struct FinanceJournalEntryRecord {
 }
 
 impl FinanceJournalEntryRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         finance_journal_entry_id: impl Into<String>,
         tenant_id: u64,
@@ -1186,6 +1183,7 @@ pub struct FinanceJournalLineRecord {
 }
 
 impl FinanceJournalLineRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         finance_journal_line_id: impl Into<String>,
         tenant_id: u64,

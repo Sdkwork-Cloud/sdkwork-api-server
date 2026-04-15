@@ -1,6 +1,6 @@
 use super::auth_utils::{
-    extract_bearer_token, header_value, query_parameter,
-    resolve_authenticated_gateway_request_context,
+    append_gateway_rate_limit_headers, evaluate_gateway_request_rate_limit, extract_bearer_token,
+    header_value, query_parameter, resolve_authenticated_gateway_request_context,
 };
 use super::*;
 
@@ -41,9 +41,17 @@ pub(crate) async fn apply_gateway_request_context(
         return next.run(request).await;
     };
 
+    let route_key = request.uri().path().to_owned();
+    let rate_limit_evaluation =
+        match evaluate_gateway_request_rate_limit(state.store.as_ref(), &context, &route_key).await
+        {
+            Ok(result) => result,
+            Err(response) => return response,
+        };
+
     let api_key_group_id = context.api_key_group_id().map(ToOwned::to_owned);
     request.extensions_mut().insert(context.clone());
-    CURRENT_GATEWAY_REQUEST_CONTEXT
+    let mut response = CURRENT_GATEWAY_REQUEST_CONTEXT
         .scope(
             context,
             with_request_api_key_group_id(
@@ -51,5 +59,9 @@ pub(crate) async fn apply_gateway_request_context(
                 CURRENT_GATEWAY_REQUEST_STARTED_AT.scope(Instant::now(), next.run(request)),
             ),
         )
-        .await
+        .await;
+    if let Some(evaluation) = rate_limit_evaluation.as_ref() {
+        append_gateway_rate_limit_headers(&mut response, evaluation);
+    }
+    response
 }

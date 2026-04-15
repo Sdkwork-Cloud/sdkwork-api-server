@@ -4,70 +4,74 @@ use sdkwork_api_app_gateway::{
     update_conversation,
 };
 
-#[test]
-fn returns_conversation_object() {
-    let response = create_conversation("tenant-1", "project-1").unwrap();
-    assert_eq!(response.object, "conversation");
-}
-
-#[test]
-fn lists_conversation_objects() {
-    let response = list_conversations("tenant-1", "project-1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "conversation");
-}
-
-#[test]
-fn retrieves_conversation_object() {
-    let response = get_conversation("tenant-1", "project-1", "conv_1").unwrap();
-    assert_eq!(response.id, "conv_1");
-}
-
-#[test]
-fn updates_conversation_object() {
-    let response = update_conversation(
-        "tenant-1",
-        "project-1",
-        "conv_1",
-        serde_json::json!({"workspace":"next"}),
-    )
-    .unwrap();
-    assert_eq!(
-        response.metadata,
-        Some(serde_json::json!({"workspace":"next"}))
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
     );
 }
 
 #[test]
-fn deletes_conversation_object() {
-    let response = delete_conversation("tenant-1", "project-1", "conv_1").unwrap();
-    assert_eq!(response.id, "conv_1");
-    assert!(response.deleted);
+fn local_conversation_fallback_requires_upstream_provider() {
+    assert_error_contains(
+        create_conversation("tenant-1", "project-1"),
+        "Local conversation fallback is not supported",
+    );
+    assert_error_contains(
+        list_conversations("tenant-1", "project-1"),
+        "Local conversation listing fallback is not supported",
+    );
 }
 
 #[test]
-fn creates_conversation_items() {
-    let response = create_conversation_items("tenant-1", "project-1", "conv_1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "conversation.item");
+fn local_conversation_fallback_requires_persisted_conversation_state() {
+    assert_error_contains(
+        get_conversation("tenant-1", "project-1", "conv_local_1"),
+        "conversation not found",
+    );
+    assert_error_contains(
+        update_conversation(
+            "tenant-1",
+            "project-1",
+            "conv_local_1",
+            Some(serde_json::json!({"workspace":"next"})),
+        ),
+        "conversation not found",
+    );
+    assert_error_contains(
+        delete_conversation("tenant-1", "project-1", "conv_local_1"),
+        "conversation not found",
+    );
 }
 
 #[test]
-fn lists_conversation_items() {
-    let response = list_conversation_items("tenant-1", "project-1", "conv_1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].id, "item_1");
+fn local_conversation_update_requires_metadata() {
+    assert_error_contains(
+        update_conversation("tenant-1", "project-1", "conv_local_1", None),
+        "Conversation metadata is required",
+    );
 }
 
 #[test]
-fn retrieves_conversation_item() {
-    let response = get_conversation_item("tenant-1", "project-1", "conv_1", "item_1").unwrap();
-    assert_eq!(response.id, "item_1");
-}
-
-#[test]
-fn deletes_conversation_item() {
-    let response = delete_conversation_item("tenant-1", "project-1", "conv_1", "item_1").unwrap();
-    assert_eq!(response.id, "item_1");
-    assert!(response.deleted);
+fn local_conversation_item_fallback_requires_persisted_state() {
+    assert_error_contains(
+        create_conversation_items("tenant-1", "project-1", "conv_local_1"),
+        "Persisted local conversation item state is required",
+    );
+    assert_error_contains(
+        list_conversation_items("tenant-1", "project-1", "conv_local_1"),
+        "Persisted local conversation item state is required",
+    );
+    assert_error_contains(
+        get_conversation_item("tenant-1", "project-1", "conv_local_1", "item_local_1"),
+        "conversation item not found",
+    );
+    assert_error_contains(
+        delete_conversation_item("tenant-1", "project-1", "conv_local_1", "item_local_1"),
+        "conversation item not found",
+    );
 }

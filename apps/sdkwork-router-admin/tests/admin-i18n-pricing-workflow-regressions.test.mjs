@@ -34,6 +34,7 @@ function buildTranslationUsagePattern(key) {
 test('pricing plan and rate workflow copy is localized through the dedicated zh-CN pricing slice', () => {
   const pricingSource = read('packages/sdkwork-router-admin-pricing/src/index.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const pricingTranslations = extractMap(i18n, 'ADMIN_ZH_PRICING_TRANSLATIONS');
 
   const expectedKeys = [
@@ -93,5 +94,5 @@ test('pricing plan and rate workflow copy is localized through the dedicated zh-
   }
 
   assert.match(i18n, /const ADMIN_ZH_PRICING_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_PRICING_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_PRICING_TRANSLATIONS,/);
 });

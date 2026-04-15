@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 mod assistants_handlers;
 mod assistants_stateless_handlers;
 mod batches_handlers;
@@ -5,7 +7,6 @@ mod batches_stateless_handlers;
 mod chat_completion_handlers;
 mod chat_completion_stateless_handlers;
 mod compat_anthropic;
-mod compat_anthropic_handlers;
 mod compat_gemini;
 mod compat_gemini_handlers;
 mod compat_streaming;
@@ -17,11 +18,14 @@ mod fine_tuning_handlers;
 mod fine_tuning_stateless_handlers;
 mod gateway_auth;
 mod gateway_commercial;
+mod gateway_compat_handlers;
 mod gateway_docs;
 mod gateway_http;
+mod gateway_market;
+mod gateway_openapi;
+mod gateway_payments;
 mod gateway_prelude;
 mod gateway_response_helpers;
-mod gateway_router_builders;
 mod gateway_router_common;
 mod gateway_state;
 mod gateway_stateful_route_groups;

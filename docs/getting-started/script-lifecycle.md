@@ -46,7 +46,7 @@ Characteristics:
 - create and reuse runtime homes
 - write PID files, logs, and environment files
 - support dry-run, foreground, and service-manager usage
-- print unified URLs, direct service URLs, and seeded credentials after successful startup
+- print unified URLs, direct service URLs, and bootstrap identity guidance after successful startup
 
 ## Script Catalog
 
@@ -128,9 +128,9 @@ After startup succeeds, the scripts print:
   - `http://127.0.0.1:9980/health`
   - `http://127.0.0.1:9981/admin/health`
   - `http://127.0.0.1:9982/portal/health`
-- seeded local credentials:
-  - admin: `admin@sdkwork.local / ChangeMe123!`
-  - portal: `portal@sdkwork.local / ChangeMe123!`
+- development identity bootstrap guidance:
+  - identities come from the active bootstrap profile
+  - review `data/identities/dev.json` before sharing a local environment
 
 ### 3. Optional: switch back to standalone browser dev servers
 
@@ -273,7 +273,7 @@ Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\stop.ps1
 ```
 
-### 6. Optional: register a service or daemon
+### 6. Optional: register a service manager entry
 
 From the install home:
 

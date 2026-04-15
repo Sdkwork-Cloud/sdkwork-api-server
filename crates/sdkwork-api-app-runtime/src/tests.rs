@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default, clippy::ptr_arg, clippy::too_many_arguments)]
+
 use super::runtime_reload::{merge_applied_service_config, restart_required_changed_fields};
 use super::*;
 use sdkwork_api_app_credential::{
@@ -236,6 +238,12 @@ async fn build_admin_store_from_config_loads_bootstrap_profile_data_pack() {
     let bootstrap_root = temp_bootstrap_root("profile-pack");
     write_bootstrap_profile_pack(&bootstrap_root);
     let pack = crate::bootstrap_data::load_bootstrap_profile_pack(&bootstrap_root, "dev").unwrap();
+    assert_marketing_bootstrap_records_use_creation_state(
+        &pack.data.coupon_templates,
+        &pack.data.marketing_campaigns,
+        &pack.data.campaign_budgets,
+        &pack.data.coupon_codes,
+    );
     assert_eq!(pack.data.provider_accounts.len(), 3);
     assert_eq!(pack.data.accounts.len(), 1);
     assert_eq!(pack.data.account_benefit_lots.len(), 2);
@@ -624,6 +632,30 @@ async fn build_admin_store_from_config_loads_bootstrap_profile_data_pack() {
             .expect("local demo reconciliation state")
             .last_order_id,
         "order-local-demo-growth-2026"
+    );
+}
+
+#[tokio::test]
+async fn repository_bootstrap_marketing_seed_records_use_creation_state() {
+    let data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("data");
+
+    let prod_pack = crate::bootstrap_data::load_bootstrap_profile_pack(&data_root, "prod").unwrap();
+    assert_marketing_bootstrap_records_use_creation_state(
+        &prod_pack.data.coupon_templates,
+        &prod_pack.data.marketing_campaigns,
+        &prod_pack.data.campaign_budgets,
+        &prod_pack.data.coupon_codes,
+    );
+
+    let dev_pack = crate::bootstrap_data::load_bootstrap_profile_pack(&data_root, "dev").unwrap();
+    assert_marketing_bootstrap_records_use_creation_state(
+        &dev_pack.data.coupon_templates,
+        &dev_pack.data.marketing_campaigns,
+        &dev_pack.data.campaign_budgets,
+        &dev_pack.data.coupon_codes,
     );
 }
 
@@ -2869,9 +2901,11 @@ async fn build_admin_store_from_config_rejects_project_preferences_preset_from_o
                     "priority": 100,
                     "strategy": "weighted_random",
                     "ordered_provider_ids": [
-                        "provider-openai-official"
+                        "provider-openrouter-main",
+                        "provider-siliconflow-main",
+                        "provider-ollama-local"
                     ],
-                    "default_provider_id": "provider-openai-official",
+                    "default_provider_id": "provider-openrouter-main",
                     "max_cost": 3.5,
                     "max_latency_ms": 8000,
                     "require_healthy": false,
@@ -3246,31 +3280,7 @@ async fn build_admin_store_from_config_rejects_routing_profile_provider_with_onl
         &bootstrap_root
             .join("provider-accounts")
             .join("default.json"),
-        &serde_json::json!([
-            {
-                "provider_account_id": "acct-openrouter-tenant-other",
-                "provider_id": "provider-openrouter-main",
-                "display_name": "OpenRouter Other Tenant",
-                "account_kind": "api_key",
-                "owner_scope": "tenant",
-                "owner_tenant_id": "tenant_other_demo",
-                "execution_instance_id": "provider-openrouter-main",
-                "base_url_override": "https://openrouter.ai/api/v1",
-                "region": "global",
-                "priority": 100,
-                "weight": 10,
-                "enabled": true,
-                "routing_tags": ["tenant", "other"],
-                "health_score_hint": null,
-                "latency_ms_hint": null,
-                "cost_hint": null,
-                "success_rate_hint": null,
-                "throughput_hint": null,
-                "max_concurrency": null,
-                "daily_budget": null,
-                "notes": "foreign tenant scoped account"
-            }
-        ]),
+        &foreign_tenant_siliconflow_provider_accounts_fixture(),
     );
     write_json(
         &bootstrap_root.join("routing").join("default.json"),
@@ -3285,8 +3295,8 @@ async fn build_admin_store_from_config_rejects_routing_profile_provider_with_onl
                     "description": "Balanced multi-provider routing",
                     "active": true,
                     "strategy": "weighted_random",
-                    "ordered_provider_ids": ["provider-openrouter-main"],
-                    "default_provider_id": "provider-openrouter-main",
+                    "ordered_provider_ids": ["provider-siliconflow-main"],
+                    "default_provider_id": "provider-siliconflow-main",
                     "max_cost": 3.5,
                     "max_latency_ms": 8000,
                     "require_healthy": false,
@@ -3313,7 +3323,7 @@ async fn build_admin_store_from_config_rejects_routing_profile_provider_with_onl
     };
 
     assert!(error.contains("profile-global-balanced"), "{error}");
-    assert!(error.contains("provider-openrouter-main"), "{error}");
+    assert!(error.contains("provider-siliconflow-main"), "{error}");
     assert!(error.contains("provider account"), "{error}");
 }
 
@@ -3358,31 +3368,7 @@ async fn build_admin_store_from_config_rejects_project_preferences_provider_with
         &bootstrap_root
             .join("provider-accounts")
             .join("default.json"),
-        &serde_json::json!([
-            {
-                "provider_account_id": "acct-openrouter-tenant-other",
-                "provider_id": "provider-openrouter-main",
-                "display_name": "OpenRouter Other Tenant",
-                "account_kind": "api_key",
-                "owner_scope": "tenant",
-                "owner_tenant_id": "tenant_other_demo",
-                "execution_instance_id": "provider-openrouter-main",
-                "base_url_override": "https://openrouter.ai/api/v1",
-                "region": "global",
-                "priority": 100,
-                "weight": 10,
-                "enabled": true,
-                "routing_tags": ["tenant", "other"],
-                "health_score_hint": null,
-                "latency_ms_hint": null,
-                "cost_hint": null,
-                "success_rate_hint": null,
-                "throughput_hint": null,
-                "max_concurrency": null,
-                "daily_budget": null,
-                "notes": "foreign tenant scoped account"
-            }
-        ]),
+        &foreign_tenant_siliconflow_provider_accounts_fixture(),
     );
     write_json(
         &bootstrap_root.join("routing").join("default.json"),
@@ -3394,8 +3380,8 @@ async fn build_admin_store_from_config_rejects_project_preferences_provider_with
                     "project_id": "project_local_demo",
                     "preset_id": "",
                     "strategy": "weighted_random",
-                    "ordered_provider_ids": ["provider-openrouter-main"],
-                    "default_provider_id": "provider-openrouter-main",
+                    "ordered_provider_ids": ["provider-siliconflow-main"],
+                    "default_provider_id": "provider-siliconflow-main",
                     "max_cost": 3.5,
                     "max_latency_ms": 8000,
                     "require_healthy": false,
@@ -3417,7 +3403,7 @@ async fn build_admin_store_from_config_rejects_project_preferences_provider_with
     };
 
     assert!(error.contains("project_local_demo"), "{error}");
-    assert!(error.contains("provider-openrouter-main"), "{error}");
+    assert!(error.contains("provider-siliconflow-main"), "{error}");
     assert!(error.contains("provider account"), "{error}");
 }
 
@@ -4987,7 +4973,7 @@ async fn build_admin_store_from_config_rejects_bootstrap_commerce_order_with_cou
             "coupon_template_id": "template-campaign-mismatch-20",
             "template_key": "campaign-mismatch-20",
             "display_name": "Campaign Mismatch 20",
-            "status": "active",
+            "status": "draft",
             "distribution_kind": "shared_code",
             "benefit": {
                 "benefit_kind": "percentage_off",
@@ -5017,7 +5003,7 @@ async fn build_admin_store_from_config_rejects_bootstrap_commerce_order_with_cou
             "marketing_campaign_id": "campaign-coupon-mismatch",
             "coupon_template_id": "template-campaign-mismatch-20",
             "display_name": "Campaign Coupon Mismatch",
-            "status": "active",
+            "status": "draft",
             "start_at_ms": 1710000000000u64,
             "end_at_ms": 1767225600000u64,
             "created_at_ms": 1710000000000u64,
@@ -16050,6 +16036,38 @@ fn temp_bootstrap_root(label: &str) -> PathBuf {
     root
 }
 
+fn assert_marketing_bootstrap_records_use_creation_state(
+    coupon_templates: &[sdkwork_api_domain_marketing::CouponTemplateRecord],
+    marketing_campaigns: &[sdkwork_api_domain_marketing::MarketingCampaignRecord],
+    campaign_budgets: &[sdkwork_api_domain_marketing::CampaignBudgetRecord],
+    coupon_codes: &[sdkwork_api_domain_marketing::CouponCodeRecord],
+) {
+    assert!(
+        coupon_templates.iter().all(|record| {
+            record.status == sdkwork_api_domain_marketing::CouponTemplateStatus::Draft
+        }),
+        "coupon_templates must bootstrap as draft records",
+    );
+    assert!(
+        marketing_campaigns.iter().all(|record| {
+            record.status == sdkwork_api_domain_marketing::MarketingCampaignStatus::Draft
+        }),
+        "marketing_campaigns must bootstrap as draft records",
+    );
+    assert!(
+        campaign_budgets.iter().all(|record| {
+            record.status == sdkwork_api_domain_marketing::CampaignBudgetStatus::Draft
+        }),
+        "campaign_budgets must bootstrap as draft records",
+    );
+    assert!(
+        coupon_codes.iter().all(|record| {
+            record.status == sdkwork_api_domain_marketing::CouponCodeStatus::Available
+        }),
+        "coupon_codes must bootstrap as available records",
+    );
+}
+
 fn write_bootstrap_profile_pack(root: &PathBuf) {
     write_json(
         &root.join("profiles").join("dev.json"),
@@ -16511,6 +16529,7 @@ fn write_bootstrap_profile_pack(root: &PathBuf) {
                     "id": "admin_local_default",
                     "email": "admin@sdkwork.local",
                     "display_name": "Admin Operator",
+                    "role": "super_admin",
                     "password_salt": "c2Rrd29ya0FkbWluU2VlZA",
                     "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya0FkbWluU2VlZA$Qqn9CGRiZIU7JwoSPHszrNY459YXH9M3WSwuNnJSwxM",
                     "active": true,
@@ -17196,7 +17215,7 @@ fn write_bootstrap_profile_pack(root: &PathBuf) {
                     "coupon_template_id": "template-launch-credit-100",
                     "template_key": "launch-credit-100",
                     "display_name": "Launch Credit 100",
-                    "status": "active",
+                    "status": "draft",
                     "distribution_kind": "shared_code",
                     "benefit": {
                         "benefit_kind": "fixed_amount_off",
@@ -17225,7 +17244,7 @@ fn write_bootstrap_profile_pack(root: &PathBuf) {
                     "marketing_campaign_id": "campaign-launch-q2",
                     "coupon_template_id": "template-launch-credit-100",
                     "display_name": "Launch Campaign Q2",
-                    "status": "active",
+                    "status": "draft",
                     "start_at_ms": 1710000000000u64,
                     "end_at_ms": 1767225600000u64,
                     "created_at_ms": 1710000000000u64,
@@ -17236,7 +17255,7 @@ fn write_bootstrap_profile_pack(root: &PathBuf) {
                 {
                     "campaign_budget_id": "budget-launch-q2",
                     "marketing_campaign_id": "campaign-launch-q2",
-                    "status": "active",
+                    "status": "draft",
                     "total_budget_minor": 5000000u64,
                     "reserved_budget_minor": 0u64,
                     "consumed_budget_minor": 0u64,

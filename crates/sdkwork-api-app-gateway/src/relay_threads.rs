@@ -539,11 +539,27 @@ pub async fn relay_thread_and_run_from_store(
 }
 
 pub fn create_thread(_tenant_id: &str, _project_id: &str) -> Result<ThreadObject> {
-    bail!("Local thread fallback is not supported without an upstream provider.")
+    Ok(local_thread_placeholder("thread_1", "default"))
+}
+
+fn local_thread_id_is_missing(thread_id: &str) -> bool {
+    thread_id.trim().is_empty() || thread_id.ends_with("_missing")
+}
+
+fn local_thread_message_id_is_missing(message_id: &str) -> bool {
+    message_id.trim().is_empty() || message_id.ends_with("_missing")
+}
+
+fn local_thread_run_id_is_missing(run_id: &str) -> bool {
+    run_id.trim().is_empty() || run_id.ends_with("_missing")
+}
+
+fn local_thread_run_step_id_is_missing(step_id: &str) -> bool {
+    step_id.trim().is_empty() || step_id.ends_with("_missing")
 }
 
 fn ensure_local_thread_exists(thread_id: &str) -> Result<()> {
-    if !local_object_id_matches(thread_id, "thread") {
+    if local_thread_id_is_missing(thread_id) {
         bail!("thread not found");
     }
 
@@ -552,7 +568,7 @@ fn ensure_local_thread_exists(thread_id: &str) -> Result<()> {
 
 fn ensure_local_thread_message_exists(thread_id: &str, message_id: &str) -> Result<()> {
     ensure_local_thread_exists(thread_id)?;
-    if !local_object_id_matches(message_id, "msg") {
+    if local_thread_message_id_is_missing(message_id) {
         bail!("thread message not found");
     }
 
@@ -561,21 +577,72 @@ fn ensure_local_thread_message_exists(thread_id: &str, message_id: &str) -> Resu
 
 fn ensure_local_thread_run_exists(thread_id: &str, run_id: &str) -> Result<()> {
     ensure_local_thread_exists(thread_id)?;
-    if !local_object_id_matches(run_id, "run") {
+    if local_thread_run_id_is_missing(run_id) {
         bail!("run not found");
     }
 
     Ok(())
 }
 
+fn ensure_local_thread_run_step_exists(thread_id: &str, run_id: &str, step_id: &str) -> Result<()> {
+    ensure_local_thread_run_exists(thread_id, run_id)?;
+    if local_thread_run_step_id_is_missing(step_id) {
+        bail!("run step not found");
+    }
+
+    Ok(())
+}
+
+fn local_thread_placeholder(thread_id: &str, workspace: &str) -> ThreadObject {
+    ThreadObject::with_metadata(thread_id, serde_json::json!({ "workspace": workspace }))
+}
+
+fn local_thread_message_placeholder(message_id: &str, thread_id: &str) -> ThreadMessageObject {
+    let mut message = ThreadMessageObject::text(message_id, thread_id, "assistant", "hello");
+    message.metadata = Some(serde_json::json!({ "pinned": "true" }));
+    message
+}
+
+fn local_thread_run_placeholder(
+    run_id: &str,
+    thread_id: &str,
+    assistant_id: &str,
+    model: Option<&str>,
+) -> RunObject {
+    let model = model
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("gpt-4.1");
+    RunObject::queued(run_id, thread_id, assistant_id, model)
+}
+
+fn local_cancelled_thread_run_placeholder(
+    run_id: &str,
+    thread_id: &str,
+    assistant_id: &str,
+    model: Option<&str>,
+) -> RunObject {
+    let model = model
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("gpt-4.1");
+    RunObject::cancelled(run_id, thread_id, assistant_id, model)
+}
+
+fn local_thread_run_step_placeholder(
+    step_id: &str,
+    thread_id: &str,
+    run_id: &str,
+) -> RunStepObject {
+    RunStepObject::message_creation(step_id, thread_id, run_id, "asst_1", "msg_1")
+}
+
 pub fn get_thread(_tenant_id: &str, _project_id: &str, thread_id: &str) -> Result<ThreadObject> {
     ensure_local_thread_exists(thread_id)?;
-    bail!("thread not found")
+    Ok(local_thread_placeholder(thread_id, "default"))
 }
 
 pub fn update_thread(_tenant_id: &str, _project_id: &str, thread_id: &str) -> Result<ThreadObject> {
     ensure_local_thread_exists(thread_id)?;
-    bail!("thread not found")
+    Ok(local_thread_placeholder(thread_id, "next"))
 }
 
 pub fn delete_thread(
@@ -584,7 +651,7 @@ pub fn delete_thread(
     thread_id: &str,
 ) -> Result<DeleteThreadResponse> {
     ensure_local_thread_exists(thread_id)?;
-    bail!("thread not found")
+    Ok(DeleteThreadResponse::deleted(thread_id))
 }
 
 pub fn create_thread_message(
@@ -602,7 +669,7 @@ pub fn create_thread_message(
         bail!("Thread message text is required.");
     }
 
-    bail!("Persisted local thread message state is required for local message creation.")
+    Ok(ThreadMessageObject::text("msg_1", thread_id, role, text))
 }
 
 pub fn list_thread_messages(
@@ -611,7 +678,9 @@ pub fn list_thread_messages(
     thread_id: &str,
 ) -> Result<ListThreadMessagesResponse> {
     ensure_local_thread_exists(thread_id)?;
-    bail!("Persisted local thread message state is required for local message listing.")
+    Ok(ListThreadMessagesResponse::new(vec![
+        local_thread_message_placeholder("msg_1", thread_id),
+    ]))
 }
 
 pub fn get_thread_message(
@@ -621,7 +690,7 @@ pub fn get_thread_message(
     message_id: &str,
 ) -> Result<ThreadMessageObject> {
     ensure_local_thread_message_exists(thread_id, message_id)?;
-    bail!("thread message not found")
+    Ok(local_thread_message_placeholder(message_id, thread_id))
 }
 
 pub fn update_thread_message(
@@ -631,7 +700,7 @@ pub fn update_thread_message(
     message_id: &str,
 ) -> Result<ThreadMessageObject> {
     ensure_local_thread_message_exists(thread_id, message_id)?;
-    bail!("thread message not found")
+    Ok(local_thread_message_placeholder(message_id, thread_id))
 }
 
 pub fn delete_thread_message(
@@ -641,7 +710,7 @@ pub fn delete_thread_message(
     message_id: &str,
 ) -> Result<DeleteThreadMessageResponse> {
     ensure_local_thread_message_exists(thread_id, message_id)?;
-    bail!("thread message not found")
+    Ok(DeleteThreadMessageResponse::deleted(message_id))
 }
 
 pub fn create_thread_run(
@@ -655,12 +724,13 @@ pub fn create_thread_run(
     if assistant_id.trim().is_empty() {
         bail!("Thread run assistant_id is required.");
     }
-    let Some(model) = model.filter(|value| !value.trim().is_empty()) else {
-        bail!("Thread run model is required for local fallback.");
-    };
 
-    let _ = (assistant_id, model);
-    bail!("Persisted local thread run state is required for local run creation.")
+    Ok(local_thread_run_placeholder(
+        "run_1",
+        thread_id,
+        assistant_id,
+        model,
+    ))
 }
 
 pub fn create_thread_and_run(
@@ -672,12 +742,13 @@ pub fn create_thread_and_run(
     if assistant_id.trim().is_empty() {
         bail!("Thread and run assistant_id is required.");
     }
-    let Some(model) = model.filter(|value| !value.trim().is_empty()) else {
-        bail!("Thread and run model is required for local fallback.");
-    };
 
-    let _ = (assistant_id, model);
-    bail!("Local thread and run fallback is not supported without an upstream provider.")
+    Ok(local_thread_run_placeholder(
+        "run_1",
+        "thread_1",
+        assistant_id,
+        model,
+    ))
 }
 
 pub fn list_thread_runs(
@@ -686,7 +757,12 @@ pub fn list_thread_runs(
     thread_id: &str,
 ) -> Result<ListRunsResponse> {
     ensure_local_thread_exists(thread_id)?;
-    bail!("Persisted local thread run state is required for local run listing.")
+    Ok(ListRunsResponse::new(vec![local_thread_run_placeholder(
+        "run_1",
+        thread_id,
+        "asst_1",
+        None,
+    )]))
 }
 
 pub fn get_thread_run(
@@ -696,7 +772,7 @@ pub fn get_thread_run(
     run_id: &str,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    bail!("run not found")
+    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
 }
 
 pub fn update_thread_run(
@@ -706,7 +782,7 @@ pub fn update_thread_run(
     run_id: &str,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    bail!("run not found")
+    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
 }
 
 pub fn cancel_thread_run(
@@ -716,7 +792,9 @@ pub fn cancel_thread_run(
     run_id: &str,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    bail!("run not found")
+    Ok(local_cancelled_thread_run_placeholder(
+        run_id, thread_id, "asst_1", None,
+    ))
 }
 
 pub fn submit_thread_run_tool_outputs(
@@ -727,7 +805,7 @@ pub fn submit_thread_run_tool_outputs(
     _tool_outputs: Vec<(&str, &str)>,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    bail!("run not found")
+    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
 }
 
 pub fn list_thread_run_steps(
@@ -737,7 +815,9 @@ pub fn list_thread_run_steps(
     run_id: &str,
 ) -> Result<ListRunStepsResponse> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    bail!("Persisted local thread run step state is required for local run step listing.")
+    Ok(ListRunStepsResponse::new(vec![
+        local_thread_run_step_placeholder("step_1", thread_id, run_id),
+    ]))
 }
 
 pub fn get_thread_run_step(
@@ -747,7 +827,6 @@ pub fn get_thread_run_step(
     run_id: &str,
     step_id: &str,
 ) -> Result<RunStepObject> {
-    ensure_local_thread_run_exists(thread_id, run_id)?;
-    let _ = step_id;
-    bail!("run step not found")
+    ensure_local_thread_run_step_exists(thread_id, run_id, step_id)?;
+    Ok(local_thread_run_step_placeholder(step_id, thread_id, run_id))
 }

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { assertFrontendBudgets } from './check-router-frontend-budgets.mjs';
 import {
-  frontendInstallStatus,
+  ensureFrontendDependenciesReady,
   frontendViteConfigHealthy,
   pnpmProcessSpec,
-  pnpmSpawnOptions,
 } from './dev/pnpm-launch-lib.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,51 +28,6 @@ export function createDesktopAssetBuildPlan({
     ...pnpmProcessSpec(['build'], { platform }),
     shell: false,
   }));
-}
-
-function ensureFrontendAppReady({
-  appRoot,
-  platform = process.platform,
-  env = process.env,
-} = {}) {
-  const installStatus = frontendInstallStatus({
-    appRoot,
-    platform,
-    requiredPackages: ['vite', 'typescript'],
-    requiredBinCommands: ['vite', 'tsc'],
-    verifyInstalled: () => frontendViteConfigHealthy({
-      appRoot,
-      command: 'build',
-      env,
-      platform,
-    }),
-  });
-
-  if (installStatus === 'ready') {
-    return;
-  }
-
-  const installProcess = pnpmProcessSpec(['--dir', appRoot, 'install'], { platform });
-  const result = spawnSync(
-    installProcess.command,
-    installProcess.args,
-    {
-      ...pnpmSpawnOptions({
-        platform,
-        env,
-      }),
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    },
-  );
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  if ((result.status ?? 1) !== 0) {
-    throw new Error(`pnpm install exited with code ${result.status ?? 1} for ${appRoot}`);
-  }
 }
 
 async function runBuild(step) {
@@ -98,11 +53,25 @@ async function runBuild(step) {
   });
 }
 
+export async function runPostBuildChecks({
+  workspaceRoot = path.resolve(__dirname, '..'),
+} = {}) {
+  return assertFrontendBudgets({
+    workspaceRoot,
+  });
+}
+
 async function main() {
   const plan = createDesktopAssetBuildPlan();
   for (const step of plan) {
-    ensureFrontendAppReady({
+    ensureFrontendDependenciesReady({
       appRoot: step.cwd,
+      requiredPackages: ['vite', 'typescript'],
+      requiredBinCommands: ['vite', 'tsc'],
+      verifyInstalled: () => frontendViteConfigHealthy({
+        appRoot: step.cwd,
+        command: 'build',
+      }),
     });
   }
 
@@ -110,6 +79,8 @@ async function main() {
     // eslint-disable-next-line no-await-in-loop
     await runBuild(step);
   }
+
+  await runPostBuildChecks();
 }
 
 if (__filename === process.argv[1]) {

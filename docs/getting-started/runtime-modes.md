@@ -111,7 +111,7 @@ Characteristics:
 - build, install, start, stop, and service registration are separate phases
 - the runtime is installed under a dedicated install home
 - `router-product-service` serves `/admin/*`, `/portal/*`, and `/api/*`
-- designed for direct daemon use or service-manager execution
+- designed for foreground execution under managed scripts or an external service manager
 
 Entry points:
 

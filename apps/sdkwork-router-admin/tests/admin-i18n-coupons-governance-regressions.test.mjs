@@ -35,6 +35,7 @@ test('coupon governance shell and detail copy is localized through the dedicated
   const couponsSource = read('packages/sdkwork-router-admin-coupons/src/index.tsx');
   const detailSource = read('packages/sdkwork-router-admin-coupons/src/page/CouponsDetailPanel.tsx');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const marketingTranslations = extractMap(i18n, 'ADMIN_ZH_MARKETING_TRANSLATIONS');
 
   const couponOverviewKeys = [
@@ -107,5 +108,5 @@ test('coupon governance shell and detail copy is localized through the dedicated
   }
 
   assert.match(i18n, /const ADMIN_ZH_MARKETING_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_MARKETING_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_MARKETING_TRANSLATIONS,/);
 });

@@ -234,7 +234,7 @@ test('buildWorkspaceCommandPlan keeps browser mode on standalone admin and porta
   assert.deepEqual(plan.portal.args, ['scripts/dev/start-portal.mjs', '--dry-run']);
 });
 
-test('workspaceAccessLines describe unified access, direct service links, and seeded credentials', () => {
+test('workspaceAccessLines describe unified access, direct service links, and bootstrap guidance without exposing fixed credentials', () => {
   const previewLines = workspaceAccessLines({
     databaseUrl: null,
     gatewayBind: '127.0.0.1:9980',
@@ -256,8 +256,10 @@ test('workspaceAccessLines describe unified access, direct service links, and se
   assert.match(previewLines, /http:\/\/127\.0\.0\.1:9980\/health/);
   assert.match(previewLines, /http:\/\/127\.0\.0\.1:9981\/admin\/health/);
   assert.match(previewLines, /http:\/\/127\.0\.0\.1:9982\/portal\/health/);
-  assert.match(previewLines, /admin@sdkwork\.local/);
-  assert.match(previewLines, /portal@sdkwork\.local/);
+  assert.match(previewLines, /bootstrap profile/i);
+  assert.doesNotMatch(previewLines, /admin@sdkwork\.local/);
+  assert.doesNotMatch(previewLines, /portal@sdkwork\.local/);
+  assert.doesNotMatch(previewLines, /ChangeMe123!/);
 
   const browserLines = workspaceAccessLines({
     databaseUrl: null,

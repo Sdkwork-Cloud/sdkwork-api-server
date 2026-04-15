@@ -6,6 +6,7 @@
       "display_name": "Growth Lab Admin",
       "password_salt": "c2Rrd29ya0FkbWluU2VlZA",
       "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$c2Rrd29ya0FkbWluU2VlZA$Qqn9CGRiZIU7JwoSPHszrNY459YXH9M3WSwuNnJSwxM",
+      "role": "super_admin",
       "active": true,
       "created_at_ms": 1710001500000
     }

@@ -44,15 +44,25 @@ function formatCreatedAt(timestampMs: number): string {
   return new Date(timestampMs).toLocaleDateString();
 }
 
+function resolveDevLoginEmailHint(): string {
+  if (!import.meta.env.DEV) {
+    return '';
+  }
+
+  return String(import.meta.env.VITE_ADMIN_LOGIN_HINT_EMAIL ?? '').trim();
+}
+
 function AdminLoginPage({
   onAuthenticated,
 }: {
   onAuthenticated: (session: AdminAuthSession) => void;
 }) {
-  const [email, setEmail] = useState('admin@sdkwork.local');
-  const [password, setPassword] = useState('ChangeMe123!');
+  const devLoginEmailHint = resolveDevLoginEmailHint();
+  const showDevAccessHint = import.meta.env.DEV;
+  const [email, setEmail] = useState(devLoginEmailHint);
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState(
-    'Use the local operator account or your rotated admin password.',
+    'Use the operator email and password provisioned by your runtime configuration.',
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -120,10 +130,16 @@ function AdminLoginPage({
               {submitting ? 'Signing in...' : 'Open control plane'}
             </button>
           </form>
-          <div className="admin-note-card">
-            <span>Default local account</span>
-            <code>admin@sdkwork.local / ChangeMe123!</code>
-          </div>
+          {showDevAccessHint ? (
+            <div className="admin-note-card">
+              <span>Local development</span>
+              <span>
+                {devLoginEmailHint
+                  ? `Local development uses identities from the active bootstrap profile. Email hint: ${devLoginEmailHint}. Enter the matching password from your runtime configuration.`
+                  : 'Local development uses identities from the active bootstrap profile. Enter the operator email and password provisioned by your runtime configuration.'}
+              </span>
+            </div>
+          ) : null}
         </article>
       </div>
     </section>
@@ -137,6 +153,7 @@ function AdminShell({
   adminUser: AdminUserProfile;
   onLogout: () => void;
 }) {
+  const devLoginEmailHint = resolveDevLoginEmailHint();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -282,15 +299,23 @@ function AdminShell({
             </form>
 
             <article className="admin-card">
-              <h4>Bootstrap operator account</h4>
+              <h4>Bootstrap identity guidance</h4>
               <ul className="admin-facts">
                 <li>
-                  <strong>Default email</strong>
-                  <span>admin@sdkwork.local</span>
+                  <strong>Identity source</strong>
+                  <span>Use the active bootstrap profile for local identities.</span>
                 </li>
                 <li>
-                  <strong>Default password</strong>
-                  <span>ChangeMe123!</span>
+                  <strong>Email hint</strong>
+                  <span>
+                    {devLoginEmailHint
+                      ? `Optional UI hint from VITE_ADMIN_LOGIN_HINT_EMAIL: ${devLoginEmailHint}`
+                      : 'Set VITE_ADMIN_LOGIN_HINT_EMAIL to prefill the operator email without exposing a password.'}
+                  </span>
+                </li>
+                <li>
+                  <strong>Password source</strong>
+                  <span>Use the password provisioned by your runtime configuration.</span>
                 </li>
                 <li>
                   <strong>Access boundary</strong>

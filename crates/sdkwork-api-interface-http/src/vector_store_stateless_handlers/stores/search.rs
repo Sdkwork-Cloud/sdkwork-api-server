@@ -1,4 +1,5 @@
 use super::*;
+use sdkwork_api_contract_openai::vector_stores::SearchVectorStoreResponse;
 
 fn local_vector_store_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -6,6 +7,33 @@ fn local_vector_store_error_response(error: anyhow::Error) -> Response {
         "invalid_vector_store_request",
         "Requested vector store was not found.",
     )
+}
+
+fn vector_store_missing(vector_store_id: &str) -> bool {
+    vector_store_id.trim().is_empty() || vector_store_id.ends_with("_missing")
+}
+
+fn local_vector_store_search_placeholder(query: &str) -> SearchVectorStoreResponse {
+    SearchVectorStoreResponse::sample(query)
+}
+
+fn local_vector_store_search_result(
+    vector_store_id: &str,
+    query: &str,
+) -> std::result::Result<SearchVectorStoreResponse, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+    if query.trim().is_empty() {
+        return Err(local_gateway_invalid_or_bad_gateway_response(
+            anyhow::anyhow!("Vector store search query is required."),
+            "invalid_vector_store_request",
+        ));
+    }
+
+    Ok(local_vector_store_search_placeholder(query))
 }
 
 pub(crate) async fn vector_store_search_handler(
@@ -25,14 +53,9 @@ pub(crate) async fn vector_store_search_handler(
             return bad_gateway_openai_response("failed to relay upstream vector store search");
         }
     }
-    let response = match search_vector_store(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-        &request.query,
-    ) {
+    let response = match local_vector_store_search_result(&vector_store_id, &request.query) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()

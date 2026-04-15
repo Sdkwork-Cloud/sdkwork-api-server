@@ -6,8 +6,8 @@
 
 1. 启动运行时
 2. 验证控制平面
-3. 登录 seeded admin
-4. 登录 seeded portal 用户
+3. 登录一个管理端身份
+4. 登录一个门户身份
 5. 创建 gateway API key
 6. 发起首个已鉴权 gateway 请求
 
@@ -29,7 +29,7 @@
 
 - 默认避开常见 `808x` 端口冲突
 - 自动拉起内置统一 Web Host
-- 在启动完成后打印可点击的访问链接和默认账号密码
+- 在启动完成后打印可点击的访问链接和 bootstrap 身份引导
 
 Linux / macOS：
 
@@ -52,10 +52,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\start-dev.ps1
 - 独立 admin 健康检查：`http://127.0.0.1:9981/admin/health`
 - 独立 portal 健康检查：`http://127.0.0.1:9982/portal/health`
 
-本地 seeded 账号：
+开发身份 bootstrap 指引：
 
-- admin：`admin@sdkwork.local / ChangeMe123!`
-- portal：`portal@sdkwork.local / ChangeMe123!`
+- 开发身份来自当前激活的 bootstrap profile
+- 在共享本地环境前先检查 `data/identities/dev.json`
+- 默认的 `prod` bootstrap profile 不会注入开发身份
 
 如果你明确想要使用独立 Vite 前端而不是统一 Web Host，可使用：
 
@@ -74,17 +75,19 @@ curl http://127.0.0.1:9982/portal/health
 
 ## 第 3 步：登录管理控制平面
 
-admin API 在首次使用时会自动写入默认本地 operator 账号：
+请使用当前 bootstrap profile 或运行时配置中已经写入的管理端身份。
 
-- 邮箱：`admin@sdkwork.local`
-- 密码：`ChangeMe123!`
+如果你在本地使用 `dev` bootstrap profile：
+
+- 先检查 `data/identities/dev.json`
+- 将下面示例中的 `<admin-email>` 与 `<admin-password>` 替换成实际注入的身份
 
 ```bash
 curl -X POST http://127.0.0.1:9981/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 
@@ -102,17 +105,19 @@ curl http://127.0.0.1:9981/admin/auth/me \
 
 ## 第 4 步：登录门户
 
-公共 portal 在本地开发时会自动写入一个演示账号：
+请使用当前 bootstrap profile 已写入的门户身份，或者先通过 `/portal/auth/register` 注册一个账户。
 
-- 邮箱：`portal@sdkwork.local`
-- 密码：`ChangeMe123!`
+如果你在本地使用 `dev` bootstrap profile：
+
+- 先检查 `data/identities/dev.json`
+- 将下面示例中的 `<portal-email>` 与 `<portal-password>` 替换成实际注入的身份
 
 ```bash
 curl -X POST http://127.0.0.1:9982/portal/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"portal@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<portal-email>",
+    "password":"<portal-password>"
   }'
 ```
 

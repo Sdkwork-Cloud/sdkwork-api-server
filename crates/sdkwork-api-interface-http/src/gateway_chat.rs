@@ -5,10 +5,27 @@ fn local_chat_completion_list_error_response() -> Response {
     )
 }
 
+fn local_stateful_chat_completion_result(
+    model: &str,
+) -> std::result::Result<ChatCompletionResponse, Response> {
+    if model.trim().is_empty() {
+        return Err(invalid_request_openai_response(
+            "Chat completion model is required.",
+            "invalid_model",
+        ));
+    }
+
+    Ok(ChatCompletionResponse::empty("chatcmpl_1", model))
+}
+
 async fn chat_completions_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response("Chat completion model is required.", "invalid_model");
+    }
+
     if request.stream.unwrap_or(false) {
         match relay_stateless_stream_request(
             &request_context,
@@ -172,6 +189,10 @@ async fn chat_completions_with_state_handler(
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response("Chat completion model is required.", "invalid_model");
+    }
+
     let options = ProviderRequestOptions::default();
     let commercial_admission = match begin_gateway_commercial_admission(
         &state,
@@ -332,11 +353,7 @@ async fn chat_completions_with_state_handler(
         );
     }
 
-    let local_chat_completion = match local_chat_completion_result(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &request.model,
-    ) {
+    let local_chat_completion = match local_stateful_chat_completion_result(&request.model) {
         Ok(response) => response,
         Err(response) => {
             if let Some(admission) = commercial_admission.as_ref() {

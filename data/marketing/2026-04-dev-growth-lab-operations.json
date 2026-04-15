@@ -17,7 +17,7 @@
       "coupon_template_id": "template-growth-lab-apac-30",
       "template_key": "growth-lab-apac-credit-30",
       "display_name": "Growth Lab APAC Credit 30",
-      "status": "active",
+      "status": "draft",
       "distribution_kind": "unique_code",
       "benefit": {
         "benefit_kind": "fixed_amount_off",
@@ -49,7 +49,7 @@
       "marketing_campaign_id": "campaign-growth-lab-apac-launch",
       "coupon_template_id": "template-growth-lab-apac-30",
       "display_name": "Growth Lab APAC Launch",
-      "status": "active",
+      "status": "draft",
       "start_at_ms": 1710001503000,
       "end_at_ms": 1767225600000,
       "created_at_ms": 1710001503000,
@@ -60,7 +60,7 @@
     {
       "campaign_budget_id": "budget-growth-lab-apac-launch",
       "marketing_campaign_id": "campaign-growth-lab-apac-launch",
-      "status": "active",
+      "status": "draft",
       "total_budget_minor": 1500000,
       "reserved_budget_minor": 0,
       "consumed_budget_minor": 0,

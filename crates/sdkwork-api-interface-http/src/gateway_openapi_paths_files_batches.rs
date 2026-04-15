@@ -1,6 +1,6 @@
-﻿use super::*;
+use super::*;
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/files",
         tag = "files",
@@ -11,9 +11,9 @@
             (status = 500, description = "Gateway failed to load files.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn files_list() {}
+pub(crate) async fn files_list() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/files",
         tag = "files",
@@ -30,9 +30,9 @@
             (status = 500, description = "Gateway failed to create the file.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn files_create() {}
+pub(crate) async fn files_create() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/files/{file_id}",
         tag = "files",
@@ -45,9 +45,9 @@
             (status = 500, description = "Gateway failed to load the file.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn file_get() {}
+pub(crate) async fn file_get() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         delete,
         path = "/v1/files/{file_id}",
         tag = "files",
@@ -60,9 +60,9 @@
             (status = 500, description = "Gateway failed to delete the file.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn file_delete() {}
+pub(crate) async fn file_delete() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/uploads",
         tag = "uploads",
@@ -75,9 +75,9 @@
             (status = 500, description = "Gateway failed to create the upload session.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn uploads_create() {}
+pub(crate) async fn uploads_create() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/uploads/{upload_id}/parts",
         tag = "uploads",
@@ -95,9 +95,9 @@
             (status = 500, description = "Gateway failed to add the upload part.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn upload_parts_create() {}
+pub(crate) async fn upload_parts_create() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/uploads/{upload_id}/complete",
         tag = "uploads",
@@ -112,9 +112,9 @@
             (status = 500, description = "Gateway failed to complete the upload session.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn upload_complete() {}
+pub(crate) async fn upload_complete() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/uploads/{upload_id}/cancel",
         tag = "uploads",
@@ -127,9 +127,9 @@
             (status = 500, description = "Gateway failed to cancel the upload session.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn upload_cancel() {}
+pub(crate) async fn upload_cancel() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/batches",
         tag = "batches",
@@ -140,9 +140,9 @@
             (status = 500, description = "Gateway failed to load batches.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn batches_list() {}
+pub(crate) async fn batches_list() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/batches",
         tag = "batches",
@@ -155,9 +155,9 @@
             (status = 500, description = "Gateway failed to create the batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn batches_create() {}
+pub(crate) async fn batches_create() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/batches/{batch_id}",
         tag = "batches",
@@ -170,9 +170,9 @@
             (status = 500, description = "Gateway failed to load the batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn batch_get() {}
+pub(crate) async fn batch_get() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/batches/{batch_id}/cancel",
         tag = "batches",
@@ -185,5 +185,4 @@
             (status = 500, description = "Gateway failed to cancel the batch.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn batch_cancel() {}
-
+pub(crate) async fn batch_cancel() {}

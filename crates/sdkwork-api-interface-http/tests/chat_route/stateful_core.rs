@@ -2,11 +2,34 @@ use super::*;
 
 #[tokio::test]
 async fn stateful_chat_route_records_usage_and_billing() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let upstream = Router::new()
+        .route(
+            "/v1/chat/completions",
+            post(upstream_chat_handler_with_usage),
+        )
+        .with_state(UpstreamCaptureState::default());
+
+    tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
-    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
+
+    configure_stateful_openai_chat_provider(
+        &admin_app,
+        &admin_token,
+        "tenant-1",
+        "provider-chat-billing",
+        &format!("http://{address}"),
+        &["gpt-4.1"],
+    )
+    .await;
 
     let response = gateway_app
         .clone()
@@ -87,7 +110,7 @@ async fn stateful_chat_route_returns_invalid_request_for_missing_model_without_u
     let api_key =
         support::issue_gateway_api_key(&pool, "tenant-chat-invalid", "project-chat-invalid").await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -127,7 +150,7 @@ async fn stateful_chat_retrieve_route_returns_not_found_without_usage() {
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -164,7 +187,7 @@ async fn stateful_chat_update_route_returns_not_found_without_usage() {
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -202,7 +225,7 @@ async fn stateful_chat_delete_route_returns_not_found_without_usage() {
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -239,7 +262,7 @@ async fn stateful_chat_messages_route_returns_not_found_without_usage() {
     )
     .await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let response = gateway_app
@@ -284,7 +307,7 @@ async fn stateful_chat_route_keeps_request_model_for_billing_despite_response_id
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app
@@ -490,7 +513,7 @@ async fn stateful_chat_route_records_upstream_token_usage() {
     let pool = memory_pool().await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
     let create_channel = admin_app

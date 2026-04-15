@@ -39,6 +39,7 @@ test('apirouter access and routing shell copy are overridden by a dedicated zh-C
   ];
   const joinedSources = sources.join('\n');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const apirouterSurfaceTranslations = extractMap(
     i18n,
     'ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS',
@@ -146,5 +147,5 @@ test('apirouter access and routing shell copy are overridden by a dedicated zh-C
   }
 
   assert.match(i18n, /const ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_APIROUTER_SURFACE_TRANSLATIONS,/);
 });

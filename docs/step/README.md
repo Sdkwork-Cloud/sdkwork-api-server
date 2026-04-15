@@ -195,7 +195,7 @@
 - 必须区分 `当前事实` 与 `目标状态`，不得把目标写成已落地现实。
 - 必须区分 `stateful standalone` 与 `stateless runtime`，不得把前者能力外推到后者。
 - 必须区分 `step 级依赖` 与 `step 内并行车道`，不得跳过主脊柱顺序。
-- Release 相关 step 必须区分 `工作区 sibling 相对路径依赖` 与 `Release 环境 GitHub 不可变依赖`；`sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase`、`sdkwork-im-sdk` 任一仓库本地与远端不一致时视为 `B3` 阻塞。
+- Release 相关 step 必须区分 `工作区 sibling 相对路径依赖` 与 `Release 环境 GitHub 不可变依赖`；`sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase` 与 `sdkwork-craw-chat-sdk`（发布 Git 根为 `apps/craw-chat`）任一依赖本地与远端不一致时视为 `B3` 阻塞。
 - 每个 step 必须包含：设计、实施落地规划、测试计划、结果验证、检查点、风险与回滚、完成定义。
 - 每个 step 完成后必须回写 `docs/架构/` 与 `docs/review/`，不能只改代码不留证据。
 

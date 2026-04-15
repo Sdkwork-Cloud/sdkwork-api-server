@@ -1,4 +1,5 @@
 use super::*;
+use sdkwork_api_contract_openai::videos::{VideoCharacterObject, VideoCharactersResponse};
 
 fn local_video_character_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -6,6 +7,89 @@ fn local_video_character_error_response(error: anyhow::Error) -> Response {
         "invalid_video_character_request",
         "Requested video character was not found.",
     )
+}
+
+fn video_missing(video_id: &str) -> bool {
+    video_id.trim().is_empty() || video_id.ends_with("_missing")
+}
+
+fn character_missing(character_id: &str) -> bool {
+    character_id.trim().is_empty() || character_id.ends_with("_missing")
+}
+
+fn local_video_character_placeholder(character_id: &str, name: &str) -> VideoCharacterObject {
+    VideoCharacterObject::new(character_id, name)
+}
+
+fn local_video_characters_placeholder() -> VideoCharactersResponse {
+    VideoCharactersResponse::new(vec![VideoCharacterObject::new("char_1", "Hero")])
+}
+
+fn local_video_characters_list_result(
+    video_id: &str,
+) -> std::result::Result<VideoCharactersResponse, Response> {
+    if video_missing(video_id) {
+        return Err(local_video_character_error_response(anyhow::anyhow!(
+            "video character not found"
+        )));
+    }
+
+    Ok(local_video_characters_placeholder())
+}
+
+fn local_video_character_retrieve_result(
+    video_id: &str,
+    character_id: &str,
+) -> std::result::Result<VideoCharacterObject, Response> {
+    if video_missing(video_id) || character_missing(character_id) {
+        return Err(local_video_character_error_response(anyhow::anyhow!(
+            "video character not found"
+        )));
+    }
+
+    Ok(local_video_character_placeholder(character_id, "Hero"))
+}
+
+fn local_video_character_update_result(
+    video_id: &str,
+    character_id: &str,
+    request: &UpdateVideoCharacterRequest,
+) -> std::result::Result<VideoCharacterObject, Response> {
+    if video_missing(video_id) || character_missing(character_id) {
+        return Err(local_video_character_error_response(anyhow::anyhow!(
+            "video character not found"
+        )));
+    }
+    let Some(name) = request
+        .name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+    else {
+        return Err(invalid_request_openai_response(
+            "Video character name is required.",
+            "invalid_video_character_request",
+        ));
+    };
+
+    Ok(local_video_character_placeholder(character_id, name))
+}
+
+fn local_video_character_create_result(
+    request: &CreateVideoCharacterRequest,
+) -> std::result::Result<VideoCharacterObject, Response> {
+    if video_missing(&request.video_id) {
+        return Err(local_video_character_error_response(anyhow::anyhow!(
+            "video character not found"
+        )));
+    }
+    if request.name.trim().is_empty() {
+        return Err(invalid_request_openai_response(
+            "Video character name is required.",
+            "invalid_video_character_request",
+        ));
+    }
+
+    Ok(local_video_character_placeholder("char_1", &request.name))
 }
 
 pub(crate) async fn video_characters_list_handler(
@@ -25,13 +109,9 @@ pub(crate) async fn video_characters_list_handler(
         }
     }
 
-    let response = match list_video_characters(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &video_id,
-    ) {
+    let response = match local_video_characters_list_result(&video_id) {
         Ok(response) => response,
-        Err(error) => return local_video_character_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -56,14 +136,9 @@ pub(crate) async fn video_character_retrieve_handler(
         }
     }
 
-    let response = match get_video_character(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &video_id,
-        &character_id,
-    ) {
+    let response = match local_video_character_retrieve_result(&video_id, &character_id) {
         Ok(response) => response,
-        Err(error) => return local_video_character_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -87,15 +162,9 @@ pub(crate) async fn video_character_update_handler(
         }
     }
 
-    let response = match update_video_character(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &video_id,
-        &character_id,
-        &request,
-    ) {
+    let response = match local_video_character_update_result(&video_id, &character_id, &request) {
         Ok(response) => response,
-        Err(error) => return local_video_character_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -118,13 +187,9 @@ pub(crate) async fn video_character_create_handler(
         }
     }
 
-    let response = match sdkwork_api_app_gateway::create_video_character(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &request,
-    ) {
+    let response = match local_video_character_create_result(&request) {
         Ok(response) => response,
-        Err(error) => return local_video_character_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()

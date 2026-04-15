@@ -1,16 +1,11 @@
 use super::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PricingPlanOwnershipScope {
+    #[default]
     Workspace,
     PlatformShared,
-}
-
-impl Default for PricingPlanOwnershipScope {
-    fn default() -> Self {
-        Self::Workspace
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

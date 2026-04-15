@@ -121,6 +121,7 @@ export function resolveReleaseWindowSnapshotProducerInput({
   }
 
   const result = collectReleaseWindowSnapshotResult({
+    preferDefaultArtifact: false,
     env,
     spawnSyncImpl,
   });

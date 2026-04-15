@@ -10,13 +10,11 @@ pub(crate) use crate::compat_anthropic::{
     anthropic_stream_from_openai, openai_chat_response_to_anthropic,
     openai_count_tokens_to_anthropic,
 };
-pub(crate) use crate::compat_anthropic_handlers::*;
 pub(crate) use crate::compat_gemini::{
     gemini_bad_gateway_response, gemini_count_tokens_request, gemini_invalid_request_response,
     gemini_request_to_chat_completion, gemini_stream_from_openai, openai_chat_response_to_gemini,
     openai_count_tokens_to_gemini,
 };
-pub(crate) use crate::compat_gemini_handlers::*;
 pub(crate) use crate::conversation_handlers::*;
 pub(crate) use crate::conversation_stateless_handlers::*;
 pub(crate) use crate::eval_handlers::*;
@@ -25,7 +23,6 @@ pub(crate) use crate::fine_tuning_handlers::*;
 pub(crate) use crate::fine_tuning_stateless_handlers::*;
 pub(crate) use crate::gateway_auth::*;
 pub(crate) use crate::gateway_commercial::enforce_project_quota;
-pub(crate) use crate::gateway_docs::*;
 pub(crate) use crate::gateway_response_helpers::*;
 pub(crate) use crate::gateway_router_common::*;
 pub(crate) use crate::gateway_stateful_route_groups::*;

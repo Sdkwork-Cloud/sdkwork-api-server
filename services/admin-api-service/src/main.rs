@@ -145,9 +145,11 @@ mod tests {
     #[serial(admin_service_http)]
     #[tokio::test]
     async fn build_admin_service_runtime_exposes_commercial_billing_control_plane_routes() {
-        let mut config = sdkwork_api_config::StandaloneConfig::default();
-        config.database_url = "sqlite::memory:".to_owned();
-        config.bootstrap_profile = "dev".to_owned();
+        let config = sdkwork_api_config::StandaloneConfig {
+            database_url: "sqlite::memory:".to_owned(),
+            bootstrap_profile: "dev".to_owned(),
+            ..Default::default()
+        };
 
         let runtime = build_admin_service_runtime(&config).await.unwrap();
         let app = admin_router_with_state_and_http_exposure(
@@ -174,9 +176,11 @@ mod tests {
     #[serial(admin_service_http)]
     #[tokio::test]
     async fn build_admin_service_runtime_exposes_pricing_lifecycle_synchronization_route() {
-        let mut config = sdkwork_api_config::StandaloneConfig::default();
-        config.database_url = "sqlite::memory:".to_owned();
-        config.bootstrap_profile = "dev".to_owned();
+        let config = sdkwork_api_config::StandaloneConfig {
+            database_url: "sqlite::memory:".to_owned(),
+            bootstrap_profile: "dev".to_owned(),
+            ..Default::default()
+        };
 
         let runtime = build_admin_service_runtime(&config).await.unwrap();
         let app = admin_router_with_state_and_http_exposure(
@@ -203,9 +207,11 @@ mod tests {
     #[serial(admin_service_http)]
     #[tokio::test]
     async fn build_admin_service_runtime_exposes_payment_control_plane_routes() {
-        let mut config = sdkwork_api_config::StandaloneConfig::default();
-        config.database_url = "sqlite::memory:".to_owned();
-        config.bootstrap_profile = "dev".to_owned();
+        let config = sdkwork_api_config::StandaloneConfig {
+            database_url: "sqlite::memory:".to_owned(),
+            bootstrap_profile: "dev".to_owned(),
+            ..Default::default()
+        };
 
         let runtime = build_admin_service_runtime(&config).await.unwrap();
         let app = admin_router_with_state_and_http_exposure(
@@ -232,9 +238,11 @@ mod tests {
     #[serial(admin_service_http)]
     #[tokio::test]
     async fn build_admin_service_runtime_reports_success_metrics_for_commercial_billing_routes() {
-        let mut config = sdkwork_api_config::StandaloneConfig::default();
-        config.database_url = "sqlite::memory:".to_owned();
-        config.bootstrap_profile = "dev".to_owned();
+        let config = sdkwork_api_config::StandaloneConfig {
+            database_url: "sqlite::memory:".to_owned(),
+            bootstrap_profile: "dev".to_owned(),
+            ..Default::default()
+        };
 
         let runtime = build_admin_service_runtime(&config).await.unwrap();
         let app = admin_router_with_state_and_http_exposure(

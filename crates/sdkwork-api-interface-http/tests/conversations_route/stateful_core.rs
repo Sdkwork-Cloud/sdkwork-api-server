@@ -421,7 +421,7 @@ async fn stateful_conversation_item_retrieve_route_returns_not_found_without_usa
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested conversation item was not found.").await;
+    assert_openai_not_found(response, "Requested conversation was not found.").await;
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }
 
@@ -450,6 +450,6 @@ async fn stateful_conversation_item_delete_route_returns_not_found_without_usage
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested conversation item was not found.").await;
+    assert_openai_not_found(response, "Requested conversation was not found.").await;
     support::assert_no_usage_records(admin_app, &admin_token).await;
 }

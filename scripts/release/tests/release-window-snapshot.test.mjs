@@ -29,6 +29,23 @@ function withTemporaryFile(filePath, content, callback) {
   }
 }
 
+function withTemporarilyMissingFile(filePath, callback) {
+  const hadOriginalFile = existsSync(filePath);
+  const originalContent = hadOriginalFile ? readFileSync(filePath, 'utf8') : null;
+
+  if (hadOriginalFile) {
+    rmSync(filePath, { force: true });
+  }
+
+  try {
+    return callback();
+  } finally {
+    if (hadOriginalFile) {
+      writeFileSync(filePath, originalContent, 'utf8');
+    }
+  }
+}
+
 function createReleaseWindowSnapshotArtifact() {
   return {
     generatedAt: '2026-04-08T11:00:00Z',
@@ -148,6 +165,65 @@ test('release window snapshot prefers the default latest artifact before live gi
   );
 });
 
+test('release window snapshot can bypass the default latest artifact in explicit live mode', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'compute-release-window-snapshot.mjs'),
+    ).href,
+  );
+
+  const artifact = createReleaseWindowSnapshotArtifact();
+
+  withTemporaryFile(
+    releaseWindowSnapshotPath,
+    `${JSON.stringify(artifact, null, 2)}\n`,
+    () => {
+      let gitSpawnCount = 0;
+      const result = module.collectReleaseWindowSnapshotResult({
+        env: {},
+        preferDefaultArtifact: false,
+        spawnSyncImpl(command, args) {
+          gitSpawnCount += 1;
+
+          const key = args.join('\u0000');
+          if (key === 'tag\u0000--list\u0000release-*\u0000--sort=-creatordate') {
+            return {
+              status: 0,
+              stdout: 'release-2026-03-28-8\n',
+              stderr: '',
+            };
+          }
+
+          if (key === 'rev-list\u0000--count\u0000release-2026-03-28-8..HEAD') {
+            return {
+              status: 0,
+              stdout: '56\n',
+              stderr: '',
+            };
+          }
+
+          if (key === 'status\u0000--short') {
+            return {
+              status: 0,
+              stdout: ' M docs/release/release-sync-audit-latest.json\n',
+              stderr: '',
+            };
+          }
+
+          throw new Error(`unexpected command: ${command} ${args.join(' ')}`);
+        },
+      });
+
+      assert.ok(gitSpawnCount > 0);
+      assert.equal(result.ok, true);
+      assert.equal(result.snapshot.latestReleaseTag, 'release-2026-03-28-8');
+      assert.equal(result.snapshot.commitsSinceLatestRelease, 56);
+      assert.equal(result.snapshot.workingTreeEntryCount, 1);
+      assert.notDeepEqual(result.snapshot, artifact.snapshot);
+    },
+  );
+});
+
 test('release window snapshot collects the latest release tag, commit delta, and working-tree size', async () => {
   const module = await import(
     pathToFileURL(
@@ -251,16 +327,19 @@ test('release window snapshot reports command-exec-blocked when git child execut
     ).href,
   );
 
-  const result = module.collectReleaseWindowSnapshotResult({
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync git EPERM'),
-      };
-    },
-  });
+  const result = withTemporarilyMissingFile(
+    releaseWindowSnapshotPath,
+    () => module.collectReleaseWindowSnapshotResult({
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync git EPERM'),
+        };
+      },
+    }),
+  );
 
   assert.equal(module.isGitCommandExecutionBlockedError(new Error('spawnSync git EPERM')), true);
   assert.equal(module.isGitCommandExecutionBlockedError(new Error('spawnSync git EACCES')), true);

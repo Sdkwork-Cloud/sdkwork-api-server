@@ -22,7 +22,7 @@ async fn stateful_fine_tuning_retrieve_route_returns_not_found_without_usage() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -48,7 +48,7 @@ async fn stateful_fine_tuning_cancel_route_returns_not_found_without_usage() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -74,7 +74,7 @@ async fn stateful_fine_tuning_events_route_returns_not_found_without_usage() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -100,7 +100,7 @@ async fn stateful_fine_tuning_checkpoints_route_returns_not_found_without_usage(
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -126,7 +126,7 @@ async fn stateful_fine_tuning_pause_route_returns_not_found_without_usage() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -152,7 +152,7 @@ async fn stateful_fine_tuning_resume_route_returns_not_found_without_usage() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -180,7 +180,7 @@ async fn stateful_fine_tuning_checkpoint_permissions_create_route_returns_not_fo
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning checkpoint was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning checkpoint was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -206,7 +206,7 @@ async fn stateful_fine_tuning_checkpoint_permissions_list_route_returns_not_foun
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning checkpoint was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning checkpoint was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 
@@ -236,7 +236,7 @@ async fn stateful_fine_tuning_checkpoint_permission_delete_route_returns_not_fou
 
     assert_openai_not_found(
         response,
-        "Requested fine-tuning checkpoint permission was not found.",
+        "Requested fine tuning checkpoint permission was not found.",
     )
     .await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
@@ -276,7 +276,7 @@ async fn stateful_fine_tuning_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

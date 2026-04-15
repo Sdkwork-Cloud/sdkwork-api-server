@@ -328,7 +328,7 @@ async fn stateful_webhooks_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -500,7 +500,7 @@ async fn stateful_webhooks_create_usage_uses_created_webhook_id_for_billing() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -672,7 +672,7 @@ async fn stateful_webhooks_create_usage_uses_created_webhook_id_for_billing() {
 async fn stateful_webhook_retrieve_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-webhook-retrieve-missing",
@@ -707,7 +707,7 @@ async fn stateful_webhook_retrieve_route_returns_not_found_without_usage() {
 async fn stateful_webhook_update_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-webhook-update-missing",
@@ -743,7 +743,7 @@ async fn stateful_webhook_update_route_returns_not_found_without_usage() {
 async fn stateful_webhook_delete_route_returns_not_found_without_usage() {
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(
         &pool,
         "tenant-webhook-delete-missing",

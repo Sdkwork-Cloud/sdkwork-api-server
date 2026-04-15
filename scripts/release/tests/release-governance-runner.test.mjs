@@ -40,6 +40,13 @@ const DIRECTLY_DERIVED_AVAILABILITY_TARGET_IDS = new Set([
   'admin-api-availability',
   'portal-api-availability',
 ]);
+const governedReleaseArtifactPaths = [
+  releaseTelemetryExportPath,
+  releaseTelemetrySnapshotPath,
+  releaseWindowSnapshotPath,
+  releaseSyncAuditPath,
+  sloGovernanceEvidencePath,
+];
 
 function createTelemetrySnapshotPayload() {
   return {
@@ -185,6 +192,33 @@ function cleanupGovernedReleaseArtifacts() {
   }
 }
 
+async function withCleanedGovernedReleaseArtifacts(callback) {
+  const originals = governedReleaseArtifactPaths.map((filePath) => ({
+    filePath,
+    hadOriginalFile: existsSync(filePath),
+    originalContent: existsSync(filePath) ? readFileSync(filePath, 'utf8') : null,
+  }));
+
+  cleanupGovernedReleaseArtifacts();
+
+  try {
+    return await callback();
+  } finally {
+    cleanupGovernedReleaseArtifacts();
+    for (const entry of originals) {
+      if (entry.hadOriginalFile) {
+        writeFileSync(entry.filePath, entry.originalContent, 'utf8');
+      }
+    }
+  }
+}
+
+function getPlanById(plans, id) {
+  const plan = plans.find((entry) => entry.id === id);
+  assert.ok(plan, `expected release governance plan ${id}`);
+  return plan;
+}
+
 test('release governance runner exposes the expected fixed verification sequence', async () => {
   const module = await import(
     pathToFileURL(
@@ -196,6 +230,11 @@ test('release governance runner exposes the expected fixed verification sequence
   assert.equal(typeof module.resolveNodeRunner, 'function');
   assert.equal(typeof module.runReleaseGovernanceCheckPlan, 'function');
   assert.equal(typeof module.runReleaseGovernanceChecks, 'function');
+  assert.equal(typeof module.parseArgs, 'function');
+  assert.deepEqual(module.parseArgs(['--profile', 'preflight', '--format', 'json']), {
+    format: 'json',
+    profile: 'preflight',
+  });
 
   const plans = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
@@ -206,19 +245,63 @@ test('release governance runner exposes the expected fixed verification sequence
     [
       'release-sync-audit-test',
       'release-workflow-test',
+      'release-governance-workflow-test',
       'release-attestation-verify-test',
       'release-observability-test',
+      'release-slo-governance-contracts-test',
       'release-slo-governance-test',
       'release-slo-governance',
       'release-runtime-tooling-test',
+      'release-unix-installed-runtime-smoke-test',
+      'release-windows-installed-runtime-smoke-test',
+      'release-materialize-external-deps-test',
       'release-window-snapshot-test',
+      'release-window-snapshot-materializer-test',
+      'release-sync-audit-materializer-test',
+      'release-governance-bundle-test',
+      'restore-release-governance-latest-test',
+      'release-telemetry-export-test',
+      'release-telemetry-snapshot-test',
+      'release-slo-evidence-materializer-test',
       'release-window-snapshot',
       'release-sync-audit',
     ],
   );
 
+  const preflightPlans = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+    profile: 'preflight',
+  });
+
   assert.deepEqual(
-    plans[0].args,
+    preflightPlans.map((plan) => plan.id),
+    [
+      'release-sync-audit-test',
+      'release-workflow-test',
+      'release-governance-workflow-test',
+      'release-attestation-verify-test',
+      'release-observability-test',
+      'release-slo-governance-contracts-test',
+      'release-slo-governance-test',
+      'release-runtime-tooling-test',
+      'release-unix-installed-runtime-smoke-test',
+      'release-windows-installed-runtime-smoke-test',
+      'release-materialize-external-deps-test',
+      'release-window-snapshot-test',
+      'release-window-snapshot-materializer-test',
+      'release-sync-audit-materializer-test',
+      'release-governance-bundle-test',
+      'restore-release-governance-latest-test',
+      'release-telemetry-export-test',
+      'release-telemetry-snapshot-test',
+      'release-slo-evidence-materializer-test',
+    ],
+  );
+
+  const planArgsById = new Map(plans.map((plan) => [plan.id, plan.args]));
+
+  assert.deepEqual(
+    planArgsById.get('release-sync-audit-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -226,7 +309,7 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[1].args,
+    planArgsById.get('release-workflow-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -234,7 +317,15 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[2].args,
+    planArgsById.get('release-governance-workflow-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release-governance-workflow.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-attestation-verify-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -242,7 +333,7 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[3].args,
+    planArgsById.get('release-observability-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -250,7 +341,15 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[4].args,
+    planArgsById.get('release-slo-governance-contracts-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/release-slo-governance-contracts.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-slo-governance-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -258,7 +357,7 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[5].args,
+    planArgsById.get('release-slo-governance'),
     [
       'scripts/release/slo-governance.mjs',
       '--format',
@@ -266,7 +365,7 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[6].args,
+    planArgsById.get('release-runtime-tooling-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -274,7 +373,31 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[7].args,
+    planArgsById.get('release-unix-installed-runtime-smoke-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/run-unix-installed-runtime-smoke.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-windows-installed-runtime-smoke-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/run-windows-installed-runtime-smoke.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-materialize-external-deps-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-external-deps.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-window-snapshot-test'),
     [
       '--test',
       '--experimental-test-isolation=none',
@@ -282,19 +405,77 @@ test('release governance runner exposes the expected fixed verification sequence
     ],
   );
   assert.deepEqual(
-    plans[8].args,
+    planArgsById.get('release-window-snapshot-materializer-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-release-window-snapshot.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-sync-audit-materializer-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-release-sync-audit.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-governance-bundle-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-release-governance-bundle.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('restore-release-governance-latest-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/restore-release-governance-latest.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-telemetry-export-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-release-telemetry-export.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-telemetry-snapshot-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-release-telemetry-snapshot.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-slo-evidence-materializer-test'),
+    [
+      '--test',
+      '--experimental-test-isolation=none',
+      'scripts/release/tests/materialize-slo-governance-evidence.test.mjs',
+    ],
+  );
+  assert.deepEqual(
+    planArgsById.get('release-window-snapshot'),
     [
       'scripts/release/compute-release-window-snapshot.mjs',
       '--format',
       'json',
+      '--live',
     ],
   );
   assert.deepEqual(
-    plans[9].args,
+    planArgsById.get('release-sync-audit'),
     [
       'scripts/release/verify-release-sync.mjs',
       '--format',
       'json',
+      '--live',
     ],
   );
 
@@ -338,6 +519,14 @@ test('release governance runner aggregates passing tests and blocking live relea
       },
     ],
     [
+      'release-governance-workflow-test',
+      {
+        status: 0,
+        stdout: 'ok release governance workflow test',
+        stderr: '',
+      },
+    ],
+    [
       'release-attestation-verify-test',
       {
         status: 0,
@@ -350,6 +539,14 @@ test('release governance runner aggregates passing tests and blocking live relea
       {
         status: 0,
         stdout: 'ok observability test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-slo-governance-contracts-test',
+      {
+        status: 0,
+        stdout: 'ok slo governance contracts test',
         stderr: '',
       },
     ],
@@ -378,10 +575,90 @@ test('release governance runner aggregates passing tests and blocking live relea
       },
     ],
     [
+      'release-unix-installed-runtime-smoke-test',
+      {
+        status: 0,
+        stdout: 'ok unix installed runtime smoke test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-windows-installed-runtime-smoke-test',
+      {
+        status: 0,
+        stdout: 'ok windows installed runtime smoke test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-materialize-external-deps-test',
+      {
+        status: 0,
+        stdout: 'ok materialize external deps test',
+        stderr: '',
+      },
+    ],
+    [
       'release-window-snapshot-test',
       {
         status: 0,
         stdout: 'ok release window snapshot test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-window-snapshot-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release window snapshot materializer test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-sync-audit-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release sync audit materializer test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-governance-bundle-test',
+      {
+        status: 0,
+        stdout: 'ok release governance bundle test',
+        stderr: '',
+      },
+    ],
+    [
+      'restore-release-governance-latest-test',
+      {
+        status: 0,
+        stdout: 'ok restore release governance latest test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-telemetry-export-test',
+      {
+        status: 0,
+        stdout: 'ok release telemetry export test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-telemetry-snapshot-test',
+      {
+        status: 0,
+        stdout: 'ok release telemetry snapshot test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-slo-evidence-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release slo evidence materializer test',
         stderr: '',
       },
     ],
@@ -428,12 +705,24 @@ test('release governance runner aggregates passing tests and blocking live relea
   assert.deepEqual(summary.passingIds, [
     'release-sync-audit-test',
     'release-workflow-test',
+    'release-governance-workflow-test',
     'release-attestation-verify-test',
     'release-observability-test',
+    'release-slo-governance-contracts-test',
     'release-slo-governance-test',
     'release-slo-governance',
     'release-runtime-tooling-test',
+    'release-unix-installed-runtime-smoke-test',
+    'release-windows-installed-runtime-smoke-test',
+    'release-materialize-external-deps-test',
     'release-window-snapshot-test',
+    'release-window-snapshot-materializer-test',
+    'release-sync-audit-materializer-test',
+    'release-governance-bundle-test',
+    'restore-release-governance-latest-test',
+    'release-telemetry-export-test',
+    'release-telemetry-snapshot-test',
+    'release-slo-evidence-materializer-test',
     'release-window-snapshot',
   ]);
   assert.deepEqual(summary.blockedIds, []);
@@ -445,17 +734,32 @@ test('release governance runner aggregates passing tests and blocking live relea
     [
       ['release-sync-audit-test', true, 0],
       ['release-workflow-test', true, 0],
+      ['release-governance-workflow-test', true, 0],
       ['release-attestation-verify-test', true, 0],
       ['release-observability-test', true, 0],
+      ['release-slo-governance-contracts-test', true, 0],
       ['release-slo-governance-test', true, 0],
       ['release-slo-governance', true, 0],
       ['release-runtime-tooling-test', true, 0],
+      ['release-unix-installed-runtime-smoke-test', true, 0],
+      ['release-windows-installed-runtime-smoke-test', true, 0],
+      ['release-materialize-external-deps-test', true, 0],
       ['release-window-snapshot-test', true, 0],
+      ['release-window-snapshot-materializer-test', true, 0],
+      ['release-sync-audit-materializer-test', true, 0],
+      ['release-governance-bundle-test', true, 0],
+      ['restore-release-governance-latest-test', true, 0],
+      ['release-telemetry-export-test', true, 0],
+      ['release-telemetry-snapshot-test', true, 0],
+      ['release-slo-evidence-materializer-test', true, 0],
       ['release-window-snapshot', true, 0],
       ['release-sync-audit', false, 1],
     ],
   );
-  assert.equal(summary.results[9].stdout.trim(), '{"releasable":false}');
+  assert.equal(
+    summary.results.find((result) => result.id === 'release-sync-audit')?.stdout.trim(),
+    '{"releasable":false}',
+  );
 });
 
 test('release governance runner distinguishes blocked lanes from real failing lanes', async () => {
@@ -483,6 +787,14 @@ test('release governance runner distinguishes blocked lanes from real failing la
       },
     ],
     [
+      'release-governance-workflow-test',
+      {
+        status: 0,
+        stdout: 'ok release governance workflow test',
+        stderr: '',
+      },
+    ],
+    [
       'release-attestation-verify-test',
       {
         status: 0,
@@ -495,6 +807,14 @@ test('release governance runner distinguishes blocked lanes from real failing la
       {
         status: 0,
         stdout: 'ok observability test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-slo-governance-contracts-test',
+      {
+        status: 0,
+        stdout: 'ok slo governance contracts test',
         stderr: '',
       },
     ],
@@ -523,10 +843,90 @@ test('release governance runner distinguishes blocked lanes from real failing la
       },
     ],
     [
+      'release-unix-installed-runtime-smoke-test',
+      {
+        status: 0,
+        stdout: 'ok unix installed runtime smoke test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-windows-installed-runtime-smoke-test',
+      {
+        status: 0,
+        stdout: 'ok windows installed runtime smoke test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-materialize-external-deps-test',
+      {
+        status: 0,
+        stdout: 'ok materialize external deps test',
+        stderr: '',
+      },
+    ],
+    [
       'release-window-snapshot-test',
       {
         status: 0,
         stdout: 'ok release window snapshot test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-window-snapshot-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release window snapshot materializer test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-sync-audit-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release sync audit materializer test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-governance-bundle-test',
+      {
+        status: 0,
+        stdout: 'ok release governance bundle test',
+        stderr: '',
+      },
+    ],
+    [
+      'restore-release-governance-latest-test',
+      {
+        status: 0,
+        stdout: 'ok restore release governance latest test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-telemetry-export-test',
+      {
+        status: 0,
+        stdout: 'ok release telemetry export test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-telemetry-snapshot-test',
+      {
+        status: 0,
+        stdout: 'ok release telemetry snapshot test',
+        stderr: '',
+      },
+    ],
+    [
+      'release-slo-evidence-materializer-test',
+      {
+        status: 0,
+        stdout: 'ok release slo evidence materializer test',
         stderr: '',
       },
     ],
@@ -573,11 +973,23 @@ test('release governance runner distinguishes blocked lanes from real failing la
   assert.deepEqual(summary.passingIds, [
     'release-sync-audit-test',
     'release-workflow-test',
+    'release-governance-workflow-test',
     'release-attestation-verify-test',
     'release-observability-test',
+    'release-slo-governance-contracts-test',
     'release-slo-governance-test',
     'release-runtime-tooling-test',
+    'release-unix-installed-runtime-smoke-test',
+    'release-windows-installed-runtime-smoke-test',
+    'release-materialize-external-deps-test',
     'release-window-snapshot-test',
+    'release-window-snapshot-materializer-test',
+    'release-sync-audit-materializer-test',
+    'release-governance-bundle-test',
+    'restore-release-governance-latest-test',
+    'release-telemetry-export-test',
+    'release-telemetry-snapshot-test',
+    'release-slo-evidence-materializer-test',
   ]);
   assert.deepEqual(summary.blockedIds, [
     'release-slo-governance',
@@ -597,16 +1009,44 @@ test('release governance runner falls back to in-process checks when node child 
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[0];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-sync-audit-test'),
     spawnSyncImpl() {
       return {
         status: 1,
         stdout: '',
         stderr: '',
         error: new Error('spawnSync node EACCES'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for release governance workflow checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-governance-workflow-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
       };
     },
   });
@@ -625,10 +1065,10 @@ test('release governance runner also falls back for attestation verification che
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[2];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-attestation-verify-test'),
     spawnSyncImpl() {
       return {
         status: 1,
@@ -653,10 +1093,38 @@ test('release governance runner also falls back for observability checks when no
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[3];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-observability-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for slo governance contract checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-slo-governance-contracts-test'),
     spawnSyncImpl() {
       return {
         status: 1,
@@ -681,10 +1149,296 @@ test('release governance runner also falls back for runtime tooling checks when 
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[6];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-runtime-tooling-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for unix installed runtime smoke checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-unix-installed-runtime-smoke-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for windows installed runtime smoke checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-windows-installed-runtime-smoke-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for external dependency materialization checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-materialize-external-deps-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for release window snapshot materializer checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-window-snapshot-materializer-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+    fallbackSpawnSyncImpl() {
+      throw new Error('git spawn should not run for release window snapshot materializer fallback');
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for release sync audit materializer checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-sync-audit-materializer-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+    fallbackSpawnSyncImpl() {
+      throw new Error('git spawn should not run for release sync audit materializer fallback');
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for governance bundle checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-governance-bundle-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for governance restore checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'restore-release-governance-latest-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for telemetry export checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-telemetry-export-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for telemetry snapshot checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-telemetry-snapshot-test'),
+    spawnSyncImpl() {
+      return {
+        status: 1,
+        stdout: '',
+        stderr: '',
+        error: new Error('spawnSync node EPERM'),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'fallback');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 0);
+});
+
+test('release governance runner also falls back for slo evidence materializer checks when node child execution is blocked', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+
+  const result = await module.runReleaseGovernanceCheckPlan({
+    plan: getPlanById(plan, 'release-slo-evidence-materializer-test'),
     spawnSyncImpl() {
       return {
         status: 1,
@@ -701,184 +1455,191 @@ test('release governance runner also falls back for runtime tooling checks when 
 });
 
 test('release governance runner also falls back for slo governance checks when node child execution is blocked', async () => {
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[4];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-slo-governance'),
+      env: {
+        SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: JSON.stringify(createTelemetryExportPayload()),
+      },
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+    });
+
+    assert.equal(result.id, 'release-slo-governance');
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 0);
   });
-
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, true);
-  assert.equal(result.status, 0);
 });
 
 test('release governance runner reports telemetry-input-missing when live slo inputs were never materialized', async () => {
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[5];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    env: {},
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-slo-governance'),
+      env: {},
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+    });
+
+    assert.equal(result.id, 'release-slo-governance');
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /telemetry-input-missing/);
   });
-
-  assert.equal(result.id, 'release-slo-governance');
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /telemetry-input-missing/);
 });
 
 test('release governance runner materializes live slo evidence from a release telemetry export when node child execution is blocked', async () => {
-  cleanupGovernedReleaseArtifacts();
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[5];
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-slo-governance'),
+      env: {
+        SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: JSON.stringify(createTelemetryExportPayload()),
+      },
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    env: {
-      SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: JSON.stringify(createTelemetryExportPayload()),
-    },
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
+    assert.equal(result.id, 'release-slo-governance');
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(releaseTelemetrySnapshotPath), true);
+    assert.equal(existsSync(sloGovernanceEvidencePath), true);
+    assert.equal(
+      JSON.parse(readFileSync(sloGovernanceEvidencePath, 'utf8')).baselineId,
+      'release-slo-governance-baseline-2026-04-08',
+    );
+    assert.match(result.stdout, /"ok": true/);
   });
-
-  assert.equal(result.id, 'release-slo-governance');
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, true);
-  assert.equal(result.status, 0);
-  assert.equal(existsSync(releaseTelemetrySnapshotPath), true);
-  assert.equal(existsSync(sloGovernanceEvidencePath), true);
-  assert.equal(
-    JSON.parse(readFileSync(sloGovernanceEvidencePath, 'utf8')).baselineId,
-    'release-slo-governance-baseline-2026-04-08',
-  );
-  assert.match(result.stdout, /"ok": true/);
-
-  cleanupGovernedReleaseArtifacts();
 });
 
 test('release governance runner materializes live slo evidence from the default release telemetry export artifact when node child execution is blocked', async () => {
-  cleanupGovernedReleaseArtifacts();
-  writeFileSync(
-    releaseTelemetryExportPath,
-    `${JSON.stringify(createTelemetryExportPayload(), null, 2)}\n`,
-    'utf8',
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    writeFileSync(
+      releaseTelemetryExportPath,
+      `${JSON.stringify(createTelemetryExportPayload(), null, 2)}\n`,
+      'utf8',
+    );
 
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[5];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    env: {},
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-slo-governance'),
+      env: {},
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+    });
+
+    assert.equal(result.id, 'release-slo-governance');
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(releaseTelemetrySnapshotPath), true);
+    assert.equal(existsSync(sloGovernanceEvidencePath), true);
+    assert.match(result.stdout, /"ok": true/);
   });
-
-  assert.equal(result.id, 'release-slo-governance');
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, true);
-  assert.equal(result.status, 0);
-  assert.equal(existsSync(releaseTelemetrySnapshotPath), true);
-  assert.equal(existsSync(sloGovernanceEvidencePath), true);
-  assert.match(result.stdout, /"ok": true/);
-
-  cleanupGovernedReleaseArtifacts();
 });
 
 test('release governance runner also falls back for release window snapshot checks when node child execution is blocked', async () => {
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[8];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
-    fallbackSpawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync git EPERM'),
-      };
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-window-snapshot'),
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+      fallbackSpawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync git EPERM'),
+        };
+      },
+    });
+
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /command-exec-blocked/);
   });
-
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /command-exec-blocked/);
 });
 
 test('release governance runner consumes governed release window snapshot input when node child execution is blocked', async () => {
@@ -890,10 +1651,10 @@ test('release governance runner consumes governed release window snapshot input 
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[8];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-window-snapshot'),
     env: {
       SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON: JSON.stringify(
         createReleaseWindowSnapshotArtifactPayload(),
@@ -919,45 +1680,44 @@ test('release governance runner consumes governed release window snapshot input 
 });
 
 test('release governance runner replays the default release window snapshot artifact when node child execution is blocked', async () => {
-  cleanupGovernedReleaseArtifacts();
-  writeFileSync(
-    releaseWindowSnapshotPath,
-    `${JSON.stringify(createReleaseWindowSnapshotArtifactPayload(), null, 2)}\n`,
-    'utf8',
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    writeFileSync(
+      releaseWindowSnapshotPath,
+      `${JSON.stringify(createReleaseWindowSnapshotArtifactPayload(), null, 2)}\n`,
+      'utf8',
+    );
 
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[8];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    env: {},
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
-    fallbackSpawnSyncImpl() {
-      throw new Error('git spawn should not run when a default latest artifact is available');
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-window-snapshot'),
+      env: {},
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+      fallbackSpawnSyncImpl() {
+        throw new Error('git spawn should not run when a default latest artifact is available');
+      },
+    });
+
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /release-2026-03-28-8/);
   });
-
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, true);
-  assert.equal(result.status, 0);
-  assert.match(result.stdout, /release-2026-03-28-8/);
-
-  cleanupGovernedReleaseArtifacts();
 });
 
 test('release governance runner consumes governed release sync audit input when node child execution is blocked', async () => {
@@ -969,10 +1729,10 @@ test('release governance runner consumes governed release sync audit input when 
 
   const plan = module.listReleaseGovernanceCheckPlans({
     nodeExecutable: 'node',
-  })[9];
+  });
 
   const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
+    plan: getPlanById(plan, 'release-sync-audit'),
     env: {
       SDKWORK_RELEASE_SYNC_AUDIT_JSON: JSON.stringify(
         createReleaseSyncAuditArtifactPayload(),
@@ -998,43 +1758,42 @@ test('release governance runner consumes governed release sync audit input when 
 });
 
 test('release governance runner replays the default release sync audit artifact when node child execution is blocked', async () => {
-  cleanupGovernedReleaseArtifacts();
-  writeFileSync(
-    releaseSyncAuditPath,
-    `${JSON.stringify(createReleaseSyncAuditArtifactPayload(), null, 2)}\n`,
-    'utf8',
-  );
+  await withCleanedGovernedReleaseArtifacts(async () => {
+    writeFileSync(
+      releaseSyncAuditPath,
+      `${JSON.stringify(createReleaseSyncAuditArtifactPayload(), null, 2)}\n`,
+      'utf8',
+    );
 
-  const module = await import(
-    pathToFileURL(
-      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
-    ).href,
-  );
+    const module = await import(
+      pathToFileURL(
+        path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+      ).href,
+    );
 
-  const plan = module.listReleaseGovernanceCheckPlans({
-    nodeExecutable: 'node',
-  })[9];
+    const plan = module.listReleaseGovernanceCheckPlans({
+      nodeExecutable: 'node',
+    });
 
-  const result = await module.runReleaseGovernanceCheckPlan({
-    plan,
-    env: {},
-    spawnSyncImpl() {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: '',
-        error: new Error('spawnSync node EPERM'),
-      };
-    },
-    fallbackSpawnSyncImpl() {
-      throw new Error('git spawn should not run when a default latest artifact is available');
-    },
+    const result = await module.runReleaseGovernanceCheckPlan({
+      plan: getPlanById(plan, 'release-sync-audit'),
+      env: {},
+      spawnSyncImpl() {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: new Error('spawnSync node EPERM'),
+        };
+      },
+      fallbackSpawnSyncImpl() {
+        throw new Error('git spawn should not run when a default latest artifact is available');
+      },
+    });
+
+    assert.equal(result.mode, 'fallback');
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /"releasable": true/);
   });
-
-  assert.equal(result.mode, 'fallback');
-  assert.equal(result.ok, true);
-  assert.equal(result.status, 0);
-  assert.match(result.stdout, /"releasable": true/);
-
-  cleanupGovernedReleaseArtifacts();
 });

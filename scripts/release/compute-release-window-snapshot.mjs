@@ -104,6 +104,7 @@ function normalizeReleaseWindowSnapshotInputPayload(payload) {
 export function resolveReleaseWindowSnapshotInput({
   snapshotPath,
   snapshotJson,
+  preferDefaultArtifact = true,
   env = process.env,
   readFile = readFileSync,
 } = {}) {
@@ -135,7 +136,7 @@ export function resolveReleaseWindowSnapshotInput({
     };
   }
 
-  if (existsSync(defaultReleaseWindowSnapshotPath)) {
+  if (preferDefaultArtifact && existsSync(defaultReleaseWindowSnapshotPath)) {
     return {
       source: 'default-file',
       snapshot: normalizeReleaseWindowSnapshotInputPayload(
@@ -250,6 +251,7 @@ export function collectReleaseWindowSnapshot({
 export function collectReleaseWindowSnapshotResult({
   snapshotPath,
   snapshotJson,
+  preferDefaultArtifact = true,
   env = process.env,
   readFile = readFileSync,
   spawnSyncImpl = spawnSync,
@@ -258,6 +260,7 @@ export function collectReleaseWindowSnapshotResult({
     const resolvedInput = resolveReleaseWindowSnapshotInput({
       snapshotPath,
       snapshotJson,
+      preferDefaultArtifact,
       env,
       readFile,
     });
@@ -299,6 +302,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   let format = 'text';
   let snapshotPath = '';
   let snapshotJson = '';
+  let live = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -320,6 +324,11 @@ function parseArgs(argv = process.argv.slice(2)) {
       continue;
     }
 
+    if (token === '--live') {
+      live = true;
+      continue;
+    }
+
     throw new Error(`unknown argument: ${token}`);
   }
 
@@ -331,6 +340,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     format,
     snapshotPath,
     snapshotJson,
+    live,
   };
 }
 
@@ -359,10 +369,11 @@ function formatReleaseWindowSnapshotResultText(result) {
 }
 
 function main() {
-  const { format, snapshotPath, snapshotJson } = parseArgs();
+  const { format, snapshotPath, snapshotJson, live } = parseArgs();
   const result = collectReleaseWindowSnapshotResult({
     snapshotPath,
     snapshotJson,
+    preferDefaultArtifact: !live,
   });
 
   if (format === 'json') {

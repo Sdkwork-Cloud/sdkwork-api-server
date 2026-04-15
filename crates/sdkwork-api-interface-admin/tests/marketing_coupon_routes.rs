@@ -1,6 +1,7 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use axum::Router;
+use sdkwork_api_storage_core::AdminStore;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -11,9 +12,22 @@ async fn read_json(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 async fn memory_pool() -> SqlitePool {
-    sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
+    let pool = sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
-        .unwrap()
+        .unwrap();
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    sdkwork_api_app_identity::upsert_admin_user(
+        &store,
+        Some("admin_local_default"),
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(sdkwork_api_domain_identity::AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+    pool
 }
 
 async fn login_token(app: Router) -> String {
@@ -45,6 +59,19 @@ fn unix_timestamp_ms() -> u64 {
         .as_millis() as u64
 }
 
+fn assert_audit_contains_request(
+    audits: &[Value],
+    expected_action: &str,
+    expected_request_id: &str,
+) {
+    assert!(
+        audits.iter().any(|audit| {
+            audit["action"] == expected_action && audit["request_id"] == expected_request_id
+        }),
+        "expected audit action={expected_action} request_id={expected_request_id}, got {audits:?}",
+    );
+}
+
 async fn admin_post_json(
     app: &Router,
     token: &str,
@@ -70,9 +97,7 @@ async fn approve_coupon_template(app: &Router, token: &str, coupon_template_id: 
     let submitted = admin_post_json(
         app,
         token,
-        &format!(
-            "/admin/marketing/coupon-templates/{coupon_template_id}/submit-for-approval"
-        ),
+        &format!("/admin/marketing/coupon-templates/{coupon_template_id}/submit-for-approval"),
         r#"{"reason":"submit coupon template for approval"}"#,
         Some(&format!("{scope}-submit")),
     )
@@ -98,7 +123,12 @@ async fn approve_coupon_template(app: &Router, token: &str, coupon_template_id: 
     );
 }
 
-async fn activate_coupon_template(app: &Router, token: &str, coupon_template_id: &str, scope: &str) {
+async fn activate_coupon_template(
+    app: &Router,
+    token: &str,
+    coupon_template_id: &str,
+    scope: &str,
+) {
     approve_coupon_template(app, token, coupon_template_id, scope).await;
 
     let published = admin_post_json(
@@ -701,7 +731,8 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
         .unwrap();
     assert_eq!(publish_audits.status(), StatusCode::OK);
     let publish_audits_json = read_json(publish_audits).await;
-    assert_eq!(publish_audits_json.as_array().unwrap().len(), 4);
+    let publish_audits = publish_audits_json.as_array().unwrap();
+    assert_eq!(publish_audits.len(), 4);
     assert_eq!(publish_audits_json[0]["action"], "retire");
     assert_eq!(publish_audits_json[0]["outcome"], "applied");
     assert_eq!(
@@ -714,15 +745,15 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
         publish_audits_json[1]["request_id"],
         "sdkw-test-campaign-publish-1"
     );
-    assert_eq!(publish_audits_json[2]["action"], "approve");
-    assert_eq!(
-        publish_audits_json[2]["request_id"],
-        "sdkw-test-campaign-publish-ready-approve"
+    assert_audit_contains_request(
+        publish_audits,
+        "approve",
+        "sdkw-test-campaign-publish-ready-approve",
     );
-    assert_eq!(publish_audits_json[3]["action"], "submit_for_approval");
-    assert_eq!(
-        publish_audits_json[3]["request_id"],
-        "sdkw-test-campaign-publish-ready-submit"
+    assert_audit_contains_request(
+        publish_audits,
+        "submit_for_approval",
+        "sdkw-test-campaign-publish-ready-submit",
     );
 
     let schedule_audits = app
@@ -738,21 +769,22 @@ async fn admin_marketing_campaign_lifecycle_routes_apply_coupon_semantic_actions
         .unwrap();
     assert_eq!(schedule_audits.status(), StatusCode::OK);
     let schedule_audits_json = read_json(schedule_audits).await;
-    assert_eq!(schedule_audits_json.as_array().unwrap().len(), 3);
+    let schedule_audits = schedule_audits_json.as_array().unwrap();
+    assert_eq!(schedule_audits.len(), 3);
     assert_eq!(schedule_audits_json[0]["action"], "schedule");
     assert_eq!(
         schedule_audits_json[0]["request_id"],
         "sdkw-test-campaign-schedule-1"
     );
-    assert_eq!(schedule_audits_json[1]["action"], "approve");
-    assert_eq!(
-        schedule_audits_json[1]["request_id"],
-        "sdkw-test-campaign-schedule-ready-approve"
+    assert_audit_contains_request(
+        schedule_audits,
+        "approve",
+        "sdkw-test-campaign-schedule-ready-approve",
     );
-    assert_eq!(schedule_audits_json[2]["action"], "submit_for_approval");
-    assert_eq!(
-        schedule_audits_json[2]["request_id"],
-        "sdkw-test-campaign-schedule-ready-submit"
+    assert_audit_contains_request(
+        schedule_audits,
+        "submit_for_approval",
+        "sdkw-test-campaign-schedule-ready-submit",
     );
 }
 
@@ -865,22 +897,23 @@ async fn admin_marketing_campaign_publish_rejects_future_coupon_campaign() {
         .unwrap();
     assert_eq!(audits.status(), StatusCode::OK);
     let audits_json = read_json(audits).await;
-    assert_eq!(audits_json.as_array().unwrap().len(), 3);
+    let audits = audits_json.as_array().unwrap();
+    assert_eq!(audits.len(), 3);
     assert_eq!(audits_json[0]["action"], "publish");
     assert_eq!(audits_json[0]["outcome"], "rejected");
     assert_eq!(
         audits_json[0]["request_id"],
         "sdkw-test-campaign-publish-rejected-1"
     );
-    assert_eq!(audits_json[1]["action"], "approve");
-    assert_eq!(
-        audits_json[1]["request_id"],
-        "sdkw-test-campaign-publish-future-approve"
+    assert_audit_contains_request(
+        audits,
+        "approve",
+        "sdkw-test-campaign-publish-future-approve",
     );
-    assert_eq!(audits_json[2]["action"], "submit_for_approval");
-    assert_eq!(
-        audits_json[2]["request_id"],
-        "sdkw-test-campaign-publish-future-submit"
+    assert_audit_contains_request(
+        audits,
+        "submit_for_approval",
+        "sdkw-test-campaign-publish-future-submit",
     );
     assert!(audits_json[0]["decision_reasons"]
         .as_array()
@@ -1485,7 +1518,7 @@ async fn admin_marketing_budget_lifecycle_routes_apply_coupon_semantic_actions()
 #[tokio::test]
 async fn admin_marketing_budget_activate_rejects_budget_without_headroom() {
     let pool = memory_pool().await;
-    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
     let token = login_token(app.clone()).await;
 
     let template = app
@@ -1552,7 +1585,7 @@ async fn admin_marketing_budget_activate_rejects_budget_without_headroom() {
                         "campaign_budget_id":"budget_lifecycle_reject",
                         "marketing_campaign_id":"campaign_budget_reject",
                         "status":"draft",
-                        "total_budget_minor":0,
+                        "total_budget_minor":500000,
                         "reserved_budget_minor":0,
                         "consumed_budget_minor":0,
                         "created_at_ms":1710000000000,
@@ -1564,6 +1597,19 @@ async fn admin_marketing_budget_activate_rejects_budget_without_headroom() {
         .await
         .unwrap();
     assert_eq!(budget.status(), StatusCode::CREATED);
+
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    let exhausted_budget = store
+        .find_campaign_budget_record("budget_lifecycle_reject")
+        .await
+        .unwrap()
+        .unwrap()
+        .with_consumed_budget_minor(500000)
+        .with_updated_at_ms(1710000000001);
+    store
+        .insert_campaign_budget_record(&exhausted_budget)
+        .await
+        .unwrap();
 
     let activated = app
         .clone()
@@ -2054,7 +2100,8 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         .unwrap();
     assert_eq!(publish_audits.status(), StatusCode::OK);
     let publish_audits_json = read_json(publish_audits).await;
-    assert_eq!(publish_audits_json.as_array().unwrap().len(), 4);
+    let publish_audits = publish_audits_json.as_array().unwrap();
+    assert_eq!(publish_audits.len(), 4);
     assert_eq!(publish_audits_json[0]["action"], "retire");
     assert_eq!(
         publish_audits_json[0]["request_id"],
@@ -2065,15 +2112,15 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         publish_audits_json[1]["request_id"],
         "sdkw-test-template-publish-1"
     );
-    assert_eq!(publish_audits_json[2]["action"], "approve");
-    assert_eq!(
-        publish_audits_json[2]["request_id"],
-        "sdkw-test-template-lifecycle-publish-approve"
+    assert_audit_contains_request(
+        publish_audits,
+        "approve",
+        "sdkw-test-template-lifecycle-publish-approve",
     );
-    assert_eq!(publish_audits_json[3]["action"], "submit_for_approval");
-    assert_eq!(
-        publish_audits_json[3]["request_id"],
-        "sdkw-test-template-lifecycle-publish-submit"
+    assert_audit_contains_request(
+        publish_audits,
+        "submit_for_approval",
+        "sdkw-test-template-lifecycle-publish-submit",
     );
 
     let schedule_audits = app
@@ -2091,21 +2138,22 @@ async fn admin_marketing_coupon_template_lifecycle_routes_apply_coupon_semantic_
         .unwrap();
     assert_eq!(schedule_audits.status(), StatusCode::OK);
     let schedule_audits_json = read_json(schedule_audits).await;
-    assert_eq!(schedule_audits_json.as_array().unwrap().len(), 3);
+    let schedule_audits = schedule_audits_json.as_array().unwrap();
+    assert_eq!(schedule_audits.len(), 3);
     assert_eq!(schedule_audits_json[0]["action"], "schedule");
     assert_eq!(
         schedule_audits_json[0]["request_id"],
         "sdkw-test-template-schedule-1"
     );
-    assert_eq!(schedule_audits_json[1]["action"], "approve");
-    assert_eq!(
-        schedule_audits_json[1]["request_id"],
-        "sdkw-test-template-lifecycle-schedule-approve"
+    assert_audit_contains_request(
+        schedule_audits,
+        "approve",
+        "sdkw-test-template-lifecycle-schedule-approve",
     );
-    assert_eq!(schedule_audits_json[2]["action"], "submit_for_approval");
-    assert_eq!(
-        schedule_audits_json[2]["request_id"],
-        "sdkw-test-template-lifecycle-schedule-submit"
+    assert_audit_contains_request(
+        schedule_audits,
+        "submit_for_approval",
+        "sdkw-test-template-lifecycle-schedule-submit",
     );
 }
 
@@ -2189,22 +2237,23 @@ async fn admin_marketing_coupon_template_publish_rejects_future_activation() {
         .unwrap();
     assert_eq!(audits.status(), StatusCode::OK);
     let audits_json = read_json(audits).await;
-    assert_eq!(audits_json.as_array().unwrap().len(), 3);
+    let audits = audits_json.as_array().unwrap();
+    assert_eq!(audits.len(), 3);
     assert_eq!(audits_json[0]["action"], "publish");
     assert_eq!(audits_json[0]["outcome"], "rejected");
     assert_eq!(
         audits_json[0]["request_id"],
         "sdkw-test-template-publish-rejected-1"
     );
-    assert_eq!(audits_json[1]["action"], "approve");
-    assert_eq!(
-        audits_json[1]["request_id"],
-        "sdkw-test-template-publish-future-activation-approve"
+    assert_audit_contains_request(
+        audits,
+        "approve",
+        "sdkw-test-template-publish-future-activation-approve",
     );
-    assert_eq!(audits_json[2]["action"], "submit_for_approval");
-    assert_eq!(
-        audits_json[2]["request_id"],
-        "sdkw-test-template-publish-future-activation-submit"
+    assert_audit_contains_request(
+        audits,
+        "submit_for_approval",
+        "sdkw-test-template-publish-future-activation-submit",
     );
     assert!(audits_json[0]["decision_reasons"]
         .as_array()

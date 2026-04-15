@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use sdkwork_api_app_identity::{gateway_auth_subject_from_request_context, GatewayRequestContext};
@@ -213,27 +215,26 @@ async fn seed_custom_marketing_coupon(
     restriction: CouponRestrictionSpec,
 ) {
     let benefit = match benefit_kind {
-        MarketingBenefitKind::PercentageOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_percent(Some(20)),
-        MarketingBenefitKind::FixedAmountOff => CouponBenefitSpec::new(benefit_kind)
-            .with_discount_amount_minor(Some(2_000)),
+        MarketingBenefitKind::PercentageOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_percent(Some(20))
+        }
+        MarketingBenefitKind::FixedAmountOff => {
+            CouponBenefitSpec::new(benefit_kind).with_discount_amount_minor(Some(2_000))
+        }
         MarketingBenefitKind::GrantUnits => {
             CouponBenefitSpec::new(benefit_kind).with_grant_units(Some(300))
         }
     };
 
-    let template = CouponTemplateRecord::new(
-        template_id,
-        code_value.to_ascii_lowercase(),
-        benefit_kind,
-    )
-    .with_display_name(format!("{code_value} template"))
-    .with_status(CouponTemplateStatus::Active)
-    .with_distribution_kind(CouponDistributionKind::UniqueCode)
-    .with_restriction(restriction)
-    .with_benefit(benefit)
-    .with_created_at_ms(1_710_000_000_000)
-    .with_updated_at_ms(1_710_000_000_000);
+    let template =
+        CouponTemplateRecord::new(template_id, code_value.to_ascii_lowercase(), benefit_kind)
+            .with_display_name(format!("{code_value} template"))
+            .with_status(CouponTemplateStatus::Active)
+            .with_distribution_kind(CouponDistributionKind::UniqueCode)
+            .with_restriction(restriction)
+            .with_benefit(benefit)
+            .with_created_at_ms(1_710_000_000_000)
+            .with_updated_at_ms(1_710_000_000_000);
     store
         .insert_coupon_template_record(&template)
         .await

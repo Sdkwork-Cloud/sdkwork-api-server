@@ -284,6 +284,10 @@ const PAYMENT_MIGRATION_STATEMENTS: &[&str] = &[
      )",
 ];
 
+pub fn payment_migration_statements() -> &'static [&'static str] {
+    PAYMENT_MIGRATION_STATEMENTS
+}
+
 pub(crate) async fn apply_postgres_payment_schema(pool: &PgPool) -> Result<()> {
     for statement in PAYMENT_MIGRATION_STATEMENTS {
         sqlx::query(statement).execute(pool).await?;

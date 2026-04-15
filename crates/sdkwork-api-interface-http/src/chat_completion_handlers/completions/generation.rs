@@ -13,16 +13,20 @@ use sdkwork_api_app_gateway::{
     relay_chat_completion_from_store_with_execution_context,
     relay_chat_completion_stream_from_store_with_execution_context,
 };
-
-fn local_chat_completion_error_response(error: anyhow::Error) -> Response {
-    local_gateway_invalid_or_bad_gateway_response(error, "invalid_model")
-}
+use sdkwork_api_contract_openai::chat_completions::ChatCompletionResponse;
 
 pub(crate) async fn chat_completions_with_state_handler(
     request_context: AuthenticatedGatewayRequest,
     State(state): State<GatewayApiState>,
     ExtractJson(request): ExtractJson<CreateChatCompletionRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response(
+            "Chat completion model is required.",
+            "invalid_model",
+        );
+    }
+
     let options = ProviderRequestOptions::default();
     let commercial_admission = match begin_gateway_commercial_admission(
         &state,
@@ -183,22 +187,7 @@ pub(crate) async fn chat_completions_with_state_handler(
         );
     }
 
-    let local_chat_completion = match create_chat_completion(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &request.model,
-    ) {
-        Ok(response) => response,
-        Err(error) => {
-            if let Some(admission) = commercial_admission.as_ref() {
-                if let Err(response) = release_gateway_commercial_admission(&state, admission).await
-                {
-                    return response;
-                }
-            }
-            return local_chat_completion_error_response(error);
-        }
-    };
+    let local_chat_completion = ChatCompletionResponse::empty("chatcmpl_1", &request.model);
 
     if let Some(admission) = commercial_admission.as_ref() {
         if let Err(response) = capture_gateway_commercial_admission(&state, admission).await {

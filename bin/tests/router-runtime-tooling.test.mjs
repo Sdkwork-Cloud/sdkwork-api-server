@@ -1037,7 +1037,7 @@ test('runtime-common.ps1 includes platform-aware PowerShell process and binary h
   assert.match(script, /Stop-Process -Id \$processId/);
 });
 
-test('runtime-common.ps1 carries startup summary helpers with unified links, direct links, and seeded credentials', () => {
+test('runtime-common.ps1 carries startup summary helpers with unified links, direct links, and bootstrap identity guidance', () => {
   const script = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.ps1'), 'utf8');
 
   assert.match(script, /function Get-RouterStartupSummaryLines/);
@@ -1045,15 +1045,20 @@ test('runtime-common.ps1 carries startup summary helpers with unified links, dir
   assert.match(script, /function Start-RouterBackgroundProcess/);
   assert.match(script, /Unified Access/);
   assert.match(script, /Direct Service Access/);
+  assert.match(script, /Identity Bootstrap/);
   assert.match(script, /\/api\/v1\/health/);
   assert.match(script, /\/admin\/health/);
   assert.match(script, /\/portal\/health/);
-  assert.match(script, /admin@sdkwork\.local/);
-  assert.match(script, /portal@sdkwork\.local/);
-  assert.match(script, /ChangeMe123!/);
+  assert.match(script, /SDKWORK_BOOTSTRAP_PROFILE/);
+  assert.match(script, /SDKWORK_BOOTSTRAP_DATA_DIR/);
+  assert.match(script, /active bootstrap profile/);
+  assert.match(script, /runtime configuration/);
+  assert.doesNotMatch(script, /admin@sdkwork\.local/);
+  assert.doesNotMatch(script, /portal@sdkwork\.local/);
+  assert.doesNotMatch(script, /ChangeMe123!/);
 });
 
-test('runtime-common.sh carries matching startup summary and seeded credential helpers for shell entrypoints', () => {
+test('runtime-common.sh carries matching startup summary and bootstrap identity guidance for shell entrypoints', () => {
   const script = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.sh'), 'utf8');
 
   assert.match(script, /router_startup_summary/);
@@ -1063,9 +1068,14 @@ test('runtime-common.sh carries matching startup summary and seeded credential h
   assert.match(script, /router_render_release_dry_run_plan_json\(\)/);
   assert.match(script, /router_start_background_process\(\)/);
   assert.match(script, /powershell\.exe -NoProfile -ExecutionPolicy Bypass -Command/);
-  assert.match(script, /admin@sdkwork\.local/);
-  assert.match(script, /portal@sdkwork\.local/);
-  assert.match(script, /ChangeMe123!/);
+  assert.match(script, /Identity Bootstrap/);
+  assert.match(script, /SDKWORK_BOOTSTRAP_PROFILE/);
+  assert.match(script, /SDKWORK_BOOTSTRAP_DATA_DIR/);
+  assert.match(script, /active bootstrap profile/);
+  assert.match(script, /runtime configuration/);
+  assert.doesNotMatch(script, /admin@sdkwork\.local/);
+  assert.doesNotMatch(script, /portal@sdkwork\.local/);
+  assert.doesNotMatch(script, /ChangeMe123!/);
 });
 
 test('shell runtime launchers stop waiting for health checks once the managed child exits', () => {

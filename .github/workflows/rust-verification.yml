@@ -10,10 +10,14 @@ on:
       - 'services/**'
       - 'vendor/**'
       - 'scripts/check-rust-dependency-audit.mjs'
+      - 'scripts/check-rust-dependency-audit.policy.json'
       - 'scripts/check-rust-dependency-audit.test.mjs'
       - 'scripts/check-rust-verification-matrix.mjs'
       - 'scripts/check-rust-verification-matrix.test.mjs'
+      - 'scripts/release/desktop-targets.mjs'
+      - 'scripts/run-tauri-cli.mjs'
       - 'scripts/rust-verification-workflow.test.mjs'
+      - 'scripts/workspace-target-dir.mjs'
       - 'docs/review/2026-04-06-rust-verification-matrix.md'
   workflow_dispatch:
     inputs:

@@ -3,50 +3,57 @@ use sdkwork_api_app_gateway::{
     delete_response, get_response, list_response_input_items,
 };
 
-#[test]
-fn returns_response_object() {
-    let response = create_response("tenant-1", "project-1", "gpt-4.1").unwrap();
-    assert_eq!(response.object, "response");
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
+    );
 }
 
 #[test]
-fn retrieves_response_object() {
-    let response = get_response("tenant-1", "project-1", "resp_1").unwrap();
-    assert_eq!(response.id, "resp_1");
-    assert_eq!(response.object, "response");
+fn local_response_fallback_requires_upstream_provider() {
+    assert_error_contains(
+        create_response("tenant-1", "project-1", "gpt-4.1"),
+        "Local response fallback is not supported",
+    );
+    assert_error_contains(
+        compact_response("tenant-1", "project-1", "gpt-4.1"),
+        "Local response compaction fallback is not supported",
+    );
 }
 
 #[test]
-fn lists_response_input_items() {
-    let response = list_response_input_items("tenant-1", "project-1", "resp_1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "response.input_item");
+fn local_response_fallback_requires_persisted_response_state() {
+    assert_error_contains(
+        get_response("tenant-1", "project-1", "resp_local_1"),
+        "response not found",
+    );
+    assert_error_contains(
+        delete_response("tenant-1", "project-1", "resp_local_1"),
+        "response not found",
+    );
+    assert_error_contains(
+        cancel_response("tenant-1", "project-1", "resp_local_1"),
+        "response not found",
+    );
 }
 
 #[test]
-fn deletes_response_object() {
-    let response = delete_response("tenant-1", "project-1", "resp_1").unwrap();
-    assert_eq!(response.id, "resp_1");
-    assert!(response.deleted);
+fn local_response_input_item_listing_requires_persisted_state() {
+    assert_error_contains(
+        list_response_input_items("tenant-1", "project-1", "resp_local_1"),
+        "Persisted local response input item state is required",
+    );
 }
 
 #[test]
-fn counts_response_input_tokens() {
-    let response = count_response_input_tokens("tenant-1", "project-1", "gpt-4.1").unwrap();
-    assert_eq!(response.object, "response.input_tokens");
-    assert_eq!(response.input_tokens, 42);
-}
-
-#[test]
-fn cancels_response_object() {
-    let response = cancel_response("tenant-1", "project-1", "resp_1").unwrap();
-    assert_eq!(response.id, "resp_1");
-    assert_eq!(response.status.as_deref(), Some("cancelled"));
-}
-
-#[test]
-fn compacts_response_object() {
-    let response = compact_response("tenant-1", "project-1", "gpt-4.1").unwrap();
-    assert_eq!(response.object, "response.compaction");
-    assert_eq!(response.model, "gpt-4.1");
+fn local_response_token_counting_is_not_supported() {
+    assert_error_contains(
+        count_response_input_tokens("tenant-1", "project-1", "gpt-4.1"),
+        "Response input token counting is not supported",
+    );
 }

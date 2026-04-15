@@ -55,9 +55,11 @@ fn security_posture_rejects_non_loopback_local_dev_defaults_without_explicit_dev
 
 #[test]
 fn security_posture_allows_non_loopback_local_dev_defaults_with_explicit_dev_mode() {
-    let mut config = StandaloneConfig::default();
-    config.gateway_bind = "0.0.0.0:8080".to_owned();
-    config.allow_insecure_dev_defaults = true;
+    let config = StandaloneConfig {
+        gateway_bind: "0.0.0.0:8080".to_owned(),
+        allow_insecure_dev_defaults: true,
+        ..Default::default()
+    };
     config.validate_security_posture().unwrap();
 }
 

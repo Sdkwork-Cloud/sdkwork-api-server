@@ -202,9 +202,9 @@ export function workspaceAccessLines(settings) {
   lines.push(`[start-workspace]   Gateway Service: ${resolveLoopbackUrl(settings.gatewayBind, '/health')}`);
   lines.push(`[start-workspace]   Admin Service: ${resolveLoopbackUrl(settings.adminBind, '/admin/health')}`);
   lines.push(`[start-workspace]   Portal Service: ${resolveLoopbackUrl(settings.portalBind, '/portal/health')}`);
-  lines.push('[start-workspace] Initial Credentials');
-  lines.push('[start-workspace]   Admin Console: admin@sdkwork.local / ChangeMe123!');
-  lines.push('[start-workspace]   Portal Console: portal@sdkwork.local / ChangeMe123!');
+  lines.push('[start-workspace] Identity Bootstrap');
+  lines.push('[start-workspace]   Development identities come from the active bootstrap profile.');
+  lines.push('[start-workspace]   Review data/identities/dev.json before sharing a local environment.');
 
   return lines;
 }

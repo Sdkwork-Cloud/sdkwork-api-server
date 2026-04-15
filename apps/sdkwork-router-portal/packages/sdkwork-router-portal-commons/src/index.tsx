@@ -11,11 +11,12 @@ import {
 import { twMerge } from 'tailwind-merge';
 
 import { setActivePortalFormatLocale } from './format-core';
-import { setActivePortalCoreLocale } from './i18n-core';
 import {
-  PORTAL_ZH_CN_MESSAGES,
-  translatePortalZhCnFallback,
-} from './portalMessages.zh-CN';
+  preloadPortalCoreLocale,
+  setActivePortalCoreLocale,
+  translatePortalText as translatePortalCoreText,
+  translatePortalTextForLocale,
+} from './i18n-core';
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -288,7 +289,8 @@ const PORTAL_MESSAGE_KEYS = [
   'Loading checkout...',
   'Loading the router product command center and current launch posture...',
   'Loading...',
-  'Local dev credentials are prefilled: {email} / {password}.',
+  'Local development uses identities from the active bootstrap profile. Email hint: {email}. Enter the matching password from your runtime configuration.',
+  'Local development uses identities from the active bootstrap profile. Enter the portal email and password provisioned by your runtime configuration.',
   'Manage keys',
   'Manage groups',
   'Manage routing profiles',
@@ -874,27 +876,12 @@ const PORTAL_MESSAGE_KEYS = [
   '{count} billing events retained a compiled snapshot id.',
 ] as const;
 
-const portalMessages: Record<Exclude<PortalLocale, 'en-US'>, Record<string, string>> = {
-  'zh-CN': PORTAL_ZH_CN_MESSAGES,
-};
-
 export const PORTAL_LOCALE_OPTIONS: Array<{ id: PortalLocale; labelKey: string }> = [
   { id: 'en-US', labelKey: 'English' },
   { id: 'zh-CN', labelKey: 'Simplified Chinese' },
 ];
 
 let activePortalLocale: PortalLocale = 'en-US';
-
-function interpolate(text: string, values?: TranslationValues): string {
-  if (!values) {
-    return text;
-  }
-
-  return Object.entries(values).reduce(
-    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
-    text,
-  );
-}
 
 function normalizeLocale(value: string | null | undefined): PortalLocale {
   if (!value) {
@@ -904,15 +891,8 @@ function normalizeLocale(value: string | null | undefined): PortalLocale {
   return value.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
 }
 
-function translateForLocale(
-  locale: PortalLocale,
-  text: string,
-  values?: TranslationValues,
-): string {
-  const translated = locale === 'en-US'
-    ? text
-    : portalMessages[locale][text] ?? translatePortalZhCnFallback(text) ?? text;
-  return interpolate(translated, values);
+export async function preloadPortalLocale(locale: PortalLocale): Promise<void> {
+  await preloadPortalCoreLocale(locale);
 }
 
 function resolveInitialLocale(): PortalLocale {
@@ -920,30 +900,61 @@ function resolveInitialLocale(): PortalLocale {
     return activePortalLocale;
   }
 
+  let locale: PortalLocale;
+
   try {
     const persisted = window.localStorage.getItem(PORTAL_I18N_STORAGE_KEY);
     if (persisted) {
-      return normalizeLocale(persisted);
+      locale = normalizeLocale(persisted);
+    } else {
+      locale = normalizeLocale(window.navigator.language);
     }
   } catch {
     // Ignore storage access failures and fall back to browser locale.
+    locale = normalizeLocale(window.navigator.language);
   }
-
-  return normalizeLocale(window.navigator.language);
-}
-
-const PortalI18nContext = createContext<PortalI18nContextValue | null>(null);
-
-export function translatePortalText(text: string, values?: TranslationValues): string {
-  return translateForLocale(activePortalLocale, text, values);
-}
-
-export function PortalI18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<PortalLocale>(resolveInitialLocale);
 
   activePortalLocale = locale;
   setActivePortalCoreLocale(locale);
   setActivePortalFormatLocale(locale);
+  return locale;
+}
+
+const PortalI18nContext = createContext<PortalI18nContextValue | null>(null);
+
+export async function preloadPreferredPortalLocale(): Promise<void> {
+  await preloadPortalLocale(resolveInitialLocale());
+}
+
+export function translatePortalText(text: string, values?: TranslationValues): string {
+  return translatePortalCoreText(text, values);
+}
+
+export function PortalI18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocale] = useState<PortalLocale>(resolveInitialLocale);
+  const [translationRevision, setTranslationRevision] = useState(0);
+
+  activePortalLocale = locale;
+  setActivePortalCoreLocale(locale);
+  setActivePortalFormatLocale(locale);
+
+  useEffect(() => {
+    if (locale !== 'zh-CN') {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    void preloadPortalLocale(locale).then(() => {
+      if (!cancelled) {
+        setTranslationRevision((current) => current + 1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -963,9 +974,9 @@ export function PortalI18nProvider({ children }: { children: ReactNode }) {
     () => ({
       locale,
       setLocale,
-      t: (text, values) => translateForLocale(locale, text, values),
+      t: (text, values) => translatePortalTextForLocale(locale, text, values),
     }),
-    [locale],
+    [locale, translationRevision],
   );
 
   return createElement(PortalI18nContext.Provider, { key: locale, value }, children);

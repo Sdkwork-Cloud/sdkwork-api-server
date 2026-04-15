@@ -42,6 +42,7 @@ test('apirouter access detail and routing evidence copy are overridden by a dedi
   ];
   const joinedSources = sources.join('\n');
   const i18n = read('packages/sdkwork-router-admin-core/src/i18n.tsx');
+  const i18nTranslations = read('packages/sdkwork-router-admin-core/src/i18nTranslations.ts');
   const apirouterDetailTranslations = extractMap(
     i18n,
     'ADMIN_ZH_APIROUTER_DETAIL_TRANSLATIONS',
@@ -95,5 +96,5 @@ test('apirouter access detail and routing evidence copy are overridden by a dedi
   }
 
   assert.match(i18n, /const ADMIN_ZH_APIROUTER_DETAIL_TRANSLATIONS: Record<string, string> = \{/);
-  assert.match(i18n, /\.\.\.ADMIN_ZH_APIROUTER_DETAIL_TRANSLATIONS,/);
+  assert.match(i18nTranslations, /\.\.\.ADMIN_ZH_APIROUTER_DETAIL_TRANSLATIONS,/);
 });

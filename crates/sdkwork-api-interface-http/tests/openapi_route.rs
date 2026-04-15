@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use std::sync::{Mutex, OnceLock};

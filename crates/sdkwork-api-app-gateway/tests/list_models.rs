@@ -47,24 +47,31 @@ fn capability_catalog_cache_reset_guard() -> CapabilityCatalogCacheResetGuard {
     CapabilityCatalogCacheResetGuard
 }
 
-#[test]
-fn returns_platform_models() {
-    let response = list_models("tenant-1", "project-1").unwrap();
-    assert_eq!(response.object, "list");
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
+    );
 }
 
 #[test]
-fn returns_platform_model() {
-    let response = get_model("tenant-1", "project-1", "gpt-4.1").unwrap();
-    assert_eq!(response.id, "gpt-4.1");
-    assert_eq!(response.object, "model");
-}
-
-#[test]
-fn deletes_platform_model() {
-    let response = delete_model("tenant-1", "project-1", "ft:gpt-4.1:sdkwork").unwrap();
-    assert_eq!(response.id, "ft:gpt-4.1:sdkwork");
-    assert!(response.deleted);
+fn local_model_catalog_fallback_requires_configured_store() {
+    assert_error_contains(
+        list_models("tenant-1", "project-1"),
+        "Local model catalog fallback is not supported",
+    );
+    assert_error_contains(
+        get_model("tenant-1", "project-1", "gpt-4.1"),
+        "Local model catalog fallback is not supported",
+    );
+    assert_error_contains(
+        delete_model("tenant-1", "project-1", "ft:gpt-4.1:sdkwork"),
+        "Local model catalog fallback is not supported",
+    );
 }
 
 #[tokio::test]

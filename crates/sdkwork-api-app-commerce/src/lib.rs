@@ -24,8 +24,7 @@ pub use order::{
     load_portal_commerce_checkout_session, load_portal_commerce_checkout_session_with_policy,
     load_portal_commerce_order, load_project_membership, preview_portal_commerce_quote,
     settle_portal_commerce_order, settle_portal_commerce_order_from_verified_payment,
-    settle_portal_commerce_order_with_billing,
-    submit_portal_commerce_order,
+    settle_portal_commerce_order_with_billing, submit_portal_commerce_order,
 };
 pub(crate) use order::{
     refund_portal_commerce_order, settle_portal_commerce_order_with_payment_event,
@@ -83,9 +82,9 @@ use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, CommercePaymentEventProcessingStatus, ProjectMembershipRecord,
 };
 use sdkwork_api_domain_marketing::{
-    CampaignBudgetRecord, CouponCodeRecord, CouponCodeStatus, CouponDistributionKind,
-    CouponRedemptionRecord, CouponRedemptionStatus, CouponRollbackRecord, CouponRollbackStatus,
-    CouponRollbackType, CouponTemplateRecord, MarketingCampaignRecord, MarketingSubjectScope,
+    CampaignBudgetRecord, CouponCodeRecord, CouponDistributionKind, CouponRedemptionRecord,
+    CouponRedemptionStatus, CouponRollbackRecord, CouponRollbackStatus, CouponRollbackType,
+    MarketingSubjectScope,
 };
 use sdkwork_api_storage_core::AdminStore;
 use sdkwork_api_storage_core::AtomicCouponRollbackCompensationCommand;
@@ -638,6 +637,7 @@ fn portal_product_offers_from_canonical_catalog(
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_priced_quote(
     target_kind: &str,
     target_id: &str,
@@ -1075,13 +1075,13 @@ fn generate_entity_id(prefix: &str) -> CommerceResult<String> {
 }
 
 fn current_time_ms() -> CommerceResult<u64> {
-    Ok(u64::try_from(
+    u64::try_from(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| CommerceError::Storage(anyhow::anyhow!("system clock error")))?
             .as_millis(),
     )
-    .map_err(|error| CommerceError::Storage(error.into()))?)
+    .map_err(|error| CommerceError::Storage(error.into()))
 }
 
 #[async_trait]
@@ -1121,6 +1121,7 @@ mod tests {
             100_000,
             "workspace_seed",
             Some(5_000),
+            current_quote_target_catalog_binding("recharge_pack", "pack-100k"),
             Some(CommerceCouponDefinition {
                 coupon: PortalCommerceCoupon {
                     id: "coupon_spring_launch".to_owned(),
@@ -1171,6 +1172,7 @@ mod tests {
                 },
             },
             Some(5_000),
+            current_quote_target_catalog_binding("coupon_redemption", "WELCOME100"),
         );
 
         assert_eq!(quote.payable_price_label, "$0.00");

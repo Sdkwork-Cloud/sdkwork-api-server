@@ -241,10 +241,10 @@ fn site_proxy_upstream_name(site: RuntimeSite) -> &'static str {
     }
 }
 
-fn site_proxy_upstream_target<'a>(
-    config: &'a RuntimeHostConfig,
+fn site_proxy_upstream_target(
+    config: &RuntimeHostConfig,
     site: RuntimeSite,
-) -> Option<&'a str> {
+) -> Option<&str> {
     match site {
         RuntimeSite::Admin => config.admin_site_proxy_upstream.as_deref(),
         RuntimeSite::Portal => config.portal_site_proxy_upstream.as_deref(),

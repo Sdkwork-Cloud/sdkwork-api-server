@@ -81,10 +81,14 @@ fn local_chat_completion_response(tenant_id: &str, project_id: &str, model: &str
 }
 
 fn local_chat_completion_stream_response(
-    _tenant_id: &str,
-    _project_id: &str,
-    _model: &str,
+    tenant_id: &str,
+    project_id: &str,
+    model: &str,
 ) -> Response {
+    if model.trim().is_empty() {
+        return local_chat_completion_response(tenant_id, project_id, model);
+    }
+
     invalid_request_openai_response(
         "Local chat completion streaming fallback is not supported without an upstream provider.",
         "invalid_chat_completion_request",

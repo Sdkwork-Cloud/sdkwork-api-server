@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn fine_tuning_route_returns_ok() {
+async fn fine_tuning_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -10,18 +10,23 @@ async fn fine_tuning_route_returns_ok() {
                 .uri("/v1/fine_tuning/jobs")
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    "{\"training_file\":\"file_1\",\"model\":\"gpt-4.1-mini\"}",
+                    "{\"training_file\":\"file_local_1\",\"model\":\"gpt-4.1-mini\"}",
                 ))
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local fine-tuning job fallback is not supported without an upstream provider.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_list_route_returns_ok() {
+async fn fine_tuning_list_route_returns_invalid_request_without_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -35,125 +40,141 @@ async fn fine_tuning_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local fine-tuning job listing fallback is not supported without an upstream provider.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_retrieve_route_returns_ok() {
+async fn fine_tuning_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/fine_tuning/jobs/ftjob_1")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
-async fn fine_tuning_cancel_route_returns_ok() {
+async fn fine_tuning_cancel_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/fine_tuning/jobs/ftjob_1/cancel")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1/cancel")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
-async fn fine_tuning_events_route_returns_ok() {
+async fn fine_tuning_events_route_returns_invalid_request_without_local_event_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/fine_tuning/jobs/ftjob_1/events")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1/events")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Persisted local fine tuning job event state is required for local event listing.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_checkpoints_route_returns_ok() {
+async fn fine_tuning_checkpoints_route_returns_invalid_request_without_local_checkpoint_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/fine_tuning/jobs/ftjob_1/checkpoints")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1/checkpoints")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Persisted local fine tuning checkpoint state is required for local checkpoint listing.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_pause_route_returns_ok() {
+async fn fine_tuning_pause_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/fine_tuning/jobs/ftjob_1/pause")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1/pause")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
-async fn fine_tuning_resume_route_returns_ok() {
+async fn fine_tuning_resume_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/fine_tuning/jobs/ftjob_1/resume")
+                .uri("/v1/fine_tuning/jobs/ftjob_local_1/resume")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
-async fn fine_tuning_checkpoint_permissions_create_route_returns_ok() {
+async fn fine_tuning_checkpoint_permissions_create_route_returns_invalid_request_without_local_permission_state(
+) {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions")
+                .uri("/v1/fine_tuning/checkpoints/ftckpt_local_1/permissions")
                 .header("content-type", "application/json")
                 .body(Body::from("{\"project_ids\":[\"project-2\"]}"))
                 .unwrap(),
@@ -161,43 +182,58 @@ async fn fine_tuning_checkpoint_permissions_create_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Persisted local fine tuning checkpoint permission state is required for local permission creation.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_checkpoint_permissions_list_route_returns_ok() {
+async fn fine_tuning_checkpoint_permissions_list_route_returns_invalid_request_without_local_permission_state(
+) {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions")
+                .uri("/v1/fine_tuning/checkpoints/ftckpt_local_1/permissions")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Persisted local fine tuning checkpoint permission state is required for local permission listing.",
+        "invalid_fine_tuning_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn fine_tuning_checkpoint_permission_delete_route_returns_ok() {
+async fn fine_tuning_checkpoint_permission_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/fine_tuning/checkpoints/ft:gpt-4.1-mini:checkpoint-1/permissions/perm_1")
+                .uri("/v1/fine_tuning/checkpoints/ftckpt_local_1/permissions/perm_local_1")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(
+        response,
+        "Requested fine tuning checkpoint permission was not found.",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -215,7 +251,7 @@ async fn fine_tuning_retrieve_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -233,7 +269,7 @@ async fn fine_tuning_cancel_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -251,7 +287,7 @@ async fn fine_tuning_events_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -269,7 +305,7 @@ async fn fine_tuning_checkpoints_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -287,7 +323,7 @@ async fn fine_tuning_pause_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -305,7 +341,7 @@ async fn fine_tuning_resume_route_returns_not_found_for_unknown_job() {
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning job was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning job was not found.").await;
 }
 
 #[tokio::test]
@@ -325,7 +361,7 @@ async fn fine_tuning_checkpoint_permissions_create_route_returns_not_found_for_u
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning checkpoint was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning checkpoint was not found.").await;
 }
 
 #[tokio::test]
@@ -343,7 +379,7 @@ async fn fine_tuning_checkpoint_permissions_list_route_returns_not_found_for_unk
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested fine-tuning checkpoint was not found.").await;
+    assert_openai_not_found(response, "Requested fine tuning checkpoint was not found.").await;
 }
 
 #[tokio::test]
@@ -365,7 +401,7 @@ async fn fine_tuning_checkpoint_permission_delete_route_returns_not_found_for_un
 
     assert_openai_not_found(
         response,
-        "Requested fine-tuning checkpoint permission was not found.",
+        "Requested fine tuning checkpoint permission was not found.",
     )
     .await;
 }

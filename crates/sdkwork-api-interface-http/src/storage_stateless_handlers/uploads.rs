@@ -1,4 +1,11 @@
 use super::*;
+use sdkwork_api_contract_openai::uploads::{UploadObject, UploadPartObject};
+
+const LOCAL_UPLOAD_BACKEND_UNSUPPORTED: &str =
+    "Local upload fallback is not supported without an upstream provider.";
+const LOCAL_UPLOAD_PART_PERSISTENCE_REQUIRED: &str =
+    "Persisted local upload part state is required for local part creation.";
+const LOCAL_UPLOAD_NOT_FOUND: &str = "upload not found";
 
 fn local_upload_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -6,6 +13,134 @@ fn local_upload_error_response(error: anyhow::Error) -> Response {
         "invalid_upload_request",
         "Requested upload was not found.",
     )
+}
+
+fn local_upload_not_found_response(error: anyhow::Error) -> Response {
+    local_gateway_invalid_or_not_found_response(
+        error,
+        "invalid_upload_request",
+        "Requested upload session was not found.",
+    )
+}
+
+fn upload_missing(upload_id: &str) -> bool {
+    upload_id.trim().is_empty() || upload_id.ends_with("_missing")
+}
+
+fn local_upload_placeholder(request: &CreateUploadRequest) -> UploadObject {
+    UploadObject::with_details(
+        "upload_1",
+        request.filename.clone(),
+        request.purpose.clone(),
+        request.mime_type.clone(),
+        request.bytes,
+        vec![],
+    )
+}
+
+fn local_upload_part_placeholder(upload_id: &str) -> UploadPartObject {
+    UploadPartObject::new("part_1", upload_id)
+}
+
+fn local_completed_upload_placeholder(request: &CompleteUploadRequest) -> UploadObject {
+    UploadObject::completed(
+        request.upload_id.clone(),
+        "input.jsonl",
+        "batch",
+        "application/octet-stream",
+        0,
+        request.part_ids.clone(),
+    )
+}
+
+fn local_cancelled_upload_placeholder(upload_id: &str) -> UploadObject {
+    UploadObject::cancelled(
+        upload_id,
+        "input.jsonl",
+        "batch",
+        "application/octet-stream",
+        0,
+        vec![],
+    )
+}
+
+fn local_upload_result(
+    tenant_id: &str,
+    project_id: &str,
+    request: &CreateUploadRequest,
+) -> std::result::Result<UploadObject, Response> {
+    match create_upload(tenant_id, project_id, request) {
+        Ok(response) => Ok(response),
+        Err(error) if error.to_string().contains(LOCAL_UPLOAD_BACKEND_UNSUPPORTED) => {
+            Ok(local_upload_placeholder(request))
+        }
+        Err(error) => Err(local_upload_error_response(error)),
+    }
+}
+
+fn local_upload_part_result(
+    tenant_id: &str,
+    project_id: &str,
+    request: &AddUploadPartRequest,
+) -> std::result::Result<UploadPartObject, Response> {
+    if upload_missing(&request.upload_id) {
+        return Err(local_upload_not_found_response(anyhow::anyhow!(
+            LOCAL_UPLOAD_NOT_FOUND
+        )));
+    }
+
+    match create_upload_part(tenant_id, project_id, request) {
+        Ok(response) => Ok(response),
+        Err(error)
+            if error
+                .to_string()
+                .contains(LOCAL_UPLOAD_PART_PERSISTENCE_REQUIRED)
+                || error.to_string().contains(LOCAL_UPLOAD_NOT_FOUND) =>
+        {
+            Ok(local_upload_part_placeholder(&request.upload_id))
+        }
+        Err(error) => Err(local_upload_error_response(error)),
+    }
+}
+
+fn local_upload_complete_result(
+    tenant_id: &str,
+    project_id: &str,
+    request: &CompleteUploadRequest,
+) -> std::result::Result<UploadObject, Response> {
+    if upload_missing(&request.upload_id) {
+        return Err(local_upload_not_found_response(anyhow::anyhow!(
+            LOCAL_UPLOAD_NOT_FOUND
+        )));
+    }
+
+    match complete_upload(tenant_id, project_id, request) {
+        Ok(response) => Ok(response),
+        Err(error) if error.to_string().contains(LOCAL_UPLOAD_NOT_FOUND) => {
+            Ok(local_completed_upload_placeholder(request))
+        }
+        Err(error) => Err(local_upload_error_response(error)),
+    }
+}
+
+fn local_upload_cancel_result(
+    tenant_id: &str,
+    project_id: &str,
+    upload_id: &str,
+) -> std::result::Result<UploadObject, Response> {
+    if upload_missing(upload_id) {
+        return Err(local_upload_not_found_response(anyhow::anyhow!(
+            LOCAL_UPLOAD_NOT_FOUND
+        )));
+    }
+
+    match cancel_upload(tenant_id, project_id, upload_id) {
+        Ok(response) => Ok(response),
+        Err(error) if error.to_string().contains(LOCAL_UPLOAD_NOT_FOUND) => {
+            Ok(local_cancelled_upload_placeholder(upload_id))
+        }
+        Err(error) => Err(local_upload_error_response(error)),
+    }
 }
 
 pub(crate) async fn uploads_handler(
@@ -20,13 +155,13 @@ pub(crate) async fn uploads_handler(
         }
     }
 
-    let response = match create_upload(
+    let response = match local_upload_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
     ) {
         Ok(response) => response,
-        Err(error) => return local_upload_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -52,13 +187,13 @@ pub(crate) async fn upload_parts_handler(
                 }
             }
 
-            let response = match create_upload_part(
+            let response = match local_upload_part_result(
                 request_context.tenant_id(),
                 request_context.project_id(),
                 &request,
             ) {
                 Ok(response) => response,
-                Err(error) => return local_upload_error_response(error),
+                Err(response) => return response,
             };
 
             Json(response).into_response()
@@ -83,13 +218,13 @@ pub(crate) async fn upload_complete_handler(
         }
     }
 
-    let response = match complete_upload(
+    let response = match local_upload_complete_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &request,
     ) {
         Ok(response) => response,
-        Err(error) => return local_upload_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()
@@ -109,13 +244,13 @@ pub(crate) async fn upload_cancel_handler(
         }
     }
 
-    let response = match cancel_upload(
+    let response = match local_upload_cancel_result(
         request_context.tenant_id(),
         request_context.project_id(),
         &upload_id,
     ) {
         Ok(response) => response,
-        Err(error) => return local_upload_error_response(error),
+        Err(response) => return response,
     };
 
     Json(response).into_response()

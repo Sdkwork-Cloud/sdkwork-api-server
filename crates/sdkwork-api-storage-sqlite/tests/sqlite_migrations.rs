@@ -1,7 +1,7 @@
 use sdkwork_api_storage_sqlite::run_migrations;
 use sqlx::SqlitePool;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -29,12 +29,12 @@ async fn creates_canonical_ai_tables_with_only_ai_prefixed_physical_tables() {
         "ai_user",
         "ai_api_key",
         "ai_identity_binding",
-        "ai_coupon_campaigns",
         "ai_channel",
         "ai_proxy_provider",
         "ai_proxy_provider_channel",
         "ai_router_credential_records",
         "ai_model",
+        "ai_proxy_provider_model",
         "ai_model_price",
         "ai_app_api_keys",
         "ai_account",
@@ -51,6 +51,13 @@ async fn creates_canonical_ai_tables_with_only_ai_prefixed_physical_tables() {
         "ai_billing_events",
         "ai_gateway_rate_limit_policies",
         "ai_gateway_rate_limit_windows",
+        "ai_marketing_campaign",
+        "ai_marketing_coupon_code",
+        "ai_extension_installations",
+        "ai_extension_instances",
+        "ai_service_runtime_nodes",
+        "ai_payment_order",
+        "ai_commerce_orders",
     ] {
         let row: (String,) =
             sqlx::query_as("select name from sqlite_master where type = 'table' and name = ?")
@@ -222,6 +229,23 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
         )]
     );
 
+    let provider_models: Vec<(String, String, String)> = sqlx::query_as(
+        "select proxy_provider_id, channel_id, model_id
+         from ai_proxy_provider_model
+         where model_id = 'gpt-legacy'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_models,
+        vec![(
+            "provider-legacy-openai".to_owned(),
+            "legacy-openai".to_owned(),
+            "gpt-legacy".to_owned(),
+        )]
+    );
+
     let prices: Vec<(String, String, String, String)> = sqlx::query_as(
         "select channel_id, model_id, proxy_provider_id, currency_code
          from ai_model_price
@@ -253,6 +277,60 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
         vec![("hashed-legacy-key".to_owned(), None, "tenant-1".to_owned(),)]
     );
 
+    let coupon_templates: Vec<(String, String, String)> = sqlx::query_as(
+        "select coupon_template_id, template_key, status
+         from ai_marketing_coupon_template
+         where coupon_template_id = 'legacy_tpl_coupon-legacy-launch'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        coupon_templates,
+        vec![(
+            "legacy_tpl_coupon-legacy-launch".to_owned(),
+            "legacy-coupon-legacy-launch".to_owned(),
+            "active".to_owned(),
+        )]
+    );
+
+    let marketing_campaigns: Vec<(String, String, String, Option<i64>)> = sqlx::query_as(
+        "select marketing_campaign_id, coupon_template_id, status, end_at_ms
+         from ai_marketing_campaign
+         where marketing_campaign_id = 'coupon-legacy-launch'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        marketing_campaigns,
+        vec![(
+            "coupon-legacy-launch".to_owned(),
+            "legacy_tpl_coupon-legacy-launch".to_owned(),
+            "active".to_owned(),
+            Some(1_767_225_599_000),
+        )]
+    );
+
+    let coupon_codes: Vec<(String, String, String, String, Option<i64>)> = sqlx::query_as(
+        "select coupon_code_id, coupon_template_id, code_value, status, expires_at_ms
+         from ai_marketing_coupon_code
+         where coupon_code_id = 'legacy_code_coupon-legacy-launch'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        coupon_codes,
+        vec![(
+            "legacy_code_coupon-legacy-launch".to_owned(),
+            "legacy_tpl_coupon-legacy-launch".to_owned(),
+            "LEGACY100".to_owned(),
+            "available".to_owned(),
+            Some(1_767_225_599_000),
+        )]
+    );
+
     let legacy_channel_rows: Vec<(String, String)> =
         sqlx::query_as("select id, name from catalog_channels where id = 'legacy-openai'")
             .fetch_all(&pool)
@@ -261,6 +339,19 @@ async fn migrates_legacy_tables_into_canonical_ai_tables_and_replaces_old_names_
     assert_eq!(
         legacy_channel_rows,
         vec![("legacy-openai".to_owned(), "Legacy OpenAI".to_owned())]
+    );
+
+    let legacy_model_rows: Vec<(String, String)> = sqlx::query_as(
+        "select external_name, provider_id
+         from catalog_models
+         where external_name = 'gpt-legacy'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        legacy_model_rows,
+        vec![("gpt-legacy".to_owned(), "provider-legacy-openai".to_owned(),)]
     );
 
     pool.close().await;
@@ -276,7 +367,7 @@ fn temp_sqlite_root(label: &str) -> PathBuf {
     root
 }
 
-fn sqlite_url_for(path: &PathBuf) -> String {
+fn sqlite_url_for(path: &Path) -> String {
     let normalized = path.to_string_lossy().replace('\\', "/");
     if normalized.starts_with('/') {
         format!("sqlite://{normalized}")
@@ -439,6 +530,41 @@ async fn seed_legacy_schema(database_url: &str) {
             '[\"responses\"]',
             1,
             64000
+        )",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "create table coupon_campaigns (
+            id text primary key not null,
+            code text not null,
+            discount_label text not null,
+            audience text not null default '',
+            remaining integer not null default 0,
+            active integer not null default 1,
+            note text not null default '',
+            expires_on text,
+            created_at_ms integer not null default 0
+        )",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "insert into coupon_campaigns (
+            id, code, discount_label, audience, remaining, active, note, expires_on, created_at_ms
+        ) values (
+            'coupon-legacy-launch',
+            'LEGACY100',
+            '$100 legacy launch credit',
+            'all_new_workspaces',
+            5000,
+            1,
+            'Legacy launch migration',
+            '2025-12-31',
+            1710002000000
         )",
     )
     .execute(&pool)

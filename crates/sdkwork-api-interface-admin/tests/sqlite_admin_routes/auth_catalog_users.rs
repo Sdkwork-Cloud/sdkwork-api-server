@@ -423,6 +423,35 @@ async fn list_and_manage_operator_users_from_admin_api() {
 async fn list_and_manage_portal_users_from_admin_api() {
     let pool = memory_pool().await;
     let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    store
+        .insert_tenant(&sdkwork_api_domain_tenant::Tenant::new(
+            "tenant_local_demo",
+            "Local Demo Workspace",
+        ))
+        .await
+        .unwrap();
+    store
+        .insert_project(&sdkwork_api_domain_tenant::Project::new(
+            "tenant_local_demo",
+            "project_local_demo",
+            "default",
+        ))
+        .await
+        .unwrap();
+    sdkwork_api_app_identity::upsert_portal_user(
+        &store,
+        sdkwork_api_app_identity::UpsertPortalUserInput {
+            user_id: Some("user_local_demo"),
+            email: "portal@sdkwork.local",
+            display_name: "Portal Demo",
+            password: Some("ChangeMe123!"),
+            workspace_tenant_id: "tenant_local_demo",
+            workspace_project_id: "project_local_demo",
+            active: true,
+        },
+    )
+    .await
+    .unwrap();
     let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
     let token = login_token(app.clone()).await;
 

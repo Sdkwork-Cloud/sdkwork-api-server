@@ -1,3 +1,5 @@
+mod commercial;
+
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -11,6 +13,12 @@ use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use tracing::Instrument;
+
+pub use commercial::{
+    annotate_current_http_metrics, CommercialEventDimensions, CommercialEventKind,
+    HttpMetricDimensions, PaymentMetricDimensions, ProviderExecutionMetricDimensions,
+    TelemetryCardinalityLimits,
+};
 
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
@@ -153,8 +161,9 @@ struct MarketingRecoveryMetricValue {
     last_failure_at_ms: u64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct ServiceMetricsState {
+    commercial: commercial::CommercialMetricsState,
     http_metrics: Mutex<BTreeMap<HttpMetricKey, HttpMetricValue>>,
     upstream_metrics: Mutex<BTreeMap<UpstreamMetricKey, u64>>,
     upstream_retry_metrics: Mutex<BTreeMap<UpstreamRetryMetricKey, u64>>,
@@ -171,9 +180,32 @@ struct ServiceMetricsState {
     commerce_reconciliation_attempt_metrics:
         Mutex<BTreeMap<CommerceReconciliationAttemptMetricKey, u64>>,
     commerce_reconciliation_metrics: Mutex<CommerceReconciliationMetricValue>,
-    marketing_recovery_attempt_metrics:
-        Mutex<BTreeMap<MarketingRecoveryAttemptMetricKey, u64>>,
+    marketing_recovery_attempt_metrics: Mutex<BTreeMap<MarketingRecoveryAttemptMetricKey, u64>>,
     marketing_recovery_metrics: Mutex<MarketingRecoveryMetricValue>,
+}
+
+impl ServiceMetricsState {
+    fn new(cardinality_limits: TelemetryCardinalityLimits) -> Self {
+        Self {
+            commercial: commercial::CommercialMetricsState::new(cardinality_limits),
+            http_metrics: Mutex::new(BTreeMap::new()),
+            upstream_metrics: Mutex::new(BTreeMap::new()),
+            upstream_retry_metrics: Mutex::new(BTreeMap::new()),
+            upstream_retry_reason_metrics: Mutex::new(BTreeMap::new()),
+            upstream_retry_delay_metrics: Mutex::new(BTreeMap::new()),
+            gateway_failover_metrics: Mutex::new(BTreeMap::new()),
+            provider_health_metrics: Mutex::new(BTreeMap::new()),
+            provider_health_persist_failure_metrics: Mutex::new(BTreeMap::new()),
+            provider_health_recovery_probe_metrics: Mutex::new(BTreeMap::new()),
+            gateway_execution_context_failure_metrics: Mutex::new(BTreeMap::new()),
+            commerce_reconciliation_attempt_metrics: Mutex::new(BTreeMap::new()),
+            commerce_reconciliation_metrics: Mutex::new(
+                CommerceReconciliationMetricValue::default(),
+            ),
+            marketing_recovery_attempt_metrics: Mutex::new(BTreeMap::new()),
+            marketing_recovery_metrics: Mutex::new(MarketingRecoveryMetricValue::default()),
+        }
+    }
 }
 
 impl HttpMetricsRegistry {
@@ -181,7 +213,18 @@ impl HttpMetricsRegistry {
         let service = service.into();
         Self {
             service: service.clone().into(),
-            state: shared_service_metrics(&service),
+            state: shared_service_metrics(&service, TelemetryCardinalityLimits::default()),
+        }
+    }
+
+    pub fn with_cardinality_limits(
+        service: impl Into<String>,
+        limits: TelemetryCardinalityLimits,
+    ) -> Self {
+        let service = service.into();
+        Self {
+            service: service.clone().into(),
+            state: Arc::new(ServiceMetricsState::new(limits)),
         }
     }
 
@@ -190,6 +233,23 @@ impl HttpMetricsRegistry {
     }
 
     pub fn record(&self, method: &str, route: &str, status: u16, duration_ms: u64) {
+        self.record_with_dimensions(
+            method,
+            route,
+            status,
+            duration_ms,
+            HttpMetricDimensions::default(),
+        );
+    }
+
+    pub fn record_with_dimensions(
+        &self,
+        method: &str,
+        route: &str,
+        status: u16,
+        duration_ms: u64,
+        dimensions: HttpMetricDimensions,
+    ) {
         let key = HttpMetricKey {
             method: method.to_owned(),
             route: route.to_owned(),
@@ -203,6 +263,35 @@ impl HttpMetricsRegistry {
         let entry = metrics.entry(key).or_default();
         entry.count += 1;
         entry.duration_ms_sum += duration_ms;
+        drop(metrics);
+
+        self.state
+            .commercial
+            .record_http(method, route, status, duration_ms, dimensions);
+    }
+
+    pub fn record_provider_execution(
+        &self,
+        duration_ms: u64,
+        dimensions: ProviderExecutionMetricDimensions,
+    ) {
+        self.state
+            .commercial
+            .record_provider_execution(duration_ms, dimensions);
+    }
+
+    pub fn record_payment_callback(&self, dimensions: PaymentMetricDimensions) {
+        self.state.commercial.record_payment_callback(dimensions);
+    }
+
+    pub fn record_commercial_event(
+        &self,
+        event_kind: CommercialEventKind,
+        dimensions: CommercialEventDimensions,
+    ) {
+        self.state
+            .commercial
+            .record_commercial_event(event_kind, dimensions);
     }
 
     pub fn record_upstream_outcome(&self, capability: &str, provider: &str, outcome: &str) {
@@ -298,6 +387,15 @@ impl HttpMetricsRegistry {
         };
         let entry = metrics.entry(key).or_default();
         *entry += 1;
+        drop(metrics);
+
+        if outcome == "success" {
+            self.state.commercial.record_failover_success(
+                self.service(),
+                from_provider,
+                to_provider,
+            );
+        }
     }
 
     pub fn record_provider_health(
@@ -576,6 +674,10 @@ impl HttpMetricsRegistry {
                 value.count
             ));
         }
+
+        self.state
+            .commercial
+            .render_prometheus(self.service(), &mut output);
 
         output.push_str(
             "# HELP sdkwork_upstream_requests_total Total upstream execution outcomes observed\n",
@@ -873,7 +975,10 @@ impl HttpMetricsRegistry {
     }
 }
 
-fn shared_service_metrics(service: &str) -> Arc<ServiceMetricsState> {
+fn shared_service_metrics(
+    service: &str,
+    limits: TelemetryCardinalityLimits,
+) -> Arc<ServiceMetricsState> {
     let registry = SHARED_SERVICE_METRICS.get_or_init(|| Mutex::new(BTreeMap::new()));
     let mut registry = match registry.lock() {
         Ok(registry) => registry,
@@ -881,8 +986,18 @@ fn shared_service_metrics(service: &str) -> Arc<ServiceMetricsState> {
     };
     registry
         .entry(service.to_owned())
-        .or_insert_with(|| Arc::new(ServiceMetricsState::default()))
+        .or_insert_with(|| Arc::new(ServiceMetricsState::new(limits)))
         .clone()
+}
+
+pub async fn with_current_http_metrics_registry<F, T>(
+    registry: Arc<HttpMetricsRegistry>,
+    future: F,
+) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    commercial::with_current_http_metrics_service(registry.service(), future).await
 }
 
 pub async fn observe_http_metrics(
@@ -901,7 +1016,13 @@ pub async fn observe_http_metrics(
     let response = next.run(request).await;
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let status = response.status().as_u16();
-    registry.record(&method, &route, status, duration_ms);
+    registry.record_with_dimensions(
+        &method,
+        &route,
+        status,
+        duration_ms,
+        commercial::current_http_metric_dimensions_for(registry.service()).unwrap_or_default(),
+    );
     response
 }
 

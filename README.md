@@ -336,9 +336,8 @@ Important runtime notes:
 - the managed start scripts now keep a companion `.state.env` file next to each managed pid file. It records the active bind set, frontend mode, and process fingerprint so repeat `start` / `stop` calls can distinguish a healthy managed instance from a stale or PID-reused process.
 - if a managed runtime is already healthy on a different bind set, re-running `bin/start-dev.*` or `bin/start.*` now prints the active managed addresses instead of failing with a generic health-check error.
 - on Windows, the `.sh` wrappers are compatibility entrypoints that hand off to the corresponding `.ps1` scripts. This keeps Git Bash workflows available while avoiding `/d/...` MSYS path mismatches inside Windows Node / cargo processes.
-- the seeded local credentials printed by the managed startup scripts are:
-  - admin: `admin@sdkwork.local / ChangeMe123!`
-  - portal: `portal@sdkwork.local / ChangeMe123!`
+- `bin/start-dev.*` and `bin/start.*` now print bootstrap identity guidance instead of fixed demo credentials.
+- development identities come from the active bootstrap profile; for the local `dev` bootstrap profile, review `data/identities/dev.json` before sharing the environment, and note that the default `prod` bootstrap profile does not seed development identities.
 - `bin/install.*` writes native service descriptors plus register/unregister helper scripts, but still does not auto-register them during a generic install run.
 - the installed runtime home intentionally includes production `start/stop` scripts and service-management assets only.
 - the generated `config/router.env` is the primary place to override release binds, database location, and site directories.

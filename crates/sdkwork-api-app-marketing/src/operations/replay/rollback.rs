@@ -2,6 +2,7 @@ use super::super::error::MarketingOperationError;
 use super::super::support::{find_coupon_rollback_record, load_coupon_redemption_for_subject};
 use super::super::types::{RollbackCouponInput, RollbackCouponResult};
 use crate::load_marketing_coupon_context_for_code_id;
+use sdkwork_api_domain_marketing::CouponRollbackStatus;
 use sdkwork_api_storage_core::AdminStore;
 
 pub(crate) async fn try_replay_rolled_back_coupon(
@@ -17,6 +18,9 @@ pub(crate) async fn try_replay_rolled_back_coupon(
     else {
         return Ok(None);
     };
+    if existing_rollback.rollback_status == CouponRollbackStatus::Failed {
+        return Ok(None);
+    }
 
     let redemption = load_coupon_redemption_for_subject(
         store,

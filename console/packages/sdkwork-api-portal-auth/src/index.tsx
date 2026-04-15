@@ -65,6 +65,14 @@ function portalErrorMessage(error: unknown): string {
   return 'Portal request failed.';
 }
 
+function resolveDevLoginEmailHint(): string {
+  if (!import.meta.env.DEV) {
+    return '';
+  }
+
+  return String(import.meta.env.VITE_PORTAL_LOGIN_HINT_EMAIL ?? '').trim();
+}
+
 export function PortalRegisterPage({ onAuthenticated, onNavigate }: PortalAuthPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -159,7 +167,9 @@ export function PortalRegisterPage({ onAuthenticated, onNavigate }: PortalAuthPa
 }
 
 export function PortalLoginPage({ onAuthenticated, onNavigate }: PortalAuthPageProps) {
-  const [email, setEmail] = useState('');
+  const devLoginEmailHint = resolveDevLoginEmailHint();
+  const showDevAccessHint = import.meta.env.DEV;
+  const [email, setEmail] = useState(devLoginEmailHint);
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState(
     'Sign in to inspect your workspace and issue environment-specific API keys.',
@@ -192,7 +202,7 @@ export function PortalLoginPage({ onAuthenticated, onNavigate }: PortalAuthPageP
       highlights={[
         'Dedicated portal account boundary',
         'Workspace overview and API key management',
-        'Quick-start demo account for local development',
+        'Bootstrap-profile guidance for local development',
       ]}
     >
       <h2>Sign in</h2>
@@ -231,10 +241,16 @@ export function PortalLoginPage({ onAuthenticated, onNavigate }: PortalAuthPageP
             Create account
           </button>
         </div>
-        <div className="portal-note-card">
-          <span>Local demo account</span>
-          <code>portal@sdkwork.local / ChangeMe123!</code>
-        </div>
+        {showDevAccessHint ? (
+          <div className="portal-note-card">
+            <span>Local development</span>
+            <span>
+              {devLoginEmailHint
+                ? `Local development uses identities from the active bootstrap profile. Email hint: ${devLoginEmailHint}. Enter the matching password from your runtime configuration.`
+                : 'Local development uses identities from the active bootstrap profile. Enter the portal email and password provisioned by your runtime configuration.'}
+            </span>
+          </div>
+        ) : null}
       </form>
     </PortalAuthShell>
   );

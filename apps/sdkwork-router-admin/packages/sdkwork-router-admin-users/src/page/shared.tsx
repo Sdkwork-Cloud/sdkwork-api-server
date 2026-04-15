@@ -60,9 +60,6 @@ export type PendingDelete =
   | { kind: 'portal'; user: ManagedUser }
   | null;
 
-export const bootstrapOperatorEmail = 'admin@sdkwork.local';
-export const bootstrapPortalEmail = 'portal@sdkwork.local';
-
 export function defaultTenantId(snapshot: UsersSnapshot): string {
   return snapshot.tenants[0]?.id ?? 'tenant_local_demo';
 }
@@ -156,11 +153,7 @@ export function isProtectedUser(
   user: ManagedUser,
   sessionUserId: string | null,
 ): boolean {
-  if (user.role === 'operator') {
-    return user.email === bootstrapOperatorEmail || user.id === sessionUserId;
-  }
-
-  return user.email === bootstrapPortalEmail;
+  return user.role === 'operator' && user.id === sessionUserId;
 }
 
 export function DialogField({

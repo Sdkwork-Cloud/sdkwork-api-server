@@ -27,12 +27,52 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /native-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-external-deps\.mjs/,
+    /rust-dependency-audit:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?ref:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?actions\/setup-node@v5[\s\S]*?node-version:\s*22[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?Swatinem\/rust-cache@v2[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?node scripts\/check-rust-dependency-audit\.mjs/,
+    'release workflow must execute a dedicated Rust dependency audit gate against the exact release ref before any assets are built',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit/,
+    'native release job must wait for the dedicated Rust dependency audit gate',
+  );
+  assert.match(
+    workflow,
+    /web-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit/,
+    'web release job must wait for the dedicated Rust dependency audit gate',
+  );
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?ref:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?pnpm\/action-setup@v4[\s\S]*?actions\/setup-node@v5[\s\S]*?node-version:\s*22[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?Swatinem\/rust-cache@v2[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?node scripts\/check-router-product\.mjs/,
+    'release workflow must execute a dedicated product verification gate against the exact release ref before any assets are built',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit[\r\n]+\s*-\s*product-verification/,
+    'native release job must wait for the dedicated product verification gate',
+  );
+  assert.match(
+    workflow,
+    /web-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit[\r\n]+\s*-\s*product-verification/,
+    'web release job must wait for the dedicated product verification gate',
+  );
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?Run release product verification[\s\S]*?node scripts\/check-router-product\.mjs/,
+    'product verification frozen install discipline must be explicit before release product verification runs',
+  );
+  assert.match(
+    workflow,
+    /product-verification:[\s\S]*?Run release product verification[\s\S]*?env:[\s\S]*?SDKWORK_STRICT_FRONTEND_INSTALLS:\s*'1'[\s\S]*?run:\s*node scripts\/check-router-product\.mjs/,
+    'strict frontend install mode must be exported before release product verification runs',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-external-deps\.mjs/,
     'native release job must wire all governed sibling refs into external dependency materialization',
   );
   assert.match(
     workflow,
-    /web-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-external-deps\.mjs/,
+    /web-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-external-deps\.mjs/,
     'web release job must wire all governed sibling refs into external dependency materialization',
   );
   assert.match(
@@ -81,12 +121,12 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /native-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
+    /native-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
     'native release job must materialize a governed release-sync audit artifact before the governance gate',
   );
   assert.match(
     workflow,
-    /web-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
+    /web-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_JSON:[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?run: node scripts\/release\/materialize-release-sync-audit\.mjs/,
     'web release job must materialize a governed release-sync audit artifact before the governance gate',
   );
   assert.match(
@@ -195,7 +235,7 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /native-release:[\s\S]*?Run release governance gate[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH:[\s\S]*?release-window-snapshot-latest\.json[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:[\s\S]*?release-sync-audit-latest\.json[\s\S]*?run: node scripts\/release\/run-release-governance-checks\.mjs --format json/,
+    /native-release:[\s\S]*?Run release governance gate[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH:[\s\S]*?release-window-snapshot-latest\.json[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:[\s\S]*?release-sync-audit-latest\.json[\s\S]*?run: node scripts\/release\/run-release-governance-checks\.mjs --format json/,
     'native release job must wire the main and sibling repository refs plus governed release-window and release-sync artifacts into the governance gate',
   );
   assert.match(
@@ -260,7 +300,7 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /web-release:[\s\S]*?Run release governance gate[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_IM_SDK_GIT_REF:[\s\S]*?SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH:[\s\S]*?release-window-snapshot-latest\.json[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:[\s\S]*?release-sync-audit-latest\.json[\s\S]*?run: node scripts\/release\/run-release-governance-checks\.mjs --format json/,
+    /web-release:[\s\S]*?Run release governance gate[\s\S]*?SDKWORK_API_ROUTER_GIT_REF:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?SDKWORK_CORE_GIT_REF:[\s\S]*?SDKWORK_UI_GIT_REF:[\s\S]*?SDKWORK_APPBASE_GIT_REF:[\s\S]*?SDKWORK_CRAW_CHAT_SDK_GIT_REF:[\s\S]*?SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH:[\s\S]*?release-window-snapshot-latest\.json[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:[\s\S]*?release-sync-audit-latest\.json[\s\S]*?run: node scripts\/release\/run-release-governance-checks\.mjs --format json/,
     'web release job must wire the main and sibling repository refs plus governed release-window and release-sync artifacts into the governance gate',
   );
   assert.match(
@@ -358,7 +398,7 @@ export async function assertReleaseWorkflowContracts({
   assert.equal(specs.length, 4);
   assert.deepEqual(
     specs.map((spec) => spec.id),
-    ['sdkwork-core', 'sdkwork-ui', 'sdkwork-appbase', 'sdkwork-im-sdk'],
+    ['sdkwork-core', 'sdkwork-ui', 'sdkwork-appbase', 'sdkwork-craw-chat-sdk'],
   );
   assert.equal(specs[0].repository, 'Sdkwork-Cloud/sdkwork-core');
   assert.equal(specs[0].envRefKey, 'SDKWORK_CORE_GIT_REF');
@@ -369,8 +409,8 @@ export async function assertReleaseWorkflowContracts({
   assert.equal(specs[2].repository, 'Sdkwork-Cloud/sdkwork-appbase');
   assert.equal(specs[2].envRefKey, 'SDKWORK_APPBASE_GIT_REF');
   assert.equal(specs[2].defaultRef, 'main');
-  assert.equal(specs[3].repository, 'Sdkwork-Cloud/sdkwork-im-sdk');
-  assert.equal(specs[3].envRefKey, 'SDKWORK_IM_SDK_GIT_REF');
+  assert.equal(specs[3].repository, 'Sdkwork-Cloud/craw-chat');
+  assert.equal(specs[3].envRefKey, 'SDKWORK_CRAW_CHAT_SDK_GIT_REF');
   assert.equal(specs[3].defaultRef, 'main');
 
   const coverage = helper.auditExternalReleaseDependencyCoverage();

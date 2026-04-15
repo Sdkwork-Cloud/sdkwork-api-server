@@ -38,16 +38,20 @@ test('product check script plans portal and admin regression tests before build 
     env: {},
   });
 
-  assert.equal(plan.length, 7);
+  assert.equal(plan.length, 9);
   assert.equal(plan[0].label, 'portal typecheck');
   assert.equal(plan[1].label, 'portal regression tests');
   assert.equal(plan[2].label, 'admin typecheck');
   assert.equal(plan[3].label, 'admin regression tests');
-  assert.equal(plan[4].label, 'desktop assets build');
-  assert.equal(plan[5].label, 'server cargo check');
-  assert.equal(plan[6].label, 'server deployment plan');
+  assert.equal(plan[4].label, 'docs bootstrap safety');
+  assert.equal(plan[5].label, 'workspace dependency audit');
+  assert.equal(plan[6].label, 'desktop assets build');
+  assert.equal(plan[7].label, 'server cargo check');
+  assert.equal(plan[8].label, 'server deployment plan');
   assert.deepEqual(plan[1].args, ['--test', 'tests/*.mjs']);
   assert.deepEqual(plan[3].args, ['--test', 'tests/*.mjs']);
-  assert.match(plan[6].args.join(' '), /--dry-run/);
-  assert.match(plan[6].args.join(' '), /--plan-format json/);
+  assert.match(plan[4].args.join(' '), /check-router-docs-safety\.mjs/);
+  assert.match(plan[5].args.join(' '), /check-rust-dependency-audit\.mjs/);
+  assert.match(plan[8].args.join(' '), /--dry-run/);
+  assert.match(plan[8].args.join(' '), /--plan-format json/);
 });

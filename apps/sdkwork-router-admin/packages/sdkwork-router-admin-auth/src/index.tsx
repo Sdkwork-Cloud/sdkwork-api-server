@@ -17,10 +17,14 @@ type AuthMode = 'login' | 'register' | 'forgot';
 const DEFAULT_LOGIN_STATUS = 'Authenticate to open the super-admin workspace.';
 const SSO_NOTICE =
   'Use the operator email and password flow for admin access. External SSO remains disabled in this workspace.';
-const DEV_ADMIN_CREDENTIALS = {
-  email: 'admin@sdkwork.local',
-  password: 'ChangeMe123!',
-};
+
+function resolveDevLoginEmailHint() {
+  if (!import.meta.env.DEV) {
+    return '';
+  }
+
+  return String(import.meta.env.VITE_ADMIN_LOGIN_HINT_EMAIL ?? '').trim();
+}
 
 type AuthBadgeProps = {
   children?: ReactNode;
@@ -138,15 +142,14 @@ export function AdminLoginPage({
   const mode = resolveAuthMode(location.pathname);
   const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
   const copy = authCopy(mode);
+  const devLoginEmailHint = resolveDevLoginEmailHint();
   const [email, setEmail] = useState(
-    import.meta.env.DEV && mode === 'login' ? DEV_ADMIN_CREDENTIALS.email : '',
+    mode === 'login' ? devLoginEmailHint : '',
   );
-  const [password, setPassword] = useState(
-    import.meta.env.DEV && mode === 'login' ? DEV_ADMIN_CREDENTIALS.password : '',
-  );
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [feedback, setFeedback] = useState('');
-  const showDevCredentials = import.meta.env.DEV && mode === 'login';
+  const showDevAccessHint = import.meta.env.DEV && mode === 'login';
 
   useEffect(() => {
     const nextEmail = searchParams.get('email');
@@ -160,13 +163,12 @@ export function AdminLoginPage({
   }, [mode]);
 
   useEffect(() => {
-    if (!showDevCredentials) {
+    if (!showDevAccessHint || !devLoginEmailHint) {
       return;
     }
 
-    setEmail((current) => current.trim() || DEV_ADMIN_CREDENTIALS.email);
-    setPassword((current) => current || DEV_ADMIN_CREDENTIALS.password);
-  }, [showDevCredentials]);
+    setEmail((current) => current.trim() || devLoginEmailHint);
+  }, [devLoginEmailHint, showDevAccessHint]);
 
   function withRedirect(pathname: string, extra: Record<string, string> = {}) {
     const params = new URLSearchParams();
@@ -339,12 +341,16 @@ export function AdminLoginPage({
               </Button>
             </form>
 
-            {showDevCredentials ? (
+            {showDevAccessHint ? (
               <p className="mt-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {t(
-                  'Local dev credentials are prefilled: {email} / {password}.',
-                  DEV_ADMIN_CREDENTIALS,
-                )}
+                {devLoginEmailHint
+                  ? t(
+                      'Local development uses identities from the active bootstrap profile. Email hint: {email}. Enter the matching password from your runtime configuration.',
+                      { email: devLoginEmailHint },
+                    )
+                  : t(
+                      'Local development uses identities from the active bootstrap profile. Enter the operator email and password provisioned by your runtime configuration.',
+                    )}
               </p>
             ) : null}
 

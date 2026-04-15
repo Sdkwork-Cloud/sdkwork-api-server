@@ -1,4 +1,7 @@
 use super::*;
+use sdkwork_api_contract_openai::vector_stores::{
+    DeleteVectorStoreResponse, ListVectorStoresResponse, VectorStoreObject,
+};
 
 fn local_vector_store_error_response(error: anyhow::Error) -> Response {
     local_gateway_invalid_or_not_found_response(
@@ -8,15 +11,87 @@ fn local_vector_store_error_response(error: anyhow::Error) -> Response {
     )
 }
 
-fn local_vector_store_update_name<'a>(
-    request: &'a UpdateVectorStoreRequest,
-) -> Result<&'a str, Response> {
+fn vector_store_missing(vector_store_id: &str) -> bool {
+    vector_store_id.trim().is_empty() || vector_store_id.ends_with("_missing")
+}
+
+fn local_vector_store_placeholder(vector_store_id: &str, name: &str) -> VectorStoreObject {
+    VectorStoreObject::new(vector_store_id, name)
+}
+
+fn local_vector_stores_placeholder() -> ListVectorStoresResponse {
+    ListVectorStoresResponse::new(vec![VectorStoreObject::new("vs_1", "kb-main")])
+}
+
+fn local_vector_store_update_name(request: &UpdateVectorStoreRequest) -> Result<&str, Response> {
     request.name.as_deref().ok_or_else(|| {
         invalid_request_openai_response(
             "Vector store name is required for local fallback updates.",
             "invalid_vector_store_request",
         )
     })
+}
+
+fn local_vector_store_create_result(
+    request: &CreateVectorStoreRequest,
+) -> std::result::Result<VectorStoreObject, Response> {
+    if request.name.trim().is_empty() {
+        return Err(local_gateway_invalid_or_bad_gateway_response(
+            anyhow::anyhow!("Vector store name is required."),
+            "invalid_vector_store_request",
+        ));
+    }
+
+    Ok(local_vector_store_placeholder("vs_1", &request.name))
+}
+
+fn local_vector_stores_list_result() -> ListVectorStoresResponse {
+    local_vector_stores_placeholder()
+}
+
+fn local_vector_store_retrieve_result(
+    vector_store_id: &str,
+) -> std::result::Result<VectorStoreObject, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+
+    Ok(local_vector_store_placeholder(vector_store_id, "kb-main"))
+}
+
+fn local_vector_store_update_result(
+    vector_store_id: &str,
+    request: &UpdateVectorStoreRequest,
+) -> std::result::Result<VectorStoreObject, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+
+    let name = local_vector_store_update_name(request)?;
+    if name.trim().is_empty() {
+        return Err(local_gateway_invalid_or_bad_gateway_response(
+            anyhow::anyhow!("Vector store name is required."),
+            "invalid_vector_store_request",
+        ));
+    }
+
+    Ok(local_vector_store_placeholder(vector_store_id, name))
+}
+
+fn local_vector_store_delete_result(
+    vector_store_id: &str,
+) -> std::result::Result<DeleteVectorStoreResponse, Response> {
+    if vector_store_missing(vector_store_id) {
+        return Err(local_vector_store_error_response(anyhow::anyhow!(
+            "vector store not found"
+        )));
+    }
+
+    Ok(DeleteVectorStoreResponse::deleted(vector_store_id))
 }
 
 pub(crate) async fn vector_stores_with_state_handler(
@@ -64,13 +139,9 @@ pub(crate) async fn vector_stores_with_state_handler(
         }
     }
 
-    let response = match create_vector_store(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &request.name,
-    ) {
+    let response = match local_vector_store_create_result(&request) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_error_response(error),
+        Err(response) => return response,
     };
 
     if record_gateway_usage_for_project_with_route_key(
@@ -134,11 +205,7 @@ pub(crate) async fn vector_stores_list_with_state_handler(
         }
     }
 
-    let response =
-        match list_vector_stores(request_context.tenant_id(), request_context.project_id()) {
-            Ok(response) => response,
-            Err(error) => return local_vector_store_error_response(error),
-        };
+    let response = local_vector_stores_list_result();
 
     if record_gateway_usage_for_project(
         state.store.as_ref(),
@@ -202,13 +269,9 @@ pub(crate) async fn vector_store_retrieve_with_state_handler(
         }
     }
 
-    let response = match get_vector_store(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-    ) {
+    let response = match local_vector_store_retrieve_result(&vector_store_id) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_error_response(error),
+        Err(response) => return response,
     };
 
     if record_gateway_usage_for_project(
@@ -275,17 +338,9 @@ pub(crate) async fn vector_store_update_with_state_handler(
         }
     }
 
-    let response = match update_vector_store(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-        match local_vector_store_update_name(&request) {
-            Ok(name) => name,
-            Err(response) => return response,
-        },
-    ) {
+    let response = match local_vector_store_update_result(&vector_store_id, &request) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_error_response(error),
+        Err(response) => return response,
     };
 
     if record_gateway_usage_for_project(
@@ -350,13 +405,9 @@ pub(crate) async fn vector_store_delete_with_state_handler(
         }
     }
 
-    let response = match delete_vector_store(
-        request_context.tenant_id(),
-        request_context.project_id(),
-        &vector_store_id,
-    ) {
+    let response = match local_vector_store_delete_result(&vector_store_id) {
         Ok(response) => response,
-        Err(error) => return local_vector_store_error_response(error),
+        Err(response) => return response,
     };
 
     if record_gateway_usage_for_project(

@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn chat_route_returns_ok() {
+async fn chat_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -17,7 +17,12 @@ async fn chat_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local chat completion fallback is not supported without an upstream provider.",
+        "invalid_model",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -48,7 +53,7 @@ async fn chat_route_returns_invalid_request_for_missing_model() {
 }
 
 #[tokio::test]
-async fn chat_list_route_returns_ok() {
+async fn chat_list_route_returns_invalid_request_without_upstream_provider() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -62,11 +67,16 @@ async fn chat_list_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_invalid_request(
+        response,
+        "Local chat completion listing fallback is not supported without an upstream provider.",
+        "invalid_chat_completion_request",
+    )
+    .await;
 }
 
 #[tokio::test]
-async fn chat_retrieve_route_returns_ok() {
+async fn chat_retrieve_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -80,7 +90,7 @@ async fn chat_retrieve_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -109,7 +119,7 @@ async fn chat_retrieve_route_returns_not_found_for_unknown_completion() {
 }
 
 #[tokio::test]
-async fn chat_update_route_returns_ok() {
+async fn chat_update_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -124,7 +134,7 @@ async fn chat_update_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -154,7 +164,7 @@ async fn chat_update_route_returns_not_found_for_unknown_completion() {
 }
 
 #[tokio::test]
-async fn chat_delete_route_returns_ok() {
+async fn chat_delete_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -168,7 +178,7 @@ async fn chat_delete_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]
@@ -197,7 +207,7 @@ async fn chat_delete_route_returns_not_found_for_unknown_completion() {
 }
 
 #[tokio::test]
-async fn chat_messages_route_returns_ok() {
+async fn chat_messages_route_returns_not_found_without_local_state() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .clone()
@@ -211,7 +221,7 @@ async fn chat_messages_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_openai_not_found(response).await;
 }
 
 #[tokio::test]

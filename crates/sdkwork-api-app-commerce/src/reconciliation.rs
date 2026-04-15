@@ -409,6 +409,7 @@ async fn reconcile_refund(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_reconciliation_item(
     store: &dyn AdminStore,
     run: &CommerceReconciliationRunRecord,

@@ -1,5 +1,15 @@
+use super::*;
+use crate::gateway_commercial::current_billing_timestamp_ms;
+use sdkwork_api_app_payment::{
+    ingest_payment_callback, PaymentCallbackIntakeDisposition, PaymentCallbackIntakeRequest,
+    PaymentCallbackNormalizedOutcome, PaymentSubjectScope,
+};
+use sdkwork_api_domain_payment::PaymentProviderCode;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
 #[derive(Debug, Clone, Deserialize)]
-struct PaymentCallbackHttpRequest {
+pub(crate) struct PaymentCallbackHttpRequest {
     tenant_id: u64,
     #[serde(default)]
     organization_id: u64,
@@ -45,16 +55,12 @@ struct PaymentCallbackHttpResponse {
     payment_transaction_id: Option<String>,
 }
 
-async fn payment_callbacks_with_state_handler(
+pub(crate) async fn payment_callbacks_with_state_handler(
     Path((provider_code, gateway_account_id)): Path<(String, String)>,
     State(state): State<GatewayApiState>,
     ExtractJson(payload): ExtractJson<PaymentCallbackHttpRequest>,
 ) -> Response {
-    let Some(payment_store) = state
-        .live_payment_store
-        .as_ref()
-        .map(Reloadable::snapshot)
-    else {
+    let Some(payment_store) = state.payment_store_snapshot() else {
         return payment_callback_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "gateway state does not expose canonical payment callback processing",

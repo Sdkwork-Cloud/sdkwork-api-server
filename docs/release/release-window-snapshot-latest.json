@@ -1,14 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-10T19:19:30.133Z",
+  "generatedAt": "2026-04-15T07:58:08.752Z",
   "source": {
-    "kind": "release-window-live-git",
-    "provenance": "s08-release-sync-external-blocker-reverify-loop-6"
+    "kind": "release-window-live-git"
   },
   "snapshot": {
-    "hasReleaseBaseline": true,
     "latestReleaseTag": "release-2026-03-28-8",
-    "workingTreeEntryCount": 527,
-    "commitsSinceLatestRelease": 22
+    "commitsSinceLatestRelease": 56,
+    "workingTreeEntryCount": 436,
+    "hasReleaseBaseline": true
   }
 }

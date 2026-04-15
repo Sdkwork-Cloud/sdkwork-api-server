@@ -8,7 +8,7 @@ fn local_webhook_error_response(error: anyhow::Error) -> Response {
     )
 }
 
-fn local_webhook_update_url<'a>(request: &'a UpdateWebhookRequest) -> Result<&'a str, Response> {
+fn local_webhook_update_url(request: &UpdateWebhookRequest) -> Result<&str, Response> {
     request.url.as_deref().ok_or_else(|| {
         invalid_request_openai_response(
             "Webhook url is required for local fallback updates.",

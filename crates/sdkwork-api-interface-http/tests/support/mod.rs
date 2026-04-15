@@ -3,7 +3,7 @@ use axum::http::{Request, StatusCode};
 use axum::Router;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::SigningKey;
-use sdkwork_api_app_identity::persist_gateway_api_key;
+use sdkwork_api_app_identity::{persist_gateway_api_key, upsert_admin_user};
 use sdkwork_api_ext_provider_native_mock::FIXTURE_EXTENSION_ID;
 use sdkwork_api_storage_sqlite::SqliteAdminStore;
 use serde_json::Value;
@@ -31,7 +31,20 @@ pub async fn issue_gateway_api_key(pool: &SqlitePool, tenant_id: &str, project_i
 }
 
 #[allow(dead_code)]
-pub async fn issue_admin_token(app: Router) -> String {
+pub async fn issue_admin_token(pool: &SqlitePool, app: Router) -> String {
+    let store = SqliteAdminStore::new(pool.clone());
+    upsert_admin_user(
+        &store,
+        Some("admin_local_default"),
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(sdkwork_api_domain_identity::AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+
     let response = app
         .oneshot(
             Request::builder()

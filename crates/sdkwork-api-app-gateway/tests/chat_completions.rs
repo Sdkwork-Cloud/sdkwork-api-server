@@ -3,47 +3,54 @@ use sdkwork_api_app_gateway::{
     list_chat_completion_messages, list_chat_completions, update_chat_completion,
 };
 
-#[test]
-fn returns_chat_completion_response() {
-    let response = create_chat_completion("tenant-1", "project-1", "gpt-4.1").unwrap();
-    assert_eq!(response.object, "chat.completion");
+fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(
+    result: Result<T, E>,
+    expected: &str,
+) {
+    let error = result.expect_err("expected error");
+    assert!(
+        error.to_string().contains(expected),
+        "expected error containing `{expected}`, got `{error}`"
+    );
 }
 
 #[test]
-fn lists_chat_completion_responses() {
-    let response = list_chat_completions("tenant-1", "project-1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "chat.completion");
+fn local_chat_completion_fallback_requires_upstream_provider() {
+    assert_error_contains(
+        create_chat_completion("tenant-1", "project-1", "gpt-4.1"),
+        "Local chat completion fallback is not supported",
+    );
+    assert_error_contains(
+        list_chat_completions("tenant-1", "project-1"),
+        "Local chat completion listing fallback is not supported",
+    );
 }
 
 #[test]
-fn retrieves_chat_completion_response() {
-    let response = get_chat_completion("tenant-1", "project-1", "chatcmpl_1").unwrap();
-    assert_eq!(response.id, "chatcmpl_1");
+fn local_chat_completion_fallback_requires_persisted_state() {
+    assert_error_contains(
+        get_chat_completion("tenant-1", "project-1", "chatcmpl_local_1"),
+        "chat completion not found",
+    );
+    assert_error_contains(
+        update_chat_completion(
+            "tenant-1",
+            "project-1",
+            "chatcmpl_local_1",
+            serde_json::json!({"tier":"gold"}),
+        ),
+        "chat completion not found",
+    );
+    assert_error_contains(
+        delete_chat_completion("tenant-1", "project-1", "chatcmpl_local_1"),
+        "chat completion not found",
+    );
 }
 
 #[test]
-fn updates_chat_completion_response() {
-    let response = update_chat_completion(
-        "tenant-1",
-        "project-1",
-        "chatcmpl_1",
-        serde_json::json!({"tier":"gold"}),
-    )
-    .unwrap();
-    assert_eq!(response.metadata, Some(serde_json::json!({"tier":"gold"})));
-}
-
-#[test]
-fn deletes_chat_completion_response() {
-    let response = delete_chat_completion("tenant-1", "project-1", "chatcmpl_1").unwrap();
-    assert_eq!(response.id, "chatcmpl_1");
-    assert!(response.deleted);
-}
-
-#[test]
-fn lists_chat_completion_messages() {
-    let response = list_chat_completion_messages("tenant-1", "project-1", "chatcmpl_1").unwrap();
-    assert_eq!(response.object, "list");
-    assert_eq!(response.data[0].object, "chat.completion.message");
+fn local_chat_completion_message_listing_requires_persisted_state() {
+    assert_error_contains(
+        list_chat_completion_messages("tenant-1", "project-1", "chatcmpl_local_1"),
+        "Persisted local chat completion message state is required",
+    );
 }

@@ -1,6 +1,88 @@
 use super::*;
 
 #[tokio::test]
+async fn stateful_upload_routes_return_local_fallbacks_without_upstream_provider() {
+    let ctx = local_upload_test_context("tenant-upload-local", "project-upload-local").await;
+
+    let upload_response = ctx
+        .gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads")
+                .header("authorization", format!("Bearer {}", ctx.api_key))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    "{\"purpose\":\"batch\",\"filename\":\"input.jsonl\",\"mime_type\":\"application/jsonl\",\"bytes\":1024}",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(upload_response.status(), StatusCode::OK);
+    let upload_json = read_json(upload_response).await;
+    assert_eq!(upload_json["id"], "upload_1");
+
+    let part_response = ctx
+        .gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads/upload_1/parts")
+                .header("authorization", format!("Bearer {}", ctx.api_key))
+                .header(
+                    "content-type",
+                    "multipart/form-data; boundary=----sdkwork-upload-part",
+                )
+                .body(Body::from(build_upload_part_multipart_body(
+                    "----sdkwork-upload-part",
+                )))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(part_response.status(), StatusCode::OK);
+    let part_json = read_json(part_response).await;
+    assert_eq!(part_json["id"], "part_1");
+
+    let complete_response = ctx
+        .gateway_app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads/upload_1/complete")
+                .header("authorization", format!("Bearer {}", ctx.api_key))
+                .header("content-type", "application/json")
+                .body(Body::from("{\"part_ids\":[\"part_1\",\"part_2\"]}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(complete_response.status(), StatusCode::OK);
+    let complete_json = read_json(complete_response).await;
+    assert_eq!(complete_json["status"], "completed");
+
+    let cancel_response = ctx
+        .gateway_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/uploads/upload_1/cancel")
+                .header("authorization", format!("Bearer {}", ctx.api_key))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(cancel_response.status(), StatusCode::OK);
+    let cancel_json = read_json(cancel_response).await;
+    assert_eq!(cancel_json["status"], "cancelled");
+}
+
+#[tokio::test]
 async fn stateful_upload_parts_route_returns_not_found_without_usage() {
     let ctx = local_upload_test_context(
         "tenant-upload-parts-missing",

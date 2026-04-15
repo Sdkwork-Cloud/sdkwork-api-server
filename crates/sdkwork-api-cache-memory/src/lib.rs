@@ -152,7 +152,8 @@ fn purge_expired_entries(state: &mut MemoryCacheState) {
     let expired = state
         .entries
         .iter()
-        .filter_map(|(composite, record)| record.entry.is_expired().then(|| composite.clone()))
+        .filter(|(_, record)| record.entry.is_expired())
+        .map(|(composite, _)| composite.clone())
         .collect::<Vec<_>>();
     for composite in expired {
         remove_entry(state, &composite);

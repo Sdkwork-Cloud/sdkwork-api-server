@@ -526,7 +526,12 @@ impl PostgresAdminStore {
         .bind(&record.operator_reason)
         .bind(&record.publication_status_before)
         .bind(&record.publication_status_after)
-        .bind(record.governed_pricing_plan_id.map(i64::try_from).transpose()?)
+        .bind(
+            record
+                .governed_pricing_plan_id
+                .map(i64::try_from)
+                .transpose()?,
+        )
         .bind(&record.governed_pricing_status_before)
         .bind(&record.governed_pricing_status_after)
         .bind(encode_string_list(&record.decision_reasons)?)

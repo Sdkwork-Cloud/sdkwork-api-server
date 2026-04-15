@@ -6,18 +6,63 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { materializeReleaseTelemetrySnapshot } from './materialize-release-telemetry-snapshot.mjs';
-import { materializeSloGovernanceEvidence } from './materialize-slo-governance-evidence.mjs';
-import { collectReleaseWindowSnapshotResult } from './compute-release-window-snapshot.mjs';
+import {
+  resolveReleaseTelemetryExportProducerInput,
+} from './materialize-release-telemetry-export.mjs';
+import {
+  resolveReleaseWindowSnapshotProducerInput,
+} from './materialize-release-window-snapshot.mjs';
+import {
+  resolveReleaseSyncAuditProducerInput,
+} from './materialize-release-sync-audit.mjs';
+import {
+  deriveReleaseTelemetrySnapshotFromExport,
+  materializeReleaseTelemetrySnapshot,
+  validateReleaseTelemetryExportShape,
+  validateReleaseTelemetrySnapshotShape,
+} from './materialize-release-telemetry-snapshot.mjs';
+import {
+  deriveSloGovernanceEvidenceFromReleaseTelemetrySnapshot,
+  materializeSloGovernanceEvidence,
+  validateSloGovernanceEvidenceShape,
+} from './materialize-slo-governance-evidence.mjs';
+import {
+  auditExternalReleaseDependencyCoverage,
+  buildExternalReleaseClonePlan,
+  listExternalReleaseDependencySpecs,
+} from './materialize-external-deps.mjs';
+import {
+  createReleaseGovernanceBundleManifest,
+  listReleaseGovernanceBundleArtifactSpecs,
+} from './materialize-release-governance-bundle.mjs';
+import {
+  createUnixInstalledRuntimeSmokeEvidence,
+  createUnixInstalledRuntimeSmokeOptions,
+  createUnixInstalledRuntimeSmokePlan,
+} from './run-unix-installed-runtime-smoke.mjs';
+import {
+  createWindowsInstalledRuntimeSmokeEvidence,
+  createWindowsInstalledRuntimeSmokeOptions,
+  createWindowsInstalledRuntimeSmokePlan,
+} from './run-windows-installed-runtime-smoke.mjs';
+import {
+  collectReleaseWindowSnapshotResult,
+  validateReleaseWindowSnapshotArtifact,
+} from './compute-release-window-snapshot.mjs';
 import { assertObservabilityContracts } from './observability-contracts.mjs';
 import { assertReleaseAttestationVerificationContracts } from './release-attestation-verification-contracts.mjs';
 import { assertReleaseSyncAuditContracts } from './release-sync-audit-contracts.mjs';
 import { assertReleaseWindowSnapshotContracts } from './release-window-snapshot-contracts.mjs';
 import { assertReleaseWorkflowContracts } from './release-workflow-contracts.mjs';
+import { listReleaseGovernanceLatestArtifactSpecs } from './restore-release-governance-latest.mjs';
 import { assertRuntimeToolingContracts } from './runtime-tooling-contracts.mjs';
 import { collectSloGovernanceResult } from './slo-governance.mjs';
 import { assertSloGovernanceContracts } from './slo-governance-contracts.mjs';
-import { auditReleaseSyncRepositories } from './verify-release-sync.mjs';
+import {
+  auditReleaseSyncRepositories,
+  validateReleaseSyncAuditArtifact,
+} from './verify-release-sync.mjs';
+import { assertReleaseGovernanceWorkflowContracts } from '../release-governance-workflow-contracts.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +85,189 @@ const defaultReleaseSyncAuditPath = path.join(
   'release',
   'release-sync-audit-latest.json',
 );
+const preflightExcludedPlanIds = new Set([
+  'release-slo-governance',
+  'release-window-snapshot',
+  'release-sync-audit',
+]);
+
+function createSyntheticPrometheusHttpCounterSamples({
+  service,
+  healthyCount,
+  unhealthyCount,
+} = {}) {
+  return [
+    '# HELP sdkwork_http_requests_total Total HTTP requests observed',
+    '# TYPE sdkwork_http_requests_total counter',
+    `sdkwork_http_requests_total{service="${service}",method="GET",route="/health",status="200"} ${healthyCount}`,
+    `sdkwork_http_requests_total{service="${service}",method="GET",route="/health",status="503"} ${unhealthyCount}`,
+  ].join('\n');
+}
+
+function createSyntheticTelemetrySupplementalTargets() {
+  return {
+    'gateway-non-streaming-success-rate': { ratio: 0.997, burnRates: { '1h': 0.9, '6h': 0.5 } },
+    'gateway-streaming-completion-success-rate': { ratio: 0.996, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'gateway-fallback-success-rate': { ratio: 0.985, burnRates: { '1h': 0.7, '6h': 0.4 } },
+    'gateway-provider-timeout-budget': { ratio: 0.004, burnRates: { '1h': 0.5, '6h': 0.3 } },
+    'routing-simulation-p95-latency': { value: 420, burnRates: { '1h': 0.9, '6h': 0.5 } },
+    'api-key-issuance-success-rate': { ratio: 0.995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'runtime-rollout-success-rate': { ratio: 0.995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'billing-event-write-success-rate': { ratio: 0.9995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'account-hold-creation-success-rate': { ratio: 0.995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'request-settlement-finalize-success-rate': { ratio: 0.995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+    'pricing-lifecycle-synchronize-success-rate': { ratio: 0.995, burnRates: { '1h': 0.8, '6h': 0.4 } },
+  };
+}
+
+function createSyntheticReleaseTelemetryExportBundle() {
+  return resolveReleaseTelemetryExportProducerInput({
+    generatedAt: '2026-04-08T10:00:00Z',
+    sourceKind: 'observability-control-plane',
+    sourceProvenance: 'release-governance-fallback',
+    freshnessMinutes: 5,
+    gatewayPrometheusText: createSyntheticPrometheusHttpCounterSamples({
+      service: 'gateway-service',
+      healthyCount: 9997,
+      unhealthyCount: 3,
+    }),
+    adminPrometheusText: createSyntheticPrometheusHttpCounterSamples({
+      service: 'admin-api-service',
+      healthyCount: 4997,
+      unhealthyCount: 3,
+    }),
+    portalPrometheusText: createSyntheticPrometheusHttpCounterSamples({
+      service: 'portal-api-service',
+      healthyCount: 9993,
+      unhealthyCount: 7,
+    }),
+    supplementalTargetsJson: JSON.stringify({
+      targets: createSyntheticTelemetrySupplementalTargets(),
+    }),
+  }).payload;
+}
+
+function createSyntheticReleaseTelemetrySnapshot() {
+  return deriveReleaseTelemetrySnapshotFromExport({
+    exportBundle: createSyntheticReleaseTelemetryExportBundle(),
+  });
+}
+
+function createSyntheticReleaseWindowSnapshotArtifact() {
+  return resolveReleaseWindowSnapshotProducerInput({
+    snapshotJson: JSON.stringify({
+      generatedAt: '2026-04-08T12:00:00Z',
+      source: {
+        kind: 'release-window-snapshot-fixture',
+        provenance: 'release-governance-fallback',
+      },
+      snapshot: {
+        latestReleaseTag: 'release-2026-03-28-8',
+        commitsSinceLatestRelease: 16,
+        workingTreeEntryCount: 631,
+        hasReleaseBaseline: true,
+      },
+    }),
+  }).artifact;
+}
+
+function createSyntheticReleaseSyncAuditArtifact() {
+  return resolveReleaseSyncAuditProducerInput({
+    auditJson: JSON.stringify({
+      generatedAt: '2026-04-08T13:00:00Z',
+      source: {
+        kind: 'release-sync-audit-fixture',
+        provenance: 'release-governance-fallback',
+      },
+      summary: {
+        releasable: true,
+        reports: [
+          {
+            id: 'sdkwork-api-router',
+            targetDir: rootDir,
+            expectedGitRoot: rootDir,
+            topLevel: rootDir,
+            remoteUrl: 'https://github.com/Sdkwork-Cloud/sdkwork-api-router.git',
+            localHead: 'abc123',
+            remoteHead: 'abc123',
+            expectedRef: 'main',
+            branch: 'main',
+            upstream: 'origin/main',
+            ahead: 0,
+            behind: 0,
+            isDirty: false,
+            reasons: [],
+            releasable: true,
+          },
+        ],
+      },
+    }),
+  }).artifact;
+}
+
+function createSyntheticUnixInstalledRuntimeSmokeFallback() {
+  const options = createUnixInstalledRuntimeSmokeOptions({
+    repoRoot: rootDir,
+    platform: 'linux',
+    arch: 'x64',
+    target: 'x86_64-unknown-linux-gnu',
+    runtimeHome: 'artifacts/release-smoke/linux-x64',
+    evidencePath: 'artifacts/release-governance/unix-installed-runtime-smoke-linux-x64.json',
+  });
+  const plan = createUnixInstalledRuntimeSmokePlan({
+    repoRoot: rootDir,
+    ...options,
+    ports: {
+      web: 19483,
+      gateway: 19480,
+      admin: 19481,
+      portal: 19482,
+    },
+  });
+  const evidence = createUnixInstalledRuntimeSmokeEvidence({
+    repoRoot: rootDir,
+    plan,
+    ok: true,
+  });
+
+  return {
+    options,
+    plan,
+    evidence,
+  };
+}
+
+function createSyntheticWindowsInstalledRuntimeSmokeFallback() {
+  const options = createWindowsInstalledRuntimeSmokeOptions({
+    repoRoot: rootDir,
+    platform: 'windows',
+    arch: 'x64',
+    target: 'x86_64-pc-windows-msvc',
+    runtimeHome: 'artifacts/release-smoke/windows-x64',
+    evidencePath: 'artifacts/release-governance/windows-installed-runtime-smoke-windows-x64.json',
+  });
+  const plan = createWindowsInstalledRuntimeSmokePlan({
+    repoRoot: rootDir,
+    ...options,
+    ports: {
+      web: 29483,
+      gateway: 29480,
+      admin: 29481,
+      portal: 29482,
+    },
+  });
+  const evidence = createWindowsInstalledRuntimeSmokeEvidence({
+    repoRoot: rootDir,
+    plan,
+    ok: true,
+  });
+
+  return {
+    options,
+    plan,
+    evidence,
+  };
+}
 
 function materializeLiveSloGovernanceEvidence({
   env = process.env,
@@ -105,8 +333,13 @@ export function resolveNodeRunner({
 
 export function listReleaseGovernanceCheckPlans({
   nodeExecutable = process.execPath,
+  profile = 'release',
 } = {}) {
-  return [
+  if (!['release', 'preflight'].includes(profile)) {
+    throw new Error(`unsupported release governance profile: ${profile}`);
+  }
+
+  const plans = [
     {
       id: 'release-sync-audit-test',
       command: nodeExecutable,
@@ -126,6 +359,15 @@ export function listReleaseGovernanceCheckPlans({
       ],
     },
     {
+      id: 'release-governance-workflow-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release-governance-workflow.test.mjs',
+      ],
+    },
+    {
       id: 'release-attestation-verify-test',
       command: nodeExecutable,
       args: [
@@ -141,6 +383,15 @@ export function listReleaseGovernanceCheckPlans({
         '--test',
         '--experimental-test-isolation=none',
         'scripts/release/tests/release-observability-contracts.test.mjs',
+      ],
+    },
+    {
+      id: 'release-slo-governance-contracts-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/release-slo-governance-contracts.test.mjs',
       ],
     },
     {
@@ -171,6 +422,33 @@ export function listReleaseGovernanceCheckPlans({
       ],
     },
     {
+      id: 'release-unix-installed-runtime-smoke-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/run-unix-installed-runtime-smoke.test.mjs',
+      ],
+    },
+    {
+      id: 'release-windows-installed-runtime-smoke-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/run-windows-installed-runtime-smoke.test.mjs',
+      ],
+    },
+    {
+      id: 'release-materialize-external-deps-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-external-deps.test.mjs',
+      ],
+    },
+    {
       id: 'release-window-snapshot-test',
       command: nodeExecutable,
       args: [
@@ -180,12 +458,76 @@ export function listReleaseGovernanceCheckPlans({
       ],
     },
     {
+      id: 'release-window-snapshot-materializer-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-release-window-snapshot.test.mjs',
+      ],
+    },
+    {
+      id: 'release-sync-audit-materializer-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-release-sync-audit.test.mjs',
+      ],
+    },
+    {
+      id: 'release-governance-bundle-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-release-governance-bundle.test.mjs',
+      ],
+    },
+    {
+      id: 'restore-release-governance-latest-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/restore-release-governance-latest.test.mjs',
+      ],
+    },
+    {
+      id: 'release-telemetry-export-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-release-telemetry-export.test.mjs',
+      ],
+    },
+    {
+      id: 'release-telemetry-snapshot-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-release-telemetry-snapshot.test.mjs',
+      ],
+    },
+    {
+      id: 'release-slo-evidence-materializer-test',
+      command: nodeExecutable,
+      args: [
+        '--test',
+        '--experimental-test-isolation=none',
+        'scripts/release/tests/materialize-slo-governance-evidence.test.mjs',
+      ],
+    },
+    {
       id: 'release-window-snapshot',
       command: nodeExecutable,
       args: [
         'scripts/release/compute-release-window-snapshot.mjs',
         '--format',
         'json',
+        '--live',
       ],
     },
     {
@@ -195,9 +537,16 @@ export function listReleaseGovernanceCheckPlans({
         'scripts/release/verify-release-sync.mjs',
         '--format',
         'json',
+        '--live',
       ],
     },
   ];
+
+  if (profile === 'preflight') {
+    return plans.filter((plan) => !preflightExcludedPlanIds.has(plan.id));
+  }
+
+  return plans;
 }
 
 function truncateText(value, maxLength = 4000) {
@@ -316,6 +665,21 @@ async function runFallbackReleaseGovernanceCheck({
     };
   }
 
+  if (plan.id === 'release-governance-workflow-test') {
+    await assertReleaseGovernanceWorkflowContracts({
+      repoRoot: rootDir,
+    });
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
   if (plan.id === 'release-observability-test') {
     await assertObservabilityContracts({
       repoRoot: rootDir,
@@ -348,6 +712,98 @@ async function runFallbackReleaseGovernanceCheck({
 
   if (plan.id === 'release-runtime-tooling-test') {
     await assertRuntimeToolingContracts({
+      repoRoot: rootDir,
+    });
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-unix-installed-runtime-smoke-test') {
+    const { plan: smokePlan, evidence } = createSyntheticUnixInstalledRuntimeSmokeFallback();
+
+    if (evidence.platform !== 'linux' || evidence.target !== 'x86_64-unknown-linux-gnu') {
+      throw new Error('unix installed runtime smoke fallback must preserve the linux release target');
+    }
+
+    if (!Array.isArray(smokePlan.healthUrls) || smokePlan.healthUrls.length !== 3) {
+      throw new Error('unix installed runtime smoke fallback must expose three health probe urls');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-windows-installed-runtime-smoke-test') {
+    const { plan: smokePlan, evidence } = createSyntheticWindowsInstalledRuntimeSmokeFallback();
+
+    if (evidence.platform !== 'windows' || evidence.target !== 'x86_64-pc-windows-msvc') {
+      throw new Error('windows installed runtime smoke fallback must preserve the windows release target');
+    }
+
+    if (!Array.isArray(smokePlan.healthUrls) || smokePlan.healthUrls.length !== 3) {
+      throw new Error('windows installed runtime smoke fallback must expose three health probe urls');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-materialize-external-deps-test') {
+    const specs = listExternalReleaseDependencySpecs();
+    if (!Array.isArray(specs) || specs.length === 0) {
+      throw new Error('external release dependency specs must be declared');
+    }
+
+    const clonePlan = buildExternalReleaseClonePlan({
+      spec: specs[0],
+      env,
+    });
+    if (!clonePlan || clonePlan.command !== 'git' || !Array.isArray(clonePlan.args)) {
+      throw new Error('external release dependency clone plans must remain git-based');
+    }
+
+    const coverage = auditExternalReleaseDependencyCoverage();
+    if (coverage.covered !== true) {
+      const uncoveredDetails = (coverage.uncoveredReferences ?? [])
+        .map((reference) => `${reference.sourceFile}:${reference.field}:${reference.name}`)
+        .join(', ');
+      throw new Error(`external release dependency coverage is incomplete: ${uncoveredDetails}`);
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-slo-governance-contracts-test') {
+    await assertSloGovernanceContracts({
       repoRoot: rootDir,
     });
     return {
@@ -404,6 +860,177 @@ async function runFallbackReleaseGovernanceCheck({
     await assertReleaseWindowSnapshotContracts({
       repoRoot: rootDir,
     });
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-window-snapshot-materializer-test') {
+    const artifact = createSyntheticReleaseWindowSnapshotArtifact();
+    const validation = validateReleaseWindowSnapshotArtifact(artifact);
+
+    if (validation.sourceKind !== 'release-window-snapshot-fixture') {
+      throw new Error('release window snapshot materializer fallback must preserve the governed source kind');
+    }
+
+    if (artifact.snapshot.latestReleaseTag !== 'release-2026-03-28-8') {
+      throw new Error('release window snapshot materializer fallback must preserve the governed release tag');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-sync-audit-materializer-test') {
+    const artifact = createSyntheticReleaseSyncAuditArtifact();
+    validateReleaseSyncAuditArtifact(artifact);
+
+    if (String(artifact.source?.kind ?? '').trim() !== 'release-sync-audit-fixture') {
+      throw new Error('release sync audit materializer fallback must preserve the governed source kind');
+    }
+
+    if (artifact.summary.releasable !== true) {
+      throw new Error('release sync audit materializer fallback must preserve the releasable summary');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-governance-bundle-test') {
+    const specs = listReleaseGovernanceBundleArtifactSpecs({
+      repoRoot: rootDir,
+    });
+    if (!Array.isArray(specs) || specs.length !== 5) {
+      throw new Error('release governance bundle specs must expose five governed artifacts');
+    }
+
+    const manifest = createReleaseGovernanceBundleManifest({
+      generatedAt: '2026-04-15T00:00:00.000Z',
+      artifacts: specs.map((spec) => ({
+        id: spec.id,
+        relativePath: spec.relativePath,
+        sourceRelativePath: spec.relativePath,
+      })),
+    });
+    if (manifest.bundleEntryCount !== specs.length) {
+      throw new Error('release governance bundle manifest must track every governed artifact');
+    }
+    if (!/restore-release-governance-latest\.mjs/.test(String(manifest.restore?.command ?? ''))) {
+      throw new Error('release governance bundle manifest must expose the restore operator command');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'restore-release-governance-latest-test') {
+    const specs = listReleaseGovernanceLatestArtifactSpecs();
+    if (!Array.isArray(specs) || specs.length !== 5) {
+      throw new Error('restore release governance helper must expose five governed artifact specs');
+    }
+
+    const uniquePortablePaths = new Set(specs.map((spec) => spec.portableRelativePath));
+    if (uniquePortablePaths.size !== specs.length) {
+      throw new Error('restore release governance helper must expose unique artifact restore paths');
+    }
+
+    if (specs.some((spec) => !spec.id || !spec.optionKey || !spec.fileName)) {
+      throw new Error('restore release governance helper specs must remain fully described');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-telemetry-export-test') {
+    const exportBundle = createSyntheticReleaseTelemetryExportBundle();
+    validateReleaseTelemetryExportShape({
+      exportBundle,
+    });
+
+    if (String(exportBundle.source?.kind ?? '').trim() !== 'observability-control-plane') {
+      throw new Error('release telemetry export fallback must keep the governed source kind');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-telemetry-snapshot-test') {
+    const snapshot = createSyntheticReleaseTelemetrySnapshot();
+    const validation = validateReleaseTelemetrySnapshotShape({
+      snapshot,
+    });
+
+    if (validation.snapshotId !== 'release-telemetry-snapshot-v1') {
+      throw new Error('release telemetry snapshot fallback must preserve the governed snapshot id');
+    }
+
+    return {
+      id: plan.id,
+      ok: true,
+      status: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: '',
+      mode: 'fallback',
+    };
+  }
+
+  if (plan.id === 'release-slo-evidence-materializer-test') {
+    const evidence = deriveSloGovernanceEvidenceFromReleaseTelemetrySnapshot({
+      snapshot: createSyntheticReleaseTelemetrySnapshot(),
+    });
+    const validation = validateSloGovernanceEvidenceShape({
+      evidence,
+    });
+
+    if (validation.baselineId !== 'release-slo-governance-baseline-2026-04-08') {
+      throw new Error('release slo evidence fallback must preserve the governed baseline id');
+    }
+
     return {
       id: plan.id,
       ok: true,
@@ -533,13 +1160,15 @@ export async function runReleaseGovernanceCheckPlan({
 }
 
 export async function runReleaseGovernanceChecks({
-  plans = listReleaseGovernanceCheckPlans(),
+  plans,
+  profile = 'release',
   env = process.env,
   spawnSyncImpl = spawnSync,
   fallbackSpawnSyncImpl = spawnSync,
 } = {}) {
+  const effectivePlans = plans ?? listReleaseGovernanceCheckPlans({ profile });
   const results = [];
-  for (const plan of plans) {
+  for (const plan of effectivePlans) {
     results.push(await runReleaseGovernanceCheckPlan({
       plan,
       env,
@@ -560,13 +1189,20 @@ export async function runReleaseGovernanceChecks({
   };
 }
 
-function parseArgs(argv = process.argv.slice(2)) {
+export function parseArgs(argv = process.argv.slice(2)) {
   let format = 'text';
+  let profile = 'release';
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === '--format') {
       format = String(argv[index + 1] ?? '').trim();
+      index += 1;
+      continue;
+    }
+
+    if (token === '--profile') {
+      profile = String(argv[index + 1] ?? '').trim();
       index += 1;
       continue;
     }
@@ -578,8 +1214,13 @@ function parseArgs(argv = process.argv.slice(2)) {
     throw new Error(`unsupported format: ${format}`);
   }
 
+  if (!['release', 'preflight'].includes(profile)) {
+    throw new Error(`unsupported profile: ${profile}`);
+  }
+
   return {
     format,
+    profile,
   };
 }
 
@@ -605,8 +1246,8 @@ function printTextReport(summary) {
 }
 
 function main() {
-  const { format } = parseArgs();
-  return runReleaseGovernanceChecks().then((summary) => {
+  const { format, profile } = parseArgs();
+  return runReleaseGovernanceChecks({ profile }).then((summary) => {
     if (format === 'json') {
       console.log(JSON.stringify(summary, null, 2));
     } else {

@@ -12,8 +12,8 @@ use sdkwork_api_domain_catalog::{
     normalize_provider_extension_id, normalize_provider_protocol_kind,
     CatalogPublicationLifecycleAction, CatalogPublicationLifecycleAuditOutcome,
     CatalogPublicationLifecycleAuditRecord, Channel, ChannelModelRecord, ModelCapability,
-    ModelCatalogEntry, ModelPriceRecord, ModelPriceTier, ProviderChannelBinding,
-    ProviderAccountRecord, ProviderModelRecord, ProxyProvider,
+    ModelCatalogEntry, ModelPriceRecord, ModelPriceTier, ProviderAccountRecord,
+    ProviderChannelBinding, ProviderModelRecord, ProxyProvider,
 };
 use sdkwork_api_domain_commerce::{
     CommerceOrderRecord, CommercePaymentAttemptRecord, CommercePaymentEventProcessingStatus,
@@ -32,13 +32,12 @@ use sdkwork_api_domain_jobs::{
 };
 use sdkwork_api_domain_marketing::{
     CampaignBudgetLifecycleAuditRecord, CampaignBudgetRecord, CampaignBudgetStatus,
-    CouponCodeLifecycleAuditRecord, CouponCodeRecord, CouponCodeStatus,
-    CouponDistributionKind, CouponRedemptionRecord, CouponRedemptionStatus,
-    CouponReservationRecord, CouponReservationStatus, CouponRollbackRecord, CouponRollbackStatus,
-    CouponRollbackType, CouponTemplateLifecycleAuditRecord, CouponTemplateRecord,
-    CouponTemplateStatus, MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord,
-    MarketingCampaignStatus, MarketingOutboxEventRecord, MarketingOutboxEventStatus,
-    MarketingSubjectScope,
+    CouponCodeLifecycleAuditRecord, CouponCodeRecord, CouponCodeStatus, CouponDistributionKind,
+    CouponRedemptionRecord, CouponRedemptionStatus, CouponReservationRecord,
+    CouponReservationStatus, CouponRollbackRecord, CouponRollbackStatus, CouponRollbackType,
+    CouponTemplateLifecycleAuditRecord, CouponTemplateRecord, CouponTemplateStatus,
+    MarketingCampaignLifecycleAuditRecord, MarketingCampaignRecord, MarketingCampaignStatus,
+    MarketingOutboxEventRecord, MarketingOutboxEventStatus, MarketingSubjectScope,
 };
 use sdkwork_api_domain_payment::{
     FinanceDirection, FinanceEntryCode, FinanceJournalEntryRecord, FinanceJournalLineRecord,
@@ -70,10 +69,10 @@ use sdkwork_api_storage_core::{
     AtomicCouponReleaseResult, AtomicCouponReservationCommand, AtomicCouponReservationResult,
     AtomicCouponRollbackCommand, AtomicCouponRollbackCompensationCommand,
     AtomicCouponRollbackCompensationResult, AtomicCouponRollbackResult,
-    ExtensionRuntimeRolloutParticipantRecord, ExtensionRuntimeRolloutRecord,
-    IdentityKernelStore, MarketingKernelTransaction, MarketingKernelTransactionExecutor,
-    MarketingStore, PaymentKernelStore, ServiceRuntimeNodeRecord,
-    StandaloneConfigRolloutParticipantRecord, StandaloneConfigRolloutRecord, StorageDialect,
+    ExtensionRuntimeRolloutParticipantRecord, ExtensionRuntimeRolloutRecord, IdentityKernelStore,
+    MarketingKernelTransaction, MarketingKernelTransactionExecutor, MarketingStore,
+    PaymentKernelStore, ServiceRuntimeNodeRecord, StandaloneConfigRolloutParticipantRecord,
+    StandaloneConfigRolloutRecord, StorageDialect,
 };
 use serde_json::Value;
 use sqlx::{
@@ -128,6 +127,7 @@ pub(crate) use postgres_migration_seed::seed_postgres_builtin_channels;
 pub(crate) use postgres_support::*;
 
 pub use migrations::run_migrations;
+pub use postgres_migration_payment_schema::payment_migration_statements;
 
 pub fn dialect_name() -> &'static str {
     "postgres"

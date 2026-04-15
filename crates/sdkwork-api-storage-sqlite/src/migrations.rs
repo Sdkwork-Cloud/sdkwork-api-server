@@ -13,8 +13,8 @@ pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     apply_sqlite_payment_schema(&pool).await?;
     apply_sqlite_commerce_jobs_schema(&pool).await?;
     apply_sqlite_catalog_gateway_schema(&pool).await?;
+    apply_sqlite_runtime_schema(&pool).await?;
     apply_sqlite_catalog_gateway_compatibility(&pool).await?;
     seed_sqlite_builtin_channels(&pool).await?;
-    apply_sqlite_runtime_schema(&pool).await?;
     Ok(pool)
 }

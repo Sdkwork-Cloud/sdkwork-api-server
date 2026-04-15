@@ -205,6 +205,75 @@ export function frontendInstallRequired(options = {}) {
   return frontendInstallStatus(options) !== 'ready';
 }
 
+export function strictFrontendInstallsEnabled(env = process.env) {
+  const value = String(env.SDKWORK_STRICT_FRONTEND_INSTALLS ?? '').trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
+export function ensureFrontendDependenciesReady({
+  appRoot,
+  requiredPackages = [],
+  requiredBinCommands = [],
+  verifyInstalled = null,
+  platform = process.platform,
+  env = process.env,
+  execPath = process.execPath,
+  installStepArgs = null,
+  spawnInstall = spawnSync,
+} = {}) {
+  if (!appRoot) {
+    throw new Error('appRoot is required');
+  }
+
+  const installStatus = frontendInstallStatus({
+    appRoot,
+    requiredPackages,
+    requiredBinCommands,
+    verifyInstalled,
+    platform,
+  });
+
+  if (installStatus === 'ready') {
+    return installStatus;
+  }
+
+  if (strictFrontendInstallsEnabled(env)) {
+    throw new Error(
+      `strict frontend install mode requires a prior frozen install step for ${appRoot}; current frontend install status is ${installStatus}`,
+    );
+  }
+
+  const stepArgs = Array.isArray(installStepArgs) && installStepArgs.length > 0
+    ? installStepArgs
+    : ['--dir', appRoot, 'install'];
+  const installProcess = pnpmProcessSpec(stepArgs, {
+    platform,
+    execPath,
+  });
+  const result = spawnInstall(
+    installProcess.command,
+    installProcess.args,
+    {
+      ...pnpmSpawnOptions({
+        platform,
+        env,
+      }),
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+    },
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if ((result.status ?? 1) !== 0) {
+    throw new Error(`pnpm install exited with code ${result.status ?? 1} for ${appRoot}`);
+  }
+
+  return installStatus;
+}
+
 export function frontendDistReady(distDir = '') {
   if (!distDir || !existsSync(distDir)) {
     return false;

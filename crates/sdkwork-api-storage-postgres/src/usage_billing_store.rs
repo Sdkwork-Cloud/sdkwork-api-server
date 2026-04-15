@@ -61,8 +61,7 @@ impl PostgresAdminStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(
                 |(
                     project_id,
@@ -130,8 +129,7 @@ impl PostgresAdminStore {
         .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(
                 |(
                     project_id,

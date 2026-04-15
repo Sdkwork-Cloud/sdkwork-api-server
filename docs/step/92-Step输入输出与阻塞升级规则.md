@@ -86,7 +86,7 @@
 
 对 `11-13` 而言，以下情况默认视为 `B3`：
 
-- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase`、`sdkwork-im-sdk` 任一 sibling SDK 本地与远端提交、Tag 或计划发布引用不一致
+- `sdkwork-core`、`sdkwork-ui`、`sdkwork-appbase` 与 `sdkwork-craw-chat-sdk`（发布 Git 根为 `apps/craw-chat`）任一 sibling SDK 本地与远端提交、Tag 或计划发布引用不一致
 - Release 产物仍引用本地 sibling 相对路径依赖
 - `/docs/release` 不完整且无法回溯到最近一次成功发布基线
 - 无法确认未成功发布版本的变更是否已被并入当前 release 说明

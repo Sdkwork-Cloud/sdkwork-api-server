@@ -8,6 +8,10 @@ pub(crate) async fn responses_handler(
     request_context: StatelessGatewayRequest,
     ExtractJson(request): ExtractJson<CreateResponseRequest>,
 ) -> Response {
+    if request.model.trim().is_empty() {
+        return invalid_request_openai_response("Response model is required.", "invalid_model");
+    }
+
     if request.stream.unwrap_or(false) {
         match relay_stateless_stream_request(
             &request_context,

@@ -1,6 +1,6 @@
 ﻿use anyhow::{anyhow, Result};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use hmac::{Hmac, Mac};
@@ -17,6 +17,7 @@ use sdkwork_api_domain_identity::{
 };
 use sdkwork_api_domain_tenant::{Project, Tenant};
 use sdkwork_api_storage_core::{AdminStore, IdentityKernelStore};
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sha2_010::Sha256 as JwtSha256;

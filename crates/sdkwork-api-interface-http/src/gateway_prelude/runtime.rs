@@ -23,10 +23,7 @@ pub(crate) use sdkwork_api_domain_rate_limit::RateLimitCheckResult;
 pub(crate) use sdkwork_api_observability::{
     observe_http_metrics, observe_http_tracing, HttpMetricsRegistry,
 };
-pub(crate) use sdkwork_api_openapi::{
-    build_openapi_document, extract_routes_from_function, render_docs_html, HttpMethod,
-    OpenApiServiceSpec, RouteEntry,
-};
+pub(crate) use sdkwork_api_openapi::{render_docs_html, OpenApiServiceSpec};
 pub(crate) use sdkwork_api_provider_core::{
     ProviderRequest, ProviderRequestOptions, ProviderStreamOutput,
 };

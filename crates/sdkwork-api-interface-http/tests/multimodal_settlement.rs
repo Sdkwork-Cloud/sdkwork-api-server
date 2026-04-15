@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use axum::routing::{get, post};
@@ -153,7 +155,7 @@ async fn run_pending_video_mutation_reconcile_case(case: VideoMutationCase) {
     let pool = memory_pool().await;
     let seeded = seed_dual_scoped_gateway_account(&pool, 7801, 8801, 1.0).await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     configure_video_provider_with_custom_price(
         admin_app.clone(),
         &admin_token,
@@ -169,7 +171,7 @@ async fn run_pending_video_mutation_reconcile_case(case: VideoMutationCase) {
 
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool.clone());
     let store = SqliteAdminStore::new(pool);
-    let estimated_charge = 0.05 + (60.0 / 60.0 * 0.30);
+    let estimated_charge = 0.05 + 0.30;
     let reconciled_charge = 0.05 + (24.0 / 60.0 * 0.30);
 
     let create_response = gateway_app

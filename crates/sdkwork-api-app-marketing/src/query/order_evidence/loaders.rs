@@ -4,10 +4,7 @@ use super::coupon::{
     load_coupon_template,
 };
 use super::types::MarketingOrderEvidenceView;
-use anyhow::{Context, Result};
-use sdkwork_api_domain_marketing::{
-    CouponCodeRecord, CouponRedemptionRecord, CouponReservationRecord, CouponTemplateRecord,
-};
+use anyhow::Result;
 use sdkwork_api_storage_core::AdminStore;
 
 pub async fn load_marketing_order_evidence(

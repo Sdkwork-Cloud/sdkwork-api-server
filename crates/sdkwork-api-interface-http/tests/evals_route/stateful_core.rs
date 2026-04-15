@@ -32,7 +32,7 @@ async fn stateful_evals_route_relays_to_openai_compatible_provider() {
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -370,7 +370,7 @@ async fn stateful_eval_run_retrieve_route_returns_not_found_without_usage() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/evals/eval_1/runs/run_missing")
+                .uri("/v1/evals/eval_local_1/runs/run_local_1")
                 .header("authorization", format!("Bearer {}", ctx.api_key))
                 .body(Body::empty())
                 .unwrap(),
@@ -396,7 +396,7 @@ async fn stateful_eval_run_delete_route_returns_not_found_without_usage() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/v1/evals/eval_1/runs/run_missing")
+                .uri("/v1/evals/eval_local_1/runs/run_local_1")
                 .header("authorization", format!("Bearer {}", ctx.api_key))
                 .body(Body::empty())
                 .unwrap(),
@@ -422,7 +422,7 @@ async fn stateful_eval_run_cancel_route_returns_not_found_without_usage() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/v1/evals/eval_1/runs/run_missing/cancel")
+                .uri("/v1/evals/eval_local_1/runs/run_local_1/cancel")
                 .header("authorization", format!("Bearer {}", ctx.api_key))
                 .body(Body::empty())
                 .unwrap(),
@@ -448,7 +448,7 @@ async fn stateful_eval_run_output_items_list_route_returns_not_found_without_usa
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/evals/eval_1/runs/run_missing/output_items")
+                .uri("/v1/evals/eval_local_1/runs/run_missing/output_items")
                 .header("authorization", format!("Bearer {}", ctx.api_key))
                 .body(Body::empty())
                 .unwrap(),
@@ -474,7 +474,7 @@ async fn stateful_eval_run_output_item_retrieve_route_returns_not_found_without_
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/v1/evals/eval_1/runs/run_1/output_items/output_item_missing")
+                .uri("/v1/evals/eval_local_1/runs/run_local_1/output_items/output_item_local_1")
                 .header("authorization", format!("Bearer {}", ctx.api_key))
                 .body(Body::empty())
                 .unwrap(),

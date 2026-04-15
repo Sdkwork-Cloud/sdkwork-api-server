@@ -10,6 +10,7 @@ use sdkwork_api_domain_marketing::{
 };
 use sdkwork_api_storage_core::AdminStore;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn ensure_marketing_campaign_lifecycle_allowed(
     store: &dyn AdminStore,
     campaign: &MarketingCampaignRecord,

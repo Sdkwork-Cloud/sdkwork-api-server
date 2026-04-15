@@ -1,6 +1,6 @@
-﻿use super::*;
+use super::*;
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/images/generations",
         tag = "images",
@@ -13,9 +13,9 @@
             (status = 500, description = "Gateway failed to create the image generation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn image_generations() {}
+pub(crate) async fn image_generations() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/images/edits",
         tag = "images",
@@ -32,9 +32,9 @@
             (status = 500, description = "Gateway failed to edit the image.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn image_edits() {}
+pub(crate) async fn image_edits() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/images/variations",
         tag = "images",
@@ -51,9 +51,9 @@
             (status = 500, description = "Gateway failed to create the image variation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn image_variations() {}
+pub(crate) async fn image_variations() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/audio/transcriptions",
         tag = "audio",
@@ -66,9 +66,9 @@
             (status = 500, description = "Gateway failed to create the transcription.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn transcriptions() {}
+pub(crate) async fn transcriptions() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/audio/translations",
         tag = "audio",
@@ -81,9 +81,9 @@
             (status = 500, description = "Gateway failed to create the translation.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn translations() {}
+pub(crate) async fn translations() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/audio/speech",
         tag = "audio",
@@ -96,9 +96,9 @@
             (status = 500, description = "Gateway failed to synthesize speech.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn audio_speech() {}
+pub(crate) async fn audio_speech() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         get,
         path = "/v1/audio/voices",
         tag = "audio",
@@ -109,9 +109,9 @@
             (status = 500, description = "Gateway failed to load the voice catalog.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn audio_voices() {}
+pub(crate) async fn audio_voices() {}
 
-    #[utoipa::path(
+#[utoipa::path(
         post,
         path = "/v1/audio/voice_consents",
         tag = "audio",
@@ -124,5 +124,4 @@
             (status = 500, description = "Gateway failed to create the audio voice consent.", body = OpenAiErrorResponse)
         )
     )]
-    pub(crate) async fn audio_voice_consents() {}
-
+pub(crate) async fn audio_voice_consents() {}

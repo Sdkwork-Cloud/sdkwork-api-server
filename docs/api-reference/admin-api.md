@@ -10,14 +10,16 @@ The admin service exposes the operator control plane under `/admin/*`.
   - `GET /admin/auth/me`
   - `POST /admin/auth/change-password`
 
+Use an operator identity provisioned by the active bootstrap profile or your runtime store. For local `dev` bootstrap data, inspect `data/identities/dev.json` before logging in.
+
 Example login:
 
 ```bash
 curl -X POST http://127.0.0.1:8081/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email":"admin@sdkwork.local",
-    "password":"ChangeMe123!"
+    "email":"<admin-email>",
+    "password":"<admin-password>"
   }'
 ```
 

@@ -256,6 +256,32 @@ pub async fn relay_get_video_from_store(
     .await
 }
 
+pub async fn relay_get_video_from_store_with_provider_id(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    provider_id: &str,
+    video_id: &str,
+) -> Result<Option<Value>> {
+    let Some(provider) = store.find_provider(provider_id).await? else {
+        return Ok(None);
+    };
+    let Some(api_key) =
+        resolve_provider_secret_with_manager(store, secret_manager, tenant_id, &provider.id)
+            .await?
+    else {
+        return Ok(None);
+    };
+
+    execute_json_provider_request_for_provider(
+        store,
+        &provider,
+        &api_key,
+        ProviderRequest::VideosRetrieve(video_id),
+    )
+    .await
+}
+
 pub async fn relay_delete_video_from_store(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,

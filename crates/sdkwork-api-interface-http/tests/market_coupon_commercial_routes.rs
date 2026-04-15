@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use sdkwork_api_app_identity::{
@@ -403,10 +405,10 @@ async fn public_coupon_and_commercial_routes_expose_coupon_semantics_and_account
 
     let benefit_lot = AccountBenefitLotRecord::new(
         9901,
-        account.tenant_id.clone(),
-        account.organization_id.clone(),
+        account.tenant_id,
+        account.organization_id,
         account.account_id,
-        account.user_id.clone(),
+        account.user_id,
         AccountBenefitType::CashCredit,
     )
     .with_source_type(AccountBenefitSourceType::Order)

@@ -36,12 +36,21 @@ const EXTERNAL_RELEASE_DEPENDENCY_SPECS = Object.freeze([
     requiredPaths: Object.freeze(['package.json']),
   }),
   Object.freeze({
-    id: 'sdkwork-im-sdk',
-    repository: 'Sdkwork-Cloud/sdkwork-im-sdk',
-    envRefKey: 'SDKWORK_IM_SDK_GIT_REF',
+    id: 'sdkwork-craw-chat-sdk',
+    repository: 'Sdkwork-Cloud/craw-chat',
+    envRefKey: 'SDKWORK_CRAW_CHAT_SDK_GIT_REF',
     defaultRef: 'main',
-    targetDir: path.resolve(rootDir, '..', 'openchat', 'sdkwork-im-sdk'),
-    requiredPaths: Object.freeze(['README.md']),
+    targetDir: path.resolve(
+      rootDir,
+      '..',
+      'craw-chat',
+      'sdks',
+      'sdkwork-craw-chat-sdk',
+      'sdkwork-craw-chat-sdk-typescript',
+    ),
+    expectedGitRoot: path.resolve(rootDir, '..', 'craw-chat'),
+    cloneTargetDir: path.resolve(rootDir, '..', 'craw-chat'),
+    requiredPaths: Object.freeze(['package.json']),
   }),
 ]);
 
@@ -323,6 +332,165 @@ export function resolveExternalReleaseDependencyRef({
   return configuredRef.length > 0 ? configuredRef : String(spec?.defaultRef ?? 'main');
 }
 
+function resolveExternalReleaseCloneTargetDir(spec = {}) {
+  const explicitCloneTargetDir = String(spec.cloneTargetDir ?? '').trim();
+  if (explicitCloneTargetDir.length > 0) {
+    return path.resolve(explicitCloneTargetDir);
+  }
+
+  return path.resolve(String(spec.targetDir ?? ''));
+}
+
+function resolveExternalReleaseExpectedGitRoot(spec = {}) {
+  const explicitExpectedGitRoot = String(spec.expectedGitRoot ?? '').trim();
+  if (explicitExpectedGitRoot.length > 0) {
+    return path.resolve(explicitExpectedGitRoot);
+  }
+
+  return resolveExternalReleaseCloneTargetDir(spec);
+}
+
+function createExpectedExternalReleaseRemoteUrl(spec = {}) {
+  const explicitRemoteUrl = String(spec.expectedRemoteUrl ?? '').trim();
+  if (explicitRemoteUrl.length > 0) {
+    return explicitRemoteUrl;
+  }
+
+  const repository = String(spec.repository ?? '').trim();
+  return repository.length > 0 ? `https://github.com/${repository}.git` : '';
+}
+
+function normalizeGitHubRemoteUrlForCompare(value = '') {
+  const normalized = String(value ?? '').trim();
+  if (normalized.length === 0) {
+    return '';
+  }
+
+  const httpsMatch = normalized.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/iu);
+  if (httpsMatch) {
+    return `github.com/${httpsMatch[1].toLowerCase()}/${httpsMatch[2].toLowerCase()}`;
+  }
+
+  const sshMatch = normalized.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/iu);
+  if (sshMatch) {
+    return `github.com/${sshMatch[1].toLowerCase()}/${sshMatch[2].toLowerCase()}`;
+  }
+
+  const sshUrlMatch = normalized.match(/^ssh:\/\/git@github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/iu);
+  if (sshUrlMatch) {
+    return `github.com/${sshUrlMatch[1].toLowerCase()}/${sshUrlMatch[2].toLowerCase()}`;
+  }
+
+  return normalized;
+}
+
+function resolveGitRunner({
+  platform = process.platform,
+} = {}) {
+  if (platform === 'win32') {
+    return {
+      command: 'git.exe',
+      shell: false,
+    };
+  }
+
+  return {
+    command: 'git',
+    shell: false,
+  };
+}
+
+function runGitCommand({
+  cwd,
+  args,
+  spawnSyncImpl = spawnSync,
+} = {}) {
+  const runner = resolveGitRunner();
+  const result = spawnSyncImpl(runner.command, args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: 'pipe',
+    shell: runner.shell,
+  });
+
+  return {
+    ok: !result.error && (result.status ?? 1) === 0,
+    status: result.status ?? 1,
+    stdout: String(result.stdout ?? ''),
+    stderr: result.error ? String(result.error.message ?? '') : String(result.stderr ?? ''),
+    errorMessage: result.error ? String(result.error.message ?? '') : '',
+  };
+}
+
+export function auditExistingExternalReleaseDependency({
+  spec,
+  spawnSyncImpl = spawnSync,
+} = {}) {
+  const topLevelResult = runGitCommand({
+    cwd: spec.targetDir,
+    args: ['rev-parse', '--show-toplevel'],
+    spawnSyncImpl,
+  });
+  const remoteUrlResult = runGitCommand({
+    cwd: spec.targetDir,
+    args: ['remote', 'get-url', 'origin'],
+    spawnSyncImpl,
+  });
+
+  const topLevel = topLevelResult.ok ? topLevelResult.stdout.trim() : '';
+  const remoteUrl = remoteUrlResult.ok ? remoteUrlResult.stdout.trim() : '';
+  const expectedRemoteUrl = createExpectedExternalReleaseRemoteUrl(spec);
+  const expectedGitRoot = resolveExternalReleaseExpectedGitRoot(spec);
+  const reasons = [];
+
+  if (!topLevel || normalizePathForCompare(topLevel) !== normalizePathForCompare(expectedGitRoot)) {
+    reasons.push('not-standalone-root');
+  }
+
+  if (!remoteUrl) {
+    reasons.push('remote-url-unverifiable');
+  } else if (
+    expectedRemoteUrl
+    && normalizeGitHubRemoteUrlForCompare(remoteUrl) !== normalizeGitHubRemoteUrlForCompare(expectedRemoteUrl)
+  ) {
+    reasons.push('remote-url-mismatch');
+  }
+
+  return {
+    id: spec.id,
+    targetDir: spec.targetDir,
+    expectedGitRoot,
+    expectedRemoteUrl,
+    topLevel,
+    remoteUrl,
+    reasons,
+    ready: reasons.length === 0,
+  };
+}
+
+function assertGovernedExternalReleaseDependencyCheckout({
+  spec,
+  spawnSyncImpl = spawnSync,
+} = {}) {
+  const audit = auditExistingExternalReleaseDependency({
+    spec,
+    spawnSyncImpl,
+  });
+
+  if (audit.ready) {
+    return audit;
+  }
+
+  const detailLines = [
+    `External release dependency target is not a governed standalone checkout: ${spec.targetDir}`,
+    `Reasons: ${audit.reasons.join(', ')}`,
+    `Expected remote: ${audit.expectedRemoteUrl || 'unconfigured'}`,
+    `Observed top-level: ${audit.topLevel || 'unavailable'}`,
+    `Observed remote: ${audit.remoteUrl || 'unavailable'}`,
+  ];
+  throw new Error(detailLines.join('\n'));
+}
+
 export function buildExternalReleaseClonePlan({
   spec,
   env = process.env,
@@ -332,6 +500,7 @@ export function buildExternalReleaseClonePlan({
   }
 
   const ref = resolveExternalReleaseDependencyRef({ spec, env });
+  const cloneTargetDir = resolveExternalReleaseCloneTargetDir(spec);
   return {
     command: 'git',
     args: [
@@ -341,7 +510,7 @@ export function buildExternalReleaseClonePlan({
       '--branch',
       ref,
       `https://github.com/${spec.repository}.git`,
-      spec.targetDir,
+      cloneTargetDir,
     ],
     ref,
   };
@@ -392,8 +561,14 @@ export function materializeExternalReleaseDependency({
 } = {}) {
   const missingBefore = collectMissingRequiredPaths({ spec, exists });
   const ref = resolveExternalReleaseDependencyRef({ spec, env });
+  const cloneTargetDir = resolveExternalReleaseCloneTargetDir(spec);
 
   if (missingBefore.length === 0) {
+    assertGovernedExternalReleaseDependencyCheckout({
+      spec,
+      spawnSyncImpl,
+    });
+
     return {
       id: spec.id,
       repository: spec.repository,
@@ -403,13 +578,13 @@ export function materializeExternalReleaseDependency({
     };
   }
 
-  if (exists(spec.targetDir)) {
+  if (exists(cloneTargetDir)) {
     throw new Error(
-      `External release dependency target already exists but is incomplete: ${spec.targetDir}\nMissing: ${missingBefore.join(', ')}`,
+      `External release dependency target already exists but is incomplete: ${cloneTargetDir}\nRequired package path: ${spec.targetDir}\nMissing: ${missingBefore.join(', ')}`,
     );
   }
 
-  mkdir(path.dirname(spec.targetDir), { recursive: true });
+  mkdir(path.dirname(cloneTargetDir), { recursive: true });
 
   const plan = buildExternalReleaseClonePlan({ spec, env });
   runGitClonePlan({
@@ -423,6 +598,11 @@ export function materializeExternalReleaseDependency({
       `External release dependency is still incomplete after clone: ${spec.targetDir}\nMissing: ${missingAfter.join(', ')}`,
     );
   }
+
+  assertGovernedExternalReleaseDependencyCheckout({
+    spec,
+    spawnSyncImpl,
+  });
 
   return {
     id: spec.id,

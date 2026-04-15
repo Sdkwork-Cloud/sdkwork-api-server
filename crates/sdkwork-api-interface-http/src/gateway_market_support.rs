@@ -1,6 +1,6 @@
 use super::*;
 
-fn gateway_error_response(status: StatusCode, message: impl Into<String>) -> Response {
+pub(super) fn gateway_error_response(status: StatusCode, message: impl Into<String>) -> Response {
     (
         status,
         Json(GatewayApiErrorResponse {
@@ -12,22 +12,22 @@ fn gateway_error_response(status: StatusCode, message: impl Into<String>) -> Res
         .into_response()
 }
 
-fn clamp_gateway_benefit_lot_limit(limit: Option<usize>) -> usize {
+pub(super) fn clamp_gateway_benefit_lot_limit(limit: Option<usize>) -> usize {
     match limit {
         Some(limit) if limit > 0 => limit.min(200),
         _ => 100,
     }
 }
 
-fn gateway_not_implemented_response(message: impl Into<String>) -> Response {
+pub(super) fn gateway_not_implemented_response(message: impl Into<String>) -> Response {
     gateway_error_response(StatusCode::NOT_IMPLEMENTED, message)
 }
 
-fn gateway_internal_error_response(message: impl Into<String>) -> Response {
+pub(super) fn gateway_internal_error_response(message: impl Into<String>) -> Response {
     gateway_error_response(StatusCode::INTERNAL_SERVER_ERROR, message)
 }
 
-fn gateway_commerce_error_response(error: CommerceError) -> Response {
+pub(super) fn gateway_commerce_error_response(error: CommerceError) -> Response {
     let status = match error {
         CommerceError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         CommerceError::NotFound(_) => StatusCode::NOT_FOUND,
@@ -37,7 +37,7 @@ fn gateway_commerce_error_response(error: CommerceError) -> Response {
     gateway_error_response(status, error.to_string())
 }
 
-fn gateway_marketing_operation_response(error: MarketingOperationError) -> Response {
+pub(super) fn gateway_marketing_operation_response(error: MarketingOperationError) -> Response {
     match error {
         MarketingOperationError::InvalidInput(message) => {
             gateway_error_response(StatusCode::BAD_REQUEST, message)
@@ -57,12 +57,14 @@ fn gateway_marketing_operation_response(error: MarketingOperationError) -> Respo
     }
 }
 
-fn gateway_current_time_millis() -> Result<u64, Response> {
-    current_billing_timestamp_ms()
+pub(super) fn gateway_current_time_millis() -> Result<u64, Response> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
         .map_err(|_| gateway_internal_error_response("failed to read current timestamp"))
 }
 
-fn gateway_account_kernel_store(
+pub(super) fn gateway_account_kernel_store(
     state: &GatewayApiState,
 ) -> Result<&dyn AccountKernelStore, Response> {
     state.store.account_kernel_store().ok_or_else(|| {
@@ -72,7 +74,7 @@ fn gateway_account_kernel_store(
     })
 }
 
-async fn load_gateway_account_context(
+pub(super) async fn load_gateway_account_context(
     state: &GatewayApiState,
     request: &AuthenticatedGatewayRequest,
 ) -> Result<(AccountRecord, AccountBalanceSnapshot), Response> {
@@ -90,7 +92,7 @@ async fn load_gateway_account_context(
     Ok((account, balance))
 }
 
-async fn resolve_gateway_account_record(
+pub(super) async fn resolve_gateway_account_record(
     state: &GatewayApiState,
     request: &AuthenticatedGatewayRequest,
 ) -> Result<AccountRecord, Response> {
@@ -106,7 +108,7 @@ async fn resolve_gateway_account_record(
         })
 }
 
-fn gateway_coupon_validation_decision_response(
+pub(super) fn gateway_coupon_validation_decision_response(
     decision: CouponValidationDecision,
 ) -> GatewayCouponValidationDecisionResponse {
     GatewayCouponValidationDecisionResponse {
@@ -116,7 +118,7 @@ fn gateway_coupon_validation_decision_response(
     }
 }
 
-fn gateway_coupon_applicability_summary(
+pub(super) fn gateway_coupon_applicability_summary(
     template: &CouponTemplateRecord,
 ) -> GatewayCouponApplicabilitySummary {
     GatewayCouponApplicabilitySummary {
@@ -125,7 +127,9 @@ fn gateway_coupon_applicability_summary(
     }
 }
 
-fn gateway_coupon_effect_summary(template: &CouponTemplateRecord) -> GatewayCouponEffectSummary {
+pub(super) fn gateway_coupon_effect_summary(
+    template: &CouponTemplateRecord,
+) -> GatewayCouponEffectSummary {
     GatewayCouponEffectSummary {
         effect_kind: if template.benefit.grant_units.is_some() {
             GatewayCouponEffectKind::AccountEntitlement
@@ -138,7 +142,7 @@ fn gateway_coupon_effect_summary(template: &CouponTemplateRecord) -> GatewayCoup
     }
 }
 
-fn resolve_idempotency_key(
+pub(super) fn resolve_idempotency_key(
     headers: &HeaderMap,
     body_value: Option<&str>,
 ) -> Result<Option<String>, Response> {
@@ -163,7 +167,7 @@ fn resolve_idempotency_key(
     })
 }
 
-async fn gateway_marketing_subject_id(
+pub(super) async fn gateway_marketing_subject_id(
     state: &GatewayApiState,
     request: &AuthenticatedGatewayRequest,
     scope: MarketingSubjectScope,
@@ -185,7 +189,7 @@ async fn gateway_marketing_subject_id(
     }
 }
 
-async fn enforce_gateway_coupon_rate_limit(
+pub(super) async fn enforce_gateway_coupon_rate_limit(
     store: &dyn AdminStore,
     request: &AuthenticatedGatewayRequest,
     action: CouponRateLimitAction,
@@ -215,7 +219,7 @@ async fn enforce_gateway_coupon_rate_limit(
     }
 }
 
-fn parse_scope_order_id(scope_json: Option<&str>) -> Option<String> {
+pub(super) fn parse_scope_order_id(scope_json: Option<&str>) -> Option<String> {
     let scope_json = scope_json?.trim();
     if scope_json.is_empty() {
         return None;
@@ -229,7 +233,9 @@ fn parse_scope_order_id(scope_json: Option<&str>) -> Option<String> {
     }
 }
 
-fn gateway_benefit_lot_item(lot: AccountBenefitLotRecord) -> GatewayCommercialBenefitLotItem {
+pub(super) fn gateway_benefit_lot_item(
+    lot: AccountBenefitLotRecord,
+) -> GatewayCommercialBenefitLotItem {
     let scope_order_id = parse_scope_order_id(lot.scope_json.as_deref());
     GatewayCommercialBenefitLotItem {
         lot_id: lot.lot_id,

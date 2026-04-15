@@ -10,8 +10,20 @@ use tower::ServiceExt;
 
 mod support;
 
+async fn assert_openai_invalid_request(
+    response: axum::response::Response,
+    message: &str,
+    code: &str,
+) {
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let json = read_json(response).await;
+    assert_eq!(json["error"]["message"], message);
+    assert_eq!(json["error"]["type"], "invalid_request_error");
+    assert_eq!(json["error"]["code"], code);
+}
+
 #[tokio::test]
-async fn audio_voice_consents_route_returns_ok() {
+async fn audio_voice_consents_route_returns_invalid_request_without_consent_backend() {
     let app = sdkwork_api_interface_http::gateway_router();
     let response = app
         .oneshot(
@@ -27,9 +39,12 @@ async fn audio_voice_consents_route_returns_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let json = read_json(response).await;
-    assert_eq!(json["object"], "voice_consent");
+    assert_openai_invalid_request(
+        response,
+        "Local voice consent fallback is not supported without a consent backend.",
+        "invalid_audio_request",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -99,7 +114,7 @@ async fn stateful_audio_voice_consents_route_relays_to_openai_compatible_provide
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, "tenant-1", "project-1").await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 
@@ -197,7 +212,7 @@ async fn stateful_audio_voice_consents_create_usage_uses_created_consent_id_for_
 
     let pool = memory_pool().await;
     let admin_app = sdkwork_api_interface_admin::admin_router_with_pool(pool.clone());
-    let admin_token = support::issue_admin_token(admin_app.clone()).await;
+    let admin_token = support::issue_admin_token(&pool, admin_app.clone()).await;
     let api_key = support::issue_gateway_api_key(&pool, tenant_id, project_id).await;
     let gateway_app = sdkwork_api_interface_http::gateway_router_with_pool(pool);
 

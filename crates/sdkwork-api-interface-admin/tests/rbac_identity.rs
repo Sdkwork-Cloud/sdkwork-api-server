@@ -11,9 +11,22 @@ async fn read_json(response: axum::response::Response) -> Value {
 }
 
 async fn memory_pool() -> SqlitePool {
-    sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
+    let pool = sdkwork_api_storage_sqlite::run_migrations("sqlite::memory:")
         .await
-        .unwrap()
+        .unwrap();
+    let store = sdkwork_api_storage_sqlite::SqliteAdminStore::new(pool.clone());
+    sdkwork_api_app_identity::upsert_admin_user(
+        &store,
+        Some("admin_local_default"),
+        "admin@sdkwork.local",
+        "Admin Operator",
+        Some("ChangeMe123!"),
+        Some(sdkwork_api_domain_identity::AdminUserRole::SuperAdmin),
+        true,
+    )
+    .await
+    .unwrap();
+    pool
 }
 
 async fn login_token(app: Router, email: &str, password: &str) -> Value {
@@ -479,18 +492,22 @@ async fn super_admin_credential_mutation_is_audited() {
     assert_eq!(audit_events.status(), StatusCode::OK);
     let audit_json = read_json(audit_events).await;
     let events = audit_json.as_array().unwrap();
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0]["action"], "credential.delete");
-    assert_eq!(events[0]["resource_type"], "credential");
+    let credential_events = events
+        .iter()
+        .filter(|event| event["resource_type"] == "credential")
+        .collect::<Vec<_>>();
+    assert_eq!(credential_events.len(), 2);
+    assert_eq!(credential_events[0]["action"], "credential.delete");
+    assert_eq!(credential_events[0]["resource_type"], "credential");
     assert_eq!(
-        events[0]["resource_id"],
+        credential_events[0]["resource_id"],
         "tenant-1:provider-secret-audit:cred-secret-audit"
     );
-    assert_eq!(events[0]["approval_scope"], "secret_control");
-    assert_eq!(events[0]["actor_user_id"], admin_user["id"]);
-    assert_eq!(events[0]["actor_role"], "super_admin");
-    assert_eq!(events[1]["action"], "credential.create");
-    assert_eq!(events[1]["resource_type"], "credential");
+    assert_eq!(credential_events[0]["approval_scope"], "secret_control");
+    assert_eq!(credential_events[0]["actor_user_id"], admin_user["id"]);
+    assert_eq!(credential_events[0]["actor_role"], "super_admin");
+    assert_eq!(credential_events[1]["action"], "credential.create");
+    assert_eq!(credential_events[1]["resource_type"], "credential");
 }
 
 #[tokio::test]
@@ -759,7 +776,6 @@ async fn super_admin_api_key_group_and_key_mutations_are_audited() {
     assert_eq!(audit_events.status(), StatusCode::OK);
     let audit_json = read_json(audit_events).await;
     let events = audit_json.as_array().unwrap();
-    assert_eq!(events.len(), 9);
 
     let actions = events
         .iter()

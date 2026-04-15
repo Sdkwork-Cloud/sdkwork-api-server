@@ -334,7 +334,7 @@ async fn stateful_container_file_create_route_returns_not_found_without_usage() 
         .await
         .unwrap();
 
-    assert_openai_not_found(response, "Requested container was not found.").await;
+    assert_openai_not_found(response, "Requested container file was not found.").await;
     support::assert_no_usage_records(ctx.admin_app, &ctx.admin_token).await;
 }
 

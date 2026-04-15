@@ -442,7 +442,7 @@ async fn read_resp_line(stream: &mut TcpStream) -> Result<String> {
         }
         bytes.push(byte[0]);
     }
-    Ok(String::from_utf8(bytes).context("redis response line is not utf8")?)
+    String::from_utf8(bytes).context("redis response line is not utf8")
 }
 
 enum RespValue {

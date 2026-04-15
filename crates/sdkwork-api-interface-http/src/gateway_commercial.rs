@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use super::*;
 use anyhow::anyhow;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -21,8 +23,8 @@ static GATEWAY_COMMERCIAL_ID_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
 pub(crate) struct GatewayCommercialAdmission {
-    request_id: u64,
-    billing_settlement: BillingPolicyExecutionResult,
+    pub(crate) request_id: u64,
+    pub(crate) billing_settlement: BillingPolicyExecutionResult,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,35 +62,6 @@ fn quota_exceeded_response(project_id: &str, evaluation: &QuotaCheckResult) -> R
     (StatusCode::TOO_MANY_REQUESTS, Json(error)).into_response()
 }
 
-fn bad_gateway_openai_response(message: impl Into<String>) -> Response {
-    let mut error = OpenAiErrorResponse::new(message, "server_error");
-    error.error.code = Some("bad_gateway".to_owned());
-    (StatusCode::BAD_GATEWAY, Json(error)).into_response()
-}
-
-fn not_found_openai_response(message: impl Into<String>) -> Response {
-    let mut error = OpenAiErrorResponse::new(message, "invalid_request_error");
-    error.error.code = Some("not_found".to_owned());
-    (StatusCode::NOT_FOUND, Json(error)).into_response()
-}
-
-fn invalid_request_openai_response(
-    message: impl Into<String>,
-    code: impl Into<String>,
-) -> Response {
-    let mut error = OpenAiErrorResponse::new(message, "invalid_request_error");
-    error.error.code = Some(code.into());
-    (StatusCode::BAD_REQUEST, Json(error)).into_response()
-}
-
-fn local_gateway_error_response(error: anyhow::Error, not_found_message: &'static str) -> Response {
-    if error.to_string().to_ascii_lowercase().contains("not found") {
-        return not_found_openai_response(not_found_message);
-    }
-
-    bad_gateway_openai_response("failed to process local gateway fallback")
-}
-
 fn quota_exceeded_message(project_id: &str, evaluation: &QuotaCheckResult) -> String {
     match (evaluation.policy_id.as_deref(), evaluation.limit_units) {
         (Some(policy_id), Some(limit_units)) => format!(
@@ -106,7 +79,7 @@ fn quota_exceeded_message(project_id: &str, evaluation: &QuotaCheckResult) -> St
     }
 }
 
-fn next_gateway_commercial_record_id(now_ms: u64) -> u64 {
+pub(crate) fn next_gateway_commercial_record_id(now_ms: u64) -> u64 {
     let sequence = GATEWAY_COMMERCIAL_ID_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         & GATEWAY_COMMERCIAL_ID_SEQUENCE_MASK;
     compose_gateway_commercial_record_id(now_ms, sequence)
@@ -448,14 +421,6 @@ pub(crate) fn response_usage_id_or_single_data_item_id(response: &Value) -> Opti
     })
 }
 
-fn image_count_from_response(response: &Value) -> u64 {
-    response
-        .get("data")
-        .and_then(Value::as_array)
-        .and_then(|data| u64::try_from(data.len()).ok())
-        .unwrap_or(0)
-}
-
 pub(crate) fn music_seconds_from_response(response: &Value) -> f64 {
     response
         .get("duration_seconds")
@@ -480,7 +445,7 @@ pub(crate) fn music_billing_amount(music_seconds: f64) -> f64 {
     music_seconds.max(1.0) * 0.001
 }
 
-fn current_billing_timestamp_ms() -> anyhow::Result<u64> {
+pub(crate) fn current_billing_timestamp_ms() -> anyhow::Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64)
 }
 
@@ -591,32 +556,6 @@ pub(crate) async fn record_gateway_usage_for_project_with_media_and_reference_id
     .await
 }
 
-pub(crate) async fn record_gateway_usage_for_project_with_route_key(
-    store: &dyn AdminStore,
-    tenant_id: &str,
-    project_id: &str,
-    capability: &str,
-    route_key: &str,
-    usage_model: &str,
-    units: u64,
-    amount: f64,
-) -> anyhow::Result<()> {
-    record_gateway_usage_for_project_with_route_key_and_tokens_and_reference_with_context(
-        store,
-        tenant_id,
-        project_id,
-        capability,
-        route_key,
-        usage_model,
-        units,
-        amount,
-        None,
-        None,
-        None,
-    )
-    .await
-}
-
 pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens_and_reference(
     store: &dyn AdminStore,
     tenant_id: &str,
@@ -675,7 +614,7 @@ pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens_a
     .await
 }
 
-async fn record_gateway_usage_for_project_with_route_key_and_tokens_reference_and_media_with_context(
+pub(crate) async fn record_gateway_usage_for_project_with_route_key_and_tokens_reference_and_media_with_context(
     store: &dyn AdminStore,
     tenant_id: &str,
     project_id: &str,
@@ -776,7 +715,7 @@ async fn record_gateway_usage_for_project_with_route_key_and_tokens_reference_an
     Ok(())
 }
 
-async fn resolve_gateway_billing_settlement(
+pub(crate) async fn resolve_gateway_billing_settlement(
     store: &dyn AdminStore,
     api_key_group_id: Option<&str>,
     upstream_cost: Option<f64>,

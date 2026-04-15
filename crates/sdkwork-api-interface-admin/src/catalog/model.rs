@@ -56,7 +56,7 @@ pub(crate) async fn list_model_prices_handler(
 }
 
 pub(crate) async fn create_model_price_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Json(request): Json<CreateModelPriceRequest>,
 ) -> Result<(StatusCode, Json<ModelPriceRecord>), StatusCode> {
@@ -80,11 +80,23 @@ pub(crate) async fn create_model_price_handler(
     .await
     .map_err(|error| super::catalog_write_error_status(&error))?;
     invalidate_catalog_cache_after_mutation().await;
+    audit::record_admin_audit_event(
+        &state,
+        &claims,
+        "model_price.create",
+        "model_price",
+        format!(
+            "{}:{}:{}",
+            record.channel_id, record.model_id, record.proxy_provider_id
+        ),
+        audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
 pub(crate) async fn delete_model_price_handler(
-    _claims: AuthenticatedAdminClaims,
+    claims: AuthenticatedAdminClaims,
     State(state): State<AdminApiState>,
     Path((channel_id, model_id, proxy_provider_id)): Path<(String, String, String)>,
 ) -> Result<StatusCode, StatusCode> {
@@ -98,6 +110,15 @@ pub(crate) async fn delete_model_price_handler(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
         invalidate_catalog_cache_after_mutation().await;
+        audit::record_admin_audit_event(
+            &state,
+            &claims,
+            "model_price.delete",
+            "model_price",
+            format!("{channel_id}:{model_id}:{proxy_provider_id}"),
+            audit::APPROVAL_SCOPE_FINANCE_CONTROL,
+        )
+        .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)

@@ -123,6 +123,7 @@ export function resolveReleaseSyncAuditProducerInput({
 
   const summary = auditReleaseSyncRepositories({
     specs,
+    preferDefaultArtifact: false,
     env,
     readFile,
     spawnSyncImpl,

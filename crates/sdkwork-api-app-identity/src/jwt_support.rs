@@ -8,19 +8,6 @@ pub(crate) const PORTAL_JWT_ISSUER: &str = "sdkwork-portal";
 pub(crate) const PORTAL_JWT_AUDIENCE: &str = "sdkwork-public-portal";
 pub(crate) const PORTAL_JWT_TTL_SECS: u64 = 60 * 60 * 12;
 
-pub const DEFAULT_ADMIN_EMAIL: &str = "admin@sdkwork.local";
-pub const DEFAULT_ADMIN_PASSWORD: &str = "ChangeMe123!";
-pub const DEFAULT_ADMIN_DISPLAY_NAME: &str = "Admin Operator";
-
-pub const DEFAULT_PORTAL_EMAIL: &str = "portal@sdkwork.local";
-pub const DEFAULT_PORTAL_PASSWORD: &str = "ChangeMe123!";
-pub const DEFAULT_PORTAL_DISPLAY_NAME: &str = "Portal Demo";
-
-pub(crate) const DEFAULT_ADMIN_USER_ID: &str = "admin_local_default";
-pub(crate) const DEFAULT_PORTAL_USER_ID: &str = "user_local_demo";
-pub(crate) const DEFAULT_PORTAL_TENANT_ID: &str = "tenant_local_demo";
-pub(crate) const DEFAULT_PORTAL_PROJECT_ID: &str = "project_local_demo";
-
 type HmacSha256 = Hmac<JwtSha256>;
 
 static HMAC_ONLY_JWT_PROVIDER: CryptoProvider = CryptoProvider {
