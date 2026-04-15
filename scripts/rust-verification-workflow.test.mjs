@@ -26,7 +26,18 @@ test('repository exposes a cached package-group Rust verification workflow', () 
   assert.match(workflow, /group:\s*gateway-service/);
   assert.match(workflow, /group:\s*admin-service/);
   assert.match(workflow, /group:\s*portal-service/);
+  assert.match(workflow, /group:\s*dependency-audit/);
   assert.match(workflow, /group:\s*product-runtime/);
+  assert.match(workflow, /vendor\/\*\*/);
+  assert.match(workflow, /scripts\/check-rust-dependency-audit\.mjs/);
+  assert.match(workflow, /scripts\/check-rust-dependency-audit\.test\.mjs/);
+  assert.match(workflow, /Install cargo-audit/);
+  assert.match(workflow, /taiki-e\/install-action@cargo-audit/);
+  assert.match(workflow, /Run rust governance node tests/);
+  assert.match(
+    workflow,
+    /node --test scripts\/check-rust-dependency-audit\.test\.mjs scripts\/check-rust-verification-matrix\.test\.mjs scripts\/rust-verification-workflow\.test\.mjs/,
+  );
   assert.match(
     workflow,
     /node scripts\/check-rust-verification-matrix\.mjs --group \$\{\{ matrix\.group \}\}/,

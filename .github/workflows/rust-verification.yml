@@ -8,6 +8,9 @@ on:
       - 'Cargo.lock'
       - 'crates/**'
       - 'services/**'
+      - 'vendor/**'
+      - 'scripts/check-rust-dependency-audit.mjs'
+      - 'scripts/check-rust-dependency-audit.test.mjs'
       - 'scripts/check-rust-verification-matrix.mjs'
       - 'scripts/check-rust-verification-matrix.test.mjs'
       - 'scripts/rust-verification-workflow.test.mjs'
@@ -31,6 +34,7 @@ jobs:
           - group: gateway-service
           - group: admin-service
           - group: portal-service
+          - group: dependency-audit
           - group: product-runtime
     steps:
       - name: Skip non-selected dispatch groups
@@ -54,6 +58,14 @@ jobs:
       - name: Cache Rust dependencies
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.group == '' || github.event.inputs.group == matrix.group }}
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        if: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.group == '' || github.event.inputs.group == matrix.group) && matrix.group == 'dependency-audit' }}
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Run rust governance node tests
+        if: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.group == '' || github.event.inputs.group == matrix.group) && matrix.group == 'dependency-audit' }}
+        run: node --test scripts/check-rust-dependency-audit.test.mjs scripts/check-rust-verification-matrix.test.mjs scripts/rust-verification-workflow.test.mjs
 
       - name: Run package-group verification
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.group == '' || github.event.inputs.group == matrix.group }}
