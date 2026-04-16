@@ -27,6 +27,7 @@ OpenAPI is generated from the current `axum` route implementation, so the JSON d
 - `code.openai`: OpenAI and Codex mirror routes on the official `/v1/*` surface
 - `code.claude`: Claude mirror routes on the official `/v1/messages*` surface
 - `code.gemini`: Gemini mirror routes on the official `/v1beta/models/{model}:*` surface
+- `images.openai`: OpenAI image mirror routes on the official `/v1/images/*` surface
 - the public contract does not invent wrapper prefixes such as `/code/*`, `/claude/*`, or `/gemini/*`
 
 ## Route Families
@@ -41,7 +42,7 @@ OpenAI-family rows below use the official `/v1` prefix. Claude and Gemini keep t
 | responses | `POST /responses`, `POST /responses/input_tokens`, `POST /responses/compact`, `GET/DELETE /responses/{response_id}`, `GET /responses/{response_id}/input_items`, `POST /responses/{response_id}/cancel` | OpenAI-style response workflow surface |
 | embeddings | `POST /embeddings` | request-model-driven provider selection |
 | moderations | `POST /moderations` | OpenAI-compatible moderation route |
-| images | `POST /images/generations`, `POST /images/edits`, `POST /images/variations` | generation and multipart edit flows |
+| images | `POST /images/generations`, `POST /images/edits`, `POST /images/variations` | active public mirror is `images.openai`; provider routing can vary behind the shared OpenAI image contract |
 | audio | `POST /audio/transcriptions`, `POST /audio/translations`, `POST /audio/speech`, `GET /audio/voices`, `POST /audio/voice_consents` | includes binary speech output and voice consent creation |
 | files | `GET/POST /files`, `GET/DELETE /files/{file_id}`, `GET /files/{file_id}/content` | metadata plus binary content retrieval |
 | uploads | `POST /uploads`, `POST /uploads/{upload_id}/parts`, `POST /uploads/{upload_id}/complete`, `POST /uploads/{upload_id}/cancel` | multipart upload lifecycle |
@@ -61,7 +62,7 @@ OpenAI-family rows below use the official `/v1` prefix. Claude and Gemini keep t
 | marketing | `POST /marketing/coupons/validate`, `POST /marketing/coupons/reserve`, `POST /marketing/coupons/confirm`, `POST /marketing/coupons/rollback` | coupon-first validation, reservation, redemption, and rollback surface |
 | commercial | `GET /commercial/account`, `GET /commercial/account/benefit-lots` | commercial account summary plus benefit-lot traversal and coupon/account-arrival evidence |
 
-Phase 1 documents the current live media contract on shared capability routes such as `/v1/images*`, `/v1/audio*`, `/v1/videos*`, and `/v1/music*`. Provider-specific mirror protocols for media families remain follow-up work.
+Phase 2A keeps the active image mirror contract on the shared OpenAI image routes `/v1/images*` and publishes that family as `images.openai`. Reserved future image mirror families such as `images.nanobanana`, `images.midjourney`, `images.volcengine`, `images.aliyun`, and `images.kling` remain design-time names only until their official protocols are formalized and implemented.
 
 ## Gateway Semantics
 

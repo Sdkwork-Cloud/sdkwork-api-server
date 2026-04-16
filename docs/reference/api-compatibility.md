@@ -22,6 +22,7 @@ These labels describe runtime behavior, not the public URL taxonomy.
 - `code.openai`: OpenAI and Codex on `/v1/*`
 - `code.claude`: Claude on `/v1/messages` and `/v1/messages/count_tokens`
 - `code.gemini`: Gemini on `/v1beta/models/{model}:*`
+- `images.openai`: OpenAI image protocol on `/v1/images/*`
 
 ## High-Value API Families
 
@@ -52,6 +53,8 @@ Currently implemented gateway families include:
 - `/v1/videos`
 
 The `music` family is exposed as resource-oriented `/v1/music*` routes instead of provider-specific transport paths, so routing, billing, and plugin adapters stay aligned with the same capability-first gateway model used by images and videos.
+
+For images, the currently active public mirror family is `images.openai` on `/v1/images/*`. Reserved future image mirror groups such as `images.nanobanana`, `images.midjourney`, `images.volcengine`, `images.aliyun`, and `images.kling` are governance names only in this phase and are not yet published as active OpenAPI tags or callable public routes.
 
 The control plane also exposes:
 
