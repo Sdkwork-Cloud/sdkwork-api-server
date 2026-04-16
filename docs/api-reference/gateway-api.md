@@ -28,6 +28,7 @@ OpenAPI is generated from the current `axum` route implementation, so the JSON d
 - `code.claude`: Claude mirror routes on the official `/v1/messages*` surface
 - `code.gemini`: Gemini mirror routes on the official `/v1beta/models/{model}:*` surface
 - `images.openai`: OpenAI image mirror routes on the official `/v1/images/*` surface
+- `video.openai`: Shared video mirror routes on the official `/v1/videos*` surface
 - the public contract does not invent wrapper prefixes such as `/code/*`, `/claude/*`, or `/gemini/*`
 
 ## Route Families
@@ -56,13 +57,15 @@ OpenAI-family rows below use the official `/v1` prefix. Claude and Gemini keep t
 | webhooks | `GET/POST /webhooks`, `GET/POST/DELETE /webhooks/{webhook_id}` | compatible webhook CRUD |
 | realtime | `POST /realtime/sessions` | realtime session creation |
 | evals | `GET/POST /evals`, `GET/POST/DELETE /evals/{eval_id}`, nested runs and output item routes | evaluation workflows |
-| videos | `GET/POST /videos`, retrieve, delete, content, remix, edits, extensions, extend, and character routes | includes both canonical and nested video resources |
+| videos | `GET/POST /videos`, retrieve, delete, content, remix, edits, extensions, extend, and character routes | active public mirror is `video.openai`; provider routing can vary behind the shared `/v1/videos*` contract |
 | music | `GET/POST /music`, `GET/DELETE /music/{music_id}`, `GET /music/{music_id}/content`, `POST /music/lyrics` | resource-oriented music generation, retrieval, binary content fetch, and lyrics creation |
 | market | `GET /market/products`, `GET /market/offers`, `POST /market/quotes` | public API product catalog, offer discovery, and quote workflows |
 | marketing | `POST /marketing/coupons/validate`, `POST /marketing/coupons/reserve`, `POST /marketing/coupons/confirm`, `POST /marketing/coupons/rollback` | coupon-first validation, reservation, redemption, and rollback surface |
 | commercial | `GET /commercial/account`, `GET /commercial/account/benefit-lots` | commercial account summary plus benefit-lot traversal and coupon/account-arrival evidence |
 
 Phase 2A keeps the active image mirror contract on the shared OpenAI image routes `/v1/images*` and publishes that family as `images.openai`. Reserved future image mirror families such as `images.nanobanana`, `images.midjourney`, `images.volcengine`, `images.aliyun`, and `images.kling` remain design-time names only until their official protocols are formalized and implemented.
+
+Phase 3A keeps the active video mirror contract on the shared `/v1/videos*` routes and publishes that family as `video.openai`. Reserved future video mirror families such as `video.sora`, `video.minimax`, `video.vidu`, `video.volcengine`, `video.google-veo`, `video.aliyun`, and `video.kling` remain design-time names only until their official protocols are formalized and implemented.
 
 ## Gateway Semantics
 
