@@ -259,6 +259,116 @@ export function createWindowsInstalledRuntimeSmokeEvidence() {
     'utf8',
   );
 
+  writeFileSync(
+    path.join(fixtureRoot, 'scripts', 'release', 'run-linux-docker-compose-smoke.mjs'),
+    `
+export function parseArgs() {
+  return {
+    platform: 'linux',
+    arch: 'x64',
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/docker-compose-smoke-linux-x64.json',
+  };
+}
+
+export function createLinuxDockerComposeSmokeOptions() {
+  return parseArgs();
+}
+
+export function createLinuxDockerComposeSmokePlan() {
+  return {
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/docker-compose-smoke-linux-x64.json',
+    composeRelativePath: 'deploy/docker/docker-compose.yml',
+    envRelativePath: 'deploy/docker/.env',
+    overrideRelativePath: 'deploy/docker/docker-compose.smoke.override.yml',
+    healthUrls: [
+      'http://127.0.0.1:3001/api/v1/health',
+      'http://127.0.0.1:3001/api/admin/health',
+      'http://127.0.0.1:3001/api/portal/health',
+    ],
+    siteUrls: [
+      'http://127.0.0.1:3001/admin/',
+      'http://127.0.0.1:3001/portal/',
+    ],
+    envContents: '',
+    overrideContents: '',
+    databaseAssertions: [],
+  };
+}
+
+export function createLinuxDockerComposeSmokeEvidence() {
+  return {
+    ok: true,
+    platform: 'linux',
+    arch: 'x64',
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/docker-compose-smoke-linux-x64.json',
+    healthUrls: [
+      'http://127.0.0.1:3001/api/v1/health',
+      'http://127.0.0.1:3001/api/admin/health',
+      'http://127.0.0.1:3001/api/portal/health',
+    ],
+    siteUrls: [
+      'http://127.0.0.1:3001/admin/',
+      'http://127.0.0.1:3001/portal/',
+    ],
+    databaseAssertions: [],
+  };
+}
+`,
+    'utf8',
+  );
+
+  writeFileSync(
+    path.join(fixtureRoot, 'scripts', 'release', 'run-linux-helm-render-smoke.mjs'),
+    `
+export function parseArgs() {
+  return {
+    platform: 'linux',
+    arch: 'x64',
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/helm-render-smoke-linux-x64.json',
+  };
+}
+
+export function createLinuxHelmRenderSmokeOptions() {
+  return parseArgs();
+}
+
+export function createLinuxHelmRenderSmokePlan() {
+  return {
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/helm-render-smoke-linux-x64.json',
+    chartRelativePath: 'deploy/helm/sdkwork-api-router',
+    renderedManifestRelativePath: 'artifacts/release-smoke/helm-render-linux-x64.yaml',
+    requiredTemplateKinds: ['Secret', 'Service', 'Deployment', 'Ingress'],
+    helmValues: {
+      databaseUrl: 'postgresql://sdkwork:sdkwork-release-smoke@postgres:5432/sdkwork_api_router',
+      adminJwtSigningSecret: 'admin-secret',
+      portalJwtSigningSecret: 'portal-secret',
+      credentialMasterKey: 'credential-master-key',
+      metricsBearerToken: 'metrics-token',
+      ingressEnabled: true,
+    },
+  };
+}
+
+export function createLinuxHelmRenderSmokeEvidence() {
+  return {
+    ok: true,
+    platform: 'linux',
+    arch: 'x64',
+    bundlePath: 'artifacts/release/native/linux/x64/bundles/sdkwork-api-router-product-server-linux-x64.tar.gz',
+    evidencePath: 'artifacts/release-governance/helm-render-smoke-linux-x64.json',
+    renderedManifestPath: 'artifacts/release-smoke/helm-render-linux-x64.yaml',
+    renderedKinds: ['Secret', 'Service', 'Deployment', 'Ingress'],
+  };
+}
+`,
+    'utf8',
+  );
+
   return fixtureRoot;
 }
 
@@ -303,6 +413,22 @@ test('repository exposes a multi-platform GitHub release workflow for tagged and
   assert.match(
     workflow,
     /Upload Unix installed runtime smoke evidence[\s\S]*if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform != 'windows'\s*\}\}[\s\S]*uses:\s*actions\/upload-artifact@v4[\s\S]*name:\s*release-governance-unix-installed-runtime-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}[\s\S]*path:\s*artifacts\/release-governance\/unix-installed-runtime-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.json/,
+  );
+  assert.match(
+    workflow,
+    /Run Linux Docker Compose packaged product smoke[\s\S]*if: matrix\.platform == 'linux'[\s\S]*node scripts\/release\/run-linux-docker-compose-smoke\.mjs --platform \$\{\{ matrix\.platform \}\} --arch \$\{\{ matrix\.arch \}\} --bundle-path artifacts\/release\/native\/\$\{\{ matrix\.platform \}\}\/\$\{\{ matrix\.arch \}\}\/bundles\/sdkwork-api-router-product-server-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.tar\.gz --evidence-path artifacts\/release-governance\/docker-compose-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.json/,
+  );
+  assert.match(
+    workflow,
+    /Upload Linux Docker Compose smoke evidence[\s\S]*if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'linux'\s*\}\}[\s\S]*uses:\s*actions\/upload-artifact@v4[\s\S]*name:\s*release-governance-docker-compose-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}[\s\S]*path:\s*artifacts\/release-governance\/docker-compose-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.json/,
+  );
+  assert.match(
+    workflow,
+    /Run Linux Helm render packaged smoke[\s\S]*if: matrix\.platform == 'linux'[\s\S]*node scripts\/release\/run-linux-helm-render-smoke\.mjs --platform \$\{\{ matrix\.platform \}\} --arch \$\{\{ matrix\.arch \}\} --bundle-path artifacts\/release\/native\/\$\{\{ matrix\.platform \}\}\/\$\{\{ matrix\.arch \}\}\/bundles\/sdkwork-api-router-product-server-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.tar\.gz --evidence-path artifacts\/release-governance\/helm-render-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.json/,
+  );
+  assert.match(
+    workflow,
+    /Upload Linux Helm render smoke evidence[\s\S]*if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'linux'\s*\}\}[\s\S]*uses:\s*actions\/upload-artifact@v4[\s\S]*name:\s*release-governance-helm-render-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}[\s\S]*path:\s*artifacts\/release-governance\/helm-render-smoke-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.json/,
   );
   assert.match(workflow, /node scripts\/release\/package-release-assets\.mjs native --platform \$\{\{ matrix\.platform \}\} --arch \$\{\{ matrix\.arch \}\} --target \$\{\{ matrix\.target \}\}/);
   assert.match(workflow, /pnpm --dir apps\/sdkwork-router-admin build/);
@@ -462,7 +588,7 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     sdkworkImSdkSpec.targetDir.replaceAll('\\', '/'),
-    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript$/,
+    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript\/composed$/,
   );
   assert.match(
     sdkworkImSdkSpec.expectedGitRoot.replaceAll('\\', '/'),
@@ -688,6 +814,16 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     workflow,
+    /native-release:[\s\S]*?Generate Linux Docker Compose smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(\s*!github\.event\.repository\.private\s*\|\|\s*vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED\s*==\s*'true'\s*\)\s*&&\s*matrix\.platform\s*==\s*'linux'\s*\}\}[\s\S]*?uses:\s*actions\/attest-build-provenance@v3[\s\S]*?subject-path:\s*artifacts\/release-governance\/docker-compose-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must attest packaged Docker Compose smoke evidence when artifact attestations are supported',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Generate Linux Helm render smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(\s*!github\.event\.repository\.private\s*\|\|\s*vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED\s*==\s*'true'\s*\)\s*&&\s*matrix\.platform\s*==\s*'linux'\s*\}\}[\s\S]*?uses:\s*actions\/attest-build-provenance@v3[\s\S]*?subject-path:\s*artifacts\/release-governance\/helm-render-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must attest packaged Helm render smoke evidence when artifact attestations are supported',
+  );
+  assert.match(
+    workflow,
     /native-release:[\s\S]*?Generate native release assets attestation[\s\S]*?if:\s*\$\{\{\s*!github\.event\.repository\.private\s*\|\|\s*vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED\s*==\s*'true'\s*\}\}[\s\S]*?uses:\s*actions\/attest-build-provenance@v3[\s\S]*?subject-path:\s*artifacts\/release\/\*\*\/*/,
     'native release job must attest packaged release assets when artifact attestations are supported',
   );
@@ -703,13 +839,13 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     workflow,
-    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Windows[\s\S]*Upload Windows installed runtime smoke evidence[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets/,
-    'native release workflow must execute Windows and Unix install-asset smoke gates, persist their evidence, and only then package assets',
+    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Windows[\s\S]*Upload Windows installed runtime smoke evidence[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Upload native release assets/,
+    'native release workflow must execute install-asset smokes, then Linux packaged bundle smokes, and only then upload packaged assets',
   );
   assert.match(
     workflow,
-    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets/,
-    'native release workflow must execute install-asset smoke, persist its evidence, and only then package assets',
+    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Upload native release assets/,
+    'native Linux release workflow must execute packaged Docker and Helm smokes after packaging the bundle and before asset upload',
   );
   assert.match(
     workflow,
@@ -718,8 +854,8 @@ test('release workflow materializes GitHub-backed external sibling dependencies 
   );
   assert.match(
     workflow,
-    /Collect native release assets[\s\S]*Upload native release assets[\s\S]*Generate native release assets attestation/,
-    'native release assets must be packaged and uploaded before attestation generation',
+    /Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Generate Linux Docker Compose smoke evidence attestation[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Generate Linux Helm render smoke evidence attestation[\s\S]*Upload native release assets[\s\S]*Generate native release assets attestation/,
+    'native Linux bundle smoke evidence must be collected and attested before native release assets are uploaded and attested',
   );
   assert.match(
     workflow,

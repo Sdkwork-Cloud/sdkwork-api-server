@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SDKWORK_POSTGRES_DB:-sdkwork_api_router}
+      POSTGRES_USER: ${SDKWORK_POSTGRES_USER:-sdkwork}
+      POSTGRES_PASSWORD: ${SDKWORK_POSTGRES_PASSWORD:-change-me-db-password}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - sdkwork-postgres:/var/lib/postgresql/data
+
+  router:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SDKWORK_DATABASE_URL: postgresql://${SDKWORK_POSTGRES_USER:-sdkwork}:${SDKWORK_POSTGRES_PASSWORD:-change-me-db-password}@postgres:5432/${SDKWORK_POSTGRES_DB:-sdkwork_api_router}
+      SDKWORK_BOOTSTRAP_PROFILE: ${SDKWORK_BOOTSTRAP_PROFILE:-prod}
+      SDKWORK_BOOTSTRAP_DATA_DIR: /opt/sdkwork/data
+      SDKWORK_ADMIN_SITE_DIR: /opt/sdkwork/sites/admin/dist
+      SDKWORK_PORTAL_SITE_DIR: /opt/sdkwork/sites/portal/dist
+      SDKWORK_WEB_BIND: 0.0.0.0:3001
+      SDKWORK_GATEWAY_BIND: 127.0.0.1:8080
+      SDKWORK_ADMIN_BIND: 127.0.0.1:8081
+      SDKWORK_PORTAL_BIND: 127.0.0.1:8082
+      SDKWORK_ADMIN_JWT_SIGNING_SECRET: ${SDKWORK_ADMIN_JWT_SIGNING_SECRET:?set in deploy/docker/.env}
+      SDKWORK_PORTAL_JWT_SIGNING_SECRET: ${SDKWORK_PORTAL_JWT_SIGNING_SECRET:?set in deploy/docker/.env}
+      SDKWORK_CREDENTIAL_MASTER_KEY: ${SDKWORK_CREDENTIAL_MASTER_KEY:?set in deploy/docker/.env}
+      SDKWORK_METRICS_BEARER_TOKEN: ${SDKWORK_METRICS_BEARER_TOKEN:?set in deploy/docker/.env}
+      SDKWORK_BROWSER_ALLOWED_ORIGINS: ${SDKWORK_BROWSER_ALLOWED_ORIGINS:-http://localhost:3001}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl --fail --silent http://127.0.0.1:3001/api/v1/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sdkwork-postgres:

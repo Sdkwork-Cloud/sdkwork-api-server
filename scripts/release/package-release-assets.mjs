@@ -80,6 +80,10 @@ const productServerBootstrapDataRoots = {
   data: path.join(rootDir, 'data'),
 };
 
+const productServerDeploymentAssetRoots = {
+  deploy: path.join(rootDir, 'deploy'),
+};
+
 export function normalizePlatformId(platform = process.platform) {
   if (platform === 'win32' || platform === 'windows') {
     return 'windows';
@@ -186,6 +190,10 @@ export function listNativeDesktopAppIds() {
 
 export function listNativeProductServerBootstrapDataRoots() {
   return { ...productServerBootstrapDataRoots };
+}
+
+export function listNativeProductServerDeploymentAssetRoots() {
+  return { ...productServerDeploymentAssetRoots };
 }
 
 export function buildNativeProductServerArchiveBaseName({ platformId, archId } = {}) {
@@ -484,11 +492,15 @@ function writeProductServerBundleReadme({ archiveRoot, platformId, archId, targe
       '- sites/admin/dist/: admin web assets',
       '- sites/portal/dist/: portal web assets',
       '- data/: bootstrap data packs for first-start initialization',
+      '- deploy/: docker, compose, and helm deployment assets',
       '',
       'Example startup:',
       platformId === 'windows'
         ? '  set SDKWORK_BOOTSTRAP_DATA_DIR=data && set SDKWORK_ADMIN_SITE_DIR=sites\\admin\\dist && set SDKWORK_PORTAL_SITE_DIR=sites\\portal\\dist && bin\\router-product-service.exe'
         : '  SDKWORK_BOOTSTRAP_DATA_DIR=data SDKWORK_ADMIN_SITE_DIR=sites/admin/dist SDKWORK_PORTAL_SITE_DIR=sites/portal/dist ./bin/router-product-service',
+      '',
+      'Container image builds reuse the Linux product-server bundle with:',
+      '  docker build -f deploy/docker/Dockerfile -t sdkwork-api-router:<tag> .',
       '',
       'Override SDKWORK_CONFIG_DIR, SDKWORK_CONFIG_FILE, SDKWORK_DATABASE_URL, and role/upstream flags as needed.',
       '',
@@ -509,6 +521,13 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
     if (!existsSync(sourceDir)) {
       throw new Error(
         `Missing product server bootstrap data for ${label}: ${sourceDir}\nbootstrap data root: ${describeDirectoryState(sourceDir)}`,
+      );
+    }
+  }
+  for (const [label, sourceDir] of Object.entries(productServerDeploymentAssetRoots)) {
+    if (!existsSync(sourceDir)) {
+      throw new Error(
+        `Missing product server deployment assets for ${label}: ${sourceDir}\ndeployment asset root: ${describeDirectoryState(sourceDir)}`,
       );
     }
   }
@@ -542,6 +561,12 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
       cpSync(sourceDir, targetDir, { recursive: true });
     }
 
+    for (const [label, sourceDir] of Object.entries(productServerDeploymentAssetRoots)) {
+      const targetDir = path.join(archiveRoot, label);
+      ensureDirectory(path.dirname(targetDir));
+      cpSync(sourceDir, targetDir, { recursive: true });
+    }
+
     writeProductServerBundleReadme({
       archiveRoot,
       platformId,
@@ -560,6 +585,7 @@ function packageProductServerBundle({ platformId, archId, targetTriple, outputDi
           services: listNativeServiceBinaryNames(),
           sites: Object.keys(productServerSiteAssetRoots),
           bootstrapDataRoots: Object.keys(productServerBootstrapDataRoots),
+          deploymentAssetRoots: Object.keys(productServerDeploymentAssetRoots),
         },
         null,
         2,

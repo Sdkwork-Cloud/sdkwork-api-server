@@ -33,13 +33,18 @@ test('repository exposes a pull-request product verification workflow with gover
   assert.match(workflow, /README\.md/);
   assert.match(workflow, /README\.zh-CN\.md/);
   assert.match(workflow, /scripts\/check-router-product\.mjs/);
+  assert.match(workflow, /scripts\/browser-runtime-smoke\.mjs/);
+  assert.match(workflow, /scripts\/browser-runtime-smoke\.test\.mjs/);
+  assert.match(workflow, /scripts\/check-portal-browser-runtime\.mjs/);
+  assert.match(workflow, /scripts\/check-admin-browser-runtime\.mjs/);
+  assert.match(workflow, /scripts\/check-admin-browser-runtime\.test\.mjs/);
   assert.match(workflow, /scripts\/run-tauri-cli\.mjs/);
   assert.match(workflow, /scripts\/release\/desktop-targets\.mjs/);
   assert.match(workflow, /scripts\/product-verification-workflow-contracts\.mjs/);
   assert.match(workflow, /scripts\/product-verification-workflow\.test\.mjs/);
   assert.match(
     workflow,
-    /Run product governance node tests[\s\S]*?node --test scripts\/product-verification-workflow\.test\.mjs scripts\/check-router-product\.test\.mjs scripts\/build-router-desktop-assets\.test\.mjs scripts\/check-router-docs-safety\.test\.mjs scripts\/check-router-frontend-budgets\.test\.mjs scripts\/dev\/tests\/pnpm-launch-lib\.test\.mjs apps\/sdkwork-router-portal\/tests\/product-entrypoint-scripts\.test\.mjs/,
+    /Run product governance node tests[\s\S]*?node --test scripts\/product-verification-workflow\.test\.mjs scripts\/check-router-product\.test\.mjs scripts\/browser-runtime-smoke\.test\.mjs scripts\/check-admin-browser-runtime\.test\.mjs scripts\/build-router-desktop-assets\.test\.mjs scripts\/check-router-docs-safety\.test\.mjs scripts\/check-router-frontend-budgets\.test\.mjs scripts\/dev\/tests\/pnpm-launch-lib\.test\.mjs apps\/sdkwork-router-portal\/tests\/product-entrypoint-scripts\.test\.mjs/,
   );
   assert.match(
     workflow,
@@ -76,6 +81,11 @@ on:
       - 'README.md'
       - 'README.zh-CN.md'
       - 'scripts/check-router-product.mjs'
+      - 'scripts/browser-runtime-smoke.mjs'
+      - 'scripts/browser-runtime-smoke.test.mjs'
+      - 'scripts/check-portal-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.test.mjs'
       - 'scripts/run-tauri-cli.mjs'
       - 'scripts/release/desktop-targets.mjs'
       - 'scripts/product-verification-workflow-contracts.mjs'
@@ -114,7 +124,7 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
 
       - name: Run product governance node tests
-        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/browser-runtime-smoke.test.mjs scripts/check-admin-browser-runtime.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
 
       - name: Run product verification gate
         run: node scripts/check-router-product.mjs
@@ -155,6 +165,11 @@ on:
       - 'README.md'
       - 'README.zh-CN.md'
       - 'scripts/check-router-product.mjs'
+      - 'scripts/browser-runtime-smoke.mjs'
+      - 'scripts/browser-runtime-smoke.test.mjs'
+      - 'scripts/check-portal-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.test.mjs'
       - 'scripts/run-tauri-cli.mjs'
       - 'scripts/release/desktop-targets.mjs'
       - 'scripts/product-verification-workflow.test.mjs'
@@ -192,7 +207,7 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
 
       - name: Run product governance node tests
-        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/browser-runtime-smoke.test.mjs scripts/check-admin-browser-runtime.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
 
       - name: Run product verification gate
         env:
@@ -235,6 +250,11 @@ on:
       - 'README.md'
       - 'README.zh-CN.md'
       - 'scripts/check-router-product.mjs'
+      - 'scripts/browser-runtime-smoke.mjs'
+      - 'scripts/browser-runtime-smoke.test.mjs'
+      - 'scripts/check-portal-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.test.mjs'
       - 'scripts/product-verification-workflow-contracts.mjs'
       - 'scripts/product-verification-workflow.test.mjs'
   workflow_dispatch:
@@ -271,7 +291,7 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
 
       - name: Run product governance node tests
-        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/browser-runtime-smoke.test.mjs scripts/check-admin-browser-runtime.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
 
       - name: Run product verification gate
         env:
@@ -314,6 +334,11 @@ on:
       - 'README.md'
       - 'README.zh-CN.md'
       - 'scripts/check-router-product.mjs'
+      - 'scripts/browser-runtime-smoke.mjs'
+      - 'scripts/browser-runtime-smoke.test.mjs'
+      - 'scripts/check-portal-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.test.mjs'
       - 'scripts/run-tauri-cli.mjs'
       - 'scripts/release/desktop-targets.mjs'
       - 'scripts/dev/pnpm-launch-lib.mjs'
@@ -354,7 +379,7 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
 
       - name: Run product governance node tests
-        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/browser-runtime-smoke.test.mjs scripts/check-admin-browser-runtime.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
 
       - name: Run product verification gate
         env:

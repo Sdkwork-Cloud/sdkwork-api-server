@@ -32,6 +32,31 @@ export async function assertProductVerificationWorkflowContracts({
   assert.match(workflow, /scripts\/check-router-product\.mjs/);
   assert.match(
     workflow,
+    /scripts\/browser-runtime-smoke\.mjs/,
+    'product verification workflow must watch the shared browser runtime smoke helper',
+  );
+  assert.match(
+    workflow,
+    /scripts\/browser-runtime-smoke\.test\.mjs/,
+    'product verification workflow must watch the shared browser runtime smoke helper test',
+  );
+  assert.match(
+    workflow,
+    /scripts\/check-portal-browser-runtime\.mjs/,
+    'product verification workflow must watch the portal browser runtime smoke entrypoint',
+  );
+  assert.match(
+    workflow,
+    /scripts\/check-admin-browser-runtime\.mjs/,
+    'product verification workflow must watch the admin browser runtime smoke entrypoint',
+  );
+  assert.match(
+    workflow,
+    /scripts\/check-admin-browser-runtime\.test\.mjs/,
+    'product verification workflow must watch the admin browser runtime smoke test',
+  );
+  assert.match(
+    workflow,
     /scripts\/run-tauri-cli\.mjs/,
     'product verification workflow must watch the shared desktop runtime helper',
   );
@@ -48,7 +73,7 @@ export async function assertProductVerificationWorkflowContracts({
   assert.match(workflow, /scripts\/product-verification-workflow\.test\.mjs/);
   assert.match(
     workflow,
-    /Run product governance node tests[\s\S]*?node --test scripts\/product-verification-workflow\.test\.mjs scripts\/check-router-product\.test\.mjs scripts\/build-router-desktop-assets\.test\.mjs scripts\/check-router-docs-safety\.test\.mjs scripts\/check-router-frontend-budgets\.test\.mjs scripts\/dev\/tests\/pnpm-launch-lib\.test\.mjs apps\/sdkwork-router-portal\/tests\/product-entrypoint-scripts\.test\.mjs/,
+    /Run product governance node tests[\s\S]*?node --test scripts\/product-verification-workflow\.test\.mjs scripts\/check-router-product\.test\.mjs scripts\/browser-runtime-smoke\.test\.mjs scripts\/check-admin-browser-runtime\.test\.mjs scripts\/build-router-desktop-assets\.test\.mjs scripts\/check-router-docs-safety\.test\.mjs scripts\/check-router-frontend-budgets\.test\.mjs scripts\/dev\/tests\/pnpm-launch-lib\.test\.mjs apps\/sdkwork-router-portal\/tests\/product-entrypoint-scripts\.test\.mjs/,
     'product verification workflow must run workflow, product, and shared pnpm helper tests before the main product gate',
   );
   assert.match(

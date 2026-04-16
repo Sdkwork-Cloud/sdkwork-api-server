@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -280,6 +280,74 @@ export function frontendDistReady(distDir = '') {
   }
 
   return existsSync(path.join(distDir, 'index.html'));
+}
+
+function latestTrackedMtime(targetPath) {
+  if (!targetPath || !existsSync(targetPath)) {
+    return 0;
+  }
+
+  const targetStat = statSync(targetPath);
+  if (targetStat.isFile()) {
+    return targetStat.mtimeMs;
+  }
+
+  if (!targetStat.isDirectory()) {
+    return 0;
+  }
+
+  let latestMtime = 0;
+  for (const entry of readdirSync(targetPath, { withFileTypes: true })) {
+    const entryPath = path.join(targetPath, entry.name);
+    if (entry.isDirectory()) {
+      latestMtime = Math.max(latestMtime, latestTrackedMtime(entryPath));
+      continue;
+    }
+
+    if (entry.isFile()) {
+      latestMtime = Math.max(latestMtime, statSync(entryPath).mtimeMs);
+    }
+  }
+
+  return latestMtime;
+}
+
+export function frontendDistUpToDate({
+  appRoot,
+  distDir = '',
+  buildInputs = [],
+} = {}) {
+  if (!appRoot) {
+    throw new Error('appRoot is required');
+  }
+
+  const resolvedDistDir = distDir || path.join(appRoot, 'dist');
+  if (!frontendDistReady(resolvedDistDir)) {
+    return false;
+  }
+
+  const distMtime = latestTrackedMtime(resolvedDistDir);
+  if (distMtime <= 0) {
+    return false;
+  }
+
+  const trackedInputs = Array.isArray(buildInputs) && buildInputs.length > 0
+    ? buildInputs
+    : ['index.html', 'package.json', 'tsconfig.json', 'vite.config.ts', 'src'];
+
+  let latestInputMtime = 0;
+  for (const inputPath of trackedInputs) {
+    latestInputMtime = Math.max(
+      latestInputMtime,
+      latestTrackedMtime(path.join(appRoot, inputPath)),
+    );
+  }
+
+  if (latestInputMtime <= 0) {
+    return false;
+  }
+
+  return distMtime >= latestInputMtime;
 }
 
 export function frontendViteConfigHealthy({

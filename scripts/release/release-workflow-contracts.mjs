@@ -255,6 +255,36 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
+    /native-release:[\s\S]*?Run Linux Docker Compose packaged product smoke[\s\S]*?if:\s*matrix\.platform == 'linux'[\s\S]*?run:\s*node scripts\/release\/run-linux-docker-compose-smoke\.mjs --platform \$\{\{\s*matrix\.platform\s*\}\} --arch \$\{\{\s*matrix\.arch\s*\}\} --bundle-path artifacts\/release\/native\/\$\{\{\s*matrix\.platform\s*\}\}\/\$\{\{\s*matrix\.arch\s*\}\}\/bundles\/sdkwork-api-router-product-server-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.tar\.gz --evidence-path artifacts\/release-governance\/docker-compose-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must run a packaged Docker Compose smoke gate against the bundled product-server archive before asset upload',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Upload Linux Docker Compose smoke evidence[\s\S]*?if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'linux'\s*\}\}[\s\S]*?uses:\s*actions\/upload-artifact@v4[\s\S]*?name:\s*release-governance-docker-compose-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}[\s\S]*?path:\s*artifacts\/release-governance\/docker-compose-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must upload packaged Docker Compose smoke evidence as a dedicated governance artifact',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Generate Linux Docker Compose smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(\s*!github\.event\.repository\.private\s*\|\|\s*vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED\s*==\s*'true'\s*\)\s*&&\s*matrix\.platform\s*==\s*'linux'\s*\}\}[\s\S]*?uses:\s*actions\/attest-build-provenance@v3[\s\S]*?subject-path:\s*artifacts\/release-governance\/docker-compose-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must attest packaged Docker Compose smoke evidence when artifact attestations are supported',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Run Linux Helm render packaged smoke[\s\S]*?if:\s*matrix\.platform == 'linux'[\s\S]*?run:\s*node scripts\/release\/run-linux-helm-render-smoke\.mjs --platform \$\{\{\s*matrix\.platform\s*\}\} --arch \$\{\{\s*matrix\.arch\s*\}\} --bundle-path artifacts\/release\/native\/\$\{\{\s*matrix\.platform\s*\}\}\/\$\{\{\s*matrix\.arch\s*\}\}\/bundles\/sdkwork-api-router-product-server-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.tar\.gz --evidence-path artifacts\/release-governance\/helm-render-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must run a packaged Helm render smoke gate against the bundled product-server archive before asset upload',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Upload Linux Helm render smoke evidence[\s\S]*?if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'linux'\s*\}\}[\s\S]*?uses:\s*actions\/upload-artifact@v4[\s\S]*?name:\s*release-governance-helm-render-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}[\s\S]*?path:\s*artifacts\/release-governance\/helm-render-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must upload packaged Helm render smoke evidence as a dedicated governance artifact',
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Generate Linux Helm render smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(\s*!github\.event\.repository\.private\s*\|\|\s*vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED\s*==\s*'true'\s*\)\s*&&\s*matrix\.platform\s*==\s*'linux'\s*\}\}[\s\S]*?uses:\s*actions\/attest-build-provenance@v3[\s\S]*?subject-path:\s*artifacts\/release-governance\/helm-render-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
+    'native Linux release lanes must attest packaged Helm render smoke evidence when artifact attestations are supported',
+  );
+  assert.match(
+    workflow,
     /native-release:[\s\S]*?Run installed native runtime smoke on Windows[\s\S]*?if:\s*matrix\.platform == 'windows'[\s\S]*?run:\s*node scripts\/release\/run-windows-installed-runtime-smoke\.mjs --platform \$\{\{\s*matrix\.platform\s*\}\} --arch \$\{\{\s*matrix\.arch\s*\}\} --target \$\{\{\s*matrix\.target\s*\}\} --evidence-path artifacts\/release-governance\/windows-installed-runtime-smoke-\$\{\{\s*matrix\.platform\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}\.json/,
     'native release job must run a dedicated Windows installed-runtime smoke gate with an explicit evidence artifact path before packaging release assets',
   );
@@ -275,13 +305,13 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Windows[\s\S]*Upload Windows installed runtime smoke evidence[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets/,
-    'native release workflow must place both Windows and Unix installed-runtime smoke gates and evidence uploads after native builds and before asset packaging',
+    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Windows[\s\S]*Upload Windows installed runtime smoke evidence[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Upload native release assets/,
+    'native release workflow must place installed-runtime smokes before packaging, then execute Linux packaged bundle smokes before asset upload',
   );
   assert.match(
     workflow,
-    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets/,
-    'native release workflow must place the Unix installed-runtime smoke gate and evidence upload after native builds and before asset packaging',
+    /Build portal desktop release[\s\S]*Run installed native runtime smoke on Unix[\s\S]*Upload Unix installed runtime smoke evidence[\s\S]*Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Upload native release assets/,
+    'native release workflow must place the Unix installed-runtime smoke gate before packaging and Linux packaged bundle smokes before asset upload',
   );
   assert.match(
     workflow,
@@ -290,8 +320,8 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /Collect native release assets[\s\S]*Upload native release assets[\s\S]*Generate native release assets attestation/,
-    'native release assets must be packaged and uploaded before attestation generation',
+    /Collect native release assets[\s\S]*Run Linux Docker Compose packaged product smoke[\s\S]*Upload Linux Docker Compose smoke evidence[\s\S]*Generate Linux Docker Compose smoke evidence attestation[\s\S]*Run Linux Helm render packaged smoke[\s\S]*Upload Linux Helm render smoke evidence[\s\S]*Generate Linux Helm render smoke evidence attestation[\s\S]*Upload native release assets[\s\S]*Generate native release assets attestation/,
+    'native release assets must follow Linux packaged bundle smoke evidence upload and attestation before the final asset attestation runs',
   );
   assert.match(
     workflow,
@@ -364,6 +394,16 @@ export async function assertReleaseWorkflowContracts({
       path.join(repoRoot, 'scripts', 'release', 'run-windows-installed-runtime-smoke.mjs'),
     ).href,
   );
+  const linuxDockerComposeSmokeHelper = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-linux-docker-compose-smoke.mjs'),
+    ).href,
+  );
+  const linuxHelmRenderSmokeHelper = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-linux-helm-render-smoke.mjs'),
+    ).href,
+  );
 
   assert.equal(typeof helper.listExternalReleaseDependencySpecs, 'function');
   assert.equal(typeof helper.buildExternalReleaseClonePlan, 'function');
@@ -393,6 +433,14 @@ export async function assertReleaseWorkflowContracts({
   assert.equal(typeof windowsRuntimeSmokeHelper.createWindowsInstalledRuntimeSmokeOptions, 'function');
   assert.equal(typeof windowsRuntimeSmokeHelper.createWindowsInstalledRuntimeSmokePlan, 'function');
   assert.equal(typeof windowsRuntimeSmokeHelper.createWindowsInstalledRuntimeSmokeEvidence, 'function');
+  assert.equal(typeof linuxDockerComposeSmokeHelper.parseArgs, 'function');
+  assert.equal(typeof linuxDockerComposeSmokeHelper.createLinuxDockerComposeSmokeOptions, 'function');
+  assert.equal(typeof linuxDockerComposeSmokeHelper.createLinuxDockerComposeSmokePlan, 'function');
+  assert.equal(typeof linuxDockerComposeSmokeHelper.createLinuxDockerComposeSmokeEvidence, 'function');
+  assert.equal(typeof linuxHelmRenderSmokeHelper.parseArgs, 'function');
+  assert.equal(typeof linuxHelmRenderSmokeHelper.createLinuxHelmRenderSmokeOptions, 'function');
+  assert.equal(typeof linuxHelmRenderSmokeHelper.createLinuxHelmRenderSmokePlan, 'function');
+  assert.equal(typeof linuxHelmRenderSmokeHelper.createLinuxHelmRenderSmokeEvidence, 'function');
 
   const specs = helper.listExternalReleaseDependencySpecs();
   assert.equal(specs.length, 4);

@@ -94,7 +94,7 @@ test('release sync audit exposes repository specs and blocks non-standalone, dir
   assert.equal(specs[4].envRefKey, 'SDKWORK_CRAW_CHAT_SDK_GIT_REF');
   assert.match(
     specs[4].targetDir.replaceAll('\\', '/'),
-    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript$/,
+    /\/craw-chat\/sdks\/sdkwork-craw-chat-sdk\/sdkwork-craw-chat-sdk-typescript\/composed$/,
   );
   assert.match(
     specs[4].expectedGitRoot.replaceAll('\\', '/'),
@@ -393,5 +393,63 @@ test('release sync audit can bypass the default latest artifact in explicit live
       assert.equal(summary.reports[0].expectedGitRoot, spec.expectedGitRoot);
       assert.equal(summary.reports[0].localHead, 'fed456');
     },
+  );
+});
+
+test('release sync audit specs can remap governed external repositories into a dedicated release root without moving the main repository', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'verify-release-sync.mjs'),
+    ).href,
+  );
+
+  assert.equal(typeof module.resolveReleaseSyncRepositorySpecs, 'function');
+
+  const governedRoot = path.join(repoRoot, 'artifacts', 'release-governance', 'external-deps');
+  const specs = module.resolveReleaseSyncRepositorySpecs({
+    env: {
+      SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT: governedRoot,
+    },
+  });
+
+  const routerSpec = specs.find((spec) => spec.id === 'sdkwork-api-router');
+  assert.ok(routerSpec);
+  assert.equal(routerSpec.targetDir, repoRoot);
+  assert.equal(routerSpec.expectedGitRoot, repoRoot);
+
+  const sdkworkCore = specs.find((spec) => spec.id === 'sdkwork-core');
+  assert.ok(sdkworkCore);
+  assert.equal(
+    sdkworkCore.targetDir,
+    path.join(governedRoot, 'sdkwork-core'),
+  );
+  assert.equal(
+    sdkworkCore.expectedGitRoot,
+    path.join(governedRoot, 'sdkwork-core'),
+  );
+
+  const sdkworkUi = specs.find((spec) => spec.id === 'sdkwork-ui');
+  assert.ok(sdkworkUi);
+  assert.equal(
+    sdkworkUi.targetDir,
+    path.join(governedRoot, 'sdkwork-ui'),
+  );
+
+  const sdkworkCrawChatSdk = specs.find((spec) => spec.id === 'sdkwork-craw-chat-sdk');
+  assert.ok(sdkworkCrawChatSdk);
+  assert.equal(
+    sdkworkCrawChatSdk.expectedGitRoot,
+    path.join(governedRoot, 'craw-chat'),
+  );
+  assert.equal(
+    sdkworkCrawChatSdk.targetDir,
+    path.join(
+      governedRoot,
+      'craw-chat',
+      'sdks',
+      'sdkwork-craw-chat-sdk',
+      'sdkwork-craw-chat-sdk-typescript',
+      'composed',
+    ),
   );
 });

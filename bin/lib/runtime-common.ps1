@@ -141,7 +141,8 @@ function Get-RouterWindowsBackendWarmupCargoArgs {
         'build',
         '-p', 'admin-api-service',
         '-p', 'gateway-service',
-        '-p', 'portal-api-service'
+        '-p', 'portal-api-service',
+        '-p', 'router-web-service'
     )
 
     if (-not [string]::IsNullOrWhiteSpace($CargoBuildJobs)) {
@@ -278,8 +279,13 @@ function Get-RouterPnpmVirtualStoreDir {
 
     foreach ($rawLine in Get-Content $modulesFile -ErrorAction SilentlyContinue) {
         $line = [string]$rawLine
-        if ($line -match '^\s*virtualStoreDir:\s*(?<value>.+?)\s*$') {
-            return $Matches.value.Trim()
+        if ($line -match '^\s*(?:"?)virtualStoreDir(?:"?)\s*:\s*(?<value>.+?)\s*,?\s*$') {
+            $value = $Matches.value.Trim()
+            if ($value.Length -ge 2 -and $value.StartsWith('"') -and $value.EndsWith('"')) {
+                $value = $value.Substring(1, $value.Length - 2)
+                $value = $value.Replace('\"', '"').Replace('\\', '\').Replace('\/', '/')
+            }
+            return $value
         }
     }
 

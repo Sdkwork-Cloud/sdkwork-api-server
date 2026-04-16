@@ -123,6 +123,58 @@ async fn admin_routes_require_valid_bearer_token() {
 
 #[tokio::test]
 #[serial]
+async fn admin_openapi_inventory_routes_stay_public_without_bearer_token() {
+    let pool = memory_pool().await;
+    let app = sdkwork_api_interface_admin::admin_router_with_pool(pool);
+
+    let openapi = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/openapi.json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(openapi.status(), StatusCode::OK);
+    let openapi_json = read_json(openapi).await;
+    assert_eq!(openapi_json["info"]["title"], "SDKWORK Admin API");
+
+    let docs = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/docs")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(docs.status(), StatusCode::OK);
+    let docs_body = read_body(docs).await;
+    assert!(docs_body.contains("SDKWORK Admin API"));
+
+    let docs_ui = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/docs/ui/")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(docs_ui.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+#[serial]
 async fn admin_routes_use_the_configured_jwt_signing_secret() {
     let pool = memory_pool().await;
     let store = Arc::new(SqliteAdminStore::new(pool));

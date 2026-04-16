@@ -25,7 +25,7 @@ if ([string]::IsNullOrWhiteSpace($RuntimeHome)) {
     }
 }
 
-$runtimeHome = if (Test-Path $RuntimeHome) { (Resolve-Path $RuntimeHome).Path } else { $RuntimeHome }
+$runtimeHome = Resolve-RouterAbsolutePath -BasePath (Get-Location).Path -CandidatePath $RuntimeHome
 $runDirectory = Join-Path $runtimeHome 'var\run'
 $logDirectory = Join-Path $runtimeHome 'var\log'
 $pidFile = Join-Path $runDirectory 'router-product-service.pid'

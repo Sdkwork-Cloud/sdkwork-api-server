@@ -77,8 +77,9 @@ const portalCommonsSourceRoot = path.resolve(
 );
 const portalCommonsSubpathRoot = `${normalizeAliasPath(portalCommonsSourceRoot)}/`;
 const reactRouterDomRoot = normalizeAliasPath(resolvePnpmPackageRoot('react-router-dom'));
-const zustandRoot = normalizeAliasPath(resolvePnpmPackageRoot('zustand'));
-const zustandSubpathRoot = `${zustandRoot}/`;
+const zustandPackageRoot = normalizeAliasPath(resolvePnpmPackageRoot('zustand'));
+const zustandEsmEntry = normalizeAliasPath(path.join(zustandPackageRoot, 'esm', 'index.mjs'));
+const zustandEsmSubpathRoot = `${normalizeAliasPath(path.join(zustandPackageRoot, 'esm'))}/`;
 const clsxRoot = normalizeAliasPath(resolvePnpmPackageRoot('clsx'));
 const tailwindMergeRoot = normalizeAliasPath(resolvePnpmPackageRoot('tailwind-merge'));
 const lucideReactRoot = resolvePnpmPackageRoot('lucide-react');
@@ -166,11 +167,11 @@ export default defineConfig({
       },
       {
         find: /^zustand$/,
-        replacement: zustandRoot,
+        replacement: zustandEsmEntry,
       },
       {
         find: /^zustand\//,
-        replacement: zustandSubpathRoot,
+        replacement: zustandEsmSubpathRoot,
       },
       {
         find: /^clsx$/,

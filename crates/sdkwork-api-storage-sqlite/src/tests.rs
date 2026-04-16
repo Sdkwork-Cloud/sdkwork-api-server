@@ -5,6 +5,7 @@ use sdkwork_api_domain_jobs::{
 };
 use sdkwork_api_domain_routing::ProviderHealthSnapshot;
 use std::path::PathBuf;
+use std::{env, fs};
 
 use super::{run_migrations, sqlite_path_from_url, SqliteAdminStore};
 
@@ -44,6 +45,35 @@ fn routing_store_uses_shared_routing_assessment_codecs() {
             "sqlite_support should define shared helper `{signature}`",
         );
     }
+}
+
+#[tokio::test]
+async fn run_migrations_configures_file_sqlite_databases_for_multi_process_runtime_use() {
+    let unique_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let database_path = env::temp_dir()
+        .join("sdkwork-router-sqlite-tests")
+        .join(format!("runtime-mode-{unique_id}.db"));
+    let database_url = format!("sqlite://{}", database_path.to_string_lossy().replace('\\', "/"));
+
+    let pool = run_migrations(&database_url).await.unwrap();
+
+    let journal_mode: String = sqlx::query_scalar("PRAGMA journal_mode;")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let busy_timeout_ms: i64 = sqlx::query_scalar("PRAGMA busy_timeout;")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(journal_mode.to_ascii_lowercase(), "wal");
+    assert_eq!(busy_timeout_ms, 5_000);
+
+    drop(pool);
+    let _ = fs::remove_file(database_path);
 }
 
 #[tokio::test]

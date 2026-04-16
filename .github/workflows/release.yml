@@ -380,6 +380,44 @@ jobs:
         shell: bash
         run: node scripts/release/package-release-assets.mjs native --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --target ${{ matrix.target }} --output-dir artifacts/release
 
+      - name: Run Linux Docker Compose packaged product smoke
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: node scripts/release/run-linux-docker-compose-smoke.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --bundle-path artifacts/release/native/${{ matrix.platform }}/${{ matrix.arch }}/bundles/sdkwork-api-router-product-server-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz --evidence-path artifacts/release-governance/docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Upload Linux Docker Compose smoke evidence
+        if: ${{ always() && matrix.platform == 'linux' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: artifacts/release-governance/docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+
+      - name: Generate Linux Docker Compose smoke evidence attestation
+        if: ${{ (!github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true') && matrix.platform == 'linux' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release-governance/docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Run Linux Helm render packaged smoke
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: node scripts/release/run-linux-helm-render-smoke.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --bundle-path artifacts/release/native/${{ matrix.platform }}/${{ matrix.arch }}/bundles/sdkwork-api-router-product-server-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz --evidence-path artifacts/release-governance/helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
+      - name: Upload Linux Helm render smoke evidence
+        if: ${{ always() && matrix.platform == 'linux' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governance-helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: artifacts/release-governance/helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+
+      - name: Generate Linux Helm render smoke evidence attestation
+        if: ${{ (!github.event.repository.private || vars.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true') && matrix.platform == 'linux' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release-governance/helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
+
       - name: Upload native release assets
         uses: actions/upload-artifact@v4
         with:

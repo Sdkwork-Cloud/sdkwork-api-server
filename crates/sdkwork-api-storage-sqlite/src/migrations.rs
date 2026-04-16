@@ -1,10 +1,19 @@
-﻿use super::*;
+use super::*;
+use std::time::Duration;
 
 pub async fn run_migrations(url: &str) -> Result<SqlitePool> {
     ensure_sqlite_parent_directory(url)?;
+    let mut options = sqlx::sqlite::SqliteConnectOptions::from_str(url)?
+        .busy_timeout(Duration::from_millis(5_000));
+    if sqlite_path_from_url(url).is_some() {
+        options = options
+            .create_if_missing(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .synchronous(sqlx::sqlite::SqliteSynchronous::Normal);
+    }
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
-        .connect(url)
+        .connect_with(options)
         .await?;
     apply_sqlite_identity_schema(&pool).await?;
     apply_sqlite_marketing_schema(&pool).await?;

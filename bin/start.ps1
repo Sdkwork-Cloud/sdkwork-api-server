@@ -39,7 +39,7 @@ if ([string]::IsNullOrWhiteSpace($RuntimeHome)) {
     }
 }
 
-$runtimeHome = if (Test-Path $RuntimeHome) { (Resolve-Path $RuntimeHome).Path } else { $RuntimeHome }
+$runtimeHome = Resolve-RouterAbsolutePath -BasePath (Get-Location).Path -CandidatePath $RuntimeHome
 $binDir = Join-Path $runtimeHome 'bin'
 $binaryPath = Join-Path $binDir $binaryName
 $configDirectory = Join-Path $runtimeHome 'config'
@@ -89,16 +89,16 @@ if (-not $env:SDKWORK_BOOTSTRAP_DATA_DIR) {
     }
 }
 if (-not $env:SDKWORK_WEB_BIND) {
-    $env:SDKWORK_WEB_BIND = '0.0.0.0:9983'
+    $env:SDKWORK_WEB_BIND = '0.0.0.0:3001'
 }
 if (-not $env:SDKWORK_GATEWAY_BIND) {
-    $env:SDKWORK_GATEWAY_BIND = '127.0.0.1:9980'
+    $env:SDKWORK_GATEWAY_BIND = '127.0.0.1:8080'
 }
 if (-not $env:SDKWORK_ADMIN_BIND) {
-    $env:SDKWORK_ADMIN_BIND = '127.0.0.1:9981'
+    $env:SDKWORK_ADMIN_BIND = '127.0.0.1:8081'
 }
 if (-not $env:SDKWORK_PORTAL_BIND) {
-    $env:SDKWORK_PORTAL_BIND = '127.0.0.1:9982'
+    $env:SDKWORK_PORTAL_BIND = '127.0.0.1:8082'
 }
 if (-not $env:SDKWORK_ADMIN_SITE_DIR) {
     $env:SDKWORK_ADMIN_SITE_DIR = $defaultAdminSiteDirPortable

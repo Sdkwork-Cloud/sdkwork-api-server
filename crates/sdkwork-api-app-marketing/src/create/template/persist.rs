@@ -19,11 +19,23 @@ async fn persist_coupon_template_record(
         .await
         .map_err(marketing_create_storage)?
     {
-        return mode.resolve_existing_primary(
+        if coupon_template_seed_matches(&existing_template, &record) {
+            return Ok(existing_template);
+        }
+        if matches!(mode, PersistMode::Ensure) {
+            let reconciled =
+                reconcile_coupon_template_seed_record(store, &existing_template, &record).await?;
+            return store
+                .insert_coupon_template_record(&reconciled)
+                .await
+                .map_err(marketing_create_storage);
+        }
+        return mode.resolve_existing_primary_with(
             "coupon template",
             &record.coupon_template_id,
             existing_template,
             &record,
+            coupon_template_seed_matches,
         );
     }
     if let Some(existing_template) = store
@@ -57,4 +69,48 @@ pub async fn ensure_coupon_template_record(
     record: CouponTemplateRecord,
 ) -> Result<CouponTemplateRecord, MarketingGovernanceError> {
     persist_coupon_template_record(store, record, PersistMode::Ensure).await
+}
+
+fn coupon_template_seed_matches(
+    existing: &CouponTemplateRecord,
+    desired: &CouponTemplateRecord,
+) -> bool {
+    existing.coupon_template_id == desired.coupon_template_id
+        && existing.template_key == desired.template_key
+        && existing.display_name == desired.display_name
+        && existing.distribution_kind == desired.distribution_kind
+        && existing.benefit == desired.benefit
+        && existing.restriction == desired.restriction
+}
+
+async fn reconcile_coupon_template_seed_record(
+    store: &dyn AdminStore,
+    existing: &CouponTemplateRecord,
+    desired: &CouponTemplateRecord,
+) -> Result<CouponTemplateRecord, MarketingGovernanceError> {
+    if existing.template_key != desired.template_key {
+        if let Some(conflicting_template) = store
+            .find_coupon_template_record_by_template_key(&desired.template_key)
+            .await
+            .map_err(marketing_create_storage)?
+        {
+            if conflicting_template.coupon_template_id != existing.coupon_template_id {
+                return Err(MarketingGovernanceError::Conflict(format!(
+                    "coupon template key {} already exists on {}",
+                    desired.template_key, conflicting_template.coupon_template_id
+                )));
+            }
+        }
+    }
+
+    Ok(desired
+        .clone()
+        .with_status(existing.status)
+        .with_approval_state(existing.approval_state)
+        .with_revision(existing.revision)
+        .with_root_coupon_template_id(existing.root_coupon_template_id.clone())
+        .with_parent_coupon_template_id(existing.parent_coupon_template_id.clone())
+        .with_activation_at_ms(existing.activation_at_ms)
+        .with_created_at_ms(existing.created_at_ms)
+        .with_updated_at_ms(existing.updated_at_ms.max(desired.updated_at_ms)))
 }

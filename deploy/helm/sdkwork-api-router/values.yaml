@@ -1,0 +1,56 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/your-org/sdkwork-api-router
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3001
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: sdkwork-router.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 10001
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+bootstrapProfile: prod
+browserAllowedOrigins: ""
+
+binds:
+  web: 0.0.0.0:3001
+  gateway: 127.0.0.1:8080
+  admin: 127.0.0.1:8081
+  portal: 127.0.0.1:8082
+
+secrets:
+  existingSecret: ""
+  databaseUrl: ""
+  adminJwtSigningSecret: ""
+  portalJwtSigningSecret: ""
+  credentialMasterKey: ""
+  metricsBearerToken: ""

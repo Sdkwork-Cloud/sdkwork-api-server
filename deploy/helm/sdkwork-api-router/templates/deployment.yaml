@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sdkwork-api-router.fullname" . }}
+  labels:
+    {{- include "sdkwork-api-router.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sdkwork-api-router.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sdkwork-api-router.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/runtime-secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: router
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+          env:
+            - name: SDKWORK_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sdkwork-api-router.secretName" . }}
+                  key: SDKWORK_DATABASE_URL
+            - name: SDKWORK_ADMIN_JWT_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sdkwork-api-router.secretName" . }}
+                  key: SDKWORK_ADMIN_JWT_SIGNING_SECRET
+            - name: SDKWORK_PORTAL_JWT_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sdkwork-api-router.secretName" . }}
+                  key: SDKWORK_PORTAL_JWT_SIGNING_SECRET
+            - name: SDKWORK_CREDENTIAL_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sdkwork-api-router.secretName" . }}
+                  key: SDKWORK_CREDENTIAL_MASTER_KEY
+            - name: SDKWORK_METRICS_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sdkwork-api-router.secretName" . }}
+                  key: SDKWORK_METRICS_BEARER_TOKEN
+            - name: SDKWORK_BOOTSTRAP_PROFILE
+              value: {{ .Values.bootstrapProfile | quote }}
+            - name: SDKWORK_BOOTSTRAP_DATA_DIR
+              value: /opt/sdkwork/data
+            - name: SDKWORK_ADMIN_SITE_DIR
+              value: /opt/sdkwork/sites/admin/dist
+            - name: SDKWORK_PORTAL_SITE_DIR
+              value: /opt/sdkwork/sites/portal/dist
+            - name: SDKWORK_WEB_BIND
+              value: {{ .Values.binds.web | quote }}
+            - name: SDKWORK_GATEWAY_BIND
+              value: {{ .Values.binds.gateway | quote }}
+            - name: SDKWORK_ADMIN_BIND
+              value: {{ .Values.binds.admin | quote }}
+            - name: SDKWORK_PORTAL_BIND
+              value: {{ .Values.binds.portal | quote }}
+            {{- if .Values.browserAllowedOrigins }}
+            - name: SDKWORK_BROWSER_ALLOWED_ORIGINS
+              value: {{ .Values.browserAllowedOrigins | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/portal/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /api/admin/health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

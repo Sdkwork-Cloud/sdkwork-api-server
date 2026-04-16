@@ -53,6 +53,24 @@ fn classify_request_routes_gateway_health_without_v1_prefix() {
 }
 
 #[test]
+fn classify_request_routes_gateway_docs_and_openapi_from_root() {
+    assert_eq!(
+        classify_request("/openapi.json"),
+        RuntimeRoute::Proxy {
+            upstream: "gateway".to_owned(),
+            request_path: "/openapi.json".to_owned(),
+        }
+    );
+    assert_eq!(
+        classify_request("/docs"),
+        RuntimeRoute::Proxy {
+            upstream: "gateway".to_owned(),
+            request_path: "/docs".to_owned(),
+        }
+    );
+}
+
+#[test]
 fn classify_request_identifies_static_site_mounts() {
     assert_eq!(
         classify_request("/portal/assets/index.js"),

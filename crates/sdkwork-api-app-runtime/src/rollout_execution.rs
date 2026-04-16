@@ -211,6 +211,7 @@ pub fn start_extension_runtime_rollout_supervision(
     let started_at_ms = unix_timestamp_ms();
 
     Ok(tokio::spawn(async move {
+        let mut last_heartbeat_at_ms = None;
         let mut interval = tokio::time::interval(Duration::from_millis(
             EXTENSION_RUNTIME_ROLLOUT_POLL_INTERVAL_MS,
         ));
@@ -220,19 +221,21 @@ pub fn start_extension_runtime_rollout_supervision(
             interval.tick().await;
 
             let store = live_store.snapshot();
-            let heartbeat = ServiceRuntimeNodeRecord::new(
-                node_id.clone(),
-                service_kind.as_str(),
-                started_at_ms,
-            )
-            .with_last_seen_at_ms(unix_timestamp_ms());
-            if let Err(error) = store.upsert_service_runtime_node(&heartbeat).await {
-                eprintln!(
-                    "extension runtime rollout heartbeat failed: service={} node_id={} error={error}",
-                    service_kind.as_str(),
-                    node_id
-                );
-                continue;
+            let now_ms = unix_timestamp_ms();
+            if service_runtime_node_heartbeat_due(last_heartbeat_at_ms, now_ms) {
+                let heartbeat =
+                    ServiceRuntimeNodeRecord::new(node_id.clone(), service_kind.as_str(), started_at_ms)
+                        .with_last_seen_at_ms(now_ms);
+                if let Err(error) = store.upsert_service_runtime_node(&heartbeat).await {
+                    eprintln!(
+                        "extension runtime rollout heartbeat failed: service={} node_id={} error={error}",
+                        service_kind.as_str(),
+                        node_id
+                    );
+                    continue;
+                }
+
+                last_heartbeat_at_ms = Some(now_ms);
             }
 
             if let Err(error) =

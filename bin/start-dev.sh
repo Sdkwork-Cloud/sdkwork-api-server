@@ -309,15 +309,29 @@ if [ -n "$EXISTING_PID" ] && [ "$DRY_RUN" != '1' ]; then
       fi
       fi
     else
+      requestedConfigurationDiffers=0
       if [ "$ACTIVE_WEB_BIND" != "$SDKWORK_WEB_BIND" ] \
         || [ "$ACTIVE_GATEWAY_BIND" != "$SDKWORK_GATEWAY_BIND" ] \
         || [ "$ACTIVE_ADMIN_BIND" != "$SDKWORK_ADMIN_BIND" ] \
         || [ "$ACTIVE_PORTAL_BIND" != "$SDKWORK_PORTAL_BIND" ] \
         || [ "$ROUTER_MODE" != "$PRIMARY_MODE" ]; then
-        router_log "development workspace already running (pid=$EXISTING_PID) with active managed settings that differ from the requested launch configuration"
-      else
-        router_log "development workspace already running (pid=$EXISTING_PID)"
+        requestedConfigurationDiffers=1
       fi
+      if [ "$requestedConfigurationDiffers" -eq 1 ]; then
+        router_startup_summary \
+          "$ROUTER_MODE" \
+          "$UNIFIED_ACCESS_ENABLED" \
+          "$ACTIVE_WEB_BIND" \
+          "$ACTIVE_GATEWAY_BIND" \
+          "$ACTIVE_ADMIN_BIND" \
+          "$ACTIVE_PORTAL_BIND" \
+          "$DEV_ADMIN_URL" \
+          "$DEV_PORTAL_URL" \
+          "$STDOUT_LOG" \
+          "$STDERR_LOG"
+        router_die "development workspace already running (pid=$EXISTING_PID) with active managed settings that differ from the requested launch configuration; run bin/stop-dev.sh before relaunching with different settings"
+      fi
+      router_log "development workspace already running (pid=$EXISTING_PID)"
       router_startup_summary \
         "$ROUTER_MODE" \
         "$UNIFIED_ACCESS_ENABLED" \

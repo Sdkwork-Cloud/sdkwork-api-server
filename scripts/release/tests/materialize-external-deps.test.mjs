@@ -141,6 +141,7 @@ test('external release dependency materializer accepts a governed nested package
       'sdks',
       'sdkwork-craw-chat-sdk',
       'sdkwork-craw-chat-sdk-typescript',
+      'composed',
     ),
     expectedGitRoot: path.join(repoRoot, '..', 'craw-chat'),
     cloneTargetDir: path.join(repoRoot, '..', 'craw-chat'),
@@ -165,4 +166,57 @@ test('external release dependency materializer accepts a governed nested package
     status: 'ready',
     skipped: true,
   });
+});
+
+test('external release dependency specs can be remapped into a dedicated governed release root', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'materialize-external-deps.mjs'),
+    ).href,
+  );
+
+  assert.equal(typeof module.resolveExternalReleaseDependencySpecs, 'function');
+
+  const governedRoot = path.join(repoRoot, 'artifacts', 'release-governance', 'external-deps');
+  const specs = module.resolveExternalReleaseDependencySpecs({
+    env: {
+      SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT: governedRoot,
+    },
+  });
+
+  const sdkworkCore = specs.find((spec) => spec.id === 'sdkwork-core');
+  assert.ok(sdkworkCore);
+  assert.equal(
+    sdkworkCore.targetDir,
+    path.join(governedRoot, 'sdkwork-core'),
+  );
+
+  const sdkworkUi = specs.find((spec) => spec.id === 'sdkwork-ui');
+  assert.ok(sdkworkUi);
+  assert.equal(
+    sdkworkUi.targetDir,
+    path.join(governedRoot, 'sdkwork-ui'),
+  );
+
+  const sdkworkCrawChatSdk = specs.find((spec) => spec.id === 'sdkwork-craw-chat-sdk');
+  assert.ok(sdkworkCrawChatSdk);
+  assert.equal(
+    sdkworkCrawChatSdk.cloneTargetDir,
+    path.join(governedRoot, 'craw-chat'),
+  );
+  assert.equal(
+    sdkworkCrawChatSdk.expectedGitRoot,
+    path.join(governedRoot, 'craw-chat'),
+  );
+  assert.equal(
+    sdkworkCrawChatSdk.targetDir,
+    path.join(
+      governedRoot,
+      'craw-chat',
+      'sdks',
+      'sdkwork-craw-chat-sdk',
+      'sdkwork-craw-chat-sdk-typescript',
+      'composed',
+    ),
+  );
 });

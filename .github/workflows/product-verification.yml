@@ -20,6 +20,11 @@ on:
       - 'scripts/check-router-docs-safety.test.mjs'
       - 'scripts/check-router-frontend-budgets.mjs'
       - 'scripts/check-router-frontend-budgets.test.mjs'
+      - 'scripts/browser-runtime-smoke.mjs'
+      - 'scripts/browser-runtime-smoke.test.mjs'
+      - 'scripts/check-admin-browser-runtime.mjs'
+      - 'scripts/check-admin-browser-runtime.test.mjs'
+      - 'scripts/check-portal-browser-runtime.mjs'
       - 'scripts/check-router-product.mjs'
       - 'scripts/check-router-product.test.mjs'
       - 'scripts/check-rust-dependency-audit.mjs'
@@ -73,7 +78,7 @@ jobs:
           pnpm --dir apps/sdkwork-router-portal install --frozen-lockfile
 
       - name: Run product governance node tests
-        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
+        run: node --test scripts/product-verification-workflow.test.mjs scripts/check-router-product.test.mjs scripts/browser-runtime-smoke.test.mjs scripts/check-admin-browser-runtime.test.mjs scripts/build-router-desktop-assets.test.mjs scripts/check-router-docs-safety.test.mjs scripts/check-router-frontend-budgets.test.mjs scripts/dev/tests/pnpm-launch-lib.test.mjs apps/sdkwork-router-portal/tests/product-entrypoint-scripts.test.mjs
 
       - name: Run product verification gate
         env:

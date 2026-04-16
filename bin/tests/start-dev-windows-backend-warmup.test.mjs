@@ -39,7 +39,10 @@ test('start-dev.ps1 wires in a Windows backend warm-up build with managed cargo 
   assert.match(commonScript, /'admin-api-service'/);
   assert.match(commonScript, /'gateway-service'/);
   assert.match(commonScript, /'portal-api-service'/);
+  assert.match(commonScript, /'router-web-service'/);
   assert.match(startDevScript, /Enable-RouterManagedCargoEnv -RepoRoot \$repoRoot/);
+  assert.match(startDevScript, /\$env:SDKWORK_ROUTER_USE_PREBUILT_BACKEND_BINARIES = '1'/);
+  assert.match(startDevScript, /\$env:SDKWORK_ROUTER_USE_PREBUILT_WEB_BINARY = '1'/);
   assert.match(startDevScript, /\$packagedBootstrapDataDirectory = Join-Path \$scriptDir 'data'/);
   assert.match(startDevScript, /Test-RouterPnpmNodeModulesHealthy -NodeModulesPath \$portalNodeModules/);
   assert.match(startDevScript, /Repair-RouterPortalFrontendNodeModules -RepoRoot \$repoRoot/);
@@ -84,7 +87,7 @@ test('start-dev.ps1 dry-run honors SDKWORK_ROUTER_DEV_HOME and refreshes the gen
     assert.match(output, /CARGO_TARGET_DIR=/);
     assert.match(
       output,
-      /backend warm-up: cargo build -p admin-api-service -p gateway-service -p portal-api-service -j 1/,
+      /backend warm-up: cargo build -p admin-api-service -p gateway-service -p portal-api-service -p router-web-service -j 1/,
     );
     assert.ok(existsSync(planFile), 'expected dry-run plan file to be written');
 

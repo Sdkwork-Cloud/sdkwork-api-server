@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   ensureFrontendDependenciesReady,
   frontendDistReady,
+  frontendDistUpToDate,
   frontendInstallRequired,
   frontendInstallStatus,
   pnpmArgumentPrefix,
@@ -30,6 +31,10 @@ function withTempApp(callback) {
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function setFileTimestamp(filePath, timestampSeconds) {
+  utimesSync(filePath, timestampSeconds, timestampSeconds);
 }
 
 test('pnpmExecutable uses node.exe on Windows so pnpm can run without cmd.exe shelling', () => {
@@ -246,6 +251,48 @@ test('frontendDistReady only accepts built static sites with an index.html entry
 
     writeFileSync(path.join(distRoot, 'index.html'), '<!doctype html>');
     assert.equal(frontendDistReady(distRoot), true);
+  });
+});
+
+test('frontendDistUpToDate only allows preview build reuse when dist is newer than the tracked frontend inputs', () => {
+  withTempApp((appRoot) => {
+    const srcRoot = path.join(appRoot, 'src');
+    const packagesRoot = path.join(appRoot, 'packages');
+    const distRoot = path.join(appRoot, 'dist');
+    const sourceFile = path.join(srcRoot, 'main.ts');
+    const packageFile = path.join(packagesRoot, 'feature.ts');
+    const distEntry = path.join(distRoot, 'index.html');
+
+    mkdirSync(srcRoot, { recursive: true });
+    mkdirSync(packagesRoot, { recursive: true });
+    mkdirSync(distRoot, { recursive: true });
+    writeFileSync(sourceFile, 'export const value = 1;\n');
+    writeFileSync(packageFile, 'export const feature = true;\n');
+    writeFileSync(distEntry, '<!doctype html>\n');
+
+    setFileTimestamp(sourceFile, 1000);
+    setFileTimestamp(packageFile, 1005);
+    setFileTimestamp(distEntry, 1010);
+
+    assert.equal(
+      frontendDistUpToDate({
+        appRoot,
+        distDir: distRoot,
+        buildInputs: ['src', 'packages'],
+      }),
+      true,
+    );
+
+    setFileTimestamp(sourceFile, 1020);
+
+    assert.equal(
+      frontendDistUpToDate({
+        appRoot,
+        distDir: distRoot,
+        buildInputs: ['src', 'packages'],
+      }),
+      false,
+    );
   });
 });
 

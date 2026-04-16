@@ -534,6 +534,7 @@ pub fn start_standalone_runtime_supervision(
 
             let mut interval =
                 tokio::time::interval(Duration::from_secs(CONFIG_RELOAD_POLL_INTERVAL_SECS));
+            let mut last_heartbeat_at_ms = None;
             interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
             interval.tick().await;
 
@@ -542,21 +543,26 @@ pub fn start_standalone_runtime_supervision(
 
                 if let Some(node_id) = reload_handles.node_id.as_deref() {
                     let coordination_store = coordination_store.snapshot();
-                    let heartbeat = ServiceRuntimeNodeRecord::new(
-                        node_id,
-                        service_kind.as_str(),
-                        started_at_ms,
-                    )
-                    .with_last_seen_at_ms(unix_timestamp_ms());
-                    if let Err(error) = coordination_store
-                        .upsert_service_runtime_node(&heartbeat)
-                        .await
-                    {
-                        eprintln!(
-                            "standalone config rollout heartbeat failed: service={} node_id={} error={error}",
-                            service_kind.as_str(),
+                    let now_ms = unix_timestamp_ms();
+                    if service_runtime_node_heartbeat_due(last_heartbeat_at_ms, now_ms) {
+                        let heartbeat = ServiceRuntimeNodeRecord::new(
                             node_id,
-                        );
+                            service_kind.as_str(),
+                            started_at_ms,
+                        )
+                        .with_last_seen_at_ms(now_ms);
+                        if let Err(error) = coordination_store
+                            .upsert_service_runtime_node(&heartbeat)
+                            .await
+                        {
+                            eprintln!(
+                                "standalone config rollout heartbeat failed: service={} node_id={} error={error}",
+                                service_kind.as_str(),
+                                node_id,
+                            );
+                        } else {
+                            last_heartbeat_at_ms = Some(now_ms);
+                        }
                     }
 
                     if let Err(error) = process_standalone_config_rollout_work(

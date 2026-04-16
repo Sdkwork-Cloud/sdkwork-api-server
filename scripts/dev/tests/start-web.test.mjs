@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -162,4 +164,56 @@ test('start-web only emits raw spawn error stacks when the Windows EPERM fallbac
   assert.match(script, /const reuseExistingDist = shouldReuseExistingFrontendDist/);
   assert.match(script, /if \(result\.error && !reuseExistingDist\)/);
   assert.match(script, /console\.warn\(\`\[start-web\] \$\{label\} failed with Windows spawn EPERM; reusing existing dist at \$\{distDir\}`\)/);
+});
+
+test('start-web preview path only skips frontend rebuilds when the existing dist is still fresh for tracked inputs', () => {
+  const script = readFileSync(path.join(import.meta.dirname, '..', 'start-web.mjs'), 'utf8');
+
+  assert.match(script, /frontendDistUpToDate/);
+  assert.match(script, /reusing fresh dist/i);
+});
+
+test('start-web can reuse a prebuilt Windows router-web-service binary after warm-up instead of spawning cargo run', {
+  skip: process.platform !== 'win32',
+}, () => {
+  const repoRoot = path.resolve(import.meta.dirname, '..', '..', '..');
+  const targetDir = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-start-web-target-'));
+  const debugDir = path.join(targetDir, 'debug');
+  mkdirSync(debugDir, { recursive: true });
+  writeFileSync(path.join(debugDir, 'router-web-service.exe'), '');
+
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/dev/start-web.mjs',
+        '--bind',
+        '127.0.0.1:13983',
+        '--admin-target',
+        '127.0.0.1:13981',
+        '--portal-target',
+        '127.0.0.1:13982',
+        '--gateway-target',
+        '127.0.0.1:13980',
+        '--dry-run',
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          SDKWORK_ROUTER_USE_PREBUILT_WEB_BINARY: '1',
+          CARGO_TARGET_DIR: targetDir,
+        },
+        encoding: 'utf8',
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const normalizedOutput = result.stdout.replaceAll('\\', '/');
+    const normalizedTargetDir = targetDir.replaceAll('\\', '/').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(normalizedOutput, new RegExp(`${normalizedTargetDir}/debug/router-web-service\\.exe`));
+    assert.doesNotMatch(normalizedOutput, /cargo(?:\.exe)? run -p router-web-service/);
+  } finally {
+    rmSync(targetDir, { recursive: true, force: true });
+  }
 });

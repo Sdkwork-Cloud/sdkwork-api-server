@@ -102,10 +102,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\start.ps1
 
 默认绑定地址：
 
-- gateway：`127.0.0.1:9980`
-- admin：`127.0.0.1:9981`
-- portal：`127.0.0.1:9982`
-- unified web host：`0.0.0.0:9983`
+- gateway：`127.0.0.1:8080`
+- admin：`127.0.0.1:8081`
+- portal：`127.0.0.1:8082`
+- unified web host：`0.0.0.0:3001`
 
 启动成功后脚本会打印：
 
@@ -232,6 +232,45 @@ pnpm --dir apps/sdkwork-router-admin tauri:build
 - 密钥优先交由服务端 secret backend 管理
 - 将 `config/router.env` 纳入环境级变更管理
 - 优先复用托管安装目录，而不是再发明另一套运行目录结构
+
+## Docker 与 Kubernetes 部署资产
+
+Linux 的 product-server 发布包现在会一并携带 `deploy/`：
+
+- `deploy/docker/Dockerfile`
+- `deploy/docker/docker-compose.yml`
+- `deploy/docker/.env.example`
+- `deploy/helm/sdkwork-api-router/`
+
+这些资产继续复用现有 `router-product-service` 运行时模型，而不是额外发明第二套部署方式：
+
+- 公网入口绑定：`0.0.0.0:3001`
+- 内部 gateway/admin/portal 绑定：`127.0.0.1:8080/8081/8082`
+- bootstrap 数据目录：`/opt/sdkwork/data`
+- admin 静态资源目录：`/opt/sdkwork/sites/admin/dist`
+- portal 静态资源目录：`/opt/sdkwork/sites/portal/dist`
+- 生产数据库：`SDKWORK_DATABASE_URL=postgresql://...`
+
+从解压后的 Linux 发布包快速启动 Docker：
+
+```bash
+cp deploy/docker/.env.example deploy/docker/.env
+docker build -f deploy/docker/Dockerfile -t sdkwork-api-router:local .
+docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d
+```
+
+将同一镜像推送后，可直接用 Helm 部署到 Kubernetes：
+
+```bash
+helm upgrade --install sdkwork-api-router deploy/helm/sdkwork-api-router \
+  --set image.repository=ghcr.io/your-org/sdkwork-api-router \
+  --set image.tag=2026.04.15 \
+  --set secrets.databaseUrl='postgresql://sdkwork:change-me@postgresql:5432/sdkwork_api_router' \
+  --set secrets.adminJwtSigningSecret='change-me-admin' \
+  --set secrets.portalJwtSigningSecret='change-me-portal' \
+  --set secrets.credentialMasterKey='change-me-master-key' \
+  --set secrets.metricsBearerToken='change-me-metrics-token'
+```
 
 ## Dry-run 示例
 

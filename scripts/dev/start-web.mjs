@@ -2,6 +2,7 @@
 
 import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
+import path from 'node:path';
 import {
   parseWebArgs,
   webAccessLines,
@@ -15,6 +16,7 @@ import {
 } from './process-supervision.mjs';
 import {
   frontendDistReady,
+  frontendDistUpToDate,
   frontendInstallStatus,
   frontendViteConfigHealthy,
   pnpmDisplayCommand,
@@ -26,6 +28,39 @@ import {
 function cargoExecutable() {
   return process.platform === 'win32' ? 'cargo.exe' : 'cargo';
 }
+
+function resolveWebLaunchSpec(env) {
+  const usePrebuiltBinary =
+    process.platform === 'win32' && env.SDKWORK_ROUTER_USE_PREBUILT_WEB_BINARY === '1';
+  if (usePrebuiltBinary && env.CARGO_TARGET_DIR) {
+    const binaryPath = path.resolve(env.CARGO_TARGET_DIR, 'debug', 'router-web-service.exe');
+    if (existsSync(binaryPath)) {
+      return {
+        command: binaryPath,
+        args: [],
+      };
+    }
+  }
+
+  return {
+    command: cargoExecutable(),
+    args: ['run', '-p', 'router-web-service'],
+  };
+}
+
+const previewBuildInputs = [
+  'index.html',
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'turbo.json',
+  'tsconfig.json',
+  'vite.config.ts',
+  'sdkwork.app.config.json',
+  'src',
+  'packages',
+  'scripts',
+];
 
 function runPnpmStep(args, dryRun, label, env, distDir = '', allowInstallReuse = false) {
   const processSpec = pnpmProcessSpec(args);
@@ -118,20 +153,33 @@ for (const appRoot of appRoots) {
 
 if (!settings.proxyDev) {
   for (const appRoot of appRoots) {
-    if (!runPnpmStep(['--dir', appRoot, 'build'], settings.dryRun, `build ${appRoot}`, env, `${appRoot}/dist`)) {
+    const distDir = `${appRoot}/dist`;
+    if (
+      settings.preview
+      && frontendDistUpToDate({
+        appRoot,
+        distDir,
+        buildInputs: previewBuildInputs,
+      })
+    ) {
+      console.log(`[start-web] build ${appRoot}: reusing fresh dist at ${distDir}`);
+      continue;
+    }
+
+    if (!runPnpmStep(['--dir', appRoot, 'build'], settings.dryRun, `build ${appRoot}`, env, distDir)) {
       process.exit(1);
     }
   }
 }
 
-const webArgs = ['run', '-p', 'router-web-service'];
-console.log(`[start-web] ${cargoExecutable()} ${webArgs.join(' ')}`);
+const webLaunchSpec = resolveWebLaunchSpec(env);
+console.log(`[start-web] ${[webLaunchSpec.command, ...webLaunchSpec.args].join(' ')}`);
 
 if (settings.dryRun) {
   process.exit(0);
 }
 
-const child = spawn(cargoExecutable(), webArgs, {
+const child = spawn(webLaunchSpec.command, webLaunchSpec.args, {
   stdio: 'inherit',
   env,
 });

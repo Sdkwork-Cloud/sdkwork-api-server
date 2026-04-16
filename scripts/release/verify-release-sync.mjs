@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
+const siblingWorkspaceRoot = path.resolve(rootDir, '..');
 const defaultReleaseSyncAuditPath = path.join(
   rootDir,
   'docs',
@@ -76,6 +77,7 @@ const RELEASE_SYNC_REPOSITORY_SPECS = Object.freeze([
       'sdks',
       'sdkwork-craw-chat-sdk',
       'sdkwork-craw-chat-sdk-typescript',
+      'composed',
     ),
     expectedGitRoot: path.resolve(rootDir, '..', 'craw-chat'),
     expectedRemoteUrl: 'https://github.com/Sdkwork-Cloud/craw-chat.git',
@@ -87,6 +89,62 @@ const RELEASE_SYNC_REPOSITORY_SPECS = Object.freeze([
 export function listReleaseSyncRepositorySpecs() {
   return RELEASE_SYNC_REPOSITORY_SPECS.map((spec) => ({
     ...spec,
+  }));
+}
+
+function resolveReleaseExternalDependencyRoot({
+  externalDependencyRoot,
+  env = process.env,
+} = {}) {
+  const resolvedRoot = String(
+    externalDependencyRoot ?? env.SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT ?? '',
+  ).trim();
+  return resolvedRoot.length > 0 ? path.resolve(resolvedRoot) : '';
+}
+
+function remapReleaseSyncRepositoryPath({
+  candidatePath,
+  externalDependencyRoot,
+} = {}) {
+  const resolvedCandidatePath = String(candidatePath ?? '').trim();
+  if (resolvedCandidatePath.length === 0 || externalDependencyRoot.length === 0) {
+    return resolvedCandidatePath;
+  }
+
+  const absoluteCandidatePath = path.resolve(resolvedCandidatePath);
+  if (
+    isPathInside(rootDir, absoluteCandidatePath)
+    || !isPathInside(siblingWorkspaceRoot, absoluteCandidatePath)
+  ) {
+    return absoluteCandidatePath;
+  }
+
+  return path.resolve(
+    externalDependencyRoot,
+    path.relative(siblingWorkspaceRoot, absoluteCandidatePath),
+  );
+}
+
+export function resolveReleaseSyncRepositorySpecs({
+  specs = listReleaseSyncRepositorySpecs(),
+  externalDependencyRoot,
+  env = process.env,
+} = {}) {
+  const resolvedExternalDependencyRoot = resolveReleaseExternalDependencyRoot({
+    externalDependencyRoot,
+    env,
+  });
+
+  return specs.map((spec) => ({
+    ...spec,
+    targetDir: remapReleaseSyncRepositoryPath({
+      candidatePath: spec.targetDir,
+      externalDependencyRoot: resolvedExternalDependencyRoot,
+    }),
+    expectedGitRoot: remapReleaseSyncRepositoryPath({
+      candidatePath: spec.expectedGitRoot,
+      externalDependencyRoot: resolvedExternalDependencyRoot,
+    }),
   }));
 }
 
@@ -253,6 +311,13 @@ export function resolveReleaseSyncRepositoryRef({
 
 function normalizePathForCompare(value) {
   return path.resolve(String(value ?? '')).replaceAll('\\', '/').toLowerCase();
+}
+
+function isPathInside(parentPath, childPath) {
+  const normalizedParent = normalizePathForCompare(parentPath);
+  const normalizedChild = normalizePathForCompare(childPath);
+  return normalizedChild === normalizedParent
+    || normalizedChild.startsWith(`${normalizedParent}/`);
 }
 
 function normalizeGitHubRemoteUrlForCompare(value = '') {
@@ -548,7 +613,7 @@ function auditRepositorySpec(spec, {
 }
 
 export function auditReleaseSyncRepositories({
-  specs = listReleaseSyncRepositorySpecs(),
+  specs,
   auditPath,
   auditJson,
   preferDefaultArtifact = true,
@@ -567,7 +632,10 @@ export function auditReleaseSyncRepositories({
     return resolvedInput.summary;
   }
 
-  const reports = specs.map((spec) => auditRepositorySpec(spec, {
+  const resolvedSpecs = Array.isArray(specs)
+    ? specs
+    : resolveReleaseSyncRepositorySpecs({ env });
+  const reports = resolvedSpecs.map((spec) => auditRepositorySpec(spec, {
     spawnSyncImpl,
   }));
   return {

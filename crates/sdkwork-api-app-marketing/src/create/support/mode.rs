@@ -8,19 +8,20 @@ pub(crate) enum PersistMode {
 }
 
 impl PersistMode {
-    pub(crate) fn resolve_existing_primary<T: PartialEq>(
+    pub(crate) fn resolve_existing_primary_with<T>(
         self,
         aggregate_label: &str,
         aggregate_id: &str,
         existing: T,
         desired: &T,
+        matches: impl FnOnce(&T, &T) -> bool,
     ) -> Result<T, MarketingGovernanceError> {
         match self {
             Self::Create => Err(MarketingGovernanceError::Conflict(format!(
                 "{aggregate_label} {aggregate_id} already exists"
             ))),
             Self::Ensure => {
-                if &existing == desired {
+                if matches(&existing, desired) {
                     Ok(existing)
                 } else {
                     Err(marketing_create_conflicting_existing_state(

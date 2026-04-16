@@ -38,6 +38,48 @@ router_repo_root() {
   CDPATH= cd -- "$SCRIPT_DIR/.." && pwd
 }
 
+router_resolve_absolute_path() {
+  BASE_PATH="$1"
+  CANDIDATE_PATH="$2"
+
+  case "$CANDIDATE_PATH" in
+    /*)
+      TARGET_PATH="$CANDIDATE_PATH"
+      ;;
+    *)
+      TARGET_PATH="$BASE_PATH/$CANDIDATE_PATH"
+      ;;
+  esac
+
+  if [ -d "$TARGET_PATH" ]; then
+    CDPATH= cd -- "$TARGET_PATH" && pwd
+    return 0
+  fi
+
+  PARENT_DIR=$(dirname -- "$TARGET_PATH")
+  LEAF_NAME=$(basename -- "$TARGET_PATH")
+
+  if [ "$PARENT_DIR" = "$TARGET_PATH" ]; then
+    printf '%s' "$TARGET_PATH"
+    return 0
+  fi
+
+  if [ -d "$PARENT_DIR" ]; then
+    RESOLVED_PARENT=$(CDPATH= cd -- "$PARENT_DIR" && pwd)
+  else
+    RESOLVED_PARENT=$(router_resolve_absolute_path "$BASE_PATH" "$PARENT_DIR")
+  fi
+
+  case "$RESOLVED_PARENT" in
+    /)
+      printf '/%s' "$LEAF_NAME"
+      ;;
+    *)
+      printf '%s/%s' "$RESOLVED_PARENT" "$LEAF_NAME"
+      ;;
+  esac
+}
+
 router_default_install_home() {
   REPO_ROOT="$1"
   printf '%s/artifacts/install/sdkwork-api-router/current' "$REPO_ROOT"

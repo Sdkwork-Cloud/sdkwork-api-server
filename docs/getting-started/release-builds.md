@@ -102,10 +102,10 @@ The managed release runtime starts `router-product-service`, which serves:
 
 By default, it binds:
 
-- gateway: `127.0.0.1:9980`
-- admin: `127.0.0.1:9981`
-- portal: `127.0.0.1:9982`
-- unified web host: `0.0.0.0:9983`
+- gateway: `127.0.0.1:8080`
+- admin: `127.0.0.1:8081`
+- portal: `127.0.0.1:8082`
+- unified web host: `0.0.0.0:3001`
 
 After successful startup, the scripts print:
 
@@ -142,6 +142,8 @@ The install step already stages service registration assets:
 - `service/systemd/`
 - `service/launchd/`
 - `service/windows-task/`
+- `deploy/docker/`
+- `deploy/helm/sdkwork-api-router/`
 
 Register or unregister them from the install home:
 
@@ -232,6 +234,46 @@ Recommended deployment shape:
 - use a server-side secret backend strategy
 - keep `config/router.env` under change control for environment-specific overrides
 - use the managed install home instead of inventing a second runtime layout
+
+### Docker And Kubernetes Assets
+
+The Linux product-server bundle now includes deployable assets under `deploy/`:
+
+- `deploy/docker/Dockerfile`
+- `deploy/docker/docker-compose.yml`
+- `deploy/docker/.env.example`
+- `deploy/helm/sdkwork-api-router/`
+
+These assets intentionally reuse the product server runtime contract instead of introducing a
+second deployment model:
+
+- public web bind: `0.0.0.0:3001`
+- internal upstream binds: `127.0.0.1:8080/8081/8082`
+- bootstrap data directory: `/opt/sdkwork/data`
+- bundled admin site directory: `/opt/sdkwork/sites/admin/dist`
+- bundled portal site directory: `/opt/sdkwork/sites/portal/dist`
+- production database: `SDKWORK_DATABASE_URL=postgresql://...`
+
+Quick Docker deployment from an extracted Linux bundle:
+
+```bash
+cp deploy/docker/.env.example deploy/docker/.env
+docker build -f deploy/docker/Dockerfile -t sdkwork-api-router:local .
+docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d
+```
+
+Quick Helm deployment after pushing the same image:
+
+```bash
+helm upgrade --install sdkwork-api-router deploy/helm/sdkwork-api-router \
+  --set image.repository=ghcr.io/your-org/sdkwork-api-router \
+  --set image.tag=2026.04.15 \
+  --set secrets.databaseUrl='postgresql://sdkwork:change-me@postgresql:5432/sdkwork_api_router' \
+  --set secrets.adminJwtSigningSecret='change-me-admin' \
+  --set secrets.portalJwtSigningSecret='change-me-portal' \
+  --set secrets.credentialMasterKey='change-me-master-key' \
+  --set secrets.metricsBearerToken='change-me-metrics-token'
+```
 
 ## Dry-Run Examples
 

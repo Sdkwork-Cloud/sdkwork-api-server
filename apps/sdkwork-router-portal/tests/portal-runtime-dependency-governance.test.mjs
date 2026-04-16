@@ -32,6 +32,9 @@ test('vite config forces shared singleton resolution for linked framework runtim
 
   assert.match(viteConfig, /dedupe:\s*\[[\s\S]*'react'[\s\S]*'react-dom'[\s\S]*'react-router-dom'[\s\S]*'lucide-react'[\s\S]*'zustand'[\s\S]*\]/);
   assert.match(viteConfig, /const sdkworkUiSourceRoot =/);
+  assert.match(viteConfig, /const zustandPackageRoot = normalizeAliasPath\(resolvePnpmPackageRoot\('zustand'\)\);/);
+  assert.match(viteConfig, /const zustandEsmEntry = normalizeAliasPath\(path\.join\(zustandPackageRoot, 'esm', 'index\.mjs'\)\);/);
+  assert.match(viteConfig, /const zustandEsmSubpathRoot = `\$\{normalizeAliasPath\(path\.join\(zustandPackageRoot, 'esm'\)\)\}\/`;/);
   assert.match(viteConfig, /find:\s*\/\^react\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^react-dom\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^react-dom\\\/client\$\/,/);
@@ -40,6 +43,8 @@ test('vite config forces shared singleton resolution for linked framework runtim
   assert.match(viteConfig, /find:\s*\/\^react-router-dom\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^zustand\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^zustand\\\/\//);
+  assert.match(viteConfig, /replacement:\s*zustandEsmEntry,/);
+  assert.match(viteConfig, /replacement:\s*zustandEsmSubpathRoot,/);
   assert.match(viteConfig, /find:\s*\/\^clsx\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^tailwind-merge\$\/,/);
   assert.match(viteConfig, /find:\s*\/\^lucide-react\$\/,/);

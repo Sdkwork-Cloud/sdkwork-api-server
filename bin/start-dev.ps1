@@ -43,6 +43,114 @@ function Read-RouterRemainingOptionValue {
     return $Args[$Index.Value]
 }
 
+function Get-RouterManagedDevCargoTargetDir {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$DevHome
+    )
+
+    return (Get-RouterManagedDevCargoTargetDirCandidates -RepoRoot $RepoRoot -DevHome $DevHome)[0]
+}
+
+function Get-RouterManagedDevCargoTargetDirCandidates {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$DevHome
+    )
+
+    $repoRootFullPath = [System.IO.Path]::GetFullPath($RepoRoot)
+    $defaultTargetDir = Join-Path $repoRootFullPath 'bin\.sdkwork-target-vs2022'
+    $normalizedDevHome = [System.IO.Path]::GetFullPath($DevHome)
+    $managedDefaultDevHome = [System.IO.Path]::GetFullPath(
+        (Join-Path $repoRootFullPath (Join-Path 'artifacts\runtime\dev' (Get-RouterRuntimePlatformKey)))
+    )
+    if ([string]::Equals($normalizedDevHome, $managedDefaultDevHome, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return @($defaultTargetDir)
+    }
+
+    $hashAlgorithm = [System.Security.Cryptography.MD5]::Create()
+    try {
+        $hashBytes = $hashAlgorithm.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($normalizedDevHome))
+    } finally {
+        $hashAlgorithm.Dispose()
+    }
+
+    $hashSuffix = -join ($hashBytes | Select-Object -First 6 | ForEach-Object { $_.ToString('x2') })
+    $candidateTargetDirs = @()
+
+    $requestedManagedCargoRoot = [string]$env:SDKWORK_ROUTER_MANAGED_CARGO_ROOT
+    if (-not [string]::IsNullOrWhiteSpace($requestedManagedCargoRoot)) {
+        if ([System.IO.Path]::IsPathRooted($requestedManagedCargoRoot)) {
+            $resolvedManagedCargoRoot = [System.IO.Path]::GetFullPath($requestedManagedCargoRoot)
+        } else {
+            $resolvedManagedCargoRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRootFullPath $requestedManagedCargoRoot))
+        }
+
+        $candidateTargetDirs += (Join-Path $resolvedManagedCargoRoot $hashSuffix)
+    } else {
+        $repoVolumeRoot = [System.IO.Path]::GetPathRoot($repoRootFullPath)
+        if (-not [string]::IsNullOrWhiteSpace($repoVolumeRoot)) {
+            $candidateTargetDirs += (Join-Path (Join-Path $repoVolumeRoot 'sdkrt') $hashSuffix)
+        }
+    }
+
+    $repoLocalFallbackTargetDir = Join-Path $repoRootFullPath "bin\.sdkrt-$hashSuffix"
+    if ($repoLocalFallbackTargetDir -notin $candidateTargetDirs) {
+        $candidateTargetDirs += $repoLocalFallbackTargetDir
+    }
+
+    return $candidateTargetDirs
+}
+
+function Test-RouterManagedCargoTargetDirAvailable {
+    param([Parameter(Mandatory = $true)][string]$TargetDir)
+
+    $debugDirectory = Join-Path $TargetDir 'debug'
+    $lockFile = Join-Path $debugDirectory '.cargo-lock'
+    $lockHandle = $null
+
+    try {
+        Ensure-RouterDirectory -DirectoryPath $debugDirectory
+        $lockHandle = [System.IO.File]::Open(
+            $lockFile,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None
+        )
+        return $true
+    } catch {
+        return $false
+    } finally {
+        if ($null -ne $lockHandle) {
+            $lockHandle.Dispose()
+        }
+    }
+}
+
+function Get-RouterAvailableManagedDevCargoTargetDir {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$DevHome
+    )
+
+    foreach ($preferredTargetDir in (Get-RouterManagedDevCargoTargetDirCandidates -RepoRoot $RepoRoot -DevHome $DevHome)) {
+        if (Test-RouterManagedCargoTargetDirAvailable -TargetDir $preferredTargetDir) {
+            return $preferredTargetDir
+        }
+
+        $targetParent = Split-Path -Parent $preferredTargetDir
+        $targetLeaf = Split-Path -Leaf $preferredTargetDir
+        for ($attempt = 1; $attempt -le 16; $attempt++) {
+            $candidateTargetDir = Join-Path $targetParent "$targetLeaf-r$attempt"
+            if (Test-RouterManagedCargoTargetDirAvailable -TargetDir $candidateTargetDir) {
+                return $candidateTargetDir
+            }
+        }
+    }
+
+    Throw-RouterError "failed to reserve a writable managed cargo target directory for development workspace $DevHome"
+}
+
 if ($RemainingArgs.Count -gt 0) {
     for ($index = 0; $index -lt $RemainingArgs.Count; $index++) {
         $arg = $RemainingArgs[$index]
@@ -317,10 +425,20 @@ try {
                 -or ($mode -ne $primaryMode)
 
             if ($requestedConfigurationDiffers) {
-                Write-RouterInfo "development workspace already running (pid=$($existingPid)) with active managed settings that differ from the requested launch configuration"
-            } else {
-                Write-RouterInfo "development workspace already running (pid=$($existingPid))"
+                Write-RouterStartupSummary `
+                    -Mode $mode `
+                    -WebBind $activeWebBind `
+                    -GatewayBind $activeGatewayBind `
+                    -AdminBind $activeAdminBind `
+                    -PortalBind $activePortalBind `
+                    -UnifiedAccessEnabled $unifiedAccessEnabled `
+                    -AdminAppUrl $adminSurfaceUrl `
+                    -PortalAppUrl $portalSurfaceUrl `
+                    -StdoutLog $stdoutLog `
+                    -StderrLog $stderrLog
+                Throw-RouterError "development workspace already running (pid=$($existingPid)) with active managed settings that differ from the requested launch configuration; run bin/stop-dev.ps1 before relaunching with different settings"
             }
+            Write-RouterInfo "development workspace already running (pid=$($existingPid))"
             Write-RouterStartupSummary `
                 -Mode $mode `
                 -WebBind $activeWebBind `
@@ -349,8 +467,23 @@ try {
         }
     }
 
+    if ((Test-RouterWindowsPlatform) -and [string]::IsNullOrWhiteSpace([string]$env:CARGO_TARGET_DIR)) {
+        $preferredManagedCargoTargetDir = Get-RouterManagedDevCargoTargetDir -RepoRoot $repoRoot -DevHome $devHome
+        $selectedManagedCargoTargetDir = Get-RouterAvailableManagedDevCargoTargetDir -RepoRoot $repoRoot -DevHome $devHome
+        if (-not [string]::Equals(
+            $preferredManagedCargoTargetDir,
+            $selectedManagedCargoTargetDir,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            Write-RouterInfo "managed cargo target dir is unavailable or busy; using fallback $selectedManagedCargoTargetDir"
+        }
+        $env:CARGO_TARGET_DIR = $selectedManagedCargoTargetDir
+    }
+
     $cargoEnv = Enable-RouterManagedCargoEnv -RepoRoot $repoRoot
     if ($cargoEnv.Enabled) {
+        $env:SDKWORK_ROUTER_USE_PREBUILT_BACKEND_BINARIES = '1'
+        $env:SDKWORK_ROUTER_USE_PREBUILT_WEB_BINARY = '1'
         Write-RouterInfo "CARGO_TARGET_DIR=$($cargoEnv.CargoTargetDir)"
         if (-not [string]::IsNullOrWhiteSpace($cargoEnv.CargoBuildJobs)) {
             Write-RouterInfo "CARGO_BUILD_JOBS=$($cargoEnv.CargoBuildJobs)"
@@ -358,6 +491,9 @@ try {
         if ($DryRun) {
             Write-RouterInfo "backend warm-up: $(Get-RouterWindowsBackendWarmupCommandDisplay -CargoBuildJobs $cargoEnv.CargoBuildJobs)"
         }
+    } else {
+        Remove-Item Env:SDKWORK_ROUTER_USE_PREBUILT_BACKEND_BINARIES -ErrorAction SilentlyContinue
+        Remove-Item Env:SDKWORK_ROUTER_USE_PREBUILT_WEB_BINARY -ErrorAction SilentlyContinue
     }
 
     $planOutput = & node @planArgs

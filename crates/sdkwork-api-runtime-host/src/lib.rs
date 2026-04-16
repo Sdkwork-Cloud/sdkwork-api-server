@@ -191,6 +191,13 @@ pub fn classify_request(request_path: &str) -> RuntimeRoute {
         return RuntimeRoute::Redirect("/admin/".to_owned());
     }
 
+    if path == "/openapi.json" || path == "/docs" {
+        return RuntimeRoute::Proxy {
+            upstream: "gateway".to_owned(),
+            request_path: path.to_owned(),
+        };
+    }
+
     if let Some(suffix) = path.strip_prefix("/api/admin") {
         return RuntimeRoute::Proxy {
             upstream: "admin".to_owned(),

@@ -655,7 +655,12 @@ fn admin_read_method(method: &Method) -> bool {
 }
 
 fn admin_route_access(method: &Method, path: &str) -> AdminRouteAccess {
-    if path == "/admin/health" || path == "/admin/auth/login" {
+    if path == "/admin/health"
+        || path == "/admin/auth/login"
+        || path == "/admin/openapi.json"
+        || path == "/admin/docs"
+        || path.starts_with("/admin/docs/")
+    {
         return AdminRouteAccess::Public;
     }
 

@@ -39,6 +39,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::MissedTickBehavior;
 
+pub(crate) const SERVICE_RUNTIME_NODE_HEARTBEAT_INTERVAL_MS: u64 = 2_000;
+
 mod rollout_execution;
 mod rollout_models;
 mod runtime_builders;
@@ -93,3 +95,15 @@ pub use runtime_core::{
 };
 pub use runtime_reload::start_standalone_runtime_supervision;
 pub use standalone_listener::{StandaloneListenerHandle, StandaloneListenerHost};
+
+pub(crate) fn service_runtime_node_heartbeat_due(
+    last_heartbeat_at_ms: Option<u64>,
+    now_ms: u64,
+) -> bool {
+    match last_heartbeat_at_ms {
+        None => true,
+        Some(previous) => {
+            now_ms.saturating_sub(previous) >= SERVICE_RUNTIME_NODE_HEARTBEAT_INTERVAL_MS
+        }
+    }
+}

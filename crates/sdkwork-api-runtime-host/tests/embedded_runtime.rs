@@ -249,6 +249,38 @@ async fn runtime_serves_static_sites_and_proxies_api_routes() {
         "gateway:/health:"
     );
 
+    let gateway_openapi_response = client
+        .get(format!("{}/openapi.json", runtime.base_url()))
+        .header("origin", "https://console.example.com")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(gateway_openapi_response.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        gateway_openapi_response
+            .headers()
+            .get("x-upstream-name")
+            .unwrap(),
+        "gateway"
+    );
+    assert_eq!(
+        gateway_openapi_response.text().await.unwrap(),
+        "gateway:/openapi.json:"
+    );
+
+    let gateway_docs_response = client
+        .get(format!("{}/docs", runtime.base_url()))
+        .header("origin", "https://console.example.com")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(gateway_docs_response.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        gateway_docs_response.headers().get("x-upstream-name").unwrap(),
+        "gateway"
+    );
+    assert_eq!(gateway_docs_response.text().await.unwrap(), "gateway:/docs:");
+
     let preflight_response = client
         .request(
             reqwest::Method::OPTIONS,

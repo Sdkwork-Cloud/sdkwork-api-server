@@ -48,7 +48,7 @@ if [ -z "$RUNTIME_HOME" ]; then
   fi
 fi
 
-RUNTIME_HOME=$(CDPATH= cd -- "$RUNTIME_HOME" 2>/dev/null && pwd || printf '%s' "$RUNTIME_HOME")
+RUNTIME_HOME=$(router_resolve_absolute_path "$PWD" "$RUNTIME_HOME")
 RUN_DIR="$RUNTIME_HOME/var/run"
 LOG_DIR="$RUNTIME_HOME/var/log"
 

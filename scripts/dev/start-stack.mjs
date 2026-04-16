@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
   databaseDisplayValue,
@@ -17,16 +19,36 @@ function cargoExecutable() {
   return process.platform === 'win32' ? 'cargo.exe' : 'cargo';
 }
 
+function resolveBackendLaunchSpec(packageName, env) {
+  const usePrebuiltBinaries =
+    process.platform === 'win32' && env.SDKWORK_ROUTER_USE_PREBUILT_BACKEND_BINARIES === '1';
+  if (usePrebuiltBinaries && env.CARGO_TARGET_DIR) {
+    const binaryPath = path.resolve(env.CARGO_TARGET_DIR, 'debug', `${packageName}.exe`);
+    if (existsSync(binaryPath)) {
+      return {
+        command: binaryPath,
+        args: [],
+      };
+    }
+  }
+
+  return {
+    command: cargoExecutable(),
+    args: ['run', '-p', packageName],
+  };
+}
+
 function startService(packageName, settings, children, onFailure) {
   const env = serviceEnv(settings);
-  const command = `${cargoExecutable()} run -p ${packageName}`;
+  const launchSpec = resolveBackendLaunchSpec(packageName, env);
+  const command = [launchSpec.command, ...launchSpec.args].join(' ');
   console.log(`[start-stack] ${command}`);
 
   if (settings.dryRun) {
     return;
   }
 
-  const child = spawn(cargoExecutable(), ['run', '-p', packageName], {
+  const child = spawn(launchSpec.command, launchSpec.args, {
     env,
     stdio: 'inherit',
   });

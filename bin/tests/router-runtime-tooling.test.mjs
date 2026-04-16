@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import test from 'node:test';
@@ -43,6 +43,10 @@ function quoteForBash(value) {
 
 function quoteForPowerShellSingleQuotedString(value) {
   return String(value).replaceAll("'", "''");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function runPowerShellCommand(command) {
@@ -617,7 +621,7 @@ test('createInstallPlan treats normalized windows platform ids as Windows execut
   );
 });
 
-test('renderRuntimeEnvTemplate defaults release runtime to writable local data and 9980-series ports', async () => {
+test('renderRuntimeEnvTemplate defaults release runtime to writable local data and product server-mode ports', async () => {
   const module = await loadModule();
   const installRoot = '/opt/sdkwork-api-router/current';
 
@@ -628,12 +632,27 @@ test('renderRuntimeEnvTemplate defaults release runtime to writable local data a
 
   assert.match(envFile, /SDKWORK_CONFIG_DIR="\/opt\/sdkwork-api-router\/current\/config"/);
   assert.match(envFile, /SDKWORK_DATABASE_URL="sqlite:\/\/\/opt\/sdkwork-api-router\/current\/var\/data\/sdkwork-api-router\.db"/);
-  assert.match(envFile, /SDKWORK_WEB_BIND="0\.0\.0\.0:9983"/);
-  assert.match(envFile, /SDKWORK_GATEWAY_BIND="127\.0\.0\.1:9980"/);
-  assert.match(envFile, /SDKWORK_ADMIN_BIND="127\.0\.0\.1:9981"/);
-  assert.match(envFile, /SDKWORK_PORTAL_BIND="127\.0\.0\.1:9982"/);
+  assert.match(envFile, /SDKWORK_WEB_BIND="0\.0\.0\.0:3001"/);
+  assert.match(envFile, /SDKWORK_GATEWAY_BIND="127\.0\.0\.1:8080"/);
+  assert.match(envFile, /SDKWORK_ADMIN_BIND="127\.0\.0\.1:8081"/);
+  assert.match(envFile, /SDKWORK_PORTAL_BIND="127\.0\.0\.1:8082"/);
   assert.match(envFile, /SDKWORK_ADMIN_SITE_DIR="\/opt\/sdkwork-api-router\/current\/sites\/admin\/dist"/);
   assert.match(envFile, /SDKWORK_PORTAL_SITE_DIR="\/opt\/sdkwork-api-router\/current\/sites\/portal\/dist"/);
+});
+
+test('production start scripts default to product server-mode binds instead of managed dev preview binds', () => {
+  const startPs1 = readFileSync(path.join(repoRoot, 'bin', 'start.ps1'), 'utf8');
+  const startSh = readFileSync(path.join(repoRoot, 'bin', 'start.sh'), 'utf8');
+
+  assert.match(startPs1, /\$env:SDKWORK_WEB_BIND = '0\.0\.0\.0:3001'/);
+  assert.match(startPs1, /\$env:SDKWORK_GATEWAY_BIND = '127\.0\.0\.1:8080'/);
+  assert.match(startPs1, /\$env:SDKWORK_ADMIN_BIND = '127\.0\.0\.1:8081'/);
+  assert.match(startPs1, /\$env:SDKWORK_PORTAL_BIND = '127\.0\.0\.1:8082'/);
+
+  assert.match(startSh, /^SDKWORK_WEB_BIND=\$\{SDKWORK_WEB_BIND:-"0\.0\.0\.0:3001"\}$/m);
+  assert.match(startSh, /^SDKWORK_GATEWAY_BIND=\$\{SDKWORK_GATEWAY_BIND:-"127\.0\.0\.1:8080"\}$/m);
+  assert.match(startSh, /^SDKWORK_ADMIN_BIND=\$\{SDKWORK_ADMIN_BIND:-"127\.0\.0\.1:8081"\}$/m);
+  assert.match(startSh, /^SDKWORK_PORTAL_BIND=\$\{SDKWORK_PORTAL_BIND:-"127\.0\.0\.1:8082"\}$/m);
 });
 
 test('service descriptors start the production runtime in foreground mode from the installed home', async () => {
@@ -1320,6 +1339,17 @@ test('start scripts treat healthy managed runtimes as idempotent instead of hard
   assert.match(startSh, /production runtime already running \(pid=\$EXISTING_PID\)/);
 });
 
+test('start-dev scripts fail fast when a healthy managed workspace uses different launch settings', () => {
+  const startDevPs1 = readFileSync(path.join(repoRoot, 'bin', 'start-dev.ps1'), 'utf8');
+  const startDevSh = readFileSync(path.join(repoRoot, 'bin', 'start-dev.sh'), 'utf8');
+
+  assert.match(startDevPs1, /\$requestedConfigurationDiffers =/);
+  assert.match(startDevPs1, /Throw-RouterError "development workspace already running \(pid=\$\(\$existingPid\)\) with active managed settings that differ from the requested launch configuration; run bin\/stop-dev\.ps1 before relaunching with different settings"/);
+
+  assert.match(startDevSh, /requestedConfigurationDiffers=/);
+  assert.match(startDevSh, /router_die "development workspace already running \(pid=\$EXISTING_PID\) with active managed settings that differ from the requested launch configuration; run bin\/stop-dev\.sh before relaunching with different settings"/);
+});
+
 test('runtime launch scripts persist managed state alongside pid files for robust restarts and stops', () => {
   const commonPs1 = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.ps1'), 'utf8');
   const commonSh = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.sh'), 'utf8');
@@ -1447,6 +1477,248 @@ test('PowerShell managed state writer persists empty app URLs instead of failing
   }
 });
 
+test('start-dev.ps1 derives distinct Windows cargo target dirs for different managed dev homes', { skip: !canSpawnPowerShellFromNode() }, () => {
+  const runtimeHomeA = createTempRuntimeHome('start-dev-cargo-a-');
+  const runtimeHomeB = createTempRuntimeHome('start-dev-cargo-b-');
+  const managedShortTargetRoot = path.join(path.parse(repoRoot).root, 'sdkrt');
+  const defaultTargetDir = path.join(repoRoot, 'bin', '.sdkwork-target-vs2022');
+
+  try {
+    const runStartDevDryRun = (runtimeHome) => spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(repoRoot, 'bin', 'start-dev.ps1'),
+        '-DryRun',
+        '-Preview',
+        '-WaitSeconds',
+        '5',
+      ],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          SDKWORK_ROUTER_DEV_HOME: runtimeHome,
+        },
+      },
+    );
+
+    const resultA = runStartDevDryRun(runtimeHomeA);
+    const outputA = `${resultA.stdout}${resultA.stderr}`;
+    assert.equal(resultA.status, 0, outputA);
+
+    const resultB = runStartDevDryRun(runtimeHomeB);
+    const outputB = `${resultB.stdout}${resultB.stderr}`;
+    assert.equal(resultB.status, 0, outputB);
+
+    const cargoTargetDirA = outputA.match(/CARGO_TARGET_DIR=([^\r\n]+)/)?.[1]?.trim();
+    const cargoTargetDirB = outputB.match(/CARGO_TARGET_DIR=([^\r\n]+)/)?.[1]?.trim();
+
+    assert.ok(cargoTargetDirA, outputA);
+    assert.ok(cargoTargetDirB, outputB);
+    assert.notEqual(cargoTargetDirA, defaultTargetDir);
+    assert.notEqual(cargoTargetDirB, defaultTargetDir);
+    assert.equal(path.dirname(cargoTargetDirA), managedShortTargetRoot);
+    assert.equal(path.dirname(cargoTargetDirB), managedShortTargetRoot);
+    assert.ok(cargoTargetDirA.length < defaultTargetDir.length, outputA);
+    assert.ok(cargoTargetDirB.length < defaultTargetDir.length, outputB);
+    assert.notEqual(cargoTargetDirA, cargoTargetDirB);
+  } finally {
+    removeTempRuntimeHome(runtimeHomeA);
+    removeTempRuntimeHome(runtimeHomeB);
+  }
+});
+
+test('start-dev.ps1 falls back to a repo-local managed Windows cargo target dir when the preferred root is unusable', { skip: !canSpawnPowerShellFromNode() }, () => {
+  const runtimeHome = createTempRuntimeHome('start-dev-cargo-root-fallback-');
+  const invalidRootDir = createTempDir('start-dev-cargo-root-unusable-');
+  const invalidRootFile = path.join(invalidRootDir, 'managed-cargo-root.txt');
+  const defaultTargetDir = path.join(repoRoot, 'bin', '.sdkwork-target-vs2022');
+
+  writeFileSync(invalidRootFile, 'not-a-directory', 'utf8');
+
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(repoRoot, 'bin', 'start-dev.ps1'),
+        '-DryRun',
+        '-Preview',
+        '-WaitSeconds',
+        '5',
+      ],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          SDKWORK_ROUTER_DEV_HOME: runtimeHome,
+          SDKWORK_ROUTER_MANAGED_CARGO_ROOT: invalidRootFile,
+        },
+      },
+    );
+
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 0, output);
+    assert.match(output, /managed cargo target dir is unavailable or busy; using fallback/i);
+
+    const cargoTargetDir = output.match(/CARGO_TARGET_DIR=([^\r\n]+)/)?.[1]?.trim();
+    assert.ok(cargoTargetDir, output);
+    assert.notEqual(cargoTargetDir, defaultTargetDir);
+    assert.equal(path.dirname(cargoTargetDir), path.join(repoRoot, 'bin'));
+    assert.match(path.basename(cargoTargetDir), /^\.sdkrt-[0-9a-f]{12}(?:-r\d+)?$/i);
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+    rmSync(invalidRootDir, { recursive: true, force: true });
+  }
+});
+
+test('start-dev.ps1 falls back to an alternate managed Windows cargo target dir when the preferred target is locked', { skip: !canSpawnPowerShellFromNode() }, async () => {
+  const runtimeHome = createTempRuntimeHome('start-dev-cargo-lock-');
+  let lockHolder = null;
+
+  const runStartDevDryRun = () => spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(repoRoot, 'bin', 'start-dev.ps1'),
+      '-DryRun',
+      '-Preview',
+      '-WaitSeconds',
+      '5',
+    ],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        SDKWORK_ROUTER_DEV_HOME: runtimeHome,
+      },
+    },
+  );
+
+  try {
+    const initialResult = runStartDevDryRun();
+    const initialOutput = `${initialResult.stdout}${initialResult.stderr}`;
+    assert.equal(initialResult.status, 0, initialOutput);
+
+    const preferredTargetDir = initialOutput.match(/CARGO_TARGET_DIR=([^\r\n]+)/)?.[1]?.trim();
+    assert.ok(preferredTargetDir, initialOutput);
+
+    const lockFile = path.join(preferredTargetDir, 'debug', '.cargo-lock');
+    const lockFilePs = quoteForPowerShellSingleQuotedString(lockFile);
+    lockHolder = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        [
+          `$lockFile = '${lockFilePs}'`,
+          '[System.IO.Directory]::CreateDirectory((Split-Path $lockFile -Parent)) | Out-Null',
+          '$lockHandle = [System.IO.File]::Open($lockFile, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)',
+          'Write-Output "LOCKED"',
+          'try { Start-Sleep -Seconds 30 } finally { $lockHandle.Dispose() }',
+        ].join('\n'),
+      ],
+      {
+        cwd: repoRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('timed out waiting for lock holder readiness')), 10000);
+      lockHolder.once('error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      lockHolder.stdout.on('data', (chunk) => {
+        if (String(chunk).includes('LOCKED')) {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+      lockHolder.once('exit', (code) => {
+        clearTimeout(timeout);
+        reject(new Error(`lock holder exited before readiness with code ${code ?? 'unknown'}`));
+      });
+    });
+
+    const fallbackResult = runStartDevDryRun();
+    const fallbackOutput = `${fallbackResult.stdout}${fallbackResult.stderr}`;
+    assert.equal(fallbackResult.status, 0, fallbackOutput);
+    assert.match(fallbackOutput, /managed cargo target dir is unavailable or busy; using fallback/i);
+
+    const fallbackTargetDir = fallbackOutput.match(/CARGO_TARGET_DIR=([^\r\n]+)/)?.[1]?.trim();
+    assert.ok(fallbackTargetDir, fallbackOutput);
+    assert.notEqual(fallbackTargetDir, preferredTargetDir);
+    assert.match(
+      fallbackTargetDir,
+      new RegExp(`^${escapeRegExp(preferredTargetDir)}-r\\d+$`, 'i'),
+    );
+  } finally {
+    if (lockHolder && lockHolder.exitCode === null) {
+      spawnSync('taskkill.exe', ['/PID', String(lockHolder.pid), '/T', '/F'], {
+        cwd: repoRoot,
+        stdio: 'ignore',
+      });
+    }
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
+test('runtime-common.ps1 accepts pnpm virtualStoreDir entries from the current quoted modules metadata format', { skip: !canSpawnPowerShellFromNode() }, () => {
+  const tempRoot = createTempDir('pnpm-virtual-store-');
+  const nodeModulesPath = path.join(tempRoot, 'node_modules');
+  const virtualStoreDir = path.join(nodeModulesPath, '.pnpm');
+  const modulesFile = path.join(nodeModulesPath, '.modules.yaml');
+  const commonScript = quoteForPowerShellSingleQuotedString(
+    path.join(repoRoot, 'bin', 'lib', 'runtime-common.ps1'),
+  );
+  const nodeModulesPathPs = quoteForPowerShellSingleQuotedString(nodeModulesPath);
+  const virtualStoreDirPs = quoteForPowerShellSingleQuotedString(virtualStoreDir);
+
+  mkdirSync(virtualStoreDir, { recursive: true });
+  writeFileSync(
+    modulesFile,
+    `{\n  "virtualStoreDir": "${virtualStoreDir.replaceAll('\\', '\\\\')}"\n}\n`,
+    'utf8',
+  );
+
+  try {
+    const result = runPowerShellCommand(
+      [
+        `. '${commonScript}'`,
+        `$nodeModulesPath = '${nodeModulesPathPs}'`,
+        '$virtualStore = Get-RouterPnpmVirtualStoreDir -NodeModulesPath $nodeModulesPath',
+        '$healthy = Test-RouterPnpmNodeModulesHealthy -NodeModulesPath $nodeModulesPath',
+        'Write-Output ("virtual=" + $virtualStore)',
+        'Write-Output ("healthy=" + $healthy)',
+      ].join('\n'),
+    );
+    const output = `${result.stdout}${result.stderr}`;
+
+    assert.equal(result.status, 0, output);
+    assert.match(output, new RegExp(`virtual=${virtualStoreDirPs.replaceAll('\\', '\\\\')}`));
+    assert.match(output, /healthy=True/);
+  } finally {
+    removeTempRuntimeHome(tempRoot);
+  }
+});
+
 test('shell start scripts warn when background services are launched from non-interactive WSL sessions', () => {
   const commonSh = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.sh'), 'utf8');
   const startDevSh = readFileSync(path.join(repoRoot, 'bin', 'start-dev.sh'), 'utf8');
@@ -1508,6 +1780,27 @@ test('start.ps1 dry-run falls back to host-local release paths when router.env c
   }
 });
 
+test('start.ps1 dry-run accepts a missing relative -Home path without double-nesting runtime files', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, () => {
+  const relativeRuntimeHome = path.join('artifacts', 'test-runtime', `start-ps1-relative-${Date.now()}`);
+  const absoluteRuntimeHome = path.join(repoRoot, relativeRuntimeHome);
+
+  try {
+    const result = runPowerShellStartDryRun(relativeRuntimeHome);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const plan = JSON.parse(result.stdout.trim());
+    const runtimeHomePortable = toPortablePath(absoluteRuntimeHome);
+
+    assert.equal(plan.mode, 'dry-run');
+    assert.equal(plan.plan_format, 'json');
+    assert.equal(plan.public_web_bind, '0.0.0.0:3001');
+    assert.equal(plan.config_dir, `${runtimeHomePortable}/config`);
+    assert.equal(plan.database_url, `sqlite://${runtimeHomePortable}/var/data/sdkwork-api-router.db`);
+  } finally {
+    removeTempRuntimeHome(absoluteRuntimeHome);
+  }
+});
+
 test('start.sh dry-run falls back to host-local release paths when router.env carries windows-style values', { skip: process.platform !== 'win32' || !hasWslDistro('Ubuntu-22.04') }, () => {
   const runtimeHome = createTempRuntimeHome('start-sh-');
 
@@ -1542,6 +1835,16 @@ test('start.sh dry-run falls back to host-local release paths when router.env ca
   } finally {
     removeTempRuntimeHome(runtimeHome);
   }
+});
+
+test('unix release entrypoints normalize relative runtime homes before changing directories', () => {
+  const commonSh = readFileSync(path.join(repoRoot, 'bin', 'lib', 'runtime-common.sh'), 'utf8');
+  const startSh = readFileSync(path.join(repoRoot, 'bin', 'start.sh'), 'utf8');
+  const stopSh = readFileSync(path.join(repoRoot, 'bin', 'stop.sh'), 'utf8');
+
+  assert.match(commonSh, /router_resolve_absolute_path\(\)/);
+  assert.match(startSh, /RUNTIME_HOME=\$\(router_resolve_absolute_path "\$PWD" "\$RUNTIME_HOME"\)/);
+  assert.match(stopSh, /RUNTIME_HOME=\$\(router_resolve_absolute_path "\$PWD" "\$RUNTIME_HOME"\)/);
 });
 
 test('unix runtime entrypoints default to the installed home beside the packaged scripts when binaries are colocated', () => {

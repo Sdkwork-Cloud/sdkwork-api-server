@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sdkwork-api-router
+description: Helm chart for the SDKWork API Router standalone product runtime
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
+const siblingWorkspaceRoot = path.resolve(rootDir, '..');
 
 const EXTERNAL_RELEASE_DEPENDENCY_SPECS = Object.freeze([
   Object.freeze({
@@ -47,6 +48,7 @@ const EXTERNAL_RELEASE_DEPENDENCY_SPECS = Object.freeze([
       'sdks',
       'sdkwork-craw-chat-sdk',
       'sdkwork-craw-chat-sdk-typescript',
+      'composed',
     ),
     expectedGitRoot: path.resolve(rootDir, '..', 'craw-chat'),
     cloneTargetDir: path.resolve(rootDir, '..', 'craw-chat'),
@@ -69,6 +71,71 @@ const PACKAGE_JSON_DEPENDENCY_FIELDS = Object.freeze([
 export function listExternalReleaseDependencySpecs() {
   return EXTERNAL_RELEASE_DEPENDENCY_SPECS.map((spec) => ({
     ...spec,
+    requiredPaths: [...spec.requiredPaths],
+  }));
+}
+
+function resolveExternalReleaseDependencyRoot({
+  externalDependencyRoot,
+  env = process.env,
+} = {}) {
+  const resolvedRoot = String(
+    externalDependencyRoot ?? env.SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT ?? '',
+  ).trim();
+  return resolvedRoot.length > 0 ? path.resolve(resolvedRoot) : '';
+}
+
+function remapExternalReleaseDependencyPath({
+  candidatePath,
+  externalDependencyRoot,
+} = {}) {
+  const resolvedCandidatePath = String(candidatePath ?? '').trim();
+  if (resolvedCandidatePath.length === 0 || externalDependencyRoot.length === 0) {
+    return resolvedCandidatePath;
+  }
+
+  const absoluteCandidatePath = path.resolve(resolvedCandidatePath);
+  if (
+    isPathInside(rootDir, absoluteCandidatePath)
+    || !isPathInside(siblingWorkspaceRoot, absoluteCandidatePath)
+  ) {
+    return absoluteCandidatePath;
+  }
+
+  return path.resolve(
+    externalDependencyRoot,
+    path.relative(siblingWorkspaceRoot, absoluteCandidatePath),
+  );
+}
+
+export function resolveExternalReleaseDependencySpecs({
+  specs = listExternalReleaseDependencySpecs(),
+  externalDependencyRoot,
+  env = process.env,
+} = {}) {
+  const resolvedExternalDependencyRoot = resolveExternalReleaseDependencyRoot({
+    externalDependencyRoot,
+    env,
+  });
+
+  return specs.map((spec) => ({
+    ...spec,
+    targetDir: remapExternalReleaseDependencyPath({
+      candidatePath: spec.targetDir,
+      externalDependencyRoot: resolvedExternalDependencyRoot,
+    }),
+    expectedGitRoot: spec.expectedGitRoot
+      ? remapExternalReleaseDependencyPath({
+        candidatePath: spec.expectedGitRoot,
+        externalDependencyRoot: resolvedExternalDependencyRoot,
+      })
+      : spec.expectedGitRoot,
+    cloneTargetDir: spec.cloneTargetDir
+      ? remapExternalReleaseDependencyPath({
+        candidatePath: spec.cloneTargetDir,
+        externalDependencyRoot: resolvedExternalDependencyRoot,
+      })
+      : spec.cloneTargetDir,
     requiredPaths: [...spec.requiredPaths],
   }));
 }
@@ -614,13 +681,17 @@ export function materializeExternalReleaseDependency({
 }
 
 export function materializeExternalReleaseDependencies({
-  specs = listExternalReleaseDependencySpecs(),
+  specs,
   env = process.env,
   exists = existsSync,
   mkdir = mkdirSync,
   spawnSyncImpl = spawnSync,
 } = {}) {
-  return specs.map((spec) =>
+  const resolvedSpecs = Array.isArray(specs)
+    ? specs
+    : resolveExternalReleaseDependencySpecs({ env });
+
+  return resolvedSpecs.map((spec) =>
     materializeExternalReleaseDependency({
       spec,
       env,

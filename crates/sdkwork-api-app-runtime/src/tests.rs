@@ -15,6 +15,19 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static TEMP_BOOTSTRAP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+#[test]
+fn service_runtime_node_heartbeat_due_emits_initial_and_interval_boundaries() {
+    assert!(service_runtime_node_heartbeat_due(None, 10));
+    assert!(!service_runtime_node_heartbeat_due(
+        Some(1_000),
+        1_000 + SERVICE_RUNTIME_NODE_HEARTBEAT_INTERVAL_MS - 1,
+    ));
+    assert!(service_runtime_node_heartbeat_due(
+        Some(1_000),
+        1_000 + SERVICE_RUNTIME_NODE_HEARTBEAT_INTERVAL_MS,
+    ));
+}
+
 #[tokio::test]
 async fn validate_secret_manager_for_store_checks_multiple_credentials() {
     let pool = run_migrations("sqlite::memory:").await.unwrap();
@@ -927,6 +940,583 @@ async fn build_admin_store_from_config_applies_bootstrap_profile_data_idempotent
     assert_eq!(async_job_attempt_count, 1);
     assert_eq!(async_job_asset_count, 1);
     assert_eq!(async_job_callback_count, 1);
+}
+
+#[tokio::test]
+async fn build_admin_store_from_config_reapplies_bootstrap_after_marketing_seed_runtime_drift() {
+    let bootstrap_root = temp_bootstrap_root("profile-pack-marketing-runtime-drift");
+    write_bootstrap_profile_pack(&bootstrap_root);
+    let marketing_path = bootstrap_root.join("marketing").join("default.json");
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    let campaign = marketing["marketing_campaigns"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["marketing_campaign_id"] == "campaign-launch-q2")
+        .expect("campaign-launch-q2 marketing fixture");
+    campaign["end_at_ms"] = serde_json::json!(4_102_444_800_000u64);
+    write_json(&marketing_path, &marketing);
+
+    let database_path = bootstrap_root.join("bootstrap-marketing-runtime-drift.db");
+    let database_url = sqlite_url_for(database_path);
+
+    let mut config = StandaloneConfig::default();
+    config.database_url = database_url;
+    config.bootstrap_data_dir = Some(bootstrap_root.to_string_lossy().into_owned());
+    config.bootstrap_profile = "dev".to_owned();
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+
+    sdkwork_api_app_marketing::mutate_marketing_coupon_template_lifecycle(
+        store.as_ref(),
+        "template-launch-credit-100",
+        sdkwork_api_domain_marketing::CouponTemplateLifecycleAction::SubmitForApproval,
+        "operator-bootstrap-test",
+        "request-bootstrap-template-submit",
+        "prepare template for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+    sdkwork_api_app_marketing::mutate_marketing_coupon_template_lifecycle(
+        store.as_ref(),
+        "template-launch-credit-100",
+        sdkwork_api_domain_marketing::CouponTemplateLifecycleAction::Approve,
+        "operator-bootstrap-test",
+        "request-bootstrap-template-approve",
+        "approve template for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+    sdkwork_api_app_marketing::mutate_marketing_coupon_template_lifecycle(
+        store.as_ref(),
+        "template-launch-credit-100",
+        sdkwork_api_domain_marketing::CouponTemplateLifecycleAction::Publish,
+        "operator-bootstrap-test",
+        "request-bootstrap-template-publish",
+        "publish template for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+
+    sdkwork_api_app_marketing::mutate_marketing_campaign_lifecycle(
+        store.as_ref(),
+        "campaign-launch-q2",
+        sdkwork_api_domain_marketing::MarketingCampaignLifecycleAction::SubmitForApproval,
+        "operator-bootstrap-test",
+        "request-bootstrap-campaign-submit",
+        "prepare campaign for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+    sdkwork_api_app_marketing::mutate_marketing_campaign_lifecycle(
+        store.as_ref(),
+        "campaign-launch-q2",
+        sdkwork_api_domain_marketing::MarketingCampaignLifecycleAction::Approve,
+        "operator-bootstrap-test",
+        "request-bootstrap-campaign-approve",
+        "approve campaign for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+    sdkwork_api_app_marketing::mutate_marketing_campaign_lifecycle(
+        store.as_ref(),
+        "campaign-launch-q2",
+        sdkwork_api_domain_marketing::MarketingCampaignLifecycleAction::Publish,
+        "operator-bootstrap-test",
+        "request-bootstrap-campaign-publish",
+        "publish campaign for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+
+    sdkwork_api_app_marketing::mutate_marketing_campaign_budget_lifecycle(
+        store.as_ref(),
+        "budget-launch-q2",
+        sdkwork_api_domain_marketing::CampaignBudgetLifecycleAction::Activate,
+        "operator-bootstrap-test",
+        "request-bootstrap-budget-activate",
+        "activate budget for bootstrap reapply regression coverage",
+    )
+    .await
+    .unwrap();
+
+    let reserve = sdkwork_api_app_marketing::reserve_coupon_for_subject(
+        store.as_ref(),
+        sdkwork_api_app_marketing::ReserveCouponInput {
+            coupon_code: "LAUNCH100",
+            subject_scope: sdkwork_api_domain_marketing::MarketingSubjectScope::Project,
+            subject_id: "project-bootstrap-runtime-drift",
+            target_kind: "subscription_plan",
+            order_amount_minor: 10_000,
+            reserve_amount_minor: 10_000,
+            ttl_ms: 60_000,
+            idempotency_key: Some("bootstrap-runtime-drift"),
+            now_ms: 1_710_000_001_000,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(reserve.created);
+    assert_eq!(
+        reserve.context.template.status,
+        sdkwork_api_domain_marketing::CouponTemplateStatus::Active
+    );
+    assert_eq!(
+        reserve.context.campaign.status,
+        sdkwork_api_domain_marketing::MarketingCampaignStatus::Active
+    );
+    assert_eq!(
+        reserve.context.budget.status,
+        sdkwork_api_domain_marketing::CampaignBudgetStatus::Active
+    );
+    assert_eq!(reserve.context.budget.reserved_budget_minor, 10_000);
+    assert_eq!(reserve.context.code.updated_at_ms, 1_710_000_001_000);
+
+    drop(store);
+    drop(commercial_billing);
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+
+    let template = store
+        .find_coupon_template_record("template-launch-credit-100")
+        .await
+        .unwrap()
+        .expect("template after bootstrap reapply");
+    let campaign = store
+        .find_marketing_campaign_record("campaign-launch-q2")
+        .await
+        .unwrap()
+        .expect("campaign after bootstrap reapply");
+    let budget = store
+        .find_campaign_budget_record("budget-launch-q2")
+        .await
+        .unwrap()
+        .expect("budget after bootstrap reapply");
+    let code = store
+        .find_coupon_code_record("coupon-code-launch-credit-100")
+        .await
+        .unwrap()
+        .expect("code after bootstrap reapply");
+
+    assert_eq!(
+        template.status,
+        sdkwork_api_domain_marketing::CouponTemplateStatus::Active
+    );
+    assert_eq!(
+        campaign.status,
+        sdkwork_api_domain_marketing::MarketingCampaignStatus::Active
+    );
+    assert_eq!(
+        budget.status,
+        sdkwork_api_domain_marketing::CampaignBudgetStatus::Active
+    );
+    assert_eq!(budget.reserved_budget_minor, 10_000);
+    assert_eq!(
+        code.status,
+        sdkwork_api_domain_marketing::CouponCodeStatus::Available
+    );
+    assert_eq!(code.updated_at_ms, 1_710_000_001_000);
+
+    drop(store);
+    drop(commercial_billing);
+}
+
+#[tokio::test]
+async fn build_admin_store_from_config_reconciles_available_coupon_code_seed_definition_drift() {
+    let bootstrap_root = temp_bootstrap_root("profile-pack-coupon-code-definition-drift");
+    write_bootstrap_profile_pack(&bootstrap_root);
+    let marketing_path = bootstrap_root.join("marketing").join("default.json");
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    marketing["coupon_templates"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "coupon_template_id": "template-bootstrap-code-reconcile",
+            "template_key": "bootstrap-code-reconcile",
+            "display_name": "Bootstrap Code Reconcile",
+            "status": "draft",
+            "distribution_kind": "shared_code",
+            "benefit": {
+                "benefit_kind": "percentage_off",
+                "discount_percent": 15,
+                "discount_amount_minor": null,
+                "currency_code": "USD",
+                "grant_units": null,
+                "grant_unit_type": null,
+                "max_discount_minor": 1500
+            },
+            "restriction": {
+                "subject_scope": "project",
+                "min_order_amount_minor": 1000,
+                "first_order_only": false,
+                "new_customer_only": false,
+                "exclusive_group": null,
+                "stacking_policy": "stackable",
+                "max_redemptions_per_subject": null,
+                "eligible_target_kinds": ["subscription_plan"]
+            },
+            "created_at_ms": 1710000000000u64,
+            "updated_at_ms": 1710000000000u64
+        }));
+    marketing["coupon_codes"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "coupon_code_id": "coupon-code-bootstrap-code-reconcile",
+            "coupon_template_id": "template-bootstrap-code-reconcile",
+            "code_value": "BOOTSTRAP15-OLD",
+            "status": "available",
+            "claimed_subject_scope": null,
+            "claimed_subject_id": null,
+            "expires_at_ms": 1767225600000u64,
+            "created_at_ms": 1710000000000u64,
+            "updated_at_ms": 1710000000000u64
+        }));
+    write_json(&marketing_path, &marketing);
+
+    let database_path = bootstrap_root.join("bootstrap-coupon-code-definition-drift.db");
+    let database_url = sqlite_url_for(database_path);
+
+    let mut config = StandaloneConfig::default();
+    config.database_url = database_url;
+    config.bootstrap_data_dir = Some(bootstrap_root.to_string_lossy().into_owned());
+    config.bootstrap_profile = "dev".to_owned();
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+    let initial_code = store
+        .find_coupon_code_record("coupon-code-bootstrap-code-reconcile")
+        .await
+        .unwrap()
+        .expect("initial bootstrap reconcile coupon code");
+    assert_eq!(initial_code.code_value, "BOOTSTRAP15-OLD");
+
+    drop(store);
+    drop(commercial_billing);
+
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    let bootstrap_code = marketing["coupon_codes"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["coupon_code_id"] == "coupon-code-bootstrap-code-reconcile")
+        .expect("coupon-code-bootstrap-code-reconcile marketing fixture");
+    bootstrap_code["code_value"] = serde_json::json!("BOOTSTRAP15");
+    write_json(&marketing_path, &marketing);
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+    let reconciled_code = store
+        .find_coupon_code_record("coupon-code-bootstrap-code-reconcile")
+        .await
+        .unwrap()
+        .expect("reconciled bootstrap coupon code");
+    assert_eq!(reconciled_code.code_value, "BOOTSTRAP15");
+    assert_eq!(
+        reconciled_code.status,
+        sdkwork_api_domain_marketing::CouponCodeStatus::Available
+    );
+
+    drop(store);
+    drop(commercial_billing);
+}
+
+#[tokio::test]
+async fn build_admin_store_from_config_reconciles_marketing_seed_definition_drift_for_runtime_records(
+) {
+    let bootstrap_root = temp_bootstrap_root("profile-pack-marketing-definition-drift");
+    write_bootstrap_profile_pack(&bootstrap_root);
+    let marketing_path = bootstrap_root.join("marketing").join("default.json");
+
+    let database_path = bootstrap_root.join("bootstrap-marketing-definition-drift.db");
+    let database_url = sqlite_url_for(database_path);
+    let mut config = StandaloneConfig::default();
+    config.database_url = database_url;
+    config.bootstrap_data_dir = Some(bootstrap_root.to_string_lossy().into_owned());
+    config.bootstrap_profile = "dev".to_owned();
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+
+    let template = store
+        .find_coupon_template_record("template-launch-credit-100")
+        .await
+        .unwrap()
+        .expect("template before bootstrap definition drift reconcile");
+    let template = store
+        .insert_coupon_template_record(
+            &template
+                .with_status(sdkwork_api_domain_marketing::CouponTemplateStatus::Active)
+                .with_approval_state(
+                    sdkwork_api_domain_marketing::CouponTemplateApprovalState::Approved,
+                )
+                .with_updated_at_ms(1_710_000_001_000),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        template.status,
+        sdkwork_api_domain_marketing::CouponTemplateStatus::Active
+    );
+
+    let campaign = store
+        .find_marketing_campaign_record("campaign-launch-q2")
+        .await
+        .unwrap()
+        .expect("campaign before bootstrap definition drift reconcile");
+    let campaign = store
+        .insert_marketing_campaign_record(
+            &campaign
+                .with_status(sdkwork_api_domain_marketing::MarketingCampaignStatus::Active)
+                .with_approval_state(
+                    sdkwork_api_domain_marketing::MarketingCampaignApprovalState::Approved,
+                )
+                .with_updated_at_ms(1_710_000_001_000),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        campaign.status,
+        sdkwork_api_domain_marketing::MarketingCampaignStatus::Active
+    );
+
+    let budget = store
+        .find_campaign_budget_record("budget-launch-q2")
+        .await
+        .unwrap()
+        .expect("budget before bootstrap definition drift reconcile");
+    let budget = store
+        .insert_campaign_budget_record(
+            &budget
+                .with_status(sdkwork_api_domain_marketing::CampaignBudgetStatus::Active)
+                .with_reserved_budget_minor(10_000)
+                .with_updated_at_ms(1_710_000_001_000),
+        )
+        .await
+        .unwrap();
+    assert_eq!(budget.reserved_budget_minor, 10_000);
+
+    drop(store);
+    drop(commercial_billing);
+
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    let template = marketing["coupon_templates"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["coupon_template_id"] == "template-launch-credit-100")
+        .expect("template-launch-credit-100 marketing fixture");
+    template["display_name"] = serde_json::json!("Launch Credit 100 Updated");
+    template["benefit"]["discount_amount_minor"] = serde_json::json!(12_000u64);
+    template["benefit"]["max_discount_minor"] = serde_json::json!(12_000u64);
+
+    let campaign = marketing["marketing_campaigns"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["marketing_campaign_id"] == "campaign-launch-q2")
+        .expect("campaign-launch-q2 marketing fixture");
+    campaign["end_at_ms"] = serde_json::json!(4_102_444_800_000u64);
+
+    let budget = marketing["campaign_budgets"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["campaign_budget_id"] == "budget-launch-q2")
+        .expect("budget-launch-q2 marketing fixture");
+    budget["total_budget_minor"] = serde_json::json!(6_000_000u64);
+    write_json(&marketing_path, &marketing);
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+
+    let template = store
+        .find_coupon_template_record("template-launch-credit-100")
+        .await
+        .unwrap()
+        .expect("template after bootstrap definition drift reconcile");
+    let campaign = store
+        .find_marketing_campaign_record("campaign-launch-q2")
+        .await
+        .unwrap()
+        .expect("campaign after bootstrap definition drift reconcile");
+    let budget = store
+        .find_campaign_budget_record("budget-launch-q2")
+        .await
+        .unwrap()
+        .expect("budget after bootstrap definition drift reconcile");
+
+    assert_eq!(template.display_name, "Launch Credit 100 Updated");
+    assert_eq!(
+        template.status,
+        sdkwork_api_domain_marketing::CouponTemplateStatus::Active
+    );
+    assert_eq!(template.benefit.discount_amount_minor, Some(12_000));
+    assert_eq!(campaign.end_at_ms, Some(4_102_444_800_000));
+    assert_eq!(
+        campaign.status,
+        sdkwork_api_domain_marketing::MarketingCampaignStatus::Active
+    );
+    assert_eq!(budget.total_budget_minor, 6_000_000);
+    assert_eq!(budget.reserved_budget_minor, 10_000);
+    assert_eq!(
+        budget.status,
+        sdkwork_api_domain_marketing::CampaignBudgetStatus::Active
+    );
+
+    drop(store);
+    drop(commercial_billing);
+}
+
+#[tokio::test]
+async fn build_admin_store_from_config_rejects_marketing_seed_budget_shrink_below_reserved_runtime_amount(
+) {
+    let bootstrap_root = temp_bootstrap_root("profile-pack-marketing-budget-shrink-conflict");
+    write_bootstrap_profile_pack(&bootstrap_root);
+    let marketing_path = bootstrap_root.join("marketing").join("default.json");
+
+    let database_path = bootstrap_root.join("bootstrap-marketing-budget-shrink-conflict.db");
+    let database_url = sqlite_url_for(database_path);
+    let mut config = StandaloneConfig::default();
+    config.database_url = database_url;
+    config.bootstrap_data_dir = Some(bootstrap_root.to_string_lossy().into_owned());
+    config.bootstrap_profile = "dev".to_owned();
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+    let budget = store
+        .find_campaign_budget_record("budget-launch-q2")
+        .await
+        .unwrap()
+        .expect("budget before shrink conflict");
+    store
+        .insert_campaign_budget_record(
+            &budget
+                .with_status(sdkwork_api_domain_marketing::CampaignBudgetStatus::Active)
+                .with_reserved_budget_minor(10_000)
+                .with_updated_at_ms(1_710_000_001_000),
+        )
+        .await
+        .unwrap();
+
+    drop(store);
+    drop(commercial_billing);
+
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    let budget = marketing["campaign_budgets"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["campaign_budget_id"] == "budget-launch-q2")
+        .expect("budget-launch-q2 marketing fixture");
+    budget["total_budget_minor"] = serde_json::json!(5_000u64);
+    write_json(&marketing_path, &marketing);
+
+    let error = match build_admin_store_and_commercial_billing_from_config(&config).await {
+        Ok(_) => panic!("bootstrap should reject shrinking a budget below reserved usage"),
+        Err(error) => format!("{error:#}"),
+    };
+    assert!(error.contains("campaign budget budget-launch-q2"));
+    assert!(error.contains("cannot shrink total budget below committed usage"));
+}
+
+#[tokio::test]
+async fn build_admin_store_from_config_rejects_marketing_seed_template_key_reconcile_when_key_is_taken(
+) {
+    let bootstrap_root = temp_bootstrap_root("profile-pack-marketing-template-key-conflict");
+    write_bootstrap_profile_pack(&bootstrap_root);
+    let marketing_path = bootstrap_root.join("marketing").join("default.json");
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    marketing["coupon_templates"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "coupon_template_id": "template-launch-credit-200",
+            "template_key": "launch-credit-200",
+            "display_name": "Launch Credit 200",
+            "status": "draft",
+            "distribution_kind": "shared_code",
+            "benefit": {
+                "benefit_kind": "fixed_amount_off",
+                "discount_percent": null,
+                "discount_amount_minor": 20_000u64,
+                "currency_code": "USD",
+                "grant_units": null,
+                "grant_unit_type": null,
+                "max_discount_minor": 20_000u64
+            },
+            "restriction": {
+                "subject_scope": "project",
+                "min_order_amount_minor": 20_000u64,
+                "first_order_only": false,
+                "new_customer_only": false,
+                "exclusive_group": null,
+                "stacking_policy": "stackable",
+                "max_redemptions_per_subject": 1u32,
+                "eligible_target_kinds": ["subscription_plan"]
+            },
+            "created_at_ms": 1_710_000_000_000u64,
+            "updated_at_ms": 1_710_000_000_000u64
+        }));
+    write_json(&marketing_path, &marketing);
+
+    let database_path = bootstrap_root.join("bootstrap-marketing-template-key-conflict.db");
+    let database_url = sqlite_url_for(database_path);
+    let mut config = StandaloneConfig::default();
+    config.database_url = database_url;
+    config.bootstrap_data_dir = Some(bootstrap_root.to_string_lossy().into_owned());
+    config.bootstrap_profile = "dev".to_owned();
+
+    let (store, commercial_billing) = build_admin_store_and_commercial_billing_from_config(&config)
+        .await
+        .unwrap();
+    drop(store);
+    drop(commercial_billing);
+
+    let mut marketing =
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&marketing_path).unwrap())
+            .unwrap();
+    let templates = marketing["coupon_templates"]
+        .as_array_mut()
+        .expect("coupon_templates marketing fixture");
+    templates.retain(|record| record["coupon_template_id"] != "template-launch-credit-200");
+    let template = templates
+        .iter_mut()
+        .find(|record| record["coupon_template_id"] == "template-launch-credit-100")
+        .expect("template-launch-credit-100 marketing fixture");
+    template["template_key"] = serde_json::json!("launch-credit-200");
+    write_json(&marketing_path, &marketing);
+
+    let error = match build_admin_store_and_commercial_billing_from_config(&config).await {
+        Ok(_) => panic!("bootstrap should reject reconciling a template key onto another template"),
+        Err(error) => format!("{error:#}"),
+    };
+    assert!(
+        error.contains("coupon template key launch-credit-200 already exists on"),
+        "{error}"
+    );
+    assert!(error.contains("template-launch-credit-200"), "{error}");
 }
 
 #[tokio::test]
