@@ -57,6 +57,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\build.ps1
 - 如果在 Docker 中执行 Unix installed-runtime smoke，`cargo build` 与 `run-unix-installed-runtime-smoke.mjs` 两步必须使用同一个 `CARGO_TARGET_DIR`
 - 即使 `ss`、`netstat` 和 `lsof` 都不可用，运行时仍能正确启动；如果你希望在启动前获得更丰富的端口冲突诊断，建议额外安装其中任意一个工具
 
+## 本地 Release Governance 准备
+
+如果你是在开发机上执行 release governance，而本地 sibling 仓库并不是干净的独立 release checkout，请先把发布工具指向一个受管 external dependency root。这样 `materialize-external-deps`、`verify-release-sync` 和 `run-release-governance-checks` 就会基于受管克隆执行，而不是误读当前机器上的脏 worktree。
+
+Linux / macOS：
+
+```bash
+export SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT="$PWD/artifacts/external-release-deps"
+node scripts/release/materialize-external-deps.mjs
+node scripts/release/verify-release-sync.mjs --format text --live
+node scripts/release/run-release-governance-checks.mjs
+```
+
+Windows：
+
+```powershell
+$env:SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT = (Join-Path (Get-Location) 'artifacts\external-release-deps')
+node scripts/release/materialize-external-deps.mjs
+node scripts/release/verify-release-sync.mjs --format text --live
+node scripts/release/run-release-governance-checks.mjs
+```
+
+当 sibling 审计出现 `not-standalone-root`、`dirty-working-tree`、`branch-not-synced` 或 `head-mismatch` 这类原因时，优先使用这条路径。
+
 ## 生成原生生产安装
 
 Linux / macOS：
