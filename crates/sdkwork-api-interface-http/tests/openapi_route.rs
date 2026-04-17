@@ -1732,3 +1732,57 @@ async fn try_gateway_router_with_pool_returns_error_for_invalid_http_exposure_en
         .to_string()
         .contains("invalid list value for SDKWORK_BROWSER_ALLOWED_ORIGINS"));
 }
+
+#[test]
+fn gateway_api_docs_use_openapi_tag_groups() {
+    let english = include_str!("../../../docs/api-reference/gateway-api.md");
+    let chinese = include_str!("../../../docs/zh/api-reference/gateway-api.md");
+
+    let required_groups = [
+        "| `code.openai` |",
+        "| `code.claude` |",
+        "| `code.gemini` |",
+        "| `images.openai` |",
+        "| `audio.openai` |",
+        "| `video.openai` |",
+        "| `music.openai` |",
+        "| `vector-stores` |",
+        "| `fine-tuning` |",
+    ];
+    let obsolete_groups = [
+        "| models |",
+        "| chat completions |",
+        "| completions |",
+        "| responses |",
+        "| embeddings |",
+        "| moderations |",
+        "| images |",
+        "| audio |",
+        "| videos |",
+        "| music |",
+        "| vector stores |",
+        "| fine tuning |",
+    ];
+
+    for required_group in required_groups {
+        assert!(
+            english.contains(required_group),
+            "english gateway api doc should include {required_group}"
+        );
+        assert!(
+            chinese.contains(required_group),
+            "chinese gateway api doc should include {required_group}"
+        );
+    }
+
+    for obsolete_group in obsolete_groups {
+        assert!(
+            !english.contains(obsolete_group),
+            "english gateway api doc should not include obsolete route group {obsolete_group}"
+        );
+        assert!(
+            !chinese.contains(obsolete_group),
+            "chinese gateway api doc should not include obsolete route group {obsolete_group}"
+        );
+    }
+}
