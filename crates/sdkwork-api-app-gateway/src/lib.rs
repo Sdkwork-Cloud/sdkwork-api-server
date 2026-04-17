@@ -311,6 +311,69 @@ pub async fn planned_execution_provider_context_for_route_without_log(
     .await
 }
 
+pub async fn planned_execution_provider_context_for_route_and_mirror_identity_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identity: &str,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_mirror_identity_without_log(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        mirror_protocol_identity,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identities_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identities: &[&str],
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_mirror_identities_without_log(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        mirror_protocol_identities,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_provider_id_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    provider_id: &str,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_provider_id_without_log(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        provider_id,
+    )
+    .await
+}
+
 pub async fn planned_execution_provider_context_for_route_without_log_with_selection_seed(
     store: &dyn AdminStore,
     secret_manager: &CredentialSecretManager,
@@ -327,6 +390,75 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
         project_id,
         capability,
         route_key,
+        selection_seed,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identity_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identity: &str,
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_mirror_identity_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        mirror_protocol_identity,
+        selection_seed,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identities: &[&str],
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        mirror_protocol_identities,
+        selection_seed,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_provider_id_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    provider_id: &str,
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    gateway_routing::planned_execution_provider_context_for_route_and_provider_id_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        provider_id,
         selection_seed,
     )
     .await

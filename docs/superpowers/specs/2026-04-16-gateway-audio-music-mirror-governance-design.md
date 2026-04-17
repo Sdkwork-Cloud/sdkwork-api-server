@@ -2,6 +2,10 @@
 
 **Date:** 2026-04-16
 
+## Superseded Status
+
+This design predates the later provider-specific music mirror rollout. The current implemented/public contract now publishes `music.suno`, `music.google`, and `music.minimax` as active provider-specific mirror families, and the Chinese public docs have already been brought in line with the English contract text.
+
 ## Goal
 
 Formalize the gateway `audio` and `music` public contracts as mirror-style API surfaces that let existing clients switch only the `base_url` while preserving the current official-style `/v1/audio/*` and `/v1/music*` paths. This slice governs OpenAPI taxonomy, operation naming, docs, and regression guardrails without inventing provider-specific wrapper paths or publishing roadmap-only mirror families.

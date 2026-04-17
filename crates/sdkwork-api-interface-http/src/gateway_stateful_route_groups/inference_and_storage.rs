@@ -16,6 +16,34 @@ pub(crate) fn apply_stateful_inference_and_storage_routes(
             post(image_variations_with_state_handler),
         )
         .route(
+            "/api/v1/services/aigc/image-generation/generation",
+            post(dashscope_image_generation_with_state_handler),
+        )
+        .route(
+            "/api/v3/images/generations",
+            post(volcengine_image_generation_with_state_handler),
+        )
+        .route(
+            "/api/v1/services/aigc/video-generation/video-synthesis",
+            post(dashscope_video_synthesis_with_state_handler),
+        )
+        .route(
+            "/v1/projects/{project}/locations/{location}/publishers/google/models/{*tail}",
+            post(video_google_veo_models_action_with_state_handler),
+        )
+        .route(
+            "/api/v1/contents/generations/tasks",
+            post(video_volcengine_task_create_with_state_handler),
+        )
+        .route(
+            "/api/v1/contents/generations/tasks/{id}",
+            get(video_volcengine_task_get_with_state_handler),
+        )
+        .route(
+            "/api/v1/tasks/{task_id}",
+            get(dashscope_image_task_get_with_state_handler),
+        )
+        .route(
             "/v1/audio/transcriptions",
             post(transcriptions_with_state_handler),
         )
@@ -34,6 +62,55 @@ pub(crate) fn apply_stateful_inference_and_storage_routes(
             get(music_list_with_state_handler).post(music_with_state_handler),
         )
         .route("/v1/music/lyrics", post(music_lyrics_with_state_handler))
+        .route(
+            "/v1/music_generation",
+            post(music_minimax_generation_with_state_handler),
+        )
+        .route(
+            "/v1/lyrics_generation",
+            post(music_minimax_lyrics_with_state_handler),
+        )
+        .route(
+            "/v1/video_generation",
+            post(video_minimax_generation_with_state_handler),
+        )
+        .route(
+            "/v1/query/video_generation",
+            get(video_minimax_generation_query_with_state_handler),
+        )
+        .route(
+            "/ent/v2/text2video",
+            post(video_vidu_text2video_with_state_handler),
+        )
+        .route(
+            "/ent/v2/img2video",
+            post(video_vidu_img2video_with_state_handler),
+        )
+        .route(
+            "/ent/v2/reference2video",
+            post(video_vidu_reference2video_with_state_handler),
+        )
+        .route(
+            "/ent/v2/tasks/{id}/creations",
+            get(video_vidu_task_creations_with_state_handler),
+        )
+        .route(
+            "/ent/v2/tasks/{id}/cancel",
+            post(video_vidu_task_cancel_with_state_handler),
+        )
+        .route(
+            "/api/v1/generate",
+            post(music_suno_generate_with_state_handler),
+        )
+        .route(
+            "/api/v1/generate/record-info",
+            get(music_suno_generate_record_info_with_state_handler),
+        )
+        .route("/api/v1/lyrics", post(music_suno_lyrics_with_state_handler))
+        .route(
+            "/api/v1/lyrics/record-info",
+            get(music_suno_lyrics_record_info_with_state_handler),
+        )
         .route(
             "/v1/music/{music_id}",
             get(music_retrieve_with_state_handler).delete(music_delete_with_state_handler),
@@ -66,6 +143,10 @@ pub(crate) fn apply_stateful_inference_and_storage_routes(
         .route(
             "/v1/files",
             get(files_list_with_state_handler).post(files_with_state_handler),
+        )
+        .route(
+            "/v1/files/retrieve",
+            get(video_minimax_file_retrieve_with_state_handler),
         )
         .route(
             "/v1/files/{file_id}",

@@ -87,7 +87,10 @@ fn provider_normalizes_default_plugin_families_for_builtin_nonstandard_families(
         derive_provider_default_plugin_family("openrouter-compatible"),
         Some("openrouter")
     );
-    assert_eq!(derive_provider_default_plugin_family("ollama"), Some("ollama"));
+    assert_eq!(
+        derive_provider_default_plugin_family("ollama"),
+        Some("ollama")
+    );
     assert_eq!(
         derive_provider_default_plugin_family("siliconflow"),
         Some("siliconflow")

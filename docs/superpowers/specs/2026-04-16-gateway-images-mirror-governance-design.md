@@ -2,6 +2,10 @@
 
 **Date:** 2026-04-16
 
+## Superseded Status
+
+This design predates the later provider-specific image mirror rollout. The current implemented/public contract now publishes `images.kling`, `images.aliyun`, and `images.volcengine` as active mirror families. `images.nanobanana` is still not published because Nano Banana remains on Google's official Gemini protocol under `code.gemini`, and `images.midjourney` remains unpublished because there is no official Midjourney API surface that satisfies the switch-only-`base_url` mirror rule.
+
 ## Goal
 
 Formalize the gateway `images` public contract as a mirror-style API surface that lets existing OpenAI image clients switch only the `base_url` while preserving the official `/v1/images/*` protocol. This slice governs OpenAPI taxonomy, docs, and regression guardrails without inventing new provider-specific wrapper paths.

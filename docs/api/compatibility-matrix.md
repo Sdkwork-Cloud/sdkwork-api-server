@@ -30,7 +30,7 @@ The table below reflects the current runtime truth as of 2026-04-16.
 | `/v1/messages/count_tokens` | `translated` | `translated` | Claude token counting mirror protocol. Uses the shared response-token counting path and preserves the configured model route key for usage accounting in stateful mode |
 | `/v1/completions` | `relay` | `relay` | Relays legacy text completions when provider wiring exists; stateless mode uses the configured single-upstream runtime or falls back locally |
 | `/v1/responses` | `relay` | `relay` | Stateful mode relays create, retrieve, delete, cancel, compact, input item flows, SSE streaming, and project quota admission; stateless mode relays the same core response operations through its configured upstream runtime |
-| `/v1beta/models/{model}:generateContent` | `translated` | `translated` | Gemini mirror protocol for Gemini CLI gateway mode and Google Generative Language clients. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization`, `x-goog-api-key`, and `?key=` while preserving routing, quota, billing, usage recording, and the official `GOOGLE_GEMINI_BASE_URL` plus `GEMINI_API_KEY_AUTH_MECHANISM=bearer` client setup path |
+| `/v1beta/models/{model}:generateContent` | `translated` | `translated` | Gemini mirror protocol for Gemini CLI gateway mode, Google Generative Language clients, and image-capable Gemini clients such as Nano Banana. Requests translate into the shared chat-completions flow; stateful mode accepts `Authorization`, `x-goog-api-key`, and `?key=` while preserving routing, quota, billing, usage recording, and the official `GOOGLE_GEMINI_BASE_URL` plus `GEMINI_API_KEY_AUTH_MECHANISM=bearer` client setup path |
 | `/v1beta/models/{model}:streamGenerateContent` | `translated` | `translated` | Gemini SSE mirror protocol via `?alt=sse`, with OpenAI-compatible upstream chunk streams re-emitted as Gemini event frames |
 | `/v1beta/models/{model}:countTokens` | `translated` | `translated` | Gemini token counting mirror protocol through the shared token-count execution path |
 | `/v1/embeddings` | `relay` | `relay` | Uses catalog, credential, and provider state in stateful mode; stateless mode relays embeddings to its configured upstream runtime or falls back locally |
@@ -39,6 +39,9 @@ The table below reflects the current runtime truth as of 2026-04-16.
 | `/v1/uploads` | `relay` | `relay` | Upload creation, part upload, completion, and cancel relay in stateful mode; stateless mode relays the same upload surface through its configured upstream runtime or falls back locally |
 | `/v1/audio/*` | `relay` | `relay` | Speech can relay binary or event-stream output; both modes now also cover transcription, translation, voices listing, and voice consent flows through the configured upstream runtime or local compatible fallback |
 | `/v1/images/*` | `relay` | `relay` | Generations, edits, and variations relay in stateful mode; stateless mode relays the same image operations through its configured upstream runtime or falls back locally |
+| `/api/v1/services/aigc/image-generation/generation` | `relay` | `relay` | Provider-specific shared DashScope image mirror transport for `images.kling` and `images.aliyun`; stateful mode preserves provider identity and task ownership while stateless mode relays the same official path directly |
+| `/api/v3/images/generations` | `relay` | `relay` | Provider-specific Volcengine image mirror transport for `images.volcengine` on the official Ark image-generation path |
+| `/api/v1/tasks/{task_id}` | `relay` | `relay` | Shared DashScope async task lookup used by the active `images.kling`, `images.aliyun`, `video.kling`, and `video.aliyun` mirror families |
 | `/v1/moderations` | `relay` | `relay` | Stateful mode relays provider moderation calls; stateless mode relays moderation through its configured upstream runtime or falls back locally |
 | `/v1/realtime/sessions` | `relay` | `relay` | Compatible request/response contract is present in both modes; stateless mode now relays realtime session creation through its configured upstream runtime or falls back locally |
 | `/v1/assistants` | `relay` | `relay` | Stateful mode relays create, list, retrieve, update, and delete; stateless mode relays the same assistants surface through its configured upstream runtime or falls back locally |
@@ -50,6 +53,24 @@ The table below reflects the current runtime truth as of 2026-04-16.
 | `/v1/webhooks` | `relay` | `relay` | CRUD-compatible relay path when upstream supports the same contract; stateless mode relays the same webhook surface through its configured upstream runtime or falls back locally |
 | `/v1/evals` | `relay` | `relay` | Create, list, retrieve, update, delete, run list, run create, run retrieve, run delete, run cancel, output item list, and output item retrieve are relay-capable in both modes |
 | `/v1/videos` | `relay` | `relay` | Create, list, retrieve, content, delete, remix, official characters create or retrieve, official edits, official extensions, legacy nested character aliases, character update, and extend relay are available in both modes |
+| `/api/v1/services/aigc/video-generation/video-synthesis` | `relay` | `relay` | Provider-specific shared DashScope video mirror transport for `video.kling` and `video.aliyun`; both modes preserve the official async synthesis path |
+| `/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predictLongRunning` | `relay` | `relay` | Provider-specific Google Veo mirror transport for `video.google-veo`, including Veo 3-class models selected through `{model}` |
+| `/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:fetchPredictOperation` | `relay` | `relay` | Provider-specific Google Veo operation lookup transport for `video.google-veo`, including Veo 3-class models selected through `{model}` |
+| `/api/v1/contents/generations/tasks*` | `relay` | `relay` | Provider-specific Volcengine video task transport for `video.volcengine` on the official create and retrieve task paths |
+| `/v1/video_generation` | `relay` | `relay` | Provider-specific MiniMax video generation transport for `video.minimax` |
+| `/v1/query/video_generation` | `relay` | `relay` | Provider-specific MiniMax video query transport for `video.minimax` |
+| `/v1/files/retrieve` | `relay` | `relay` | Provider-specific MiniMax file retrieval transport used by `video.minimax` result downloads |
+| `/ent/v2/text2video` | `relay` | `relay` | Provider-specific Vidu text-to-video transport for `video.vidu` |
+| `/ent/v2/img2video` | `relay` | `relay` | Provider-specific Vidu image-to-video transport for `video.vidu` |
+| `/ent/v2/reference2video` | `relay` | `relay` | Provider-specific Vidu reference-video transport for `video.vidu` |
+| `/ent/v2/tasks/{id}/creations` | `relay` | `relay` | Provider-specific Vidu task result lookup transport for `video.vidu` |
+| `/ent/v2/tasks/{id}/cancel` | `relay` | `relay` | Provider-specific Vidu task cancel transport for `video.vidu` |
+| `/v1/music*` | `relay` | `relay` | Shared music mirror transport for `music.openai`, including list, create, retrieve, delete, content, and lyrics operations |
+| `/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict` | `relay` | `relay` | Provider-specific Google music mirror transport for `music.google` on the official Vertex AI predict path |
+| `/v1/music_generation` | `relay` | `relay` | Provider-specific MiniMax music generation transport for `music.minimax` |
+| `/v1/lyrics_generation` | `relay` | `relay` | Provider-specific MiniMax lyrics generation transport for `music.minimax` |
+| `/api/v1/generate*` | `relay` | `relay` | Provider-specific Suno generation transport for `music.suno`, including create and record-info lookup |
+| `/api/v1/lyrics*` | `relay` | `relay` | Provider-specific Suno lyrics transport for `music.suno`, including create and record-info lookup |
 
 ## Control Plane
 

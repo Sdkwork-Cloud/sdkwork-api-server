@@ -1,5 +1,6 @@
-use sdkwork_api_app_gateway::{cancel_fine_tuning_job, create_fine_tuning_job, get_fine_tuning_job,
-    list_fine_tuning_jobs};
+use sdkwork_api_app_gateway::{
+    cancel_fine_tuning_job, create_fine_tuning_job, get_fine_tuning_job, list_fine_tuning_jobs,
+};
 use sdkwork_api_contract_openai::fine_tuning::CreateFineTuningJobRequest;
 
 fn assert_error_contains<T: std::fmt::Debug, E: std::fmt::Display>(

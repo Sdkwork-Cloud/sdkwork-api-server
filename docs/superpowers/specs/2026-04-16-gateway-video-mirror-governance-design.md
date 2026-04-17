@@ -2,6 +2,10 @@
 
 **Date:** 2026-04-16
 
+## Superseded Status
+
+This design predates the later provider-specific video mirror rollout. The current implemented/public contract keeps `video.openai` as the shared OpenAI video family for Sora 2 and Sora 2 Pro, does not publish `video.sora`, and now publishes `video.kling`, `video.aliyun`, `video.google-veo`, `video.minimax`, `video.vidu`, and `video.volcengine` as active provider-specific mirror families.
+
 ## Goal
 
 Formalize the gateway `video` public contract as a mirror-style API surface that keeps the existing official `/v1/videos*` family stable while publishing it as a first-class mirror protocol group. This slice governs OpenAPI taxonomy, operation naming, docs, and regression guardrails without inventing provider-specific wrapper paths or new runtime routes.

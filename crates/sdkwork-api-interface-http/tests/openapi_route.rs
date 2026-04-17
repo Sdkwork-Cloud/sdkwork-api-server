@@ -453,30 +453,274 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert!(tags.iter().any(|tag| tag["name"] == "code.openai"));
     assert!(tags.iter().any(|tag| tag["name"] == "code.claude"));
     assert!(tags.iter().any(|tag| tag["name"] == "code.gemini"));
+    let code_gemini_tag = tags
+        .iter()
+        .find(|tag| tag["name"] == "code.gemini")
+        .unwrap();
+    assert!(code_gemini_tag["description"]
+        .as_str()
+        .unwrap()
+        .contains("Nano Banana"));
     assert!(tags.iter().any(|tag| tag["name"] == "images.openai"));
+    assert!(tags.iter().any(|tag| tag["name"] == "images.kling"));
+    assert!(tags.iter().any(|tag| tag["name"] == "images.aliyun"));
+    assert!(tags.iter().any(|tag| tag["name"] == "images.volcengine"));
     assert!(tags.iter().any(|tag| tag["name"] == "audio.openai"));
     assert!(tags.iter().any(|tag| tag["name"] == "video.openai"));
+    let video_openai_tag = tags
+        .iter()
+        .find(|tag| tag["name"] == "video.openai")
+        .unwrap();
+    assert!(video_openai_tag["description"]
+        .as_str()
+        .unwrap()
+        .contains("Sora 2"));
+    assert!(video_openai_tag["description"]
+        .as_str()
+        .unwrap()
+        .contains("Sora 2 Pro"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.minimax"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.vidu"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.kling"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.aliyun"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.google-veo"));
+    let video_google_veo_tag = tags
+        .iter()
+        .find(|tag| tag["name"] == "video.google-veo")
+        .unwrap();
+    assert!(video_google_veo_tag["description"]
+        .as_str()
+        .unwrap()
+        .contains("Veo 3"));
+    assert!(tags.iter().any(|tag| tag["name"] == "video.volcengine"));
     assert!(tags.iter().any(|tag| tag["name"] == "music.openai"));
+    assert!(tags.iter().any(|tag| tag["name"] == "music.suno"));
+    assert!(tags.iter().any(|tag| tag["name"] == "music.minimax"));
+    assert!(tags.iter().any(|tag| tag["name"] == "music.google"));
     assert!(!tags.iter().any(|tag| tag["name"] == "audio"));
     assert!(!tags.iter().any(|tag| tag["name"] == "music"));
     assert!(!tags.iter().any(|tag| tag["name"] == "images"));
     assert!(!tags.iter().any(|tag| tag["name"] == "videos"));
     assert!(!tags.iter().any(|tag| tag["name"] == "images.nanobanana"));
     assert!(!tags.iter().any(|tag| tag["name"] == "images.midjourney"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "images.volcengine"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "images.aliyun"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "images.kling"));
     assert!(!tags.iter().any(|tag| tag["name"] == "video.sora"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.minimax"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.vidu"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.volcengine"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.google-veo"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.aliyun"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "video.kling"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "music.suno"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "music.google"));
-    assert!(!tags.iter().any(|tag| tag["name"] == "music.minimax"));
     assert!(!tags.iter().any(|tag| tag["name"] == "compatibility"));
+    assert!(json["paths"]["/api/v1/generate"]["post"].is_object());
+    assert!(json["paths"]["/api/v1/generate/record-info"]["get"].is_object());
+    assert!(json["paths"]["/api/v1/lyrics"]["post"].is_object());
+    assert!(json["paths"]["/api/v1/lyrics/record-info"]["get"].is_object());
+    assert!(json["paths"]["/v1/music_generation"]["post"].is_object());
+    assert!(json["paths"]["/v1/lyrics_generation"]["post"].is_object());
+    assert!(json["paths"]["/v1/video_generation"]["post"].is_object());
+    assert!(json["paths"]["/v1/query/video_generation"]["get"].is_object());
+    assert!(json["paths"]["/v1/files/retrieve"]["get"].is_object());
+    assert!(json["paths"]["/ent/v2/text2video"]["post"].is_object());
+    assert!(json["paths"]["/ent/v2/img2video"]["post"].is_object());
+    assert!(json["paths"]["/ent/v2/reference2video"]["post"].is_object());
+    assert!(json["paths"]["/ent/v2/tasks/{id}/creations"]["get"].is_object());
+    assert!(json["paths"]["/ent/v2/tasks/{id}/cancel"]["post"].is_object());
+    assert!(json["paths"]["/api/v1/services/aigc/image-generation/generation"]["post"].is_object());
+    assert!(
+        json["paths"]["/api/v1/services/aigc/video-generation/video-synthesis"]["post"].is_object()
+    );
+    assert!(json["paths"]
+        ["/v1/projects/{project}/locations/{location}/publishers/google/models/{tail}"]["post"]
+        .is_object());
+    assert!(json["paths"]
+        ["/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict"]
+        ["post"]
+        .is_object());
+    assert!(json["paths"]["/api/v1/tasks/{task_id}"]["get"].is_object());
+    assert_eq!(
+        json["paths"]["/api/v1/generate"]["post"]["tags"][0],
+        "music.suno"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/generate"]["post"]["operationId"],
+        "music_suno_generate_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/generate/record-info"]["get"]["tags"][0],
+        "music.suno"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/generate/record-info"]["get"]["operationId"],
+        "music_suno_generate_record_info_get"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/lyrics"]["post"]["tags"][0],
+        "music.suno"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/lyrics"]["post"]["operationId"],
+        "music_suno_lyrics_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/lyrics/record-info"]["get"]["tags"][0],
+        "music.suno"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/lyrics/record-info"]["get"]["operationId"],
+        "music_suno_lyrics_record_info_get"
+    );
+    assert_eq!(
+        json["paths"]["/v1/music_generation"]["post"]["tags"][0],
+        "music.minimax"
+    );
+    assert_eq!(
+        json["paths"]["/v1/music_generation"]["post"]["operationId"],
+        "music_minimax_generation_create"
+    );
+    assert_eq!(
+        json["paths"]["/v1/lyrics_generation"]["post"]["tags"][0],
+        "music.minimax"
+    );
+    assert_eq!(
+        json["paths"]["/v1/lyrics_generation"]["post"]["operationId"],
+        "music_minimax_lyrics_create"
+    );
+    assert_eq!(
+        json["paths"]["/v1/video_generation"]["post"]["tags"][0],
+        "video.minimax"
+    );
+    assert_eq!(
+        json["paths"]["/v1/video_generation"]["post"]["operationId"],
+        "video_minimax_generation_create"
+    );
+    assert_eq!(
+        json["paths"]["/v1/query/video_generation"]["get"]["tags"][0],
+        "video.minimax"
+    );
+    assert_eq!(
+        json["paths"]["/v1/query/video_generation"]["get"]["operationId"],
+        "video_minimax_generation_query"
+    );
+    assert_eq!(
+        json["paths"]["/v1/files/retrieve"]["get"]["tags"][0],
+        "video.minimax"
+    );
+    assert_eq!(
+        json["paths"]["/v1/files/retrieve"]["get"]["operationId"],
+        "video_minimax_file_retrieve"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/text2video"]["post"]["tags"][0],
+        "video.vidu"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/text2video"]["post"]["operationId"],
+        "video_vidu_text2video_create"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/img2video"]["post"]["tags"][0],
+        "video.vidu"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/img2video"]["post"]["operationId"],
+        "video_vidu_img2video_create"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/reference2video"]["post"]["tags"][0],
+        "video.vidu"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/reference2video"]["post"]["operationId"],
+        "video_vidu_reference2video_create"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/tasks/{id}/creations"]["get"]["tags"][0],
+        "video.vidu"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/tasks/{id}/creations"]["get"]["operationId"],
+        "video_vidu_task_creations_get"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/tasks/{id}/cancel"]["post"]["tags"][0],
+        "video.vidu"
+    );
+    assert_eq!(
+        json["paths"]["/ent/v2/tasks/{id}/cancel"]["post"]["operationId"],
+        "video_vidu_task_cancel_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/services/aigc/image-generation/generation"]["post"]["tags"],
+        serde_json::json!(["images.kling", "images.aliyun"])
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/services/aigc/image-generation/generation"]["post"]["operationId"],
+        "images_dashscope_generation_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v3/images/generations"]["post"]["tags"][0],
+        "images.volcengine"
+    );
+    assert_eq!(
+        json["paths"]["/api/v3/images/generations"]["post"]["operationId"],
+        "images_volcengine_generate_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/services/aigc/video-generation/video-synthesis"]["post"]["tags"],
+        serde_json::json!(["video.kling", "video.aliyun"])
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/services/aigc/video-generation/video-synthesis"]["post"]
+            ["operationId"],
+        "video_dashscope_synthesis_create"
+    );
+    assert_eq!(
+        json["paths"]
+            ["/v1/projects/{project}/locations/{location}/publishers/google/models/{tail}"]["post"]
+            ["tags"][0],
+        "video.google-veo"
+    );
+    assert_eq!(
+        json["paths"]
+            ["/v1/projects/{project}/locations/{location}/publishers/google/models/{tail}"]["post"]
+            ["operationId"],
+        "video_google_veo_models_action_create"
+    );
+    assert_eq!(
+        json["paths"]
+            ["/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict"]
+            ["post"]["tags"][0],
+        "music.google"
+    );
+    assert_eq!(
+        json["paths"]
+            ["/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict"]
+            ["post"]["operationId"],
+        "music_google_predict_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/contents/generations/tasks"]["post"]["tags"][0],
+        "video.volcengine"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/contents/generations/tasks"]["post"]["operationId"],
+        "video_volcengine_tasks_create"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/contents/generations/tasks/{id}"]["get"]["tags"][0],
+        "video.volcengine"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/contents/generations/tasks/{id}"]["get"]["operationId"],
+        "video_volcengine_task_get"
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/tasks/{task_id}"]["get"]["tags"],
+        serde_json::json!([
+            "images.kling",
+            "images.aliyun",
+            "video.kling",
+            "video.aliyun"
+        ])
+    );
+    assert_eq!(
+        json["paths"]["/api/v1/tasks/{task_id}"]["get"]["operationId"],
+        "dashscope_task_get"
+    );
     assert!(json["paths"]["/code"].is_null());
     assert!(json["paths"]["/code/chat/completions"].is_null());
     assert!(json["paths"]["/claude/messages"].is_null());
@@ -487,13 +731,50 @@ async fn openapi_routes_expose_gateway_api_inventory() {
     assert!(json["paths"]["/images/nanobanana/generations"].is_null());
     assert!(json["paths"]["/v1/images/nanobanana/generations"].is_null());
     assert!(json["paths"]["/v1/images/midjourney/generations"].is_null());
+    assert!(json["paths"]["/images/kling/generation"].is_null());
+    assert!(json["paths"]["/images/volcengine/generations"].is_null());
+    assert!(json["paths"]["/v1/images/volcengine/generations"].is_null());
+    assert!(json["paths"]["/api/v1/images/volcengine/generations"].is_null());
+    assert!(json["paths"]["/v1/images/kling/generation"].is_null());
+    assert!(json["paths"]["/api/v1/images/kling/generation"].is_null());
+    assert!(json["paths"]["/images/aliyun/generation"].is_null());
+    assert!(json["paths"]["/v1/images/aliyun/generation"].is_null());
+    assert!(json["paths"]["/api/v1/images/aliyun/generation"].is_null());
     assert!(json["paths"]["/music/openai/tracks"].is_null());
+    assert!(json["paths"]["/music/google/predict"].is_null());
     assert!(json["paths"]["/music/suno/tracks"].is_null());
+    assert!(json["paths"]["/music/minimax/generation"].is_null());
+    assert!(json["paths"]["/v1/music/google/predict"].is_null());
     assert!(json["paths"]["/v1/music/suno/tracks"].is_null());
+    assert!(json["paths"]["/v1/music/minimax/generation"].is_null());
+    assert!(json["paths"]["/v1/api/v1/generate"].is_null());
+    assert!(json["paths"]["/api/v1/music/suno/generate"].is_null());
+    assert!(json["paths"]["/api/v1/music_generation"].is_null());
     assert!(json["paths"]["/video/openai/videos"].is_null());
     assert!(json["paths"]["/video/sora/videos"].is_null());
+    assert!(json["paths"]["/video/minimax/generation"].is_null());
+    assert!(json["paths"]["/v1/video/minimax/generation"].is_null());
+    assert!(json["paths"]["/video/minimax/query"].is_null());
+    assert!(json["paths"]["/files/minimax/retrieve"].is_null());
+    assert!(json["paths"]["/video/kling/synthesis"].is_null());
+    assert!(json["paths"]["/v1/video/kling/synthesis"].is_null());
+    assert!(json["paths"]["/api/v1/video/kling/synthesis"].is_null());
+    assert!(json["paths"]["/video/aliyun/synthesis"].is_null());
+    assert!(json["paths"]["/v1/video/aliyun/synthesis"].is_null());
+    assert!(json["paths"]["/api/v1/video/aliyun/synthesis"].is_null());
+    assert!(json["paths"]["/video/google-veo/predict"].is_null());
+    assert!(json["paths"]["/v1/video/google-veo/predict"].is_null());
+    assert!(json["paths"]["/api/v1/video/google-veo/predict"].is_null());
+    assert!(json["paths"]["/video/volcengine/tasks"].is_null());
+    assert!(json["paths"]["/v1/video/volcengine/tasks"].is_null());
+    assert!(json["paths"]["/api/v1/video/volcengine/tasks"].is_null());
+    assert!(json["paths"]["/video/vidu/text2video"].is_null());
+    assert!(json["paths"]["/v1/video/vidu/text2video"].is_null());
+    assert!(json["paths"]["/ent/v2/video/text2video"].is_null());
+    assert!(json["paths"]["/ent/v2/vidu/text2video"].is_null());
     assert!(json["paths"]["/v1/videos/sora/create"].is_null());
     assert!(json["paths"]["/v1/video/create"].is_null());
+    assert!(json["paths"]["/api/v1/video_generation"].is_null());
     assert!(json["components"]["schemas"].is_object());
     assert!(json["components"]["schemas"]["ListModelsResponse"].is_object());
     assert!(json["components"]["schemas"]["GatewayMarketProductsResponse"].is_object());

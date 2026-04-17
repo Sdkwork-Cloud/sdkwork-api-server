@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Superseded status:** This plan reflects an earlier governance stage. The current implemented/public contract now publishes `images.kling`, `images.aliyun`, and `images.volcengine` as active image mirror families. `images.nanobanana` is not an image family and remains governed under `code.gemini`; `images.midjourney` remains unpublished.
+
 **Goal:** Publish the gateway image OpenAPI contract as an OpenAI mirror surface under `images.openai`, reserve future provider families without exposing them publicly, and add regression guardrails that prevent wrapper-path and taxonomy drift.
 
 **Architecture:** Keep the live `/v1/images/*` router behavior unchanged and limit this slice to OpenAPI metadata, docs, and regression tests. The shared image contract remains the official OpenAI image protocol, while provider-specific image family names stay reserved in docs and design governance until real mirror routes exist.

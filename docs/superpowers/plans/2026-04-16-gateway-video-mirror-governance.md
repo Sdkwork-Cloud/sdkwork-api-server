@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Superseded status:** This plan reflects an earlier governance stage. The current implemented/public contract keeps Sora 2 and Sora 2 Pro on `video.openai`, does not publish `video.sora`, and now publishes `video.kling`, `video.aliyun`, `video.google-veo`, `video.minimax`, `video.vidu`, and `video.volcengine` as active provider-specific mirror families.
+
 **Goal:** Publish the gateway video OpenAPI contract as a mirror surface under `video.openai`, reserve future provider-specific video families without exposing them publicly, and add regression guardrails that prevent wrapper-path and taxonomy drift.
 
 **Architecture:** Keep the live `/v1/videos*` router behavior unchanged and limit this slice to OpenAPI metadata, docs, and regression tests. The shared video contract remains the current public `/v1/videos*` protocol, while provider-specific video family names stay reserved in docs and design governance until real mirror routes exist.

@@ -2,6 +2,10 @@
 
 **Date:** 2026-04-16
 
+## Superseded Status
+
+This design was partially superseded by later mirror-governance work on 2026-04-17. The current implemented/public contract does not publish `images.nanobanana`, `images.midjourney`, or `video.sora`; Nano Banana stays on `code.gemini`, and Sora 2 plus Sora 2 Pro stay on `video.openai`. Provider-specific families that now exist as active public mirrors include `images.kling`, `images.aliyun`, `images.volcengine`, `video.kling`, `video.aliyun`, `video.google-veo`, `video.minimax`, `video.vidu`, `video.volcengine`, `music.google`, `music.minimax`, and `music.suno`.
+
 ## Goal
 
 Formalize the gateway as a mirror-style API router that lets supported clients switch only the `base_url` and continue calling the corresponding official protocol surface without SDK-level request rewrites. The first delivery slice fixes the gateway OpenAPI baseline and promotes the existing OpenAI/Codex, Claude, and Gemini protocol surfaces into first-class public contract groups.

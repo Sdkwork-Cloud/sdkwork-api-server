@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Superseded status:** This plan reflects an earlier governance stage. The current implemented/public contract still uses `audio.openai` and `music.openai` for the shared `/v1/audio/*` and `/v1/music*` surfaces, while `music.suno`, `music.google`, and `music.minimax` are now active provider-specific mirror families rather than reserved future names.
+
 **Goal:** Publish `audio.openai` and `music.openai` as the active shared media mirror families while keeping `/v1/audio/*` and `/v1/music*` unchanged.
 
 **Architecture:** Treat audio and music governance as a public contract hardening slice, not a runtime routing expansion. Update OpenAPI tags and `operationId` values first through failing regression coverage, then align docs so the generated schema and narrative docs describe the same active mirror families and reserved future groups.

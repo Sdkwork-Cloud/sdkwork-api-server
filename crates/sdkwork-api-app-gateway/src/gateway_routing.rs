@@ -59,12 +59,7 @@ pub async fn planned_execution_usage_context_for_route(
 ) -> Result<PlannedExecutionUsageContext> {
     let api_key_group_id = current_request_api_key_group_id();
     let decision = planned_execution_decision_for_route_without_log_with_selection_seed(
-        store,
-        tenant_id,
-        project_id,
-        capability,
-        route_key,
-        None,
+        store, tenant_id, project_id, capability, route_key, None,
     )
     .await?;
     gateway_usage_context_for_decision_provider(
@@ -93,6 +88,50 @@ pub async fn planned_execution_provider_context_for_route_without_log(
         project_id,
         capability,
         route_key,
+        None,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identity_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identity: &str,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        &[mirror_protocol_identity],
+        None,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identities_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identities: &[&str],
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        mirror_protocol_identities,
         None,
     )
     .await
@@ -202,6 +241,173 @@ pub async fn planned_execution_provider_context_for_route_without_log_with_selec
     Ok(None)
 }
 
+pub async fn planned_execution_provider_context_for_route_and_mirror_identity_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identity: &str,
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        &[mirror_protocol_identity],
+        selection_seed,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_mirror_identities_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    mirror_protocol_identities: &[&str],
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    let api_key_group_id = current_request_api_key_group_id();
+    let decision = planned_execution_decision_for_route_without_log_with_selection_seed(
+        store,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        selection_seed,
+    )
+    .await?;
+    let candidate_providers =
+        mirror_identity_candidate_providers(store, &decision, mirror_protocol_identities).await?;
+    if candidate_providers.is_empty() {
+        return Ok(None);
+    }
+
+    let candidate_ids = candidate_providers
+        .iter()
+        .map(|provider| provider.id.clone())
+        .collect::<Vec<_>>();
+    let mut first_resolution_error = None;
+    for provider in candidate_providers {
+        let Some(descriptor) = resolve_provider_execution_descriptor_for_failover_candidate(
+            store,
+            secret_manager,
+            tenant_id,
+            &provider,
+            decision.requested_region.as_deref(),
+            true,
+            &mut first_resolution_error,
+        )
+        .await?
+        else {
+            continue;
+        };
+
+        let decision = planned_execution_mirror_identity_decision(
+            &decision,
+            &provider.id,
+            candidate_ids.clone(),
+        );
+        return build_planned_execution_provider_context(
+            store,
+            tenant_id,
+            api_key_group_id,
+            decision,
+            provider,
+            descriptor,
+        )
+        .await
+        .map(Some);
+    }
+
+    if let Some(error) = first_resolution_error {
+        return Err(error);
+    }
+
+    Ok(None)
+}
+
+pub async fn planned_execution_provider_context_for_route_and_provider_id_without_log(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    provider_id: &str,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    planned_execution_provider_context_for_route_and_provider_id_without_log_with_selection_seed(
+        store,
+        secret_manager,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        provider_id,
+        None,
+    )
+    .await
+}
+
+pub async fn planned_execution_provider_context_for_route_and_provider_id_without_log_with_selection_seed(
+    store: &dyn AdminStore,
+    secret_manager: &CredentialSecretManager,
+    tenant_id: &str,
+    project_id: &str,
+    capability: &str,
+    route_key: &str,
+    provider_id: &str,
+    selection_seed: Option<u64>,
+) -> Result<Option<PlannedExecutionProviderContext>> {
+    let api_key_group_id = current_request_api_key_group_id();
+    let decision = planned_execution_decision_for_route_without_log_with_selection_seed(
+        store,
+        tenant_id,
+        project_id,
+        capability,
+        route_key,
+        selection_seed,
+    )
+    .await?;
+    let Some(provider) = store.find_provider(provider_id).await? else {
+        return Ok(None);
+    };
+
+    let mut first_resolution_error = None;
+    let Some(descriptor) = resolve_provider_execution_descriptor_for_failover_candidate(
+        store,
+        secret_manager,
+        tenant_id,
+        &provider,
+        decision.requested_region.as_deref(),
+        false,
+        &mut first_resolution_error,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+
+    let decision = planned_execution_exact_provider_decision(&decision, &provider.id);
+    build_planned_execution_provider_context(
+        store,
+        tenant_id,
+        api_key_group_id,
+        decision,
+        provider,
+        descriptor,
+    )
+    .await
+    .map(Some)
+}
+
 async fn planned_execution_decision_for_route_without_log_with_selection_seed(
     store: &dyn AdminStore,
     tenant_id: &str,
@@ -245,6 +451,102 @@ async fn planned_execution_decision_for_route_without_log_with_selection_seed(
     record_gateway_recovery_probe_from_decision(&decision);
 
     Ok(decision)
+}
+
+async fn mirror_identity_candidate_providers(
+    store: &dyn AdminStore,
+    decision: &RoutingDecision,
+    mirror_protocol_identities: &[&str],
+) -> Result<Vec<ProxyProvider>> {
+    let normalized_identities = mirror_protocol_identities
+        .iter()
+        .map(|identity| identity.trim().to_ascii_lowercase())
+        .filter(|identity| !identity.is_empty())
+        .collect::<std::collections::BTreeSet<_>>();
+    if normalized_identities.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut providers = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+
+    if let Some(provider) = store.find_provider(&decision.selected_provider_id).await? {
+        if normalized_identities.contains(&provider.mirror_protocol_identity())
+            && seen.insert(provider.id.clone())
+        {
+            providers.push(provider);
+        }
+    }
+
+    for provider_id in &decision.candidate_ids {
+        let Some(provider) = store.find_provider(provider_id).await? else {
+            continue;
+        };
+        if !normalized_identities.contains(&provider.mirror_protocol_identity()) {
+            continue;
+        }
+        if seen.insert(provider.id.clone()) {
+            providers.push(provider);
+        }
+    }
+
+    if !providers.is_empty() {
+        return Ok(providers);
+    }
+
+    let mut all_providers = store.list_providers().await?;
+    all_providers.sort_by(|left, right| left.id.cmp(&right.id));
+    for provider in all_providers {
+        if !normalized_identities.contains(&provider.mirror_protocol_identity()) {
+            continue;
+        }
+        if seen.insert(provider.id.clone()) {
+            providers.push(provider);
+        }
+    }
+
+    Ok(providers)
+}
+
+fn planned_execution_mirror_identity_decision(
+    decision: &RoutingDecision,
+    provider_id: &str,
+    candidate_ids: Vec<String>,
+) -> RoutingDecision {
+    let mut adjusted = if decision.selected_provider_id == provider_id {
+        decision.clone()
+    } else {
+        let mut fallback_decision = planned_execution_failover_decision(decision, provider_id);
+        fallback_decision.fallback_reason = gateway_execution_mirror_protocol_fallback_reason(
+            fallback_decision.fallback_reason.as_deref(),
+        );
+        fallback_decision
+    };
+    adjusted.candidate_ids = candidate_ids;
+    adjusted
+}
+
+fn planned_execution_exact_provider_decision(
+    decision: &RoutingDecision,
+    provider_id: &str,
+) -> RoutingDecision {
+    let mut adjusted = if decision.selected_provider_id == provider_id {
+        decision.clone()
+    } else {
+        let mut fallback_decision = planned_execution_failover_decision(decision, provider_id);
+        fallback_decision.fallback_reason = gateway_execution_exact_provider_fallback_reason(
+            fallback_decision.fallback_reason.as_deref(),
+        );
+        fallback_decision
+    };
+    if !adjusted
+        .candidate_ids
+        .iter()
+        .any(|candidate_id| candidate_id == provider_id)
+    {
+        adjusted.candidate_ids.insert(0, provider_id.to_owned());
+    }
+    adjusted
 }
 
 pub(crate) async fn resolve_store_relay_provider_for_decision(
@@ -539,16 +841,27 @@ async fn gateway_usage_context_for_decision_provider_with_target(
 }
 
 pub(crate) fn gateway_execution_failover_fallback_reason(existing: Option<&str>) -> Option<String> {
+    gateway_execution_append_fallback_reason(existing, "gateway_execution_failover")
+}
+
+fn gateway_execution_mirror_protocol_fallback_reason(existing: Option<&str>) -> Option<String> {
+    gateway_execution_append_fallback_reason(existing, "mirror_protocol_identity_fallback")
+}
+
+fn gateway_execution_exact_provider_fallback_reason(existing: Option<&str>) -> Option<String> {
+    gateway_execution_append_fallback_reason(existing, "exact_provider_resolution")
+}
+
+fn gateway_execution_append_fallback_reason(
+    existing: Option<&str>,
+    reason: &str,
+) -> Option<String> {
     match existing {
-        Some(existing)
-            if existing
-                .split(';')
-                .any(|value| value == "gateway_execution_failover") =>
-        {
+        Some(existing) if existing.split(';').any(|value| value == reason) => {
             Some(existing.to_owned())
         }
-        Some(existing) => Some(format!("{existing};gateway_execution_failover")),
-        None => Some("gateway_execution_failover".to_owned()),
+        Some(existing) => Some(format!("{existing};{reason}")),
+        None => Some(reason.to_owned()),
     }
 }
 

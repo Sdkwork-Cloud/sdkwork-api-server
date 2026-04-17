@@ -758,10 +758,7 @@ pub fn list_thread_runs(
 ) -> Result<ListRunsResponse> {
     ensure_local_thread_exists(thread_id)?;
     Ok(ListRunsResponse::new(vec![local_thread_run_placeholder(
-        "run_1",
-        thread_id,
-        "asst_1",
-        None,
+        "run_1", thread_id, "asst_1", None,
     )]))
 }
 
@@ -772,7 +769,9 @@ pub fn get_thread_run(
     run_id: &str,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
+    Ok(local_thread_run_placeholder(
+        run_id, thread_id, "asst_1", None,
+    ))
 }
 
 pub fn update_thread_run(
@@ -782,7 +781,9 @@ pub fn update_thread_run(
     run_id: &str,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
+    Ok(local_thread_run_placeholder(
+        run_id, thread_id, "asst_1", None,
+    ))
 }
 
 pub fn cancel_thread_run(
@@ -805,7 +806,9 @@ pub fn submit_thread_run_tool_outputs(
     _tool_outputs: Vec<(&str, &str)>,
 ) -> Result<RunObject> {
     ensure_local_thread_run_exists(thread_id, run_id)?;
-    Ok(local_thread_run_placeholder(run_id, thread_id, "asst_1", None))
+    Ok(local_thread_run_placeholder(
+        run_id, thread_id, "asst_1", None,
+    ))
 }
 
 pub fn list_thread_run_steps(
@@ -828,5 +831,7 @@ pub fn get_thread_run_step(
     step_id: &str,
 ) -> Result<RunStepObject> {
     ensure_local_thread_run_step_exists(thread_id, run_id, step_id)?;
-    Ok(local_thread_run_step_placeholder(step_id, thread_id, run_id))
+    Ok(local_thread_run_step_placeholder(
+        step_id, thread_id, run_id,
+    ))
 }

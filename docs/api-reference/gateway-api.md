@@ -26,11 +26,23 @@ OpenAPI is generated from the current `axum` route implementation, so the JSON d
 
 - `code.openai`: OpenAI and Codex mirror routes on the official `/v1/*` surface
 - `code.claude`: Claude mirror routes on the official `/v1/messages*` surface
-- `code.gemini`: Gemini mirror routes on the official `/v1beta/models/{model}:*` surface
+- `code.gemini`: Gemini mirror routes on the official `/v1beta/models/{model}:*` surface, including image-capable Gemini models such as Nano Banana
 - `images.openai`: OpenAI image mirror routes on the official `/v1/images/*` surface
+- `images.kling`: Kling image mirror routes on the shared official DashScope `/api/v1/services/aigc/image-generation/*` and `/api/v1/tasks/{task_id}` surface
+- `images.aliyun`: Aliyun image mirror routes on the shared official DashScope `/api/v1/services/aigc/image-generation/*` and `/api/v1/tasks/{task_id}` surface
+- `images.volcengine`: Volcengine image mirror routes on the official `/api/v3/images/generations` surface
 - `audio.openai`: Shared audio mirror routes on the official `/v1/audio/*` surface
-- `video.openai`: Shared video mirror routes on the official `/v1/videos*` surface
+- `video.openai`: Shared video mirror routes on the official `/v1/videos*` surface, including Sora 2 and Sora 2 Pro
+- `video.kling`: Kling video mirror routes on the shared official DashScope `/api/v1/services/aigc/video-generation/*` and `/api/v1/tasks/{task_id}` surface
+- `video.aliyun`: Aliyun video mirror routes on the shared official DashScope `/api/v1/services/aigc/video-generation/*` and `/api/v1/tasks/{task_id}` surface
+- `video.google-veo`: Google Veo mirror routes on the official Vertex AI publisher-model `/v1/projects/*/locations/*/publishers/google/models/*` surface, including Veo 3-class models selected by the official model path
+- `video.minimax`: MiniMax video mirror routes on the official `/v1/video_generation`, `/v1/query/video_generation`, and `/v1/files/retrieve` surface
+- `video.vidu`: Vidu video mirror routes on the official `/ent/v2/*` surface
+- `video.volcengine`: Volcengine video mirror routes on the official `/api/v1/contents/generations/tasks*` surface
 - `music.openai`: Shared music mirror routes on the official `/v1/music*` surface
+- `music.google`: Google music mirror routes on the official Vertex AI `/v1/projects/*/locations/*/publishers/google/models/{model}:predict` surface
+- `music.minimax`: MiniMax music mirror routes on the official `/v1/music_generation` and `/v1/lyrics_generation` surface
+- `music.suno`: Suno music mirror routes on the official `/api/v1/*` surface
 - the public contract does not invent wrapper prefixes such as `/code/*`, `/claude/*`, or `/gemini/*`
 
 ## Route Families
@@ -46,6 +58,9 @@ OpenAI-family rows below use the official `/v1` prefix. Claude and Gemini keep t
 | embeddings | `POST /embeddings` | request-model-driven provider selection |
 | moderations | `POST /moderations` | OpenAI-compatible moderation route |
 | images | `POST /images/generations`, `POST /images/edits`, `POST /images/variations` | active public mirror is `images.openai`; provider routing can vary behind the shared OpenAI image contract |
+| images.kling | `POST /api/v1/services/aigc/image-generation/generation`, `GET /api/v1/tasks/{task_id}` | active provider-specific mirror tag on the shared official DashScope async image transport paths for Kling-compatible clients |
+| images.aliyun | `POST /api/v1/services/aigc/image-generation/generation`, `GET /api/v1/tasks/{task_id}` | active provider-specific mirror tag on the shared official DashScope async image transport paths for Aliyun-compatible clients |
+| images.volcengine | `POST /api/v3/images/generations` | active provider-specific mirror family on Volcengine Ark's official image generation transport |
 | audio | `POST /audio/transcriptions`, `POST /audio/translations`, `POST /audio/speech`, `GET /audio/voices`, `POST /audio/voice_consents` | active public mirror is `audio.openai`; provider routing can vary behind the shared `/v1/audio/*` contract |
 | files | `GET/POST /files`, `GET/DELETE /files/{file_id}`, `GET /files/{file_id}/content` | metadata plus binary content retrieval |
 | uploads | `POST /uploads`, `POST /uploads/{upload_id}/parts`, `POST /uploads/{upload_id}/complete`, `POST /uploads/{upload_id}/cancel` | multipart upload lifecycle |
@@ -59,19 +74,28 @@ OpenAI-family rows below use the official `/v1` prefix. Claude and Gemini keep t
 | webhooks | `GET/POST /webhooks`, `GET/POST/DELETE /webhooks/{webhook_id}` | compatible webhook CRUD |
 | realtime | `POST /realtime/sessions` | realtime session creation |
 | evals | `GET/POST /evals`, `GET/POST/DELETE /evals/{eval_id}`, nested runs and output item routes | evaluation workflows |
-| videos | `GET/POST /videos`, retrieve, delete, content, remix, edits, extensions, extend, and character routes | active public mirror is `video.openai`; provider routing can vary behind the shared `/v1/videos*` contract |
+| videos | `GET/POST /videos`, retrieve, delete, content, remix, edits, extensions, extend, and character routes | active public mirror is `video.openai`; Sora 2 and Sora 2 Pro stay on the shared official `/v1/videos*` contract rather than moving into a provider wrapper family |
+| video.kling | `POST /api/v1/services/aigc/video-generation/video-synthesis`, `GET /api/v1/tasks/{task_id}` | active provider-specific mirror family on the shared official DashScope async video transport paths for Kling-compatible clients |
+| video.aliyun | `POST /api/v1/services/aigc/video-generation/video-synthesis`, `GET /api/v1/tasks/{task_id}` | active provider-specific mirror family on the shared official DashScope async video transport paths for Aliyun-compatible clients |
+| video.google-veo | `POST /v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predictLongRunning`, `POST /v1/projects/{project}/locations/{location}/publishers/google/models/{model}:fetchPredictOperation` | active provider-specific mirror family on Google Vertex AI's official Veo long-running generation transport, including Veo 3-class models selected through `{model}` |
+| video.minimax | `POST /v1/video_generation`, `GET /v1/query/video_generation`, `GET /v1/files/retrieve` | active provider-specific mirror family on MiniMax's official async video transport paths |
+| video.vidu | `POST /ent/v2/text2video`, `POST /ent/v2/img2video`, `POST /ent/v2/reference2video`, `GET /ent/v2/tasks/{id}/creations`, `POST /ent/v2/tasks/{id}/cancel` | active provider-specific mirror family on Vidu's official async video transport paths |
+| video.volcengine | `POST /api/v1/contents/generations/tasks`, `GET /api/v1/contents/generations/tasks/{id}` | active provider-specific mirror family on Volcengine's official async video task transport |
 | music | `GET/POST /music`, `GET/DELETE /music/{music_id}`, `GET /music/{music_id}/content`, `POST /music/lyrics` | active public mirror is `music.openai`; provider routing can vary behind the shared `/v1/music*` contract |
+| music.google | `POST /v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict` | active provider-specific mirror family on Google Vertex AI's official music prediction transport |
+| music.minimax | `POST /v1/music_generation`, `POST /v1/lyrics_generation` | active provider-specific mirror family on MiniMax's official music generation transport paths |
+| music.suno | `POST /api/v1/generate`, `GET /api/v1/generate/record-info`, `POST /api/v1/lyrics`, `GET /api/v1/lyrics/record-info` | active provider-specific mirror family on Suno's official transport paths |
 | market | `GET /market/products`, `GET /market/offers`, `POST /market/quotes` | public API product catalog, offer discovery, and quote workflows |
 | marketing | `POST /marketing/coupons/validate`, `POST /marketing/coupons/reserve`, `POST /marketing/coupons/confirm`, `POST /marketing/coupons/rollback` | coupon-first validation, reservation, redemption, and rollback surface |
 | commercial | `GET /commercial/account`, `GET /commercial/account/benefit-lots` | commercial account summary plus benefit-lot traversal and coupon/account-arrival evidence |
 
-Phase 2A keeps the active image mirror contract on the shared OpenAI image routes `/v1/images*` and publishes that family as `images.openai`. Reserved future image mirror families such as `images.nanobanana`, `images.midjourney`, `images.volcengine`, `images.aliyun`, and `images.kling` remain design-time names only until their official protocols are formalized and implemented.
+The gateway now publishes four active image mirror tags across three public path families: the shared `images.openai` contract on `/v1/images*`, the provider-specific `images.kling` and `images.aliyun` tags on the shared official DashScope `/api/v1/services/aigc/image-generation/generation` and `/api/v1/tasks/{task_id}` paths, and the provider-specific `images.volcengine` tag on Volcengine Ark's official `/api/v3/images/generations` path. Nano Banana stays on Google's official Gemini `/v1beta/models/{model}:generateContent` surface and is therefore documented under `code.gemini` instead of a separate `images.nanobanana` family. `images.midjourney` remains unpublished because Midjourney does not provide an official API surface that can be mirrored by switching only `base_url`.
 
 This slice keeps the active audio mirror contract on the shared `/v1/audio/*` routes and publishes that family as `audio.openai`. The public contract stays on the current shared audio surface and does not introduce wrapper paths such as `/audio/openai/*`.
 
-Phase 3A keeps the active video mirror contract on the shared `/v1/videos*` routes and publishes that family as `video.openai`. Reserved future video mirror families such as `video.sora`, `video.minimax`, `video.vidu`, `video.volcengine`, `video.google-veo`, `video.aliyun`, and `video.kling` remain design-time names only until their official protocols are formalized and implemented.
+The gateway now publishes seven active video mirror families: the shared `video.openai` contract on `/v1/videos*` for OpenAI video clients, including Sora 2 and Sora 2 Pro, the provider-specific `video.kling` and `video.aliyun` contracts on the shared official DashScope `/api/v1/services/aigc/video-generation/video-synthesis` and `/api/v1/tasks/{task_id}` paths, the provider-specific `video.google-veo` contract on Google Vertex AI's official `/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predictLongRunning` and `:fetchPredictOperation` paths, including Veo 3-class models selected through `{model}`, the provider-specific `video.minimax` contract on MiniMax's official `/v1/video_generation`, `/v1/query/video_generation`, and `/v1/files/retrieve` paths, the provider-specific `video.vidu` contract on Vidu's official `/ent/v2/text2video`, `/ent/v2/img2video`, `/ent/v2/reference2video`, `/ent/v2/tasks/{id}/creations`, and `/ent/v2/tasks/{id}/cancel` paths, and the provider-specific `video.volcengine` contract on Volcengine's official `/api/v1/contents/generations/tasks` and `/api/v1/contents/generations/tasks/{id}` paths. Because OpenAI already defines the official Sora transport, the gateway does not publish a separate `video.sora` family.
 
-This slice keeps the active music mirror contract on the shared `/v1/music*` routes and publishes that family as `music.openai`. Reserved future music mirror families such as `music.suno`, `music.google`, and `music.minimax` remain design-time names only until their official protocols are formalized and implemented.
+The gateway now publishes four active music mirror families: the shared `music.openai` contract on `/v1/music*`, the provider-specific `music.google` contract on Google Vertex AI's official `/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict` path, the provider-specific `music.minimax` contract on MiniMax's official `/v1/music_generation` and `/v1/lyrics_generation` paths, and the provider-specific `music.suno` contract on Suno's official `/api/v1/generate*` and `/api/v1/lyrics*` paths.
 
 ## Gateway Semantics
 

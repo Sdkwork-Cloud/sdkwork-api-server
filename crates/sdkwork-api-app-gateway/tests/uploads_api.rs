@@ -33,7 +33,8 @@ fn local_upload_part_fallback_requires_persisted_state() {
 
 #[test]
 fn local_upload_completion_requires_persisted_state() {
-    let request = CompleteUploadRequest::new("upload_local_1", vec!["part_local_1", "part_local_2"]);
+    let request =
+        CompleteUploadRequest::new("upload_local_1", vec!["part_local_1", "part_local_2"]);
     assert_error_contains(
         sdkwork_api_app_gateway::complete_upload("tenant-1", "project-1", &request),
         "upload not found",

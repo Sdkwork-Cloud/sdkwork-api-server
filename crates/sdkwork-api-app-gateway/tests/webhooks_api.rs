@@ -25,8 +25,8 @@ fn local_webhook_fallback_requires_upstream_provider() {
     assert_eq!(created.id, "wh_1");
     assert_eq!(created.url, "https://example.com/webhook");
 
-    let listed = list_webhooks("tenant-1", "project-1")
-        .expect("list webhooks should use local fallback");
+    let listed =
+        list_webhooks("tenant-1", "project-1").expect("list webhooks should use local fallback");
     assert_eq!(listed.data.len(), 1);
     assert_eq!(listed.data[0].id, "wh_1");
     assert_eq!(listed.data[0].url, "https://example.com/webhook");
@@ -76,7 +76,12 @@ fn local_webhook_fallback_requires_persisted_webhook_state() {
 #[test]
 fn local_webhook_create_requires_url() {
     assert_error_contains(
-        create_webhook("tenant-1", "project-1", "   ", &["response.completed".to_owned()]),
+        create_webhook(
+            "tenant-1",
+            "project-1",
+            "   ",
+            &["response.completed".to_owned()],
+        ),
         "Webhook url is required",
     );
 }

@@ -25,6 +25,7 @@ mod gateway_market;
 mod gateway_openapi;
 mod gateway_payments;
 mod gateway_prelude;
+mod gateway_provider_mirror_relay;
 mod gateway_response_helpers;
 mod gateway_router_common;
 mod gateway_state;

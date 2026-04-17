@@ -482,9 +482,11 @@ pub fn create_realtime_session(
     let unique_suffix = now.as_nanos();
     let mut session =
         RealtimeSessionObject::new(format!("sess_local_{unique_suffix}"), model.trim());
-    session.client_secret = Some(sdkwork_api_contract_openai::realtime::RealtimeClientSecret {
-        value: format!("rtcs_local_{unique_suffix}"),
-        expires_at: now.as_secs().saturating_add(600),
-    });
+    session.client_secret = Some(
+        sdkwork_api_contract_openai::realtime::RealtimeClientSecret {
+            value: format!("rtcs_local_{unique_suffix}"),
+            expires_at: now.as_secs().saturating_add(600),
+        },
+    );
     Ok(session)
 }

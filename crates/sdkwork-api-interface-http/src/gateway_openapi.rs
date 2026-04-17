@@ -68,6 +68,12 @@ mod paths_code_openai;
 #[path = "gateway_openapi_paths_files_batches.rs"]
 mod paths_files_batches;
 #[allow(dead_code)]
+#[path = "gateway_openapi_paths_images_dashscope.rs"]
+mod paths_images_dashscope;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_images_volcengine.rs"]
+mod paths_images_volcengine;
+#[allow(dead_code)]
 #[path = "gateway_openapi_paths_jobs.rs"]
 mod paths_jobs;
 #[allow(dead_code)]
@@ -83,6 +89,15 @@ mod paths_models_chat;
 #[path = "gateway_openapi_paths_music.rs"]
 mod paths_music;
 #[allow(dead_code)]
+#[path = "gateway_openapi_paths_music_google.rs"]
+mod paths_music_google;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_music_minimax.rs"]
+mod paths_music_minimax;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_music_suno.rs"]
+mod paths_music_suno;
+#[allow(dead_code)]
 #[path = "gateway_openapi_paths_storage.rs"]
 mod paths_storage;
 #[allow(dead_code)]
@@ -91,6 +106,21 @@ mod paths_vector_compat;
 #[allow(dead_code)]
 #[path = "gateway_openapi_paths_video.rs"]
 mod paths_video;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_video_dashscope.rs"]
+mod paths_video_dashscope;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_video_google_veo.rs"]
+mod paths_video_google_veo;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_video_minimax.rs"]
+mod paths_video_minimax;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_video_vidu.rs"]
+mod paths_video_vidu;
+#[allow(dead_code)]
+#[path = "gateway_openapi_paths_video_volcengine.rs"]
+mod paths_video_volcengine;
 
 mod openapi_paths {
     pub(crate) use super::paths_agents::*;
@@ -99,14 +129,24 @@ mod openapi_paths {
     pub(crate) use super::paths_code_gemini::*;
     pub(crate) use super::paths_code_openai::*;
     pub(crate) use super::paths_files_batches::*;
+    pub(crate) use super::paths_images_dashscope::*;
+    pub(crate) use super::paths_images_volcengine::*;
     pub(crate) use super::paths_jobs::*;
     pub(crate) use super::paths_market_commercial::*;
     pub(crate) use super::paths_media::*;
     pub(crate) use super::paths_models_chat::*;
     pub(crate) use super::paths_music::*;
+    pub(crate) use super::paths_music_google::*;
+    pub(crate) use super::paths_music_minimax::*;
+    pub(crate) use super::paths_music_suno::*;
     pub(crate) use super::paths_storage::*;
     pub(crate) use super::paths_vector_compat::*;
     pub(crate) use super::paths_video::*;
+    pub(crate) use super::paths_video_dashscope::*;
+    pub(crate) use super::paths_video_google_veo::*;
+    pub(crate) use super::paths_video_minimax::*;
+    pub(crate) use super::paths_video_vidu::*;
+    pub(crate) use super::paths_video_volcengine::*;
 }
 
 #[derive(OpenApi)]
@@ -150,11 +190,26 @@ mod openapi_paths {
         openapi_paths::image_generations,
         openapi_paths::image_edits,
         openapi_paths::image_variations,
+        openapi_paths::images_dashscope_generation_create,
+        openapi_paths::images_volcengine_generate_create,
+        openapi_paths::images_dashscope_task_get,
+        openapi_paths::video_dashscope_synthesis_create,
+        openapi_paths::video_google_veo_models_action_create,
+        openapi_paths::video_volcengine_tasks_create,
+        openapi_paths::video_volcengine_task_get,
         openapi_paths::transcriptions,
         openapi_paths::translations,
         openapi_paths::audio_speech,
         openapi_paths::audio_voices,
         openapi_paths::audio_voice_consents,
+        openapi_paths::video_minimax_generation_create,
+        openapi_paths::video_minimax_generation_query,
+        openapi_paths::video_minimax_file_retrieve,
+        openapi_paths::video_vidu_text2video_create,
+        openapi_paths::video_vidu_img2video_create,
+        openapi_paths::video_vidu_reference2video_create,
+        openapi_paths::video_vidu_task_creations_get,
+        openapi_paths::video_vidu_task_cancel_create,
         openapi_paths::containers_list,
         openapi_paths::containers_create,
         openapi_paths::container_get,
@@ -222,6 +277,13 @@ mod openapi_paths {
         openapi_paths::music_delete,
         openapi_paths::music_content,
         openapi_paths::music_lyrics,
+        openapi_paths::music_google_predict_create,
+        openapi_paths::music_minimax_generation_create,
+        openapi_paths::music_minimax_lyrics_create,
+        openapi_paths::music_suno_generate_create,
+        openapi_paths::music_suno_generate_record_info_get,
+        openapi_paths::music_suno_lyrics_create,
+        openapi_paths::music_suno_lyrics_record_info_get,
         openapi_paths::uploads_create,
         openapi_paths::upload_parts_create,
         openapi_paths::upload_complete,
@@ -337,13 +399,25 @@ mod openapi_paths {
         (name = "system.sdkwork", description = "Gateway health and system-facing routes."),
         (name = "code.openai", description = "Official OpenAI and Codex mirror routes."),
         (name = "code.claude", description = "Official Claude mirror routes."),
-        (name = "code.gemini", description = "Official Gemini mirror routes."),
+        (name = "code.gemini", description = "Official Gemini mirror routes, including image-capable Gemini generateContent models such as Nano Banana."),
         (name = "conversations", description = "OpenAI-compatible conversation and conversation item routes."),
         (name = "containers", description = "Container lifecycle and container file routes."),
         (name = "images.openai", description = "Official OpenAI image mirror routes."),
+        (name = "images.kling", description = "Official shared DashScope image transport published for Kling-compatible clients."),
+        (name = "images.aliyun", description = "Official shared DashScope image transport published for Aliyun-compatible clients."),
+        (name = "images.volcengine", description = "Official Volcengine image mirror routes."),
         (name = "audio.openai", description = "Official shared audio mirror routes."),
-        (name = "video.openai", description = "Official shared video mirror routes."),
+        (name = "video.openai", description = "Official shared video mirror routes, including Sora 2 and Sora 2 Pro."),
+        (name = "video.kling", description = "Official shared DashScope video transport published for Kling-compatible clients."),
+        (name = "video.aliyun", description = "Official shared DashScope video transport published for Aliyun-compatible clients."),
+        (name = "video.google-veo", description = "Official Google Veo video mirror routes, including Veo 3-class models selected through the official Vertex AI model path."),
+        (name = "video.minimax", description = "Official MiniMax video mirror routes."),
+        (name = "video.vidu", description = "Official Vidu video mirror routes."),
+        (name = "video.volcengine", description = "Official Volcengine video mirror routes."),
         (name = "music.openai", description = "Official shared music mirror routes."),
+        (name = "music.google", description = "Official Google music mirror routes."),
+        (name = "music.minimax", description = "Official MiniMax music mirror routes."),
+        (name = "music.suno", description = "Official Suno music mirror routes."),
         (name = "files", description = "File upload, listing, and retrieval routes."),
         (name = "uploads", description = "Multi-part upload lifecycle routes."),
         (name = "batches", description = "Batch execution submission and management routes."),

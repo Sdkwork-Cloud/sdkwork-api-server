@@ -1,8 +1,8 @@
 use sdkwork_api_app_catalog::{
-    list_model_prices, list_provider_models, persist_channel,
-    persist_channel_model_with_metadata, persist_model_price_with_rates_and_metadata,
-    persist_model_with_metadata, persist_provider_model_with_metadata,
-    persist_provider_with_bindings_and_extension_id, PersistProviderWithBindingsRequest,
+    list_model_prices, list_provider_models, persist_channel, persist_channel_model_with_metadata,
+    persist_model_price_with_rates_and_metadata, persist_model_with_metadata,
+    persist_provider_model_with_metadata, persist_provider_with_bindings_and_extension_id,
+    PersistProviderWithBindingsRequest,
 };
 use sdkwork_api_domain_catalog::ModelCapability;
 use sdkwork_api_storage_sqlite::{run_migrations, SqliteAdminStore};
@@ -118,7 +118,9 @@ async fn persisting_provider_model_variants_creates_provider_model_and_price_rec
     let pool = run_migrations("sqlite::memory:").await.unwrap();
     let store = SqliteAdminStore::new(pool);
 
-    persist_channel(&store, "anthropic", "Anthropic").await.unwrap();
+    persist_channel(&store, "anthropic", "Anthropic")
+        .await
+        .unwrap();
     persist_provider_with_bindings_and_extension_id(
         &store,
         PersistProviderWithBindingsRequest {

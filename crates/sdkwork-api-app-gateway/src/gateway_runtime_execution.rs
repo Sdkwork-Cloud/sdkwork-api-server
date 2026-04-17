@@ -398,11 +398,7 @@ pub(crate) async fn execute_json_provider_request_for_descriptor_with_options(
             Ok(response) => {
                 record_gateway_upstream_outcome(capability, &descriptor.provider_id, "success");
                 persist_gateway_execution_health_snapshot(
-                    store,
-                    descriptor,
-                    true,
-                    capability,
-                    None,
+                    store, descriptor, true, capability, None,
                 )
                 .await;
                 return Ok(response.into_json());
