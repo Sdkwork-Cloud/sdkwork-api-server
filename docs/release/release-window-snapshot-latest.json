@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-15T07:58:08.752Z",
+  "generatedAt": "2026-04-17T18:29:38.711Z",
   "source": {
     "kind": "release-window-live-git"
   },
   "snapshot": {
     "latestReleaseTag": "release-2026-03-28-8",
-    "commitsSinceLatestRelease": 56,
-    "workingTreeEntryCount": 436,
+    "commitsSinceLatestRelease": 97,
+    "workingTreeEntryCount": 3,
     "hasReleaseBaseline": true
   }
 }

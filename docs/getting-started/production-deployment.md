@@ -57,6 +57,30 @@ Cross-platform release hygiene:
 - when you run Unix installed-runtime smoke inside Docker, keep the same `CARGO_TARGET_DIR` for the `cargo build` and `run-unix-installed-runtime-smoke.mjs` steps
 - the runtime starts correctly even when `ss`, `netstat`, and `lsof` are unavailable; install one of them when you want richer bind-conflict diagnostics during preflight
 
+## Local Release Governance Preparation
+
+If you run release governance from a development host where sibling repositories are not clean standalone release checkouts, point the release tooling at a managed external dependency root first. This keeps `materialize-external-deps`, `verify-release-sync`, and `run-release-governance-checks` aligned to governed clones instead of unrelated local worktrees.
+
+Linux or macOS:
+
+```bash
+export SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT="$PWD/artifacts/external-release-deps"
+node scripts/release/materialize-external-deps.mjs
+node scripts/release/verify-release-sync.mjs --format text --live
+node scripts/release/run-release-governance-checks.mjs
+```
+
+Windows:
+
+```powershell
+$env:SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_ROOT = (Join-Path (Get-Location) 'artifacts\external-release-deps')
+node scripts/release/materialize-external-deps.mjs
+node scripts/release/verify-release-sync.mjs --format text --live
+node scripts/release/run-release-governance-checks.mjs
+```
+
+Use this whenever direct sibling audits report reasons such as `not-standalone-root`, `dirty-working-tree`, `branch-not-synced`, or `head-mismatch`.
+
 ## Generate A Native Production Install
 
 Linux or macOS:
