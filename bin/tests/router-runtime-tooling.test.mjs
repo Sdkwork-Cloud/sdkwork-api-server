@@ -134,6 +134,26 @@ function runPowerShellStartDryRun(runtimeHome) {
   );
 }
 
+function runPowerShellStopDryRun(runtimeHome) {
+  return spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(repoRoot, 'bin', 'stop.ps1'),
+      '-DryRun',
+      '-Home',
+      runtimeHome,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  );
+}
+
 function hasWslDistro(name) {
   if (process.platform !== 'win32') {
     return false;
@@ -271,6 +291,24 @@ function runWslStartDryRun(runtimeHome, distro = 'Ubuntu-22.04') {
   const command = [
     `cd ${quoteForBash(repoRootWsl)}`,
     `bash bin/start.sh --dry-run --home ${quoteForBash(runtimeHomeWsl)}`,
+  ].join(' && ');
+
+  return spawnSync(
+    'wsl.exe',
+    ['-d', distro, '--', '/bin/bash', '-lc', command],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  );
+}
+
+function runWslStopDryRun(runtimeHome, distro = 'Ubuntu-22.04') {
+  const repoRootWsl = toWslPath(repoRoot);
+  const runtimeHomeWsl = toWslPath(runtimeHome);
+  const command = [
+    `cd ${quoteForBash(repoRootWsl)}`,
+    `bash bin/stop.sh --dry-run --home ${quoteForBash(runtimeHomeWsl)}`,
   ].join(' && ');
 
   return spawnSync(
@@ -615,6 +653,29 @@ test('createInstallPlan system mode emits linux standard program, config, and st
   assert.equal(targetFiles.includes('/etc/sdkwork-api-router/router.yaml'), true);
   assert.equal(targetFiles.includes('/etc/sdkwork-api-router/router.env'), true);
   assert.equal(targetFiles.includes('/etc/sdkwork-api-router/router.env.example'), true);
+});
+
+test('createInstallPlan system mode publishes formal service assets alongside windows-task compatibility assets', async () => {
+  const module = await loadModule();
+  const plan = module.createInstallPlan({
+    repoRoot,
+    mode: 'system',
+    platform: 'win32',
+    env: {
+      ProgramFiles: 'C:/Program Files',
+      ProgramData: 'C:/ProgramData',
+      USERPROFILE: 'C:/Users/admin',
+      TEMP: 'C:/Temp',
+    },
+  });
+  const targetFiles = plan.files.map((file) => toPortablePath(file.targetPath));
+
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/systemd/sdkwork-api-router.service')), true);
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/launchd/com.sdkwork.api-router.plist')), true);
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/windows-service/install-service.ps1')), true);
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/windows-service/uninstall-service.ps1')), true);
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/windows-service/run-service.ps1')), true);
+  assert.equal(targetFiles.some((targetPath) => targetPath.endsWith('/service/windows-task/sdkwork-api-router.xml')), true);
 });
 
 test('createInstallPlan reads release binaries from the managed short Windows target directory when needed', async () => {
@@ -1033,6 +1094,16 @@ test('router-ops install parses system mode', () => {
   });
 });
 
+test('router-ops validate-config parses system mode with runtime-home overrides', () => {
+  return loadRouterOpsModule().then(({ parseArgs }) => {
+    const options = parseArgs(['validate-config', '--mode', 'system', '--home', 'D:/router/runtime']);
+
+    assert.equal(options.command, 'validate-config');
+    assert.equal(options.mode, 'system');
+    assert.equal(toPortablePath(options.installRoot), 'D:/router/runtime');
+  });
+});
+
 test('router-ops install parses portable mode with a custom home', () => {
   return loadRouterOpsModule().then(({ parseArgs }) => {
     const options = parseArgs(['install', '--mode', 'portable', '--home', 'D:/custom/router']);
@@ -1065,7 +1136,7 @@ test('router-ops rejects install-only flags during build', () => {
   return loadRouterOpsModule().then(({ parseArgs }) => {
     assert.throws(
       () => parseArgs(['build', '--home', 'artifacts/install/custom']),
-      /--home is only supported for the install command/,
+      /--home is only supported for install or validate-config/,
     );
   });
 });
@@ -1911,6 +1982,59 @@ test('start.ps1 dry-run accepts a missing relative -Home path without double-nes
   }
 });
 
+test('start.ps1 dry-run loads system install config from the release manifest instead of portable SQLite defaults', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, () => {
+  const runtimeHome = createTempRuntimeHome('start-ps1-system-');
+  const systemConfigDir = path.join(runtimeHome, 'system-config');
+  const systemDataDir = path.join(runtimeHome, 'system-data');
+  const systemLogDir = path.join(runtimeHome, 'system-log');
+  const systemRunDir = path.join(runtimeHome, 'system-run');
+  const routerYamlPath = path.join(systemConfigDir, 'router.yaml');
+  const runtimeHomePortable = toPortablePath(runtimeHome);
+  const systemConfigDirPortable = toPortablePath(systemConfigDir);
+  const routerYamlPortable = toPortablePath(routerYamlPath);
+
+  try {
+    mkdirSync(systemConfigDir, { recursive: true });
+    writeFileSync(
+      path.join(runtimeHome, 'release-manifest.json'),
+      `${JSON.stringify({
+        installMode: 'system',
+        configRoot: systemConfigDirPortable,
+        configFile: routerYamlPortable,
+        mutableDataRoot: toPortablePath(systemDataDir),
+        logRoot: toPortablePath(systemLogDir),
+        runRoot: toPortablePath(systemRunDir),
+      }, null, 2)}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      path.join(systemConfigDir, 'router.env'),
+      [
+        'SDKWORK_ROUTER_INSTALL_MODE="system"',
+        `SDKWORK_CONFIG_DIR="${systemConfigDirPortable}"`,
+        `SDKWORK_CONFIG_FILE="${routerYamlPortable}"`,
+        'SDKWORK_DATABASE_URL="postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router"',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = runPowerShellStartDryRun(runtimeHome);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const plan = JSON.parse(result.stdout.trim());
+    assert.equal(plan.mode, 'dry-run');
+    assert.equal(plan.plan_format, 'json');
+    assert.equal(plan.config_dir, systemConfigDirPortable);
+    assert.equal(plan.config_file, routerYamlPortable);
+    assert.equal(plan.database_url, 'postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router');
+    assert.notEqual(plan.config_dir, `${runtimeHomePortable}/config`);
+    assert.notEqual(plan.database_url, `sqlite://${runtimeHomePortable}/var/data/sdkwork-api-router.db`);
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
 test('start.sh dry-run falls back to host-local release paths when router.env carries windows-style values', { skip: process.platform !== 'win32' || !hasWslDistro('Ubuntu-22.04') }, () => {
   const runtimeHome = createTempRuntimeHome('start-sh-');
 
@@ -1942,6 +2066,112 @@ test('start.sh dry-run falls back to host-local release paths when router.env ca
     assert.equal(plan.database_url, `sqlite://${runtimeHomeWsl}/var/data/sdkwork-api-router.db`);
     assert.equal(plan.site_dirs.admin, `${runtimeHomeWsl}/sites/admin/dist`);
     assert.equal(plan.site_dirs.portal, `${runtimeHomeWsl}/sites/portal/dist`);
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
+test('start.sh dry-run loads system install config from the release manifest instead of portable SQLite defaults', { skip: process.platform !== 'win32' || !hasWslDistro('Ubuntu-22.04') }, () => {
+  const runtimeHome = createTempRuntimeHome('start-sh-system-');
+  const systemConfigDir = path.join(runtimeHome, 'system-config');
+  const systemDataDir = path.join(runtimeHome, 'system-data');
+  const systemLogDir = path.join(runtimeHome, 'system-log');
+  const systemRunDir = path.join(runtimeHome, 'system-run');
+  const routerYamlPath = path.join(systemConfigDir, 'router.yaml');
+  const runtimeHomeWsl = toWslPath(runtimeHome);
+  const systemConfigDirWsl = toWslPath(systemConfigDir);
+  const routerYamlWsl = toWslPath(routerYamlPath);
+
+  try {
+    mkdirSync(systemConfigDir, { recursive: true });
+    writeFileSync(
+      path.join(runtimeHome, 'release-manifest.json'),
+      `${JSON.stringify({
+        installMode: 'system',
+        configRoot: systemConfigDirWsl,
+        configFile: routerYamlWsl,
+        mutableDataRoot: toWslPath(systemDataDir),
+        logRoot: toWslPath(systemLogDir),
+        runRoot: toWslPath(systemRunDir),
+      }, null, 2)}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      path.join(systemConfigDir, 'router.env'),
+      [
+        'SDKWORK_ROUTER_INSTALL_MODE="system"',
+        `SDKWORK_CONFIG_DIR="${systemConfigDirWsl}"`,
+        `SDKWORK_CONFIG_FILE="${routerYamlWsl}"`,
+        'SDKWORK_DATABASE_URL="postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router"',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = runWslStartDryRun(runtimeHome);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const plan = JSON.parse(result.stdout.trim());
+    assert.equal(plan.mode, 'dry-run');
+    assert.equal(plan.plan_format, 'json');
+    assert.equal(plan.config_dir, systemConfigDirWsl);
+    assert.equal(plan.config_file, routerYamlWsl);
+    assert.equal(plan.database_url, 'postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router');
+    assert.notEqual(plan.config_dir, `${runtimeHomeWsl}/config`);
+    assert.notEqual(plan.database_url, `sqlite://${runtimeHomeWsl}/var/data/sdkwork-api-router.db`);
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
+test('stop.ps1 dry-run resolves the system run directory from the release manifest', { skip: process.platform !== 'win32' || !canSpawnPowerShellFromNode() }, () => {
+  const runtimeHome = createTempRuntimeHome('stop-ps1-system-');
+  const systemRunDir = path.join(runtimeHome, 'system-run');
+
+  try {
+    writeFileSync(
+      path.join(runtimeHome, 'release-manifest.json'),
+      `${JSON.stringify({
+        installMode: 'system',
+        runRoot: toPortablePath(systemRunDir),
+      }, null, 2)}\n`,
+      'utf8',
+    );
+
+    const result = runPowerShellStopDryRun(runtimeHome);
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 0, output);
+    assert.match(
+      output,
+      new RegExp(`would stop router-product-service using pid file ${escapeRegExp(path.join(systemRunDir, 'router-product-service.pid'))}`),
+    );
+  } finally {
+    removeTempRuntimeHome(runtimeHome);
+  }
+});
+
+test('stop.sh dry-run resolves the system run directory from the release manifest', { skip: process.platform !== 'win32' || !hasWslDistro('Ubuntu-22.04') }, () => {
+  const runtimeHome = createTempRuntimeHome('stop-sh-system-');
+  const systemRunDir = path.join(runtimeHome, 'system-run');
+  const systemRunDirWsl = toWslPath(systemRunDir);
+
+  try {
+    writeFileSync(
+      path.join(runtimeHome, 'release-manifest.json'),
+      `${JSON.stringify({
+        installMode: 'system',
+        runRoot: systemRunDirWsl,
+      }, null, 2)}\n`,
+      'utf8',
+    );
+
+    const result = runWslStopDryRun(runtimeHome);
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 0, output);
+    assert.match(
+      output,
+      new RegExp(`would stop router-product-service using pid file ${escapeRegExp(`${systemRunDirWsl}/router-product-service.pid`)}`),
+    );
   } finally {
     removeTempRuntimeHome(runtimeHome);
   }

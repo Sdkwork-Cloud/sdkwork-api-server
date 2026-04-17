@@ -40,14 +40,80 @@ if ([string]::IsNullOrWhiteSpace($RuntimeHome)) {
 }
 
 $runtimeHome = Resolve-RouterAbsolutePath -BasePath (Get-Location).Path -CandidatePath $RuntimeHome
+$releaseManifest = Get-RouterReleaseManifest -RuntimeHome $runtimeHome
+$manifestInstallMode = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'installMode'
+$manifestConfigDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'configRoot'
+$manifestConfigFile = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'configFile'
+$manifestDataDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'mutableDataRoot'
+$manifestLogDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'logRoot'
+$manifestRunDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'runRoot'
+$installMode = Get-RouterNormalizedInstallMode -RequestedMode ([string]$env:SDKWORK_ROUTER_INSTALL_MODE) -FallbackMode $manifestInstallMode
+$defaultConfigDirectoryRaw = Get-RouterDefaultConfigRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$initialConfigDirectory = [string]$env:SDKWORK_CONFIG_DIR
+if ([string]::IsNullOrWhiteSpace($initialConfigDirectory) -and -not [string]::IsNullOrWhiteSpace([string]$env:SDKWORK_CONFIG_FILE)) {
+    $initialConfigDirectory = Split-Path -Parent ([string]$env:SDKWORK_CONFIG_FILE)
+}
+if ([string]::IsNullOrWhiteSpace($initialConfigDirectory) -and -not [string]::IsNullOrWhiteSpace($manifestConfigDirectory)) {
+    $initialConfigDirectory = $manifestConfigDirectory
+}
+if ([string]::IsNullOrWhiteSpace($initialConfigDirectory)) {
+    $initialConfigDirectory = $defaultConfigDirectoryRaw
+}
+$initialConfigDirectory = Resolve-RouterHostPath -PathValue $initialConfigDirectory -DefaultValue $defaultConfigDirectoryRaw
+$envFile = Join-Path $initialConfigDirectory 'router.env'
+Import-RouterEnvFile -EnvFile $envFile
+
+$installMode = Get-RouterNormalizedInstallMode -RequestedMode ([string]$env:SDKWORK_ROUTER_INSTALL_MODE) -FallbackMode $manifestInstallMode
+$defaultConfigDirectoryRaw = Get-RouterDefaultConfigRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$defaultDataDirectoryRaw = Get-RouterDefaultDataRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$defaultLogDirectoryRaw = Get-RouterDefaultLogRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$defaultRunDirectoryRaw = Get-RouterDefaultRunRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$defaultConfigFileRaw = Join-Path $defaultConfigDirectoryRaw 'router.yaml'
+
+$configDirectoryRaw = [string]$env:SDKWORK_CONFIG_DIR
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw) -and -not [string]::IsNullOrWhiteSpace([string]$env:SDKWORK_CONFIG_FILE)) {
+    $configDirectoryRaw = Split-Path -Parent ([string]$env:SDKWORK_CONFIG_FILE)
+}
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw) -and -not [string]::IsNullOrWhiteSpace($manifestConfigDirectory)) {
+    $configDirectoryRaw = $manifestConfigDirectory
+}
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw)) {
+    $configDirectoryRaw = $defaultConfigDirectoryRaw
+}
+$configDirectory = Resolve-RouterHostPath -PathValue $configDirectoryRaw -DefaultValue $defaultConfigDirectoryRaw
+
+$configFileRaw = [string]$env:SDKWORK_CONFIG_FILE
+if ([string]::IsNullOrWhiteSpace($configFileRaw) -and -not [string]::IsNullOrWhiteSpace($manifestConfigFile)) {
+    $configFileRaw = $manifestConfigFile
+}
+if ([string]::IsNullOrWhiteSpace($configFileRaw)) {
+    $configFileRaw = $defaultConfigFileRaw
+}
+$configFilePath = Resolve-RouterHostPath -PathValue $configFileRaw -DefaultValue $defaultConfigFileRaw
+
+$dataDirectoryRaw = if (-not [string]::IsNullOrWhiteSpace($manifestDataDirectory)) {
+    $manifestDataDirectory
+} else {
+    $defaultDataDirectoryRaw
+}
+$dataDirectory = Resolve-RouterHostPath -PathValue $dataDirectoryRaw -DefaultValue $defaultDataDirectoryRaw
+
+$logDirectoryRaw = if (-not [string]::IsNullOrWhiteSpace($manifestLogDirectory)) {
+    $manifestLogDirectory
+} else {
+    $defaultLogDirectoryRaw
+}
+$logDirectory = Resolve-RouterHostPath -PathValue $logDirectoryRaw -DefaultValue $defaultLogDirectoryRaw
+
+$runDirectoryRaw = if (-not [string]::IsNullOrWhiteSpace($manifestRunDirectory)) {
+    $manifestRunDirectory
+} else {
+    $defaultRunDirectoryRaw
+}
+$runDirectory = Resolve-RouterHostPath -PathValue $runDirectoryRaw -DefaultValue $defaultRunDirectoryRaw
+
 $binDir = Join-Path $runtimeHome 'bin'
 $binaryPath = Join-Path $binDir $binaryName
-$configDirectory = Join-Path $runtimeHome 'config'
-$varDirectory = Join-Path $runtimeHome 'var'
-$dataDirectory = Join-Path $varDirectory 'data'
-$logDirectory = Join-Path $varDirectory 'log'
-$runDirectory = Join-Path $varDirectory 'run'
-$envFile = Join-Path $configDirectory 'router.env'
 $pidFile = Join-Path $runDirectory 'router-product-service.pid'
 $stateFile = Join-Path $runDirectory 'router-product-service.state.env'
 $stdoutLog = Join-Path $logDirectory 'router-product-service.stdout.log'
@@ -58,7 +124,8 @@ $defaultPortalSiteDir = Join-Path $runtimeHome 'sites\portal\dist'
 $defaultBootstrapDataDir = Join-Path $runtimeHome 'data'
 $repositoryBootstrapDataDir = Join-Path $repoRoot 'data'
 $defaultConfigDirPortable = Convert-ToRouterPortablePath -PathValue $configDirectory
-$defaultDatabaseUrl = "sqlite://$(Convert-ToRouterPortablePath -PathValue $dataDirectory)/sdkwork-api-router.db"
+$defaultConfigFilePortable = Convert-ToRouterPortablePath -PathValue $configFilePath
+$defaultDatabaseUrl = Get-RouterDefaultDatabaseUrl -DataRoot $dataDirectory -InstallMode $installMode
 $defaultAdminSiteDirPortable = Convert-ToRouterPortablePath -PathValue $defaultAdminSiteDir
 $defaultPortalSiteDirPortable = Convert-ToRouterPortablePath -PathValue $defaultPortalSiteDir
 
@@ -67,16 +134,20 @@ Ensure-RouterDirectory -DirectoryPath $dataDirectory
 Ensure-RouterDirectory -DirectoryPath $logDirectory
 Ensure-RouterDirectory -DirectoryPath $runDirectory
 
-Import-RouterEnvFile -EnvFile $envFile
-
 if (-not $env:SDKWORK_ROUTER_BINARY) {
     $env:SDKWORK_ROUTER_BINARY = $binaryPath
 }
 if (-not $env:SDKWORK_CONFIG_DIR) {
     $env:SDKWORK_CONFIG_DIR = $defaultConfigDirPortable
 }
+if (-not $env:SDKWORK_CONFIG_FILE) {
+    $env:SDKWORK_CONFIG_FILE = $defaultConfigFilePortable
+}
 if (-not $env:SDKWORK_DATABASE_URL) {
     $env:SDKWORK_DATABASE_URL = $defaultDatabaseUrl
+}
+if (-not $env:SDKWORK_ROUTER_INSTALL_MODE) {
+    $env:SDKWORK_ROUTER_INSTALL_MODE = $installMode
 }
 if (-not $env:SDKWORK_BOOTSTRAP_PROFILE) {
     $env:SDKWORK_BOOTSTRAP_PROFILE = 'prod'
@@ -122,7 +193,9 @@ if ($PortalUpstream) { $env:SDKWORK_PORTAL_PROXY_TARGET = $PortalUpstream }
 if ($AdminSiteDir) { $env:SDKWORK_ADMIN_SITE_DIR = $AdminSiteDir }
 if ($PortalSiteDir) { $env:SDKWORK_PORTAL_SITE_DIR = $PortalSiteDir }
 $env:SDKWORK_ROUTER_BINARY = Resolve-RouterHostPath -PathValue $env:SDKWORK_ROUTER_BINARY -DefaultValue $binaryPath
+$env:SDKWORK_ROUTER_INSTALL_MODE = Get-RouterNormalizedInstallMode -RequestedMode ([string]$env:SDKWORK_ROUTER_INSTALL_MODE) -FallbackMode $installMode
 $env:SDKWORK_CONFIG_DIR = Resolve-RouterHostPath -PathValue $env:SDKWORK_CONFIG_DIR -DefaultValue $defaultConfigDirPortable
+$env:SDKWORK_CONFIG_FILE = Resolve-RouterHostPath -PathValue $env:SDKWORK_CONFIG_FILE -DefaultValue $defaultConfigFilePortable
 $env:SDKWORK_DATABASE_URL = Resolve-RouterHostDatabaseUrl -DatabaseUrl $env:SDKWORK_DATABASE_URL -DefaultValue $defaultDatabaseUrl
 $env:SDKWORK_ADMIN_SITE_DIR = Resolve-RouterHostPath -PathValue $env:SDKWORK_ADMIN_SITE_DIR -DefaultValue $defaultAdminSiteDirPortable
 $env:SDKWORK_PORTAL_SITE_DIR = Resolve-RouterHostPath -PathValue $env:SDKWORK_PORTAL_SITE_DIR -DefaultValue $defaultPortalSiteDirPortable

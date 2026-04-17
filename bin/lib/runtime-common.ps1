@@ -52,6 +52,213 @@ function Get-RouterDefaultInstallHome {
     return Join-Path $RepoRoot 'artifacts\install\sdkwork-api-router\current'
 }
 
+function Get-RouterNormalizedInstallMode {
+    param(
+        [string]$RequestedMode = '',
+        [string]$FallbackMode = 'portable'
+    )
+
+    $candidate = if ([string]::IsNullOrWhiteSpace($RequestedMode)) {
+        $FallbackMode
+    } else {
+        $RequestedMode
+    }
+
+    $normalized = [string]$candidate
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        return 'portable'
+    }
+
+    if ($normalized.Trim().ToLowerInvariant() -eq 'system') {
+        return 'system'
+    }
+
+    return 'portable'
+}
+
+function Get-RouterReleaseManifestPath {
+    param([Parameter(Mandatory = $true)][string]$RuntimeHome)
+    return Join-Path $RuntimeHome 'release-manifest.json'
+}
+
+function Get-RouterReleaseManifest {
+    param([Parameter(Mandatory = $true)][string]$RuntimeHome)
+
+    $manifestPath = Get-RouterReleaseManifestPath -RuntimeHome $RuntimeHome
+    if (-not (Test-Path $manifestPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        return (Get-Content $manifestPath -Raw | ConvertFrom-Json)
+    } catch {
+        return $null
+    }
+}
+
+function Get-RouterReleaseManifestString {
+    param(
+        [Parameter(ValueFromPipeline = $true)]$Manifest,
+        [Parameter(Mandatory = $true)][string]$PropertyName
+    )
+
+    if ($null -eq $Manifest) {
+        return ''
+    }
+
+    $property = $Manifest.PSObject.Properties[$PropertyName]
+    if ($null -eq $property -or $null -eq $property.Value) {
+        return ''
+    }
+
+    return [string]$property.Value
+}
+
+function Get-RouterDefaultSystemConfigRoot {
+    if (Test-RouterWindowsPlatform) {
+        $programDataRoot = [string]$env:ProgramData
+        if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+            $programDataRoot = 'C:\ProgramData'
+        }
+        return Join-Path $programDataRoot 'sdkwork-api-router'
+    }
+
+    try {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
+            return '/Library/Application Support/sdkwork-api-router'
+        }
+    } catch {
+        # Fall through to the Linux/default path.
+    }
+
+    return '/etc/sdkwork-api-router'
+}
+
+function Get-RouterDefaultSystemDataRoot {
+    if (Test-RouterWindowsPlatform) {
+        $programDataRoot = [string]$env:ProgramData
+        if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+            $programDataRoot = 'C:\ProgramData'
+        }
+        return Join-Path $programDataRoot 'sdkwork-api-router\data'
+    }
+
+    try {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
+            return '/Library/Application Support/sdkwork-api-router/data'
+        }
+    } catch {
+        # Fall through to the Linux/default path.
+    }
+
+    return '/var/lib/sdkwork-api-router'
+}
+
+function Get-RouterDefaultSystemLogRoot {
+    if (Test-RouterWindowsPlatform) {
+        $programDataRoot = [string]$env:ProgramData
+        if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+            $programDataRoot = 'C:\ProgramData'
+        }
+        return Join-Path $programDataRoot 'sdkwork-api-router\log'
+    }
+
+    try {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
+            return '/Library/Logs/sdkwork-api-router'
+        }
+    } catch {
+        # Fall through to the Linux/default path.
+    }
+
+    return '/var/log/sdkwork-api-router'
+}
+
+function Get-RouterDefaultSystemRunRoot {
+    if (Test-RouterWindowsPlatform) {
+        $programDataRoot = [string]$env:ProgramData
+        if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+            $programDataRoot = 'C:\ProgramData'
+        }
+        return Join-Path $programDataRoot 'sdkwork-api-router\run'
+    }
+
+    try {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
+            return '/Library/Application Support/sdkwork-api-router/run'
+        }
+    } catch {
+        # Fall through to the Linux/default path.
+    }
+
+    return '/run/sdkwork-api-router'
+}
+
+function Get-RouterDefaultConfigRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuntimeHome,
+        [string]$InstallMode = 'portable'
+    )
+
+    if ((Get-RouterNormalizedInstallMode -RequestedMode $InstallMode) -eq 'system') {
+        return Get-RouterDefaultSystemConfigRoot
+    }
+
+    return Join-Path $RuntimeHome 'config'
+}
+
+function Get-RouterDefaultDataRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuntimeHome,
+        [string]$InstallMode = 'portable'
+    )
+
+    if ((Get-RouterNormalizedInstallMode -RequestedMode $InstallMode) -eq 'system') {
+        return Get-RouterDefaultSystemDataRoot
+    }
+
+    return Join-Path $RuntimeHome 'var\data'
+}
+
+function Get-RouterDefaultLogRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuntimeHome,
+        [string]$InstallMode = 'portable'
+    )
+
+    if ((Get-RouterNormalizedInstallMode -RequestedMode $InstallMode) -eq 'system') {
+        return Get-RouterDefaultSystemLogRoot
+    }
+
+    return Join-Path $RuntimeHome 'var\log'
+}
+
+function Get-RouterDefaultRunRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuntimeHome,
+        [string]$InstallMode = 'portable'
+    )
+
+    if ((Get-RouterNormalizedInstallMode -RequestedMode $InstallMode) -eq 'system') {
+        return Get-RouterDefaultSystemRunRoot
+    }
+
+    return Join-Path $RuntimeHome 'var\run'
+}
+
+function Get-RouterDefaultDatabaseUrl {
+    param(
+        [Parameter(Mandatory = $true)][string]$DataRoot,
+        [string]$InstallMode = 'portable'
+    )
+
+    if ((Get-RouterNormalizedInstallMode -RequestedMode $InstallMode) -eq 'system') {
+        return 'postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router'
+    }
+
+    return "sqlite://$(Convert-ToRouterPortablePath -PathValue $DataRoot)/sdkwork-api-router.db"
+}
+
 function Get-RouterDefaultDevHome {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 

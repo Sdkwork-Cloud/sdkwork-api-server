@@ -49,8 +49,41 @@ if [ -z "$RUNTIME_HOME" ]; then
 fi
 
 RUNTIME_HOME=$(router_resolve_absolute_path "$PWD" "$RUNTIME_HOME")
-RUN_DIR="$RUNTIME_HOME/var/run"
-LOG_DIR="$RUNTIME_HOME/var/log"
+MANIFEST_FILE=$(router_release_manifest_path "$RUNTIME_HOME")
+MANIFEST_INSTALL_MODE=$(router_release_manifest_string "$MANIFEST_FILE" 'installMode' || true)
+MANIFEST_CONFIG_DIR=$(router_release_manifest_string "$MANIFEST_FILE" 'configRoot' || true)
+MANIFEST_LOG_DIR=$(router_release_manifest_string "$MANIFEST_FILE" 'logRoot' || true)
+MANIFEST_RUN_DIR=$(router_release_manifest_string "$MANIFEST_FILE" 'runRoot' || true)
+
+INSTALL_MODE=$(router_normalize_install_mode "${SDKWORK_ROUTER_INSTALL_MODE:-$MANIFEST_INSTALL_MODE}")
+DEFAULT_CONFIG_DIR_RAW=$(router_default_config_root "$RUNTIME_HOME" "$INSTALL_MODE")
+CONFIG_DIR_RAW="${SDKWORK_CONFIG_DIR:-}"
+if [ -z "$CONFIG_DIR_RAW" ] && [ -n "${SDKWORK_CONFIG_FILE:-}" ]; then
+  CONFIG_DIR_RAW=$(dirname -- "$SDKWORK_CONFIG_FILE")
+fi
+if [ -z "$CONFIG_DIR_RAW" ] && [ -n "$MANIFEST_CONFIG_DIR" ]; then
+  CONFIG_DIR_RAW="$MANIFEST_CONFIG_DIR"
+fi
+if [ -z "$CONFIG_DIR_RAW" ]; then
+  CONFIG_DIR_RAW="$DEFAULT_CONFIG_DIR_RAW"
+fi
+CONFIG_DIR=$(router_resolve_host_path "$CONFIG_DIR_RAW" "$DEFAULT_CONFIG_DIR_RAW")
+ENV_FILE="$CONFIG_DIR/router.env"
+router_load_env_file "$ENV_FILE"
+
+INSTALL_MODE=$(router_normalize_install_mode "${SDKWORK_ROUTER_INSTALL_MODE:-$MANIFEST_INSTALL_MODE}")
+DEFAULT_LOG_DIR_RAW=$(router_default_log_root "$RUNTIME_HOME" "$INSTALL_MODE")
+DEFAULT_RUN_DIR_RAW=$(router_default_run_root "$RUNTIME_HOME" "$INSTALL_MODE")
+LOG_DIR_RAW="$MANIFEST_LOG_DIR"
+if [ -z "$LOG_DIR_RAW" ]; then
+  LOG_DIR_RAW="$DEFAULT_LOG_DIR_RAW"
+fi
+RUN_DIR_RAW="$MANIFEST_RUN_DIR"
+if [ -z "$RUN_DIR_RAW" ]; then
+  RUN_DIR_RAW="$DEFAULT_RUN_DIR_RAW"
+fi
+LOG_DIR=$(router_resolve_host_path "$LOG_DIR_RAW" "$DEFAULT_LOG_DIR_RAW")
+RUN_DIR=$(router_resolve_host_path "$RUN_DIR_RAW" "$DEFAULT_RUN_DIR_RAW")
 
 if router_is_windows; then
   PS_SCRIPT="$(router_windows_path "$SCRIPT_DIR/stop.ps1")"

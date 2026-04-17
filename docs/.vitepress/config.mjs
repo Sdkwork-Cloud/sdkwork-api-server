@@ -3,19 +3,19 @@
 import { defineConfig } from 'vitepress';
 
 const englishNav = [
-  { text: 'Getting Started', link: '/getting-started/quickstart' },
+  { text: 'Getting Started', link: '/getting-started/production-deployment' },
   { text: 'Architecture', link: '/architecture/software-architecture' },
   { text: 'API Reference', link: '/api-reference/overview' },
-  { text: 'Operations', link: '/operations/configuration' },
+  { text: 'Operations', link: '/operations/install-layout' },
   { text: 'Reference', link: '/reference/api-compatibility' },
   { text: '中文', link: '/zh/' },
 ];
 
 const chineseNav = [
-  { text: '开始使用', link: '/zh/getting-started/quickstart' },
+  { text: '开始使用', link: '/zh/getting-started/production-deployment' },
   { text: '架构', link: '/zh/architecture/software-architecture' },
   { text: 'API 参考', link: '/zh/api-reference/overview' },
-  { text: '运维', link: '/zh/operations/configuration' },
+  { text: '运维', link: '/zh/operations/install-layout' },
   { text: '参考', link: '/zh/reference/api-compatibility' },
   { text: 'English', link: '/' },
 ];
@@ -24,6 +24,7 @@ const englishSidebar = [
   {
     text: 'Getting Started',
     items: [
+      { text: 'Production Deployment', link: '/getting-started/production-deployment' },
       { text: 'Quickstart', link: '/getting-started/quickstart' },
       { text: 'Installation', link: '/getting-started/installation' },
       { text: 'Source Development', link: '/getting-started/source-development' },
@@ -54,6 +55,8 @@ const englishSidebar = [
   {
     text: 'Operations',
     items: [
+      { text: 'Install Layout', link: '/operations/install-layout' },
+      { text: 'Service Management', link: '/operations/service-management' },
       { text: 'Configuration', link: '/operations/configuration' },
       { text: 'Health and Metrics', link: '/operations/health-and-metrics' },
     ],
@@ -73,6 +76,7 @@ const chineseSidebar = [
   {
     text: '开始使用',
     items: [
+      { text: '生产部署', link: '/zh/getting-started/production-deployment' },
       { text: '快速开始', link: '/zh/getting-started/quickstart' },
       { text: '安装准备', link: '/zh/getting-started/installation' },
       { text: '源码运行', link: '/zh/getting-started/source-development' },
@@ -103,6 +107,8 @@ const chineseSidebar = [
   {
     text: '运维',
     items: [
+      { text: '安装布局', link: '/zh/operations/install-layout' },
+      { text: '服务管理', link: '/zh/operations/service-management' },
       { text: '配置说明', link: '/zh/operations/configuration' },
       { text: '健康检查与 Metrics', link: '/zh/operations/health-and-metrics' },
     ],
@@ -125,6 +131,15 @@ export default defineConfig({
   lang: 'en-US',
   cleanUrls: true,
   lastUpdated: true,
+  srcExclude: [
+    'superpowers/**',
+    'step/**',
+    'review/**',
+    'release/**',
+    'plans/**',
+    'prompts/**',
+    '架构/**',
+  ],
   head: [['meta', { name: 'theme-color', content: '#0f766e' }]],
   themeConfig: {
     search: { provider: 'local' },

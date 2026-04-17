@@ -9,14 +9,17 @@ import {
   assertInstallInputsExist,
   createInstallPlan,
   createReleaseBuildPlan,
+  createValidateConfigPlan,
   defaultInstallRoot,
+  executeValidateConfigPlan,
   executeReleaseBuildPlan,
   toPortablePath,
 } from './lib/router-runtime-tooling.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD_ONLY_FLAGS = new Set(['--install', '--skip-docs', '--skip-console']);
-const INSTALL_ONLY_FLAGS = new Set(['--force', '--home', '--mode']);
+const RUNTIME_LAYOUT_FLAGS = new Set(['--home', '--mode']);
+const INSTALL_ONLY_FLAGS = new Set(['--force']);
 const INSTALL_MODES = new Set(['portable', 'system']);
 
 class UserInputError extends Error {}
@@ -27,6 +30,7 @@ function printUsage() {
       'Usage:',
       '  node bin/router-ops.mjs build [--install] [--skip-docs] [--skip-console] [--dry-run]',
       '  node bin/router-ops.mjs install [--mode <portable|system>] [--home <dir>] [--force] [--dry-run]',
+      '  node bin/router-ops.mjs validate-config [--mode <portable|system>] [--home <dir>] [--dry-run]',
     ].join('\n'),
   );
 }
@@ -34,6 +38,10 @@ function printUsage() {
 function assertOptionSupported(command, token) {
   if (BUILD_ONLY_FLAGS.has(token) && command !== 'build') {
     throw new UserInputError(`${token} is only supported for the build command`);
+  }
+
+  if (RUNTIME_LAYOUT_FLAGS.has(token) && command !== 'install' && command !== 'validate-config') {
+    throw new UserInputError(`${token} is only supported for install or validate-config`);
   }
 
   if (INSTALL_ONLY_FLAGS.has(token) && command !== 'install') {
@@ -106,7 +114,7 @@ export function parseArgs(argv) {
     }
   }
 
-  if (options.command === 'install' && !options.installRoot) {
+  if ((options.command === 'install' || options.command === 'validate-config') && !options.installRoot) {
     options.installRoot = defaultInstallRoot(repoRoot, {
       mode: options.mode,
       platform: process.platform,
@@ -136,6 +144,12 @@ function printInstallPlan(plan) {
     }
     console.log(`copy ${toPortablePath(file.sourcePath)} -> ${toPortablePath(file.targetPath)}`);
   }
+}
+
+function printValidateConfigPlan(plan) {
+  console.log(`# validate-config mode=${plan.mode} source=${plan.source}`);
+  console.log(`# install-root=${toPortablePath(plan.installRoot)}`);
+  console.log(`${plan.label}: ${plan.command} ${plan.args.join(' ')}`);
 }
 
 async function main() {
@@ -180,6 +194,23 @@ async function main() {
       force: options.force,
     });
     console.log(`installed runtime to ${toPortablePath(options.installRoot)}`);
+    return;
+  }
+
+  if (options.command === 'validate-config') {
+    const plan = createValidateConfigPlan({
+      repoRoot,
+      mode: options.mode,
+      installRoot: options.installRoot,
+    });
+
+    if (options.dryRun) {
+      printValidateConfigPlan(plan);
+      return;
+    }
+
+    await executeValidateConfigPlan(plan);
+    console.log(`validated runtime config for ${toPortablePath(plan.installRoot)}`);
     return;
   }
 

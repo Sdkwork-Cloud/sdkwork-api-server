@@ -13,6 +13,7 @@ use serde_json::json;
 const SDKWORK_CONFIG_DIR: &str = "SDKWORK_CONFIG_DIR";
 const SDKWORK_CONFIG_FILE: &str = "SDKWORK_CONFIG_FILE";
 const SDKWORK_DATABASE_URL: &str = "SDKWORK_DATABASE_URL";
+const SDKWORK_ROUTER_INSTALL_MODE: &str = "SDKWORK_ROUTER_INSTALL_MODE";
 const SDKWORK_WEB_BIND: &str = "SDKWORK_WEB_BIND";
 const SDKWORK_ROUTER_ROLES: &str = "SDKWORK_ROUTER_ROLES";
 const SDKWORK_ROUTER_NODE_ID_PREFIX: &str = "SDKWORK_ROUTER_NODE_ID_PREFIX";
@@ -106,13 +107,14 @@ async fn main() -> anyhow::Result<()> {
     let cli = RouterProductServiceCli::parse();
     let settings = resolve_service_settings(&cli, env::vars())?;
     let (loader, config) = load_runtime_config(&settings, &cli)?;
+    let install_mode = env::var(SDKWORK_ROUTER_INSTALL_MODE).ok();
+    validate_runtime_config_for_install_mode(&config, install_mode.as_deref())?;
 
     if settings.dry_run {
         print!("{}", render_service_plan(&settings, &config)?);
         return Ok(());
     }
 
-    config.validate_security_posture()?;
     init_tracing("router-product-service");
     let options = build_runtime_options(&settings)?;
     let runtime = RouterProductRuntime::start(loader, config, options).await?;
@@ -275,6 +277,30 @@ fn build_loader_cli_overrides(cli: &RouterProductServiceCli) -> Vec<(String, Str
         overrides.push((SDKWORK_PORTAL_BIND.to_owned(), portal_bind.to_owned()));
     }
     overrides
+}
+
+fn validate_runtime_config_for_install_mode(
+    config: &StandaloneConfig,
+    install_mode: Option<&str>,
+) -> anyhow::Result<()> {
+    config.validate_security_posture()?;
+
+    let normalized_install_mode = install_mode
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_lowercase());
+
+    if matches!(normalized_install_mode.as_deref(), Some("system"))
+        && !config.allow_insecure_dev_defaults
+        && config.database_url.to_ascii_lowercase().starts_with("sqlite:")
+    {
+        anyhow::bail!(
+            "system install mode refuses SQLite database_url {}; configure PostgreSQL, MySQL, or another networked production database, or set SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS=true for explicit development-only override",
+            config.database_url,
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_roles(value: &str) -> anyhow::Result<Vec<ProductRuntimeRole>> {
@@ -565,8 +591,9 @@ mod tests {
 
     use super::{
         build_loader_cli_overrides, render_service_plan, resolve_default_site_dirs_for_paths,
-        resolve_service_settings, PlanFormat, ProductRuntimeRole, ProductServiceSettings,
-        RouterProductServiceCli, StandaloneConfig, StandaloneConfigLoader,
+        resolve_service_settings, validate_runtime_config_for_install_mode, PlanFormat,
+        ProductRuntimeRole, ProductServiceSettings, RouterProductServiceCli, StandaloneConfig,
+        StandaloneConfigLoader,
     };
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -716,6 +743,34 @@ database_url: "sqlite://router.db"
                 .database_url,
             "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"
         );
+    }
+
+    #[test]
+    fn system_install_mode_rejects_sqlite_without_explicit_dev_override() {
+        let error = validate_runtime_config_for_install_mode(
+            &StandaloneConfig {
+                database_url: "sqlite:///tmp/router.db".to_owned(),
+                ..StandaloneConfig::default()
+            },
+            Some("system"),
+        )
+        .expect_err("system installs should reject sqlite by default");
+
+        assert!(error.to_string().contains("SQLite"));
+        assert!(error.to_string().contains("SDKWORK_ALLOW_INSECURE_DEV_DEFAULTS"));
+    }
+
+    #[test]
+    fn system_install_mode_allows_postgres_placeholders_for_validation() {
+        validate_runtime_config_for_install_mode(
+            &StandaloneConfig {
+                database_url:
+                    "postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router".to_owned(),
+                ..StandaloneConfig::default()
+            },
+            Some("system"),
+        )
+        .expect("system installs should accept PostgreSQL validation placeholders");
     }
 
     fn sqlite_url_for(path: impl AsRef<Path>) -> String {

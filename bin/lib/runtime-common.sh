@@ -85,6 +85,137 @@ router_default_install_home() {
   printf '%s/artifacts/install/sdkwork-api-router/current' "$REPO_ROOT"
 }
 
+router_normalize_install_mode() {
+  MODE="$(printf '%s' "${1:-portable}" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  case "$MODE" in
+    system)
+      printf '%s' 'system'
+      ;;
+    *)
+      printf '%s' 'portable'
+      ;;
+  esac
+}
+
+router_release_manifest_path() {
+  printf '%s/release-manifest.json' "$1"
+}
+
+router_release_manifest_string() {
+  MANIFEST_FILE="$1"
+  KEY="$2"
+  if [ ! -f "$MANIFEST_FILE" ]; then
+    return 1
+  fi
+
+  VALUE=$(sed -n "s/^[[:space:]]*\"$KEY\"[[:space:]]*:[[:space:]]*\"\\(.*\\)\"[[:space:]]*,\{0,1\}[[:space:]]*$/\\1/p" "$MANIFEST_FILE" | head -n 1)
+  if [ -z "$VALUE" ]; then
+    return 1
+  fi
+
+  VALUE=$(printf '%s' "$VALUE" | sed 's/\\"/"/g; s/\\\\/\\/g')
+  printf '%s' "$VALUE"
+}
+
+router_default_system_config_root() {
+  case "$(router_runtime_platform_name)" in
+    darwin)
+      printf '%s' '/Library/Application Support/sdkwork-api-router'
+      ;;
+    *)
+      printf '%s' '/etc/sdkwork-api-router'
+      ;;
+  esac
+}
+
+router_default_system_data_root() {
+  case "$(router_runtime_platform_name)" in
+    darwin)
+      printf '%s' '/Library/Application Support/sdkwork-api-router/data'
+      ;;
+    *)
+      printf '%s' '/var/lib/sdkwork-api-router'
+      ;;
+  esac
+}
+
+router_default_system_log_root() {
+  case "$(router_runtime_platform_name)" in
+    darwin)
+      printf '%s' '/Library/Logs/sdkwork-api-router'
+      ;;
+    *)
+      printf '%s' '/var/log/sdkwork-api-router'
+      ;;
+  esac
+}
+
+router_default_system_run_root() {
+  case "$(router_runtime_platform_name)" in
+    darwin)
+      printf '%s' '/Library/Application Support/sdkwork-api-router/run'
+      ;;
+    *)
+      printf '%s' '/run/sdkwork-api-router'
+      ;;
+  esac
+}
+
+router_default_config_root() {
+  RUNTIME_HOME="$1"
+  INSTALL_MODE="$(router_normalize_install_mode "${2:-portable}")"
+  if [ "$INSTALL_MODE" = 'system' ]; then
+    router_default_system_config_root
+    return 0
+  fi
+
+  printf '%s/config' "$RUNTIME_HOME"
+}
+
+router_default_data_root() {
+  RUNTIME_HOME="$1"
+  INSTALL_MODE="$(router_normalize_install_mode "${2:-portable}")"
+  if [ "$INSTALL_MODE" = 'system' ]; then
+    router_default_system_data_root
+    return 0
+  fi
+
+  printf '%s/var/data' "$RUNTIME_HOME"
+}
+
+router_default_log_root() {
+  RUNTIME_HOME="$1"
+  INSTALL_MODE="$(router_normalize_install_mode "${2:-portable}")"
+  if [ "$INSTALL_MODE" = 'system' ]; then
+    router_default_system_log_root
+    return 0
+  fi
+
+  printf '%s/var/log' "$RUNTIME_HOME"
+}
+
+router_default_run_root() {
+  RUNTIME_HOME="$1"
+  INSTALL_MODE="$(router_normalize_install_mode "${2:-portable}")"
+  if [ "$INSTALL_MODE" = 'system' ]; then
+    router_default_system_run_root
+    return 0
+  fi
+
+  printf '%s/var/run' "$RUNTIME_HOME"
+}
+
+router_default_database_url() {
+  DATA_ROOT="$1"
+  INSTALL_MODE="$(router_normalize_install_mode "${2:-portable}")"
+  if [ "$INSTALL_MODE" = 'system' ]; then
+    printf '%s' 'postgresql://sdkwork:change-me@127.0.0.1:5432/sdkwork_api_router'
+    return 0
+  fi
+
+  printf 'sqlite://%s/sdkwork-api-router.db' "$(router_portable_path "$DATA_ROOT")"
+}
+
 router_default_dev_home() {
   REPO_ROOT="$1"
   printf '%s/artifacts/runtime/dev/%s' "$REPO_ROOT" "$(router_runtime_key)"

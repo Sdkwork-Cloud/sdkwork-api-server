@@ -26,8 +26,42 @@ if ([string]::IsNullOrWhiteSpace($RuntimeHome)) {
 }
 
 $runtimeHome = Resolve-RouterAbsolutePath -BasePath (Get-Location).Path -CandidatePath $RuntimeHome
-$runDirectory = Join-Path $runtimeHome 'var\run'
-$logDirectory = Join-Path $runtimeHome 'var\log'
+$releaseManifest = Get-RouterReleaseManifest -RuntimeHome $runtimeHome
+$manifestInstallMode = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'installMode'
+$manifestConfigDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'configRoot'
+$manifestLogDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'logRoot'
+$manifestRunDirectory = Get-RouterReleaseManifestString -Manifest $releaseManifest -PropertyName 'runRoot'
+$installMode = Get-RouterNormalizedInstallMode -RequestedMode ([string]$env:SDKWORK_ROUTER_INSTALL_MODE) -FallbackMode $manifestInstallMode
+$defaultConfigDirectoryRaw = Get-RouterDefaultConfigRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$configDirectoryRaw = [string]$env:SDKWORK_CONFIG_DIR
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw) -and -not [string]::IsNullOrWhiteSpace([string]$env:SDKWORK_CONFIG_FILE)) {
+    $configDirectoryRaw = Split-Path -Parent ([string]$env:SDKWORK_CONFIG_FILE)
+}
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw) -and -not [string]::IsNullOrWhiteSpace($manifestConfigDirectory)) {
+    $configDirectoryRaw = $manifestConfigDirectory
+}
+if ([string]::IsNullOrWhiteSpace($configDirectoryRaw)) {
+    $configDirectoryRaw = $defaultConfigDirectoryRaw
+}
+$configDirectory = Resolve-RouterHostPath -PathValue $configDirectoryRaw -DefaultValue $defaultConfigDirectoryRaw
+$envFile = Join-Path $configDirectory 'router.env'
+Import-RouterEnvFile -EnvFile $envFile
+
+$installMode = Get-RouterNormalizedInstallMode -RequestedMode ([string]$env:SDKWORK_ROUTER_INSTALL_MODE) -FallbackMode $manifestInstallMode
+$defaultLogDirectoryRaw = Get-RouterDefaultLogRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$defaultRunDirectoryRaw = Get-RouterDefaultRunRoot -RuntimeHome $runtimeHome -InstallMode $installMode
+$logDirectoryRaw = if (-not [string]::IsNullOrWhiteSpace($manifestLogDirectory)) {
+    $manifestLogDirectory
+} else {
+    $defaultLogDirectoryRaw
+}
+$runDirectoryRaw = if (-not [string]::IsNullOrWhiteSpace($manifestRunDirectory)) {
+    $manifestRunDirectory
+} else {
+    $defaultRunDirectoryRaw
+}
+$logDirectory = Resolve-RouterHostPath -PathValue $logDirectoryRaw -DefaultValue $defaultLogDirectoryRaw
+$runDirectory = Resolve-RouterHostPath -PathValue $runDirectoryRaw -DefaultValue $defaultRunDirectoryRaw
 $pidFile = Join-Path $runDirectory 'router-product-service.pid'
 $stateFile = Join-Path $runDirectory 'router-product-service.state.env'
 $stdoutLog = Join-Path $logDirectory 'router-product-service.stdout.log'

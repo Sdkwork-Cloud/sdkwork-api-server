@@ -1,29 +1,33 @@
 # SDKWork API Router Deployment Assets
 
-This directory contains the commercial deployment assets for the standalone
-`router-product-service` runtime.
+This page is Docker and Helm asset-specific.
 
-## Layout
+For native `system` installs, OS-standard directories, service registration, and production initialization, use:
+
+- [Production Deployment](../docs/getting-started/production-deployment.md)
+- [Install Layout](../docs/operations/install-layout.md)
+- [Service Management](../docs/operations/service-management.md)
+
+## What Lives Here
 
 - `docker/`
-  - `Dockerfile`: builds a Linux runtime image from an extracted product-server bundle
-  - `docker-compose.yml`: quick PostgreSQL-backed local or single-host deployment
-  - `.env.example`: required runtime secrets and database defaults
+  - `Dockerfile`: Linux product-runtime image build
+  - `docker-compose.yml`: quick PostgreSQL-backed single-host deployment
+  - `.env.example`: required runtime secrets and database placeholders
 - `helm/sdkwork-api-router/`
-  - Helm chart for Kubernetes deployment with externally managed PostgreSQL
+  - Kubernetes chart for externally managed PostgreSQL deployments
 
 ## Runtime Contract
 
-All deployment assets reuse the existing server-mode runtime model:
+These assets intentionally reuse the same production runtime contract:
 
-- public web host binds `0.0.0.0:3001`
-- internal gateway/admin/portal listeners stay on loopback `127.0.0.1:8080/8081/8082`
-- bootstrap data is loaded from `/opt/sdkwork/data`
-- static admin and portal assets are served from `/opt/sdkwork/sites/admin/dist`
-  and `/opt/sdkwork/sites/portal/dist`
-- `SDKWORK_DATABASE_URL` must point at PostgreSQL for production deployments
+- public web bind: `0.0.0.0:3001`
+- internal gateway/admin/portal binds: `127.0.0.1:8080/8081/8082`
+- bundled bootstrap data under `/opt/sdkwork/data`
+- bundled admin and portal assets under `/opt/sdkwork/sites/*/dist`
+- PostgreSQL-backed `SDKWORK_DATABASE_URL`
 
-Use the Linux product-server release bundle as the Docker build context:
+## Quick Docker Compose Deployment
 
 ```bash
 tar -xzf sdkwork-api-router-product-server-linux-x64.tar.gz
@@ -33,7 +37,7 @@ docker build -f deploy/docker/Dockerfile -t sdkwork-api-router:local .
 docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d
 ```
 
-For Kubernetes, build and push the same image, then install the Helm chart:
+## Quick Helm Deployment
 
 ```bash
 helm upgrade --install sdkwork-api-router deploy/helm/sdkwork-api-router \

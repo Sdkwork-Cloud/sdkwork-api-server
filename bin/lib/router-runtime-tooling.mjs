@@ -444,6 +444,7 @@ export function renderRuntimeEnvTemplate({
   return [
     '# SDKWork Router production runtime defaults',
     '# Canonical runtime config should live in router.yaml.',
+    `SDKWORK_ROUTER_INSTALL_MODE=${quoteEnvValue(layout.mode)}`,
     `SDKWORK_CONFIG_DIR=${quoteEnvValue(configDir)}`,
     `SDKWORK_CONFIG_FILE=${quoteEnvValue(configFile)}`,
     `SDKWORK_DATABASE_URL=${quoteEnvValue(defaultDatabaseUrlForLayout(layout))}`,
@@ -966,6 +967,133 @@ export function renderWindowsTaskUninstallScript({
   ].join('\n');
 }
 
+export function renderWindowsServiceRunScript({
+  installRoot,
+  mode = 'portable',
+  platform = process.platform,
+  env = process.env,
+} = {}) {
+  const layout = resolveRuntimeLayout({
+    installRoot,
+    mode,
+    platform,
+    env,
+  });
+  const portableRoot = toPortablePath(layout.installRoot);
+  const envFile = toPortablePath(layout.envFile);
+
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    "$runtimeHome = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)",
+    "$runtimeCommon = Join-Path $runtimeHome 'bin\\lib\\runtime-common.ps1'",
+    "if (-not (Test-Path $runtimeCommon -PathType Leaf)) {",
+    '    throw "Runtime common helpers not found: $runtimeCommon"',
+    '}',
+    '. $runtimeCommon',
+    `Import-RouterEnvFile -EnvFile '${envFile.replaceAll("'", "''")}'`,
+    `& (Join-Path $runtimeHome 'bin\\start.ps1') -Foreground -Home '${portableRoot.replaceAll("'", "''")}'`,
+    'exit $LASTEXITCODE',
+    '',
+  ].join('\n');
+}
+
+export function renderWindowsServiceInstallScript({
+  serviceName = 'sdkwork-api-router',
+  displayName = 'SDKWork API Router',
+} = {}) {
+  return [
+    'param(',
+    `    [string]$ServiceName = '${serviceName}',`,
+    `    [string]$DisplayName = '${displayName}',`,
+    '    [string]$ScExe = $env:SC_EXE,',
+    '    [switch]$SkipAdminCheck',
+    ')',
+    '',
+    "Set-StrictMode -Version Latest",
+    "$ErrorActionPreference = 'Stop'",
+    '',
+    'function Test-IsAdministrator {',
+    '    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())',
+    '    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
+    '}',
+    '',
+    'if (-not $ScExe) {',
+    "    $ScExe = 'sc.exe'",
+    '}',
+    '',
+    'if (-not $SkipAdminCheck -and -not (Test-IsAdministrator)) {',
+    '    throw "Administrator privileges are required to register the Windows service."',
+    '}',
+    '',
+    "$runScript = Join-Path $PSScriptRoot 'run-service.ps1'",
+    'if (-not (Test-Path $runScript -PathType Leaf)) {',
+    '    throw "Windows service runner not found: $runScript"',
+    '}',
+    '',
+    '$binPath = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$runScript`""',
+    '& $ScExe query $ServiceName | Out-Null',
+    'if ($LASTEXITCODE -eq 0) {',
+    '    & $ScExe stop $ServiceName | Out-Null',
+    '    & $ScExe delete $ServiceName | Out-Null',
+    '    Start-Sleep -Seconds 1',
+    '}',
+    '& $ScExe create $ServiceName "binPath= $binPath" "start= auto" "DisplayName= $DisplayName" | Out-Null',
+    'if ($LASTEXITCODE -ne 0) {',
+    '    throw "$ScExe failed to create service $ServiceName"',
+    '}',
+    '& $ScExe description $ServiceName $DisplayName | Out-Null',
+    '& $ScExe start $ServiceName | Out-Null',
+    'if ($LASTEXITCODE -ne 0) {',
+    '    throw "$ScExe failed to start service $ServiceName"',
+    '}',
+    'Write-Host "Installed Windows service $ServiceName using $runScript"',
+    '',
+  ].join('\n');
+}
+
+export function renderWindowsServiceUninstallScript({
+  serviceName = 'sdkwork-api-router',
+} = {}) {
+  return [
+    'param(',
+    `    [string]$ServiceName = '${serviceName}',`,
+    '    [string]$ScExe = $env:SC_EXE,',
+    '    [switch]$SkipAdminCheck',
+    ')',
+    '',
+    "Set-StrictMode -Version Latest",
+    "$ErrorActionPreference = 'Stop'",
+    '',
+    'function Test-IsAdministrator {',
+    '    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())',
+    '    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
+    '}',
+    '',
+    'if (-not $ScExe) {',
+    "    $ScExe = 'sc.exe'",
+    '}',
+    '',
+    'if (-not $SkipAdminCheck -and -not (Test-IsAdministrator)) {',
+    '    throw "Administrator privileges are required to unregister the Windows service."',
+    '}',
+    '',
+    '& $ScExe query $ServiceName | Out-Null',
+    'if ($LASTEXITCODE -ne 0) {',
+    '    Write-Host "Windows service $ServiceName is not registered."',
+    '    exit 0',
+    '}',
+    '',
+    '& $ScExe stop $ServiceName | Out-Null',
+    '& $ScExe delete $ServiceName | Out-Null',
+    'if ($LASTEXITCODE -ne 0) {',
+    '    throw "$ScExe failed to delete service $ServiceName"',
+    '}',
+    '',
+    'Write-Host "Removed Windows service $ServiceName"',
+    '',
+  ].join('\n');
+}
+
 export function createInstallPlan({
   repoRoot,
   installRoot,
@@ -1010,6 +1138,7 @@ export function createInstallPlan({
     layout.staticDataDir,
     layout.serviceSystemdDir,
     layout.serviceLaunchdDir,
+    layout.pathApi.join(layout.installRoot, 'service', 'windows-service'),
     layout.serviceWindowsTaskDir,
     layout.sitesAdminDir,
     layout.sitesPortalDir,
@@ -1155,6 +1284,41 @@ export function createInstallPlan({
     {
       type: 'text',
       targetPath: layout.pathApi.join(
+        layout.installRoot,
+        'service',
+        'windows-service',
+        'run-service.ps1',
+      ),
+      contents: renderWindowsServiceRunScript({
+        installRoot: layout.installRoot,
+        mode: normalizedMode,
+        platform: runtimePlatform,
+        env,
+      }),
+    },
+    {
+      type: 'text',
+      targetPath: layout.pathApi.join(
+        layout.installRoot,
+        'service',
+        'windows-service',
+        'install-service.ps1',
+      ),
+      contents: renderWindowsServiceInstallScript(),
+    },
+    {
+      type: 'text',
+      targetPath: layout.pathApi.join(
+        layout.installRoot,
+        'service',
+        'windows-service',
+        'uninstall-service.ps1',
+      ),
+      contents: renderWindowsServiceUninstallScript(),
+    },
+    {
+      type: 'text',
+      targetPath: layout.pathApi.join(
         layout.serviceWindowsTaskDir,
         'sdkwork-api-router.xml',
       ),
@@ -1260,6 +1424,130 @@ export function assertInstallInputsExist(plan) {
   }
 }
 
+function parseEnvValue(value) {
+  const trimmed = String(value ?? '').trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1)
+      .replaceAll('\\"', '"')
+      .replaceAll('\\\\', '\\');
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
+}
+
+function readEnvFileValues(envFilePath, {
+  exists = existsSync,
+  readFile = readFileSync,
+} = {}) {
+  if (!exists(envFilePath)) {
+    return {};
+  }
+
+  const values = {};
+  const content = String(readFile(envFilePath, 'utf8'));
+  for (const rawLine of content.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1);
+    values[key] = parseEnvValue(value);
+  }
+
+  return values;
+}
+
+export function createValidateConfigPlan({
+  repoRoot,
+  installRoot,
+  mode = 'portable',
+  platform = process.platform,
+  env = process.env,
+  exists = existsSync,
+  readFile = readFileSync,
+} = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
+  const normalizedMode = normalizeInstallMode(mode);
+  const resolvedInstallRoot = installRoot ?? defaultInstallRoot(repoRoot, {
+    mode: normalizedMode,
+    platform: runtimePlatform,
+    env,
+  });
+  const layout = resolveRuntimeLayout({
+    installRoot: resolvedInstallRoot,
+    mode: normalizedMode,
+    platform: runtimePlatform,
+    env,
+  });
+  const envFileValues = readEnvFileValues(layout.envFile, {
+    exists,
+    readFile,
+  });
+  const validationEnv = {
+    ...env,
+    ...envFileValues,
+  };
+
+  validationEnv.SDKWORK_ROUTER_INSTALL_MODE ??= normalizedMode;
+  validationEnv.SDKWORK_CONFIG_DIR ??= toPortablePath(layout.configRoot);
+  validationEnv.SDKWORK_CONFIG_FILE ??= toPortablePath(layout.configFile);
+  validationEnv.SDKWORK_DATABASE_URL ??= defaultDatabaseUrlForLayout(layout);
+  validationEnv.SDKWORK_ADMIN_SITE_DIR ??= toPortablePath(layout.adminSiteDistDir);
+  validationEnv.SDKWORK_PORTAL_SITE_DIR ??= toPortablePath(layout.portalSiteDistDir);
+  validationEnv.SDKWORK_ROUTER_BINARY ??= toPortablePath(layout.routerBinary);
+
+  const binaryPath = validationEnv.SDKWORK_ROUTER_BINARY;
+  if (binaryPath && exists(binaryPath)) {
+    return {
+      label: 'validate-config',
+      command: binaryPath,
+      args: ['--dry-run', '--plan-format', 'json'],
+      cwd: layout.installRoot,
+      env: validationEnv,
+      shell: false,
+      windowsHide: runtimePlatform === 'win32',
+      installRoot: layout.installRoot,
+      mode: normalizedMode,
+      layout,
+      source: 'binary',
+    };
+  }
+
+  const rustRunner = resolveRustRunner(runtimePlatform, validationEnv);
+  return {
+    label: 'validate-config',
+    command: rustRunner.command,
+    args: [
+      ...rustRunner.args,
+      'run',
+      '-p',
+      'router-product-service',
+      '--',
+      '--dry-run',
+      '--plan-format',
+      'json',
+    ],
+    cwd: repoRoot,
+    env: validationEnv,
+    shell: rustRunner.shell,
+    windowsHide: runtimePlatform === 'win32',
+    installRoot: layout.installRoot,
+    mode: normalizedMode,
+    layout,
+    source: 'cargo',
+  };
+}
+
 export async function runCommandStep(step) {
   await new Promise((resolve, reject) => {
     const child = spawn(step.command, step.args, {
@@ -1290,6 +1578,10 @@ export async function executeReleaseBuildPlan(plan) {
     // eslint-disable-next-line no-await-in-loop
     await runCommandStep(step);
   }
+}
+
+export async function executeValidateConfigPlan(plan) {
+  await runCommandStep(plan);
 }
 
 export function readTextFile(filePath) {
