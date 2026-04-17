@@ -10,9 +10,13 @@ pub enum RuntimeMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalConfigPaths {
     pub root_dir: PathBuf,
+    pub router_config_yaml: PathBuf,
+    pub router_config_yml: PathBuf,
+    pub router_config_json: PathBuf,
     pub primary_config_yaml: PathBuf,
     pub secondary_config_yml: PathBuf,
     pub fallback_config_json: PathBuf,
+    pub config_fragment_dir: PathBuf,
     pub database_file: PathBuf,
     pub secret_local_file: PathBuf,
     pub extensions_dir: PathBuf,
@@ -25,9 +29,13 @@ impl LocalConfigPaths {
 
     pub fn from_root_dir(root_dir: PathBuf) -> Self {
         Self {
+            router_config_yaml: root_dir.join("router.yaml"),
+            router_config_yml: root_dir.join("router.yml"),
+            router_config_json: root_dir.join("router.json"),
             primary_config_yaml: root_dir.join("config.yaml"),
             secondary_config_yml: root_dir.join("config.yml"),
             fallback_config_json: root_dir.join("config.json"),
+            config_fragment_dir: root_dir.join("conf.d"),
             database_file: root_dir.join("sdkwork-api-server.db"),
             secret_local_file: root_dir.join("secrets.json"),
             extensions_dir: root_dir.join("extensions"),
@@ -35,8 +43,11 @@ impl LocalConfigPaths {
         }
     }
 
-    pub(crate) fn discovered_config_candidates(&self) -> [PathBuf; 3] {
+    pub(crate) fn discovered_config_candidates(&self) -> [PathBuf; 6] {
         [
+            self.router_config_yaml.clone(),
+            self.router_config_yml.clone(),
+            self.router_config_json.clone(),
             self.primary_config_yaml.clone(),
             self.secondary_config_yml.clone(),
             self.fallback_config_json.clone(),

@@ -30,9 +30,7 @@ pub(crate) fn bind_is_loopback(bind: &str) -> bool {
     }
 
     normalized_bind_host(trimmed)
-        .map(|host| {
-            host.eq_ignore_ascii_case("localhost") || host == "127.0.0.1" || host == "::1"
-        })
+        .map(|host| host.eq_ignore_ascii_case("localhost") || host == "127.0.0.1" || host == "::1")
         .unwrap_or(false)
 }
 
@@ -114,15 +112,64 @@ pub(crate) fn resolve_config_file_path(
     Ok(None)
 }
 
+pub(crate) fn resolve_config_overlay_dir(
+    paths: &LocalConfigPaths,
+    values: &HashMap<String, String>,
+) -> Result<PathBuf> {
+    Ok(resolve_requested_config_file_path(paths, values)?
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| paths.root_dir.clone())
+        .join("conf.d"))
+}
+
+pub(crate) fn resolve_config_overlay_paths(
+    paths: &LocalConfigPaths,
+    values: &HashMap<String, String>,
+) -> Result<Vec<PathBuf>> {
+    let overlay_dir = resolve_config_overlay_dir(paths, values)?;
+    if !overlay_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut overlays = fs::read_dir(&overlay_dir)
+        .with_context(|| {
+            format!(
+                "failed to read config overlay directory {}",
+                overlay_dir.display()
+            )
+        })?
+        .map(|entry| {
+            entry
+                .map(|entry| entry.path())
+                .with_context(|| format!("failed to read entry in {}", overlay_dir.display()))
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|path| path.is_file() && is_supported_config_extension(path))
+        .collect::<Vec<_>>();
+    overlays.sort();
+    Ok(overlays)
+}
+
 pub(crate) fn config_watch_paths(
     paths: &LocalConfigPaths,
     values: &HashMap<String, String>,
 ) -> Result<Vec<PathBuf>> {
     if let Some(path) = resolve_requested_config_file_path(paths, values)? {
-        return Ok(vec![path]);
+        let overlay_dir = resolve_config_overlay_dir(paths, values)?;
+        let mut watch_paths = vec![path, overlay_dir];
+        watch_paths.extend(resolve_config_overlay_paths(paths, values)?);
+        watch_paths.sort();
+        watch_paths.dedup();
+        return Ok(watch_paths);
     }
 
-    Ok(paths.discovered_config_candidates().to_vec())
+    let mut watch_paths = paths.discovered_config_candidates().to_vec();
+    watch_paths.push(resolve_config_overlay_dir(paths, values)?);
+    watch_paths.extend(resolve_config_overlay_paths(paths, values)?);
+    watch_paths.sort();
+    watch_paths.dedup();
+    Ok(watch_paths)
 }
 
 pub(crate) fn resolve_requested_config_file_path(
@@ -170,7 +217,21 @@ pub(crate) fn load_config_file(path: &Path) -> Result<StandaloneConfigFile> {
     }
 }
 
-pub(crate) fn parse_bool_env(values: &HashMap<String, String>, key: &str, default: bool) -> Result<bool> {
+fn is_supported_config_extension(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase())
+            .as_deref(),
+        Some("yaml" | "yml" | "json")
+    )
+}
+
+pub(crate) fn parse_bool_env(
+    values: &HashMap<String, String>,
+    key: &str,
+    default: bool,
+) -> Result<bool> {
     match values.get(key) {
         Some(value) => value
             .parse::<bool>()
@@ -179,7 +240,11 @@ pub(crate) fn parse_bool_env(values: &HashMap<String, String>, key: &str, defaul
     }
 }
 
-pub(crate) fn parse_u64_env(values: &HashMap<String, String>, key: &str, default: u64) -> Result<u64> {
+pub(crate) fn parse_u64_env(
+    values: &HashMap<String, String>,
+    key: &str,
+    default: u64,
+) -> Result<u64> {
     match values.get(key) {
         Some(value) => value
             .parse::<u64>()
@@ -403,11 +468,9 @@ mod tests {
 
     #[test]
     fn parses_pricing_lifecycle_sync_interval_from_env_pairs() {
-        let config = StandaloneConfig::from_pairs([(
-            "SDKWORK_PRICING_LIFECYCLE_SYNC_INTERVAL_SECS",
-            "15",
-        )])
-        .unwrap();
+        let config =
+            StandaloneConfig::from_pairs([("SDKWORK_PRICING_LIFECYCLE_SYNC_INTERVAL_SECS", "15")])
+                .unwrap();
 
         assert_eq!(config.pricing_lifecycle_sync_interval_secs, 15);
     }

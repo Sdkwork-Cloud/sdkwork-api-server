@@ -4,6 +4,7 @@ use super::*;
 pub struct StandaloneConfigLoader {
     local_root: PathBuf,
     values: HashMap<String, String>,
+    overrides: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,7 +62,6 @@ pub(crate) struct StandaloneConfigFile {
     pub(crate) secret_keyring_service: Option<String>,
 }
 
-
 impl StandaloneConfigLoader {
     pub fn from_env() -> Result<(Self, StandaloneConfig)> {
         Self::from_values(collect_pairs(std::env::vars()))
@@ -79,11 +79,15 @@ impl StandaloneConfigLoader {
     {
         let values = collect_pairs(pairs);
         let local_root = absolutize_path(local_root.as_ref())?;
-        Self::from_local_root_and_values(local_root, values)
+        Self::from_local_root_and_values(local_root, values, HashMap::new())
     }
 
     pub fn reload(&self) -> Result<StandaloneConfig> {
-        StandaloneConfig::from_local_root_and_values(self.local_root.clone(), self.values.clone())
+        StandaloneConfig::from_local_root_and_values_with_overrides(
+            self.local_root.clone(),
+            self.values.clone(),
+            self.overrides.clone(),
+        )
     }
 
     pub fn local_root(&self) -> &Path {
@@ -96,11 +100,11 @@ impl StandaloneConfigLoader {
         K: Into<String>,
         V: Into<String>,
     {
-        let mut values = self.values.clone();
+        let mut overrides = self.overrides.clone();
         for (key, value) in pairs {
-            values.insert(key.into(), value.into());
+            overrides.insert(key.into(), value.into());
         }
-        Self::from_local_root_and_values(self.local_root.clone(), values)
+        Self::from_local_root_and_values(self.local_root.clone(), self.values.clone(), overrides)
     }
 
     pub fn watch_state(&self) -> Result<StandaloneConfigWatchState> {
@@ -109,16 +113,27 @@ impl StandaloneConfigLoader {
 
     fn from_values(values: HashMap<String, String>) -> Result<(Self, StandaloneConfig)> {
         let local_root = resolve_local_root_dir(&values)?;
-        Self::from_local_root_and_values(local_root, values)
+        Self::from_local_root_and_values(local_root, values, HashMap::new())
     }
 
     fn from_local_root_and_values(
         local_root: PathBuf,
         values: HashMap<String, String>,
+        overrides: HashMap<String, String>,
     ) -> Result<(Self, StandaloneConfig)> {
-        let config =
-            StandaloneConfig::from_local_root_and_values(local_root.clone(), values.clone())?;
-        Ok((Self { local_root, values }, config))
+        let config = StandaloneConfig::from_local_root_and_values_with_overrides(
+            local_root.clone(),
+            values.clone(),
+            overrides.clone(),
+        )?;
+        Ok((
+            Self {
+                local_root,
+                values,
+                overrides,
+            },
+            config,
+        ))
     }
 }
 

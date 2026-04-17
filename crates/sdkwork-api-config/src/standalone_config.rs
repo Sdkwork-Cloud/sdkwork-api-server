@@ -436,8 +436,18 @@ impl StandaloneConfig {
         local_root: PathBuf,
         values: HashMap<String, String>,
     ) -> Result<Self> {
+        Self::from_local_root_and_values_with_overrides(local_root, values, HashMap::new())
+    }
+
+    pub(crate) fn from_local_root_and_values_with_overrides(
+        local_root: PathBuf,
+        values: HashMap<String, String>,
+        overrides: HashMap<String, String>,
+    ) -> Result<Self> {
         let paths = LocalConfigPaths::from_root_dir(local_root);
         let mut config = Self::local_defaults(&paths);
+
+        config.apply_env_overrides(&values)?;
 
         if let Some(config_file) = resolve_config_file_path(&paths, &values)? {
             let overlay = load_config_file(&config_file)?;
@@ -445,7 +455,15 @@ impl StandaloneConfig {
             config.apply_file_overlay(overlay, base_dir, &config_file)?;
         }
 
-        config.apply_env_overrides(&values)?;
+        for overlay_path in resolve_config_overlay_paths(&paths, &values)? {
+            let overlay = load_config_file(&overlay_path)?;
+            let base_dir = overlay_path.parent().unwrap_or(paths.root_dir.as_path());
+            config.apply_file_overlay(overlay, base_dir, &overlay_path)?;
+        }
+
+        if !overrides.is_empty() {
+            config.apply_env_overrides(&overrides)?;
+        }
         Ok(config)
     }
 
@@ -554,9 +572,8 @@ impl StandaloneConfig {
             self.portal_jwt_signing_secret = value;
         }
         if let Some(value) = file.bootstrap_data_dir {
-            self.bootstrap_data_dir = normalize_optional_string(
-                normalize_file_path_value(&value, base_dir),
-            );
+            self.bootstrap_data_dir =
+                normalize_optional_string(normalize_file_path_value(&value, base_dir));
         }
         if let Some(value) = file.bootstrap_profile {
             self.bootstrap_profile = value;

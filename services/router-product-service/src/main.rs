@@ -105,9 +105,7 @@ struct ProductServiceSettings {
 async fn main() -> anyhow::Result<()> {
     let cli = RouterProductServiceCli::parse();
     let settings = resolve_service_settings(&cli, env::vars())?;
-    apply_loader_env_overrides(&settings);
-
-    let (loader, config) = StandaloneConfigLoader::from_env()?;
+    let (loader, config) = load_runtime_config(&settings, &cli)?;
 
     if settings.dry_run {
         print!("{}", render_service_plan(&settings, &config)?);
@@ -237,19 +235,46 @@ fn build_runtime_options(
     Ok(options)
 }
 
-fn apply_loader_env_overrides(settings: &ProductServiceSettings) {
+fn load_runtime_config(
+    settings: &ProductServiceSettings,
+    cli: &RouterProductServiceCli,
+) -> anyhow::Result<(StandaloneConfigLoader, StandaloneConfig)> {
+    apply_loader_discovery_env_overrides(settings);
+    let (loader, config) = StandaloneConfigLoader::from_env()?;
+    let cli_overrides = build_loader_cli_overrides(cli);
+    if cli_overrides.is_empty() {
+        Ok((loader, config))
+    } else {
+        loader.with_overrides(cli_overrides)
+    }
+}
+
+fn apply_loader_discovery_env_overrides(settings: &ProductServiceSettings) {
     for (key, value) in [
         (SDKWORK_CONFIG_DIR, settings.config_dir.as_deref()),
         (SDKWORK_CONFIG_FILE, settings.config_file.as_deref()),
-        (SDKWORK_DATABASE_URL, settings.database_url.as_deref()),
-        (SDKWORK_GATEWAY_BIND, settings.gateway_bind.as_deref()),
-        (SDKWORK_ADMIN_BIND, settings.admin_bind.as_deref()),
-        (SDKWORK_PORTAL_BIND, settings.portal_bind.as_deref()),
     ] {
         if let Some(value) = value {
             env::set_var(key, value);
         }
     }
+}
+
+fn build_loader_cli_overrides(cli: &RouterProductServiceCli) -> Vec<(String, String)> {
+    let mut overrides = Vec::new();
+    if let Some(database_url) = cli.database_url.as_deref() {
+        overrides.push((SDKWORK_DATABASE_URL.to_owned(), database_url.to_owned()));
+    }
+    if let Some(gateway_bind) = cli.gateway_bind.as_deref() {
+        overrides.push((SDKWORK_GATEWAY_BIND.to_owned(), gateway_bind.to_owned()));
+    }
+    if let Some(admin_bind) = cli.admin_bind.as_deref() {
+        overrides.push((SDKWORK_ADMIN_BIND.to_owned(), admin_bind.to_owned()));
+    }
+    if let Some(portal_bind) = cli.portal_bind.as_deref() {
+        overrides.push((SDKWORK_PORTAL_BIND.to_owned(), portal_bind.to_owned()));
+    }
+    overrides
 }
 
 fn parse_roles(value: &str) -> anyhow::Result<Vec<ProductRuntimeRole>> {
@@ -539,9 +564,9 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        render_service_plan, resolve_default_site_dirs_for_paths, resolve_service_settings,
-        PlanFormat, ProductRuntimeRole, ProductServiceSettings, RouterProductServiceCli,
-        StandaloneConfig,
+        build_loader_cli_overrides, render_service_plan, resolve_default_site_dirs_for_paths,
+        resolve_service_settings, PlanFormat, ProductRuntimeRole, ProductServiceSettings,
+        RouterProductServiceCli, StandaloneConfig, StandaloneConfigLoader,
     };
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -647,6 +672,59 @@ mod tests {
             Some("sqlite:///tmp/router.db".to_owned())
         );
         assert_eq!(settings.roles, Some(vec![ProductRuntimeRole::Portal]));
+    }
+
+    #[test]
+    fn explicit_cli_database_url_overrides_loaded_config_file() {
+        let root = unique_temp_dir("cli-database-url");
+        fs::create_dir_all(&root).expect("config root should exist");
+        fs::write(
+            root.join("router.yaml"),
+            r#"
+database_url: "sqlite://router.db"
+"#,
+        )
+        .expect("router.yaml should be written");
+
+        let cli = RouterProductServiceCli::try_parse_from([
+            "router-product-service",
+            "--database-url",
+            "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router",
+        ])
+        .expect("cli should parse");
+
+        let (loader, file_config) = StandaloneConfigLoader::from_local_root_and_pairs(
+            &root,
+            std::iter::empty::<(&str, &str)>(),
+        )
+        .expect("file-backed config should load");
+        let expected_file_database_url = sqlite_url_for(root.join("router.db"));
+        assert_eq!(file_config.database_url, expected_file_database_url);
+
+        let (loader, overridden) = loader
+            .with_overrides(build_loader_cli_overrides(&cli))
+            .expect("cli overrides should reload config");
+
+        assert_eq!(
+            overridden.database_url,
+            "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"
+        );
+        assert_eq!(
+            loader
+                .reload()
+                .expect("reloaded config should preserve cli overrides")
+                .database_url,
+            "postgres://postgres:postgres@127.0.0.1:5432/sdkwork_api_router"
+        );
+    }
+
+    fn sqlite_url_for(path: impl AsRef<Path>) -> String {
+        let normalized = path.as_ref().to_string_lossy().replace('\\', "/");
+        if normalized.starts_with('/') {
+            format!("sqlite://{normalized}")
+        } else {
+            format!("sqlite:///{normalized}")
+        }
     }
 
     #[test]

@@ -343,12 +343,24 @@ fn local_config_paths_use_sdkwork_router_root() {
         PathBuf::from("/tmp/sdkwork-user/.sdkwork/router")
     );
     assert_eq!(
+        paths.router_config_yaml,
+        PathBuf::from("/tmp/sdkwork-user/.sdkwork/router/router.yaml")
+    );
+    assert_eq!(
+        paths.router_config_json,
+        PathBuf::from("/tmp/sdkwork-user/.sdkwork/router/router.json")
+    );
+    assert_eq!(
         paths.primary_config_yaml,
         PathBuf::from("/tmp/sdkwork-user/.sdkwork/router/config.yaml")
     );
     assert_eq!(
         paths.fallback_config_json,
         PathBuf::from("/tmp/sdkwork-user/.sdkwork/router/config.json")
+    );
+    assert_eq!(
+        paths.config_fragment_dir,
+        PathBuf::from("/tmp/sdkwork-user/.sdkwork/router/conf.d")
     );
     assert_eq!(
         paths.secret_local_file,
@@ -386,10 +398,10 @@ fn uses_local_root_sqlite_defaults_when_no_config_file_exists() {
 }
 
 #[test]
-fn loads_yaml_config_before_environment_overrides() {
+fn prefers_router_yaml_over_environment_overrides() {
     let root = temp_config_root("yaml-env-override");
     fs::write(
-        root.join("config.yaml"),
+        root.join("router.yaml"),
         r#"
 gateway_bind: "127.0.0.1:18080"
 admin_bind: "127.0.0.1:18081"
@@ -404,16 +416,20 @@ extension_paths:
 
     let config = StandaloneConfig::from_local_root_and_pairs(
         &root,
-        [("SDKWORK_GATEWAY_BIND", "127.0.0.1:28080")],
+        [
+            ("SDKWORK_GATEWAY_BIND", "127.0.0.1:28080"),
+            ("SDKWORK_BOOTSTRAP_PROFILE", "dev"),
+        ],
     )
     .unwrap();
 
-    assert_eq!(config.gateway_bind, "127.0.0.1:28080");
+    assert_eq!(config.gateway_bind, "127.0.0.1:18080");
     assert_eq!(config.admin_bind, "127.0.0.1:18081");
     assert_eq!(
         config.database_url,
         sqlite_url_for(root.join("router.db")).as_str()
     );
+    assert_eq!(config.bootstrap_profile, "dev");
     assert_eq!(
         config.secret_local_file,
         root.join("secrets/custom.json").to_string_lossy()
@@ -430,10 +446,104 @@ extension_paths:
 }
 
 #[test]
-fn loads_cache_settings_from_config_file_and_allows_env_override_to_clear_cache_url() {
-    let root = temp_config_root("cache-config");
+fn environment_still_fills_missing_fields_when_router_yaml_omits_them() {
+    let root = temp_config_root("env-fallback");
+    fs::write(
+        root.join("router.yaml"),
+        r#"
+admin_bind: "127.0.0.1:18081"
+"#,
+    )
+    .unwrap();
+
+    let config = StandaloneConfig::from_local_root_and_pairs(
+        &root,
+        [
+            ("SDKWORK_GATEWAY_BIND", "127.0.0.1:28080"),
+            (
+                "SDKWORK_DATABASE_URL",
+                "postgres://sdkwork:secret@localhost/sdkwork",
+            ),
+            ("SDKWORK_BOOTSTRAP_PROFILE", "dev"),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(config.gateway_bind, "127.0.0.1:28080");
+    assert_eq!(config.admin_bind, "127.0.0.1:18081");
+    assert_eq!(
+        config.database_url,
+        "postgres://sdkwork:secret@localhost/sdkwork"
+    );
+    assert_eq!(config.bootstrap_profile, "dev");
+}
+
+#[test]
+fn loads_router_yaml_before_legacy_config_yaml() {
+    let root = temp_config_root("router-before-legacy");
+    fs::write(
+        root.join("router.yaml"),
+        r#"
+portal_bind: "127.0.0.1:19082"
+"#,
+    )
+    .unwrap();
     fs::write(
         root.join("config.yaml"),
+        r#"
+portal_bind: "127.0.0.1:29082"
+"#,
+    )
+    .unwrap();
+
+    let config =
+        StandaloneConfig::from_local_root_and_pairs(&root, std::iter::empty::<(&str, &str)>())
+            .unwrap();
+
+    assert_eq!(config.portal_bind, "127.0.0.1:19082");
+}
+
+#[test]
+fn loads_conf_d_fragments_in_lexical_order() {
+    let root = temp_config_root("conf-d-order");
+    let conf_d = root.join("conf.d");
+    fs::create_dir_all(&conf_d).unwrap();
+    fs::write(
+        root.join("router.yaml"),
+        r#"
+gateway_bind: "127.0.0.1:18080"
+portal_bind: "127.0.0.1:18082"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        conf_d.join("10-base.yaml"),
+        r#"
+portal_bind: "127.0.0.1:28082"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        conf_d.join("20-final.yaml"),
+        r#"
+portal_bind: "127.0.0.1:38082"
+"#,
+    )
+    .unwrap();
+
+    let config =
+        StandaloneConfig::from_local_root_and_pairs(&root, std::iter::empty::<(&str, &str)>())
+            .unwrap();
+
+    assert_eq!(config.gateway_bind, "127.0.0.1:18080");
+    assert_eq!(config.portal_bind, "127.0.0.1:38082");
+}
+
+#[test]
+fn loads_cache_settings_from_config_file_before_environment_fallback() {
+    let root = temp_config_root("cache-config");
+    fs::write(
+        root.join("router.yaml"),
         r#"
 cache_backend: "redis"
 cache_url: "redis://cache.internal:6379/2"
@@ -450,8 +560,11 @@ cache_url: "redis://cache.internal:6379/2"
     )
     .unwrap();
 
-    assert_eq!(config.cache_backend, CacheBackendKind::Memory);
-    assert!(config.cache_url.is_none());
+    assert_eq!(config.cache_backend, CacheBackendKind::Redis);
+    assert_eq!(
+        config.cache_url.as_deref(),
+        Some("redis://cache.internal:6379/2")
+    );
 }
 
 #[test]
@@ -519,10 +632,10 @@ browser_allowed_origins:
 }
 
 #[test]
-fn loads_bootstrap_settings_from_config_file_and_allows_env_override() {
+fn loads_bootstrap_settings_from_config_file_before_environment_fallback() {
     let root = temp_config_root("bootstrap-settings");
     fs::write(
-        root.join("config.yaml"),
+        root.join("router.yaml"),
         r#"
 bootstrap_data_dir: "bootstrap-data"
 bootstrap_profile: "prod"
@@ -539,11 +652,12 @@ bootstrap_profile: "prod"
     )
     .unwrap();
 
+    let expected_bootstrap_dir = root.join("bootstrap-data");
     assert_eq!(
         config.bootstrap_data_dir.as_deref(),
-        Some("D:/sdkwork/bootstrap")
+        Some(expected_bootstrap_dir.to_string_lossy().as_ref())
     );
-    assert_eq!(config.bootstrap_profile, "dev");
+    assert_eq!(config.bootstrap_profile, "prod");
 }
 
 #[test]
@@ -575,7 +689,7 @@ fn exports_resolved_config_back_to_sdkwork_environment_pairs() {
 }
 
 #[test]
-fn standalone_config_loader_reloads_from_original_inputs_after_resolved_env_export() {
+fn resolved_env_export_keeps_config_file_as_higher_precedence_than_env() {
     let root = temp_config_root("loader-reload");
     fs::write(
         root.join("config.yaml"),
@@ -602,9 +716,9 @@ extension_hot_reload_interval_secs: 7
     )
     .unwrap();
 
-    let stale =
+    let rebuilt =
         StandaloneConfig::from_local_root_and_pairs(&root, initial.resolved_env_pairs()).unwrap();
-    assert_eq!(stale.extension_hot_reload_interval_secs, 1);
+    assert_eq!(rebuilt.extension_hot_reload_interval_secs, 7);
 
     let reloaded = loader.reload().unwrap();
     assert_eq!(reloaded.gateway_bind, "127.0.0.1:29080");
