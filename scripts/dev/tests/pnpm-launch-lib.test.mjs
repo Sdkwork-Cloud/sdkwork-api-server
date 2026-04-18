@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -386,6 +386,35 @@ test('frontendInstallStatus returns ready when required packages exist and the t
     writeFileSync(path.join(nodeModulesRoot, '.modules.yaml'), 'layoutVersion: 5\n');
     writeFileSync(path.join(viteRoot, 'package.json'), '{"name":"vite"}\n');
     writeFileSync(path.join(binRoot, 'vite'), '#!/usr/bin/env node\n');
+
+    assert.equal(
+      frontendInstallStatus({
+        appRoot,
+        platform: 'linux',
+        requiredPackages: ['vite'],
+        requiredBinCommands: ['vite'],
+        verifyInstalled: () => true,
+      }),
+      'ready',
+    );
+  });
+});
+
+test('frontendInstallStatus treats unix pnpm bin symlinks as healthy command shims', () => {
+  withTempApp((appRoot) => {
+    const nodeModulesRoot = path.join(appRoot, 'node_modules');
+    const viteRoot = path.join(nodeModulesRoot, 'vite');
+    const viteBinRoot = path.join(viteRoot, 'bin');
+    const viteBinEntry = path.join(viteBinRoot, 'vite.js');
+    const binRoot = path.join(nodeModulesRoot, '.bin');
+    const viteCommandLink = path.join(binRoot, 'vite');
+
+    mkdirSync(viteBinRoot, { recursive: true });
+    mkdirSync(binRoot, { recursive: true });
+    writeFileSync(path.join(nodeModulesRoot, '.modules.yaml'), 'layoutVersion: 5\n');
+    writeFileSync(path.join(viteRoot, 'package.json'), '{"name":"vite"}\n');
+    writeFileSync(viteBinEntry, '#!/usr/bin/env node\n');
+    symlinkSync(viteBinEntry, viteCommandLink);
 
     assert.equal(
       frontendInstallStatus({

@@ -148,7 +148,7 @@ function missingFrontendBinCommands(
 
   const availableCommands = new Set(
     readdirSync(binRoot, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
+      .filter((entry) => entry.isFile() || entry.isSymbolicLink())
       .map((entry) => entry.name.toLowerCase()),
   );
 
