@@ -81,6 +81,7 @@ jobs:
       - name: Materialize external release dependencies
         shell: bash
         env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}

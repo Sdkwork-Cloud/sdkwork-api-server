@@ -626,7 +626,6 @@ export function listReleaseGovernanceCheckPlans({
         'scripts/release/verify-release-sync.mjs',
         '--format',
         'json',
-        '--live',
       ],
     },
   ];

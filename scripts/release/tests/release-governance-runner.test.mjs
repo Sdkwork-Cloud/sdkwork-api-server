@@ -475,7 +475,6 @@ test('release governance runner exposes the expected fixed verification sequence
       'scripts/release/verify-release-sync.mjs',
       '--format',
       'json',
-      '--live',
     ],
   );
 

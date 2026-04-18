@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-17T18:29:48.219Z",
+  "generatedAt": "2026-04-18T05:26:12.891Z",
   "source": {
     "kind": "release-sync-audit-live-git"
   },
@@ -13,8 +13,8 @@
         "expectedGitRoot": "D:\\javasource\\spring-ai-plus\\spring-ai-plus-business\\apps\\sdkwork-api-router",
         "topLevel": "D:/javasource/spring-ai-plus/spring-ai-plus-business/apps/sdkwork-api-router",
         "remoteUrl": "git@github.com:Sdkwork-Cloud/sdkwork-api-router.git",
-        "localHead": "d595902684ad9f41a8c2e1ab9dad04f396ab13be",
-        "remoteHead": "d595902684ad9f41a8c2e1ab9dad04f396ab13be",
+        "localHead": "376afa74b89471d095e4465132dbdeb8db082ac0",
+        "remoteHead": "376afa74b89471d095e4465132dbdeb8db082ac0",
         "expectedRef": "main",
         "branch": "main",
         "upstream": "origin/main",

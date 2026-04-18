@@ -113,8 +113,8 @@ export async function assertProductVerificationWorkflowContracts({
   );
   assert.match(
     workflow,
-    /Materialize external release dependencies[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile/,
-    'product verification workflow must materialize external release dependencies before frozen frontend installs so workspace-linked packages resolve on GitHub runners',
+    /Materialize external release dependencies[\s\S]*?env:[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile/,
+    'product verification workflow must materialize only referenced external release dependencies before frozen frontend installs so workspace-linked packages resolve on GitHub runners without cloning unrelated governance-only repositories',
   );
   assert.match(
     workflow,

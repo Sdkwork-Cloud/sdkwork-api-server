@@ -56,7 +56,7 @@ test('repository exposes a pull-request product verification workflow with gover
   );
   assert.match(
     workflow,
-    /Materialize external release dependencies[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile/,
+    /Materialize external release dependencies[\s\S]*?env:[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile/,
   );
   assert.match(
     workflow,
@@ -143,6 +143,8 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Install product verification workspace dependencies
@@ -235,6 +237,8 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Install product verification workspace dependencies
@@ -326,6 +330,8 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Install product verification workspace dependencies
@@ -522,6 +528,8 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
 
       - name: Install product verification workspace dependencies

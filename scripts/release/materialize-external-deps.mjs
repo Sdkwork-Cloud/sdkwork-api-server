@@ -68,6 +68,11 @@ const PACKAGE_JSON_DEPENDENCY_FIELDS = Object.freeze([
   'peerDependencies',
 ]);
 
+const EXTERNAL_RELEASE_DEPENDENCY_MATERIALIZATION_SCOPES = new Set([
+  'all',
+  'referenced',
+]);
+
 export function listExternalReleaseDependencySpecs() {
   return EXTERNAL_RELEASE_DEPENDENCY_SPECS.map((spec) => ({
     ...spec,
@@ -399,6 +404,67 @@ export function resolveExternalReleaseDependencyRef({
   return configuredRef.length > 0 ? configuredRef : String(spec?.defaultRef ?? 'main');
 }
 
+function createExternalReleaseDependencyCoverageError({
+  coverage,
+} = {}) {
+  const details = (coverage?.uncoveredReferences ?? []).map((reference) =>
+    `${reference.sourceFile} ${reference.field}:${reference.name} -> ${reference.rawValue}`);
+  return new Error(
+    `External release dependency coverage is incomplete.\n${details.join('\n')}`,
+  );
+}
+
+export function resolveExternalReleaseDependencyMaterializationScope({
+  scope,
+  env = process.env,
+} = {}) {
+  const resolvedScope = String(
+    scope ?? env.SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE ?? 'all',
+  ).trim().toLowerCase();
+
+  if (EXTERNAL_RELEASE_DEPENDENCY_MATERIALIZATION_SCOPES.has(resolvedScope)) {
+    return resolvedScope;
+  }
+
+  throw new Error(
+    `unsupported external release dependency materialization scope: ${resolvedScope || '<empty>'}`,
+  );
+}
+
+export function selectExternalReleaseDependencySpecsForMaterialization({
+  specs,
+  coverage,
+  scope,
+  env = process.env,
+} = {}) {
+  const resolvedSpecs = Array.isArray(specs)
+    ? specs
+    : resolveExternalReleaseDependencySpecs({ env });
+  const resolvedScope = resolveExternalReleaseDependencyMaterializationScope({
+    scope,
+    env,
+  });
+
+  if (resolvedScope === 'all') {
+    return [...resolvedSpecs];
+  }
+
+  const resolvedCoverage = coverage ?? auditExternalReleaseDependencyCoverage();
+  if (resolvedCoverage.covered !== true) {
+    throw createExternalReleaseDependencyCoverageError({
+      coverage: resolvedCoverage,
+    });
+  }
+
+  const dependencyIds = new Set(
+    (resolvedCoverage.externalDependencyIds ?? [])
+      .map((dependencyId) => String(dependencyId ?? '').trim())
+      .filter(Boolean),
+  );
+
+  return resolvedSpecs.filter((spec) => dependencyIds.has(spec.id));
+}
+
 function resolveExternalReleaseCloneTargetDir(spec = {}) {
   const explicitCloneTargetDir = String(spec.cloneTargetDir ?? '').trim();
   if (explicitCloneTargetDir.length > 0) {
@@ -682,6 +748,8 @@ export function materializeExternalReleaseDependency({
 
 export function materializeExternalReleaseDependencies({
   specs,
+  coverage,
+  scope,
   env = process.env,
   exists = existsSync,
   mkdir = mkdirSync,
@@ -690,8 +758,14 @@ export function materializeExternalReleaseDependencies({
   const resolvedSpecs = Array.isArray(specs)
     ? specs
     : resolveExternalReleaseDependencySpecs({ env });
+  const selectedSpecs = selectExternalReleaseDependencySpecsForMaterialization({
+    specs: resolvedSpecs,
+    coverage,
+    scope,
+    env,
+  });
 
-  return resolvedSpecs.map((spec) =>
+  return selectedSpecs.map((spec) =>
     materializeExternalReleaseDependency({
       spec,
       env,
@@ -705,15 +779,14 @@ export function materializeExternalReleaseDependencies({
 function runCli() {
   const coverage = auditExternalReleaseDependencyCoverage();
   if (!coverage.covered) {
-    const details = coverage.uncoveredReferences.map((reference) =>
-      `${reference.sourceFile} ${reference.field}:${reference.name} -> ${reference.rawValue}`,
-    );
-    throw new Error(
-      `External release dependency coverage is incomplete.\n${details.join('\n')}`,
-    );
+    throw createExternalReleaseDependencyCoverageError({
+      coverage,
+    });
   }
 
-  const results = materializeExternalReleaseDependencies();
+  const results = materializeExternalReleaseDependencies({
+    coverage,
+  });
 
   for (const result of results) {
     const action = result.skipped ? 'reused' : 'cloned';

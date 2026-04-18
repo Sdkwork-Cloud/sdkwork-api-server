@@ -30,8 +30,8 @@ export async function assertReleaseWorkflowContracts({
 
   assert.match(
     workflow,
-    /product-verification:[\s\S]*?Materialize external release dependencies[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?pnpm --dir docs install --frozen-lockfile/,
-    'release workflow product verification must materialize external release dependencies before frozen installs so workspace-linked packages resolve on GitHub runners',
+    /product-verification:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?pnpm --dir docs install --frozen-lockfile/,
+    'release workflow product verification must materialize only referenced external release dependencies before frozen installs so workspace-linked packages resolve on GitHub runners without cloning unrelated governance-only repositories',
   );
   assert.match(
     workflow,
@@ -63,6 +63,11 @@ export async function assertReleaseWorkflowContracts({
     workflow,
     /governance-release:[\s\S]*?needs:\s*[\r\n]+\s*-\s*prepare[\r\n]+\s*-\s*rust-dependency-audit[\r\n]+\s*-\s*product-verification/,
     'governance release job must wait for prepare, Rust dependency audit, and product verification gates',
+  );
+  assert.match(
+    workflow,
+    /governance-release:[\s\S]*?Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:\s*docs\/release\/release-sync-audit-latest\.json[\s\S]*?node scripts\/release\/materialize-release-sync-audit\.mjs/,
+    'governance release job must seed the sync-audit materializer from the committed governed artifact path unless an explicit JSON override is supplied',
   );
   assert.match(
     workflow,
@@ -215,6 +220,7 @@ export async function assertReleaseWorkflowContracts({
   assert.equal(typeof helper.listExternalReleaseDependencySpecs, 'function');
   assert.equal(typeof helper.buildExternalReleaseClonePlan, 'function');
   assert.equal(typeof helper.auditExternalReleaseDependencyCoverage, 'function');
+  assert.equal(typeof helper.selectExternalReleaseDependencySpecsForMaterialization, 'function');
   assert.equal(typeof releaseWindowHelper.resolveReleaseWindowSnapshotProducerInput, 'function');
   assert.equal(typeof releaseWindowHelper.materializeReleaseWindowSnapshot, 'function');
   assert.equal(typeof releaseSyncHelper.resolveReleaseSyncAuditProducerInput, 'function');
@@ -263,4 +269,16 @@ export async function assertReleaseWorkflowContracts({
   assert.equal(coverage.covered, true);
   assert.deepEqual(coverage.uncoveredReferences, []);
   assert.deepEqual(coverage.externalDependencyIds, ['sdkwork-ui']);
+
+  const referencedSpecs = helper.selectExternalReleaseDependencySpecsForMaterialization({
+    specs,
+    coverage,
+    env: {
+      SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: 'referenced',
+    },
+  });
+  assert.deepEqual(
+    referencedSpecs.map((spec) => spec.id),
+    ['sdkwork-ui'],
+  );
 }

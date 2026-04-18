@@ -65,6 +65,7 @@ test('release sync audit materializer writes the standard governed artifact from
   const outputPath = path.join(fixtureRoot, 'release-sync-audit-latest.json');
 
   const result = module.materializeReleaseSyncAudit({
+    env: {},
     auditJson: JSON.stringify(createReleaseSyncAuditArtifactPayload()),
     outputPath,
   });
@@ -92,6 +93,7 @@ test('release sync audit materializer can derive the latest artifact from live m
   const targetDir = fixtureRoot;
 
   const result = module.materializeReleaseSyncAudit({
+    env: {},
     generatedAt: '2026-04-08T13:00:00Z',
     sourceKind: 'release-sync-audit-live-git',
     sourceProvenance: 'synthetic-test',
@@ -195,6 +197,7 @@ test('release sync audit materializer prefers live git over the default latest a
 
   try {
     const result = module.materializeReleaseSyncAudit({
+      env: {},
       generatedAt: '2026-04-15T10:00:00Z',
       sourceKind: 'release-sync-audit-live-git',
       outputPath,

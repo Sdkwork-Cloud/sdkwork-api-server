@@ -114,6 +114,7 @@ jobs:
       - name: Materialize external release dependencies
         shell: bash
         env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
@@ -158,6 +159,7 @@ jobs:
       - name: Materialize external release dependencies
         shell: bash
         env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}
@@ -180,6 +182,7 @@ jobs:
       - name: Materialize release sync audit
         shell: bash
         env:
+          SDKWORK_RELEASE_SYNC_AUDIT_PATH: docs/release/release-sync-audit-latest.json
           SDKWORK_RELEASE_SYNC_AUDIT_JSON: ${{ vars.SDKWORK_RELEASE_SYNC_AUDIT_JSON || '' }}
           SDKWORK_API_ROUTER_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
@@ -336,6 +339,7 @@ jobs:
       - name: Materialize external release dependencies
         shell: bash
         env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
           SDKWORK_CORE_GIT_REF: ${{ vars.SDKWORK_CORE_GIT_REF || 'main' }}
           SDKWORK_UI_GIT_REF: ${{ vars.SDKWORK_UI_GIT_REF || 'main' }}
           SDKWORK_APPBASE_GIT_REF: ${{ vars.SDKWORK_APPBASE_GIT_REF || 'main' }}

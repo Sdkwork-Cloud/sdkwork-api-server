@@ -144,7 +144,7 @@ test('release workflow publishes only official server and portal desktop product
   assert.match(workflow, /docs\/pnpm-lock\.yaml/);
   assert.match(
     workflow,
-    /product-verification:[\s\S]*?Materialize external release dependencies[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?pnpm --dir docs install --frozen-lockfile/,
+    /product-verification:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?pnpm --dir docs install --frozen-lockfile/,
   );
   assert.match(
     workflow,
@@ -153,6 +153,18 @@ test('release workflow publishes only official server and portal desktop product
   assert.match(
     workflow,
     /Build docs site[\s\S]*?pnpm --dir docs build/,
+  );
+  assert.match(
+    workflow,
+    /governance-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs/,
+  );
+  assert.match(
+    workflow,
+    /native-release:[\s\S]*?Materialize external release dependencies[\s\S]*?SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE:\s*referenced[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs/,
+  );
+  assert.match(
+    workflow,
+    /Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:\s*docs\/release\/release-sync-audit-latest\.json[\s\S]*?node scripts\/release\/materialize-release-sync-audit\.mjs/,
   );
   assert.doesNotMatch(workflow, /run-desktop-release-build\.mjs --app admin/);
   assert.doesNotMatch(workflow, /web-release:/);
@@ -238,6 +250,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-audit
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
       - name: Install product verification workspace dependencies
         run: |
@@ -332,6 +346,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-audit
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
       - name: Install product verification workspace dependencies
         run: |
@@ -353,6 +369,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
       - name: Materialize release window snapshot
         run: node scripts/release/materialize-release-window-snapshot.mjs
@@ -460,6 +478,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-audit
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
       - name: Install product verification workspace dependencies
         run: |
@@ -605,6 +625,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-audit
       - name: Materialize external release dependencies
+        env:
+          SDKWORK_RELEASE_EXTERNAL_DEPENDENCY_SCOPE: referenced
         run: node scripts/release/materialize-external-deps.mjs
       - name: Install product verification workspace dependencies
         run: |
