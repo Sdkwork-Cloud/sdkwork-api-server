@@ -157,3 +157,23 @@ test('browser runtime smoke plan preserves setup scripts, forbidden texts, and e
   assert.match(setupScript, /\/api\/portal\/workspace/);
   assert.match(setupScript, /646979632893840957/);
 });
+
+test('browser runtime smoke hardens Linux CI launch plans for hosted Chromium startup', async () => {
+  const module = await import(
+    pathToFileURL(path.join(repoRoot, 'scripts', 'browser-runtime-smoke.mjs')).href,
+  );
+
+  const plan = module.createBrowserRuntimeSmokePlan({
+    url: 'http://127.0.0.1:3001/admin/',
+    expectedSelectors: ['input[type="email"]'],
+    browserPath: '/usr/bin/google-chrome',
+    platform: 'linux',
+    env: {
+      GITHUB_ACTIONS: 'true',
+    },
+  });
+
+  assert.equal(plan.devtoolsTimeoutMs, 30000);
+  assert.ok(plan.browserArgs.includes('--no-sandbox'));
+  assert.ok(plan.browserArgs.includes('--disable-dev-shm-usage'));
+});

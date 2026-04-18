@@ -284,7 +284,18 @@ export function resolveAvailableNativeBuildRoot({
   return firstExistingRoot;
 }
 
-function resolveServiceReleaseRoot({
+function normalizeNodePlatform(platform = process.platform) {
+  if (platform === 'windows') {
+    return 'win32';
+  }
+  if (platform === 'macos') {
+    return 'darwin';
+  }
+
+  return platform;
+}
+
+function buildWorkspaceServiceReleaseRoot({
   targetTriple = '',
   env = process.env,
   platform = process.platform,
@@ -298,11 +309,89 @@ function resolveServiceReleaseRoot({
     resolveWorkspaceTargetDir({
       workspaceRoot: rootDir,
       env,
-      platform,
+      platform: normalizeNodePlatform(platform),
     }),
     ...targetSegments,
     'release',
   );
+}
+
+export function resolveServiceReleaseRootCandidates({
+  targetTriple = '',
+  env = process.env,
+  platform = process.platform,
+} = {}) {
+  const candidates = [];
+  const normalizedTargetTriple = String(targetTriple ?? '').trim();
+
+  candidates.push(
+    buildWorkspaceServiceReleaseRoot({
+      targetTriple,
+      env,
+      platform,
+    }),
+  );
+  if (normalizedTargetTriple.length > 0) {
+    candidates.push(
+      buildWorkspaceServiceReleaseRoot({
+        env,
+        platform,
+      }),
+    );
+  }
+
+  const repositoryTargetRoot = path.join(rootDir, 'target');
+  if (normalizedTargetTriple.length > 0) {
+    candidates.push(path.join(repositoryTargetRoot, normalizedTargetTriple, 'release'));
+  }
+  candidates.push(path.join(repositoryTargetRoot, 'release'));
+
+  return [...new Set(candidates)];
+}
+
+export function resolveAvailableServiceReleaseRoot({
+  targetTriple = '',
+  env = process.env,
+  platform = process.platform,
+  serviceBinaryNames = SERVICE_BINARY_NAMES,
+  serviceReleaseRoots,
+  exists = existsSync,
+} = {}) {
+  const platformId = normalizePlatformId(platform);
+  const candidates = Array.isArray(serviceReleaseRoots) && serviceReleaseRoots.length > 0
+    ? [...new Set(serviceReleaseRoots)]
+    : resolveServiceReleaseRootCandidates({
+        targetTriple,
+        env,
+        platform,
+      });
+
+  let firstExistingRoot = '';
+  for (const candidate of candidates) {
+    if (!exists(candidate)) {
+      continue;
+    }
+
+    if (firstExistingRoot.length === 0) {
+      firstExistingRoot = candidate;
+    }
+
+    const hasAllServiceBinaries = serviceBinaryNames.every((binaryName) =>
+      exists(path.join(candidate, withExecutable(binaryName, platformId))));
+    if (hasAllServiceBinaries) {
+      return candidate;
+    }
+  }
+
+  return firstExistingRoot || candidates[0] || buildWorkspaceServiceReleaseRoot({
+    targetTriple,
+    env,
+    platform,
+  });
+}
+
+function resolveServiceReleaseRoot(options = {}) {
+  return resolveAvailableServiceReleaseRoot(options);
 }
 
 function parseArgs(argv) {
@@ -469,7 +558,11 @@ function copyServiceBinaries({
   resolveServiceRoot = resolveServiceReleaseRoot,
   serviceBinaryNames = SERVICE_BINARY_NAMES,
 }) {
-  const serviceReleaseRoot = resolveServiceRoot({ targetTriple });
+  const serviceReleaseRoot = resolveServiceRoot({
+    targetTriple,
+    platform: platformId,
+    serviceBinaryNames,
+  });
   ensureDirectory(targetDir);
 
   for (const binaryName of serviceBinaryNames) {

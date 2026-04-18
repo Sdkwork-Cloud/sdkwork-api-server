@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 ENV SDKWORK_HOME=/opt/sdkwork \
     SDKWORK_CONFIG_DIR=/opt/sdkwork/config \

@@ -509,6 +509,12 @@ async function loadRouterOpsModule() {
   );
 }
 
+async function loadPackageReleaseAssetsModule() {
+  return import(
+    pathToFileURL(path.join(repoRoot, 'scripts', 'release', 'package-release-assets.mjs')).href
+  );
+}
+
 function installUnixRuntimeSmokeFixture(runtimeHome) {
   const runtimeBinDir = path.join(runtimeHome, 'bin');
   const runtimeLibDir = path.join(runtimeBinDir, 'lib');
@@ -1041,6 +1047,105 @@ test('createReleaseBuildPlan injects the Windows cc-rs reproducible-build workar
     plan.steps.find((step) => step.label === 'portal desktop release build')?.env.SDKWORK_CC_DISABLE_BREPRO,
     '1',
   );
+});
+
+test('packageProductServerBundle falls back to repository cargo target roots when managed Windows target roots only contain desktop outputs', async () => {
+  const module = await loadPackageReleaseAssetsModule();
+  const fixtureRoot = createTempDir('package-product-server-service-root-');
+  const outputDir = path.join(fixtureRoot, 'release-output');
+  const managedTargetRoot = path.join(fixtureRoot, 'managed', 'x86_64-pc-windows-msvc', 'release');
+  const repositoryTargetRoot = path.join(fixtureRoot, 'target', 'x86_64-pc-windows-msvc', 'release');
+  const adminSiteDir = path.join(fixtureRoot, 'sites', 'admin', 'dist');
+  const portalSiteDir = path.join(fixtureRoot, 'sites', 'portal', 'dist');
+  const bootstrapDataDir = path.join(fixtureRoot, 'data');
+  const deploymentAssetDir = path.join(fixtureRoot, 'deploy');
+
+  try {
+    mkdirSync(managedTargetRoot, { recursive: true });
+    writeFileSync(path.join(managedTargetRoot, 'desktop-only.txt'), 'desktop build residue\n', 'utf8');
+    mkdirSync(repositoryTargetRoot, { recursive: true });
+    for (const binaryName of module.listNativeServiceBinaryNames()) {
+      writeFileSync(
+        path.join(repositoryTargetRoot, `${binaryName}.exe`),
+        `${binaryName}\n`,
+        'utf8',
+      );
+    }
+
+    mkdirSync(adminSiteDir, { recursive: true });
+    mkdirSync(portalSiteDir, { recursive: true });
+    mkdirSync(bootstrapDataDir, { recursive: true });
+    mkdirSync(path.join(deploymentAssetDir, 'docker'), { recursive: true });
+    writeFileSync(path.join(adminSiteDir, 'index.html'), '<html>admin</html>\n', 'utf8');
+    writeFileSync(path.join(portalSiteDir, 'index.html'), '<html>portal</html>\n', 'utf8');
+    writeFileSync(path.join(bootstrapDataDir, 'seed.json'), '{"seed":"fixture"}\n', 'utf8');
+    writeFileSync(path.join(deploymentAssetDir, 'docker', 'docker-compose.yml'), 'services: {}\n', 'utf8');
+
+    const result = module.packageProductServerBundle({
+      platformId: 'windows',
+      archId: 'x64',
+      targetTriple: 'x86_64-pc-windows-msvc',
+      outputDir,
+      resolveServiceRootCandidates: () => [managedTargetRoot, repositoryTargetRoot],
+      siteAssetRoots: {
+        admin: adminSiteDir,
+        portal: portalSiteDir,
+      },
+      bootstrapDataRoots: {
+        data: bootstrapDataDir,
+      },
+      deploymentAssetRoots: {
+        deploy: deploymentAssetDir,
+      },
+      runTar: (archivePath) => {
+        writeFileSync(archivePath, 'bundle archive\n', 'utf8');
+      },
+    });
+
+    assert.equal(result.productId, 'sdkwork-api-router-product-server');
+    assert.equal(
+      existsSync(path.join(outputDir, 'native', 'windows', 'x64', 'bundles', result.fileName)),
+      true,
+    );
+    const manifest = JSON.parse(
+      readFileSync(path.join(outputDir, 'native', 'windows', 'x64', 'bundles', result.manifestFileName), 'utf8'),
+    );
+    assert.deepEqual(manifest.services, module.listNativeServiceBinaryNames());
+  } finally {
+    removeTempRuntimeHome(fixtureRoot);
+  }
+});
+
+test('resolveAvailableServiceReleaseRoot prefers repository cargo target roots when managed Windows target roots miss service binaries', async () => {
+  const module = await loadPackageReleaseAssetsModule();
+  const fixtureRoot = createTempDir('resolve-service-release-root-');
+  const managedTargetRoot = path.join(fixtureRoot, 'managed', 'x86_64-pc-windows-msvc', 'release');
+  const repositoryTargetRoot = path.join(fixtureRoot, 'target', 'x86_64-pc-windows-msvc', 'release');
+
+  try {
+    assert.equal(typeof module.resolveAvailableServiceReleaseRoot, 'function');
+
+    mkdirSync(managedTargetRoot, { recursive: true });
+    writeFileSync(path.join(managedTargetRoot, 'desktop-only.txt'), 'desktop build residue\n', 'utf8');
+    mkdirSync(repositoryTargetRoot, { recursive: true });
+    for (const binaryName of module.listNativeServiceBinaryNames()) {
+      writeFileSync(
+        path.join(repositoryTargetRoot, `${binaryName}.exe`),
+        `${binaryName}\n`,
+        'utf8',
+      );
+    }
+
+    const resolvedRoot = module.resolveAvailableServiceReleaseRoot({
+      platform: 'windows',
+      targetTriple: 'x86_64-pc-windows-msvc',
+      serviceReleaseRoots: [managedTargetRoot, repositoryTargetRoot],
+    });
+
+    assert.equal(resolvedRoot, repositoryTargetRoot);
+  } finally {
+    removeTempRuntimeHome(fixtureRoot);
+  }
 });
 
 test('createInstallPlan separates stable current control assets from versioned release payloads', async () => {

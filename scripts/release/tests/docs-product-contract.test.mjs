@@ -232,3 +232,9 @@ test('install and deployment docs describe the bundle-driven server install cont
     assert.match(content, /release governance preflight/i);
   }
 });
+
+test('product Docker runtime uses the hosted Linux ARM release baseline', () => {
+  const dockerfile = read('deploy/docker/Dockerfile');
+
+  assert.match(dockerfile, /^FROM ubuntu:24\.04$/m);
+});

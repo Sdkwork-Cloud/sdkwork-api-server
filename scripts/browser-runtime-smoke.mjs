@@ -17,6 +17,10 @@ const DEFAULT_DEVTOOLS_TIMEOUT_MS = 10_000;
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const MAX_SAFE_INTEGER_TEXT = String(Number.MAX_SAFE_INTEGER);
 
+function isHostedLinuxCiRuntime(platform = process.platform, env = process.env) {
+  return platform === 'linux' && String(env.GITHUB_ACTIONS ?? '').toLowerCase() === 'true';
+}
+
 function readOptionValue(token, next) {
   if (!next || next.startsWith('--')) {
     throw new Error(`${token} requires a value`);
@@ -247,6 +251,25 @@ export function createBrowserRuntimeSmokePlan({
     env,
     browserPath,
   });
+  const browserArgs = [
+    '--headless=new',
+    '--disable-gpu',
+  ];
+  if (isHostedLinuxCiRuntime(platform, env)) {
+    browserArgs.push('--no-sandbox', '--disable-dev-shm-usage');
+  }
+  browserArgs.push(
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-background-networking',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-sync',
+    '--mute-audio',
+    `--remote-debugging-port=${remoteDebuggingPort}`,
+    `--user-data-dir=${userDataDir}`,
+    'about:blank',
+  );
 
   return {
     url,
@@ -255,24 +278,14 @@ export function createBrowserRuntimeSmokePlan({
     forbiddenTexts: uniqueStrings(forbiddenTexts),
     expectedRequestIncludes: uniqueStrings(expectedRequestIncludes),
     timeoutMs,
+    devtoolsTimeoutMs: isHostedLinuxCiRuntime(platform, env)
+      ? 30_000
+      : DEFAULT_DEVTOOLS_TIMEOUT_MS,
     browserCommand,
     setupScript: String(setupScript || ''),
     remoteDebuggingPort,
     userDataDir,
-    browserArgs: [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-background-networking',
-      '--disable-background-timer-throttling',
-      '--disable-renderer-backgrounding',
-      '--disable-sync',
-      '--mute-audio',
-      `--remote-debugging-port=${remoteDebuggingPort}`,
-      `--user-data-dir=${userDataDir}`,
-      'about:blank',
-    ],
+    browserArgs,
   };
 }
 
@@ -730,11 +743,11 @@ export async function runBrowserRuntimeSmoke({
   try {
     await waitForJson(
       `http://127.0.0.1:${plan.remoteDebuggingPort}/json/version`,
-      DEFAULT_DEVTOOLS_TIMEOUT_MS,
+      plan.devtoolsTimeoutMs,
     );
     const pageDebuggerUrl = await waitForPageWebSocketDebuggerUrl(
       plan.remoteDebuggingPort,
-      DEFAULT_DEVTOOLS_TIMEOUT_MS,
+      plan.devtoolsTimeoutMs,
     );
     const socket = await connectWebSocket(pageDebuggerUrl);
     client = createCdpClient(socket);

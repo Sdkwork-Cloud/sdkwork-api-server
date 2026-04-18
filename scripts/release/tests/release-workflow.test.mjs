@@ -143,6 +143,22 @@ test('release workflow publishes only official server and portal desktop product
   assert.match(workflow, /sdkwork-api-router-product-server-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.tar\.gz/);
   assert.match(workflow, /sdkwork-api-router-product-server-\$\{\{ matrix\.platform \}\}-\$\{\{ matrix\.arch \}\}\.manifest\.json/);
   assert.match(workflow, /desktop\/portal\/sdkwork-router-portal-desktop-\*/);
+  assert.match(
+    workflow,
+    /Upload Windows installed runtime smoke evidence[\s\S]*?if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'windows'[\s\S]*?hashFiles\(format\('artifacts\/release-governance\/windows-installed-runtime-smoke-\{0\}-\{1\}\.json', matrix\.platform, matrix\.arch\)\)\s*!=\s*''\s*\}\}/,
+  );
+  assert.match(
+    workflow,
+    /Generate Windows smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(!github\.event\.repository\.private \|\| vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true'\)\s*&&\s*matrix\.platform == 'windows'[\s\S]*?hashFiles\(format\('artifacts\/release-governance\/windows-installed-runtime-smoke-\{0\}-\{1\}\.json', matrix\.platform, matrix\.arch\)\)\s*!=\s*''\s*\}\}/,
+  );
+  assert.match(
+    workflow,
+    /Upload Linux Helm render smoke evidence[\s\S]*?if:\s*\$\{\{\s*always\(\)\s*&&\s*matrix\.platform == 'linux'[\s\S]*?hashFiles\(format\('artifacts\/release-governance\/helm-render-smoke-\{0\}-\{1\}\.json', matrix\.platform, matrix\.arch\)\)\s*!=\s*''\s*\}\}/,
+  );
+  assert.match(
+    workflow,
+    /Generate Linux Helm render smoke evidence attestation[\s\S]*?if:\s*\$\{\{\s*\(!github\.event\.repository\.private \|\| vars\.SDKWORK_RELEASE_ARTIFACT_ATTESTATIONS_ENABLED == 'true'\)\s*&&\s*matrix\.platform == 'linux'[\s\S]*?hashFiles\(format\('artifacts\/release-governance\/helm-render-smoke-\{0\}-\{1\}\.json', matrix\.platform, matrix\.arch\)\)\s*!=\s*''\s*\}\}/,
+  );
   assert.doesNotMatch(workflow, /console\/pnpm-lock\.yaml/);
   assert.match(workflow, /docs\/pnpm-lock\.yaml/);
   assert.match(
