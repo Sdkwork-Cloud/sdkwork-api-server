@@ -4,25 +4,9 @@ import path from 'node:path';
 import test from 'node:test';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
-const clawRoot = path.resolve(appRoot, '..', '..', '..', 'claw-studio');
 
 function readFromApp(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
-}
-
-function readFromClaw(relativePath) {
-  return readFileSync(path.join(clawRoot, relativePath), 'utf8');
-}
-
-function readFirstExistingClaw(candidates) {
-  for (const relativePath of candidates) {
-    const absolutePath = path.join(clawRoot, relativePath);
-    if (existsSync(absolutePath)) {
-      return readFileSync(absolutePath, 'utf8');
-    }
-  }
-
-  throw new Error(`Unable to resolve claw reference from candidates: ${candidates.join(', ')}`);
 }
 
 test('admin root imports shared ui css while the shell package owns layout host primitives', () => {
@@ -176,10 +160,6 @@ test('admin shell chrome keeps shared desktop shell while sidebar interaction st
 test('admin sidebar collapse heuristics and persisted preference mirror claw-studio', () => {
   const adminStore = readFromApp('packages/sdkwork-router-admin-core/src/store.ts');
   const adminAutoCollapse = readFromApp('packages/sdkwork-router-admin-core/src/sidebarAutoCollapse.ts');
-  const clawStore = readFirstExistingClaw([
-    'packages/sdkwork-claw-core/src/stores/useAppStore.ts',
-    'packages/sdkwork-claw-core/src/store/useAppStore.ts',
-  ]);
 
   const clawBaselineStoreSnippets = [
     'isSidebarCollapsed',
@@ -190,7 +170,6 @@ test('admin sidebar collapse heuristics and persisted preference mirror claw-stu
   ];
 
   for (const snippet of clawBaselineStoreSnippets) {
-    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(adminStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 

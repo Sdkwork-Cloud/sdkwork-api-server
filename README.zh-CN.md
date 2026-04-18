@@ -4,6 +4,17 @@
 
 SDKWork API Router 是一个基于 Rust 的 OpenAI 兼容网关、管理控制平面、公共门户与产品运行时仓库。仓库同时提供源码开发工作流，以及面向线上发布的 build/install/service 管理工具链。
 
+## 正式产品
+
+仓库对外发布的正式用户产品只有两个：
+
+- `sdkwork-api-router-product-server`
+  - 标准 server 产品，用于原生安装、Docker、Docker Compose 和 Helm 部署
+- `sdkwork-router-portal-desktop`
+  - portal-first 的 desktop 外壳，内置本地 product runtime
+
+其余内容都属于源码开发界面、中间构建产物或 release governance 证据，不是正式发布产品。
+
 ## 生产部署入口
 
 准备线上发布时，优先阅读：
@@ -109,11 +120,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\install.ps1 -Mode syst
 在注册系统服务前校验生成后的配置：
 
 ```bash
-./validate-config.sh --home <install-root>
+./current/bin/validate-config.sh --home ./current
 ```
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\validate-config.ps1 -Home <install-root>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\current\bin\validate-config.ps1 -Home .\current
 ```
 
 继续阅读：

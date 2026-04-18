@@ -32,10 +32,8 @@ test('app root imports sdkwork ui framework and stylesheet directly', () => {
 test('tooling resolves the shared ui framework by package name', () => {
   const tsconfig = read('tsconfig.json');
   const viteConfig = read('vite.config.ts');
-  const viteResolvesSharedUiByPackage =
-    viteConfig.includes('@sdkwork/ui-pc-react')
-    || (viteConfig.includes("'@sdkwork'") && viteConfig.includes("'ui-pc-react'"));
 
   assert.match(tsconfig, /@sdkwork\/ui-pc-react/);
-  assert.equal(viteResolvesSharedUiByPackage, true);
+  assert.match(viteConfig, /@sdkwork\\\/ui-pc-react/);
+  assert.match(viteConfig, /resolveSdkworkUiSourcePath/);
 });

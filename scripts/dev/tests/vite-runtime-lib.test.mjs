@@ -138,6 +138,46 @@ test('resolveReadablePackageRoot falls back to a donor app when the current app 
   assert.equal(packageRoot, path.dirname(donorPackageJson));
 });
 
+test('resolveReadablePackageRoot can recover a transitive pnpm package from the current app install', () => {
+  const pnpmRoot = path.join(adminRoot, 'node_modules', '.pnpm');
+  const transitivePackageJson = path.join(
+    pnpmRoot,
+    'react-router@7.13.1_react@19.2.4',
+    'node_modules',
+    'react-router',
+    'package.json',
+  );
+
+  const packageRoot = resolveReadablePackageRoot({
+    appRoot: adminRoot,
+    donorRoots: [portalRoot],
+    packageName: 'react-router',
+    fileExists(filePath) {
+      return filePath === transitivePackageJson || filePath === pnpmRoot;
+    },
+    isReadable(filePath) {
+      return filePath === transitivePackageJson;
+    },
+    readDir(directoryPath) {
+      if (directoryPath !== pnpmRoot) {
+        throw new Error(`unexpected directory scan: ${directoryPath}`);
+      }
+
+      return [{
+        isDirectory() {
+          return true;
+        },
+        name: 'react-router@7.13.1_react@19.2.4',
+      }];
+    },
+  });
+
+  assert.equal(
+    packageRoot,
+    path.dirname(transitivePackageJson),
+  );
+});
+
 test('findReadableModuleResolution falls back to a donor app when the current app resolution is unreadable', () => {
   const currentResolvedPath = path.join(adminRoot, 'node_modules', 'lucide-react', 'dist', 'index.js');
   const donorResolvedPath = path.join(portalRoot, 'node_modules', 'lucide-react', 'dist', 'index.js');

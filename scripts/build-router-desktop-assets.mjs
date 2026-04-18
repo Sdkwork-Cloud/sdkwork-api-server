@@ -6,8 +6,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { assertFrontendBudgets } from './check-router-frontend-budgets.mjs';
 import {
+  checkFrontendViteConfig,
   ensureFrontendDependenciesReady,
-  frontendViteConfigHealthy,
 } from './dev/pnpm-launch-lib.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,7 +74,7 @@ async function main() {
       appRoot: step.cwd,
       requiredPackages: ['vite', 'typescript'],
       requiredBinCommands: ['vite', 'tsc'],
-      verifyInstalled: () => frontendViteConfigHealthy({
+      verifyInstalled: () => checkFrontendViteConfig({
         appRoot: step.cwd,
         command: 'build',
       }),

@@ -1,33 +1,16 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
-const clawRoot = path.resolve(appRoot, '..', '..', '..', 'claw-studio');
 
 function readFromApp(relativePath) {
   return readFileSync(path.join(appRoot, relativePath), 'utf8');
 }
 
-function readFromClaw(relativePath) {
-  return readFileSync(path.join(clawRoot, relativePath), 'utf8');
-}
-
-function readFirstExistingClaw(candidates) {
-  for (const relativePath of candidates) {
-    const absolutePath = path.join(clawRoot, relativePath);
-    if (existsSync(absolutePath)) {
-      return readFileSync(absolutePath, 'utf8');
-    }
-  }
-
-  throw new Error(`Unable to resolve claw reference from candidates: ${candidates.join(', ')}`);
-}
-
 test('portal theme stylesheet keeps the claw-studio token and scrollbar foundation intact', () => {
   const portalTheme = readFromApp('src/theme.css');
-  const clawTheme = readFromClaw('packages/sdkwork-claw-shell/src/styles/index.css');
   const clawWorkspaceSourceDirectivePattern = /@source "(?:\.\.\/){3,}";/;
 
   const requiredThemeSnippets = [
@@ -45,11 +28,9 @@ test('portal theme stylesheet keeps the claw-studio token and scrollbar foundati
   ];
 
   for (const snippet of requiredThemeSnippets) {
-    assert.match(clawTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(portalTheme, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  assert.match(clawTheme, clawWorkspaceSourceDirectivePattern);
   assert.match(portalTheme, /@source "\.\/";/);
   assert.match(portalTheme, /@source "\.\.\/packages";/);
   assert.doesNotMatch(portalTheme, clawWorkspaceSourceDirectivePattern);
@@ -79,10 +60,6 @@ test('portal sidebar collapse heuristics and persisted preference mirror claw-st
   const portalAutoCollapse = readFromApp(
     'packages/sdkwork-router-portal-core/src/lib/sidebarAutoCollapse.ts',
   );
-  const clawStore = readFirstExistingClaw([
-    'packages/sdkwork-claw-core/src/stores/useAppStore.ts',
-    'packages/sdkwork-claw-core/src/store/useAppStore.ts',
-  ]);
 
   const clawBaselineStoreSnippets = [
     'isSidebarCollapsed',
@@ -93,7 +70,6 @@ test('portal sidebar collapse heuristics and persisted preference mirror claw-st
   ];
 
   for (const snippet of clawBaselineStoreSnippets) {
-    assert.match(clawStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(portalStore, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 

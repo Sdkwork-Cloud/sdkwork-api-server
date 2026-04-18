@@ -12,8 +12,8 @@ import {
   runBrowserRuntimeSmoke,
 } from './browser-runtime-smoke.mjs';
 import {
+  checkFrontendViteConfig,
   ensureFrontendDependenciesReady,
-  frontendViteConfigHealthy,
   pnpmSpawnOptions,
 } from './dev/pnpm-launch-lib.mjs';
 
@@ -404,7 +404,7 @@ export async function runAdminBrowserRuntimeSmoke({
     appRoot: adminAppDir,
     requiredPackages: ['vite', 'typescript'],
     requiredBinCommands: ['vite', 'tsc'],
-    verifyInstalled: () => frontendViteConfigHealthy({
+    verifyInstalled: () => checkFrontendViteConfig({
       appRoot: adminAppDir,
       command: 'build',
     }),

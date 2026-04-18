@@ -4,6 +4,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import {
+  resolveWorkspaceTargetDir,
+  resolveWorkspaceTempDir,
+} from './workspace-target-dir.mjs';
+
 const workspaceRoot = path.resolve(import.meta.dirname, '..');
 
 function readJson(relativePath) {
@@ -30,6 +35,18 @@ test('check-router-product exposes Windows-safe pnpm and rust runner plans witho
     platform: 'win32',
     env: {},
   });
+  const defaultWindowsTargetDir = resolveWorkspaceTargetDir({
+    workspaceRoot,
+    env: {},
+    platform: 'win32',
+    hostPlatform: 'win32',
+  });
+  const defaultWindowsTempDir = resolveWorkspaceTempDir({
+    workspaceRoot,
+    env: {},
+    platform: 'win32',
+    hostPlatform: 'win32',
+  });
 
   const stepByLabel = new Map(plan.map((step) => [step.label, step]));
 
@@ -52,9 +69,29 @@ test('check-router-product exposes Windows-safe pnpm and rust runner plans witho
   assert.match(stepByLabel.get('docs site build')?.args[4] ?? '', /docs/);
   assert.match(stepByLabel.get('docs site build')?.args[4] ?? '', /build/);
   assert.equal(stepByLabel.get('docs site build')?.cwd, workspaceRoot);
+  assert.equal(
+    String(stepByLabel.get('docs site build')?.env.TEMP ?? '').replaceAll('\\', '/'),
+    defaultWindowsTempDir.replaceAll('\\', '/'),
+  );
+  assert.equal(
+    String(stepByLabel.get('docs site build')?.env.TMP ?? '').replaceAll('\\', '/'),
+    defaultWindowsTempDir.replaceAll('\\', '/'),
+  );
   assert.match(stepByLabel.get('workspace dependency audit')?.args.join(' ') ?? '', /check-rust-dependency-audit\.mjs/);
   assert.match(stepByLabel.get('portal desktop runtime payload')?.args.join(' ') ?? '', /prepare-router-portal-desktop-runtime\.mjs/);
   assert.doesNotMatch(stepByLabel.get('portal desktop runtime payload')?.args.join(' ') ?? '', /build-router-desktop-assets\.mjs/);
+  assert.equal(
+    String(stepByLabel.get('server cargo check')?.env.CARGO_TARGET_DIR ?? '').replaceAll('\\', '/'),
+    defaultWindowsTargetDir.replaceAll('\\', '/'),
+  );
+  assert.equal(
+    String(stepByLabel.get('server cargo check')?.env.TEMP ?? '').replaceAll('\\', '/'),
+    defaultWindowsTempDir.replaceAll('\\', '/'),
+  );
+  assert.equal(
+    String(stepByLabel.get('server cargo check')?.env.TMP ?? '').replaceAll('\\', '/'),
+    defaultWindowsTempDir.replaceAll('\\', '/'),
+  );
   assert.match(stepByLabel.get('server deployment plan')?.args.join(' ') ?? '', /--bind 127\.0\.0\.1:3001/);
 
   const linuxPlan = module.createProductCheckPlan({

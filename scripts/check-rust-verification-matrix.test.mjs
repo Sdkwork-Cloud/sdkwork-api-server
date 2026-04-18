@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -193,4 +194,34 @@ test('check-rust-verification-matrix plan json omits inherited environment secre
 
   assert.doesNotMatch(output, new RegExp(secret));
   assert.doesNotMatch(output, /"env":/);
+});
+
+test('managed Windows workspace roots fall back to the host temp directory on non-Windows runners', async () => {
+  const workspaceTargetDir = await import(
+    pathToFileURL(path.join(workspaceRoot, 'scripts', 'workspace-target-dir.mjs')).href,
+  );
+
+  const managedWindowsTargetDir = workspaceTargetDir.resolveWorkspaceTargetDir({
+    workspaceRoot,
+    env: {},
+    platform: 'win32',
+    hostPlatform: 'linux',
+  });
+  const managedWindowsTempDir = workspaceTargetDir.resolveWorkspaceTempDir({
+    workspaceRoot,
+    env: {},
+    platform: 'win32',
+    hostPlatform: 'linux',
+  });
+
+  assert.match(
+    managedWindowsTargetDir.replaceAll('\\', '/'),
+    new RegExp(`^${path.join(os.tmpdir(), 'sdkwork-target').replaceAll('\\', '/').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`),
+  );
+  assert.match(
+    managedWindowsTempDir.replaceAll('\\', '/'),
+    new RegExp(`^${path.join(os.tmpdir(), 'sdkwork-temp').replaceAll('\\', '/').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`),
+  );
+  assert.doesNotMatch(managedWindowsTargetDir.replaceAll('\\', '/'), /^\/sdkwork-target(?:\/|$)/);
+  assert.doesNotMatch(managedWindowsTempDir.replaceAll('\\', '/'), /^\/sdkwork-temp(?:\/|$)/);
 });

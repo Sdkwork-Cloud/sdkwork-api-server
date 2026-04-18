@@ -18,6 +18,10 @@ function defaultFileExists(filePath) {
   return fs.existsSync(filePath);
 }
 
+function defaultReadDir(directoryPath, options) {
+  return fs.readdirSync(directoryPath, options);
+}
+
 function listWorkspaceAppRoots(appsRoot) {
   if (!defaultFileExists(appsRoot)) {
     return [];
@@ -94,6 +98,7 @@ export function resolveReadablePackageEntry({
   packageName,
   relativeEntry,
   fileExists = defaultFileExists,
+  readDir = defaultReadDir,
   isReadable = defaultIsReadable,
 }) {
   const entrySegments = normalizeRelativeEntry(relativeEntry);
@@ -102,14 +107,41 @@ export function resolveReadablePackageEntry({
     .filter((candidateRoot, index, roots) => roots.indexOf(candidateRoot) === index);
 
   for (const candidateRoot of candidateRoots) {
-    const candidateEntry = path.join(
+    const directEntry = path.join(
       candidateRoot,
       'node_modules',
       packageName,
       ...entrySegments,
     );
-    if (fileExists(candidateEntry) && isReadable(candidateEntry)) {
-      return candidateEntry;
+
+    const candidateEntries = [directEntry];
+    const pnpmRoot = path.join(candidateRoot, 'node_modules', '.pnpm');
+    if (fileExists(pnpmRoot)) {
+      const pnpmDirectoryPrefix = `${packageName.replace('/', '+')}@`;
+
+      let pnpmEntries = [];
+      try {
+        pnpmEntries = readDir(pnpmRoot, { withFileTypes: true });
+      } catch {
+        pnpmEntries = [];
+      }
+
+      candidateEntries.push(...pnpmEntries
+        .filter((entry) => entry.isDirectory() && entry.name.startsWith(pnpmDirectoryPrefix))
+        .sort((left, right) => right.name.localeCompare(left.name))
+        .map((entry) => path.join(
+          pnpmRoot,
+          entry.name,
+          'node_modules',
+          packageName,
+          ...entrySegments,
+        )));
+    }
+
+    for (const candidateEntry of candidateEntries) {
+      if (fileExists(candidateEntry) && isReadable(candidateEntry)) {
+        return candidateEntry;
+      }
     }
   }
 

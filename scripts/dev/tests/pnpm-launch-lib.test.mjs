@@ -94,19 +94,15 @@ test('pnpmSpawnOptions keeps Windows launches direct and hidden without opening 
   const options = pnpmSpawnOptions({
     platform: 'win32',
     env,
+    execPath: 'C:/Tools/node.exe',
     cwd: 'D:/workspace/sdkwork-api-router',
   });
 
-  assert.deepEqual(options, {
-    cwd: 'D:/workspace/sdkwork-api-router',
-    env: {
-      ...env,
-      NODE_OPTIONS: options.env.NODE_OPTIONS,
-    },
-    shell: false,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
+  assert.equal(options.cwd, 'D:/workspace/sdkwork-api-router');
+  assert.equal(options.shell, false);
+  assert.equal(options.stdio, 'inherit');
+  assert.equal(options.windowsHide, true);
+  assert.match(String(options.env.PATH ?? '').replaceAll('\\', '/'), /^C:\/Tools;C:\/pnpm$/);
   assert.match(options.env.NODE_OPTIONS, /vite-windows-realpath-preload\.mjs/);
   assert.match(options.env.NODE_OPTIONS, /--import=/);
 });
@@ -133,14 +129,29 @@ test('pnpmSpawnOptions preserves existing NODE_OPTIONS while adding the Vite pre
       NODE_OPTIONS: '--max-old-space-size=4096',
       PATH: 'C:/pnpm',
     },
+    execPath: 'C:/Tools/node.exe',
   });
 
+  assert.match(String(options.env.PATH ?? '').replaceAll('\\', '/'), /^C:\/Tools;C:\/pnpm$/);
   assert.match(options.env.NODE_OPTIONS, /--max-old-space-size=4096/);
   assert.match(options.env.NODE_OPTIONS, /vite-windows-realpath-preload\.mjs/);
   assert.equal(
     options.env.NODE_OPTIONS.match(/vite-windows-realpath-preload\.mjs/g)?.length,
     1,
   );
+});
+
+test('pnpmSpawnOptions prepends the Node executable directory to PATH on Windows', () => {
+  const options = pnpmSpawnOptions({
+    platform: 'win32',
+    env: {
+      PATH: 'C:/pnpm;C:/Windows/System32',
+    },
+    execPath: 'C:/Tools/node.exe',
+  });
+
+  const normalizedPath = String(options.env.PATH ?? '').replaceAll('\\', '/');
+  assert.match(normalizedPath, /^C:\/Tools;C:\/pnpm;C:\/Windows\/System32$/);
 });
 
 test('dev launchers use the shared pnpm helper for Windows-safe process spawning', () => {
@@ -214,6 +225,42 @@ test('ensureFrontendDependenciesReady refuses to auto-install when strict mode i
     );
 
     assert.equal(installAttempted, false);
+  });
+});
+
+test('ensureFrontendDependenciesReady surfaces unhealthy verification details in strict mode errors', () => {
+  withTempApp((appRoot) => {
+    const nodeModulesRoot = path.join(appRoot, 'node_modules');
+    const viteRoot = path.join(nodeModulesRoot, 'vite');
+    const typescriptRoot = path.join(nodeModulesRoot, 'typescript');
+    const binRoot = path.join(nodeModulesRoot, '.bin');
+
+    mkdirSync(viteRoot, { recursive: true });
+    mkdirSync(typescriptRoot, { recursive: true });
+    mkdirSync(binRoot, { recursive: true });
+    writeFileSync(path.join(nodeModulesRoot, '.modules.yaml'), 'layoutVersion: 5\n');
+    writeFileSync(path.join(viteRoot, 'package.json'), '{"name":"vite"}\n');
+    writeFileSync(path.join(typescriptRoot, 'package.json'), '{"name":"typescript"}\n');
+    writeFileSync(path.join(binRoot, 'vite'), '#!/usr/bin/env node\n');
+    writeFileSync(path.join(binRoot, 'tsc'), '#!/usr/bin/env node\n');
+
+    assert.throws(
+      () => ensureFrontendDependenciesReady({
+        appRoot,
+        platform: 'linux',
+        env: {
+          SDKWORK_STRICT_FRONTEND_INSTALLS: '1',
+        },
+        requiredPackages: ['vite', 'typescript'],
+        requiredBinCommands: ['vite', 'tsc'],
+        verifyInstalled: () => ({
+          ok: false,
+          reason: 'vite config failed to load',
+          stderr: 'Error: missing aliased module',
+        }),
+      }),
+      /vite config failed to load[\s\S]*missing aliased module/i,
+    );
   });
 });
 

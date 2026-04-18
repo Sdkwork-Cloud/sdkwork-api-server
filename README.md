@@ -4,6 +4,17 @@
 
 SDKWork API Router is a Rust-based OpenAI-compatible gateway, admin control plane, public portal, and product runtime. The repository ships both source-native development workflows and production-grade release/install tooling.
 
+## Official Products
+
+The repository publishes exactly two official user-facing release products:
+
+- `sdkwork-api-router-product-server`
+  - the canonical server bundle for native installs, Docker, Docker Compose, and Helm
+- `sdkwork-router-portal-desktop`
+  - the portal-first desktop shell with the bundled local product runtime
+
+Everything else in this repository is either a source-development surface, an intermediate build output, or release-governance evidence.
+
 ## Production Entry Points
 
 Use these pages first when you are planning an online deployment:
@@ -89,17 +100,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\bin\install.ps1 -Mode syst
 Validate the generated production config before service registration:
 
 ```bash
-./validate-config.sh --home <install-root>
+./current/bin/validate-config.sh --home ./current
 ```
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\validate-config.ps1 -Home <install-root>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\current\bin\validate-config.ps1 -Home .\current
 ```
 
 After installation, the installed runtime also exposes:
 
-- `<install-root>/bin/validate-config.sh`
-- `<install-root>\bin\validate-config.ps1`
+- `<install-root>/current/bin/validate-config.sh`
+- `<install-root>\current\bin\validate-config.ps1`
 
 Then continue with:
 
