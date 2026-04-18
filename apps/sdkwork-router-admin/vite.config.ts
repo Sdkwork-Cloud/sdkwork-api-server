@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,25 +9,27 @@ import {
 } from '../../scripts/dev/vite-runtime-lib.mjs';
 
 const configDir = fileURLToPath(new URL('.', import.meta.url));
-const installedUiRoot = path.join(configDir, 'node_modules', '@sdkwork', 'ui-pc-react');
-const workspaceUiRoot = path.join(
+const sdkworkUiSourceRoot = path.resolve(
   configDir,
-  '..',
-  '..',
-  '..',
-  'sdkwork-ui',
-  'sdkwork-ui-pc-react',
+  '../../../sdkwork-ui/sdkwork-ui-pc-react/src',
 );
-const workspaceUiDistRoot = path.join(workspaceUiRoot, 'dist');
 const defaultAdminProxyTarget = 'http://127.0.0.1:9981';
 const donorRoots = resolveWorkspaceDonorRoots(configDir);
 const normalizedConfigDir = path.resolve(configDir);
+const zustandPackageRoot = resolveReadablePackageRoot({
+  appRoot: configDir,
+  donorRoots,
+  packageName: 'zustand',
+});
+const zustandEsmEntry = normalizeAliasPath(path.join(zustandPackageRoot, 'esm', 'index.mjs'));
+const zustandEsmSubpathRoot = `${normalizeAliasPath(path.join(zustandPackageRoot, 'esm'))}/`;
 
-function resolveSdkworkUiDistPath(entryPath: string) {
-  const installedCandidate = path.join(installedUiRoot, 'dist', entryPath);
-  return existsSync(installedCandidate)
-    ? installedCandidate
-    : path.join(workspaceUiDistRoot, entryPath);
+function normalizeAliasPath(value: string) {
+  return value.replaceAll('\\', '/');
+}
+
+function resolveSdkworkUiSourcePath(relativePath: string) {
+  return path.resolve(sdkworkUiSourceRoot, relativePath);
 }
 
 function resolveProxyTarget(envValue: string | undefined, fallbackTarget: string) {
@@ -64,6 +65,14 @@ const readableRuntimeDependencyAliases = [
       packageName: 'react-router',
     }),
   },
+  {
+    find: /^zustand$/,
+    replacement: zustandEsmEntry,
+  },
+  {
+    find: /^zustand\//,
+    replacement: zustandEsmSubpathRoot,
+  },
 ];
 
 type VitePluginFactory = () => unknown;
@@ -74,32 +83,36 @@ const sharedUiEntryAliases = [
     replacement: path.join(configDir, 'src', 'vendor', 'motion-react.tsx'),
   },
   {
+    find: /^use-sync-external-store\/shim$/,
+    replacement: path.join(configDir, 'src', 'vendor', 'use-sync-external-store-shim.ts'),
+  },
+  {
     find: /^@sdkwork\/ui-pc-react\/styles\.css$/,
-    replacement: resolveSdkworkUiDistPath('sdkwork-ui.css'),
+    replacement: resolveSdkworkUiSourcePath('styles/sdkwork-ui.css'),
   },
   {
     find: /^@sdkwork\/ui-pc-react\/theme$/,
-    replacement: resolveSdkworkUiDistPath('theme.js'),
+    replacement: resolveSdkworkUiSourcePath('theme/index.ts'),
   },
   {
     find: /^@sdkwork\/ui-pc-react\/components\/ui$/,
-    replacement: resolveSdkworkUiDistPath('components-ui.js'),
+    replacement: resolveSdkworkUiSourcePath('components/ui/index.ts'),
   },
   {
     find: /^@sdkwork\/ui-pc-react\/components\/ui\/feedback$/,
-    replacement: resolveSdkworkUiDistPath('ui-feedback.js'),
+    replacement: resolveSdkworkUiSourcePath('components/ui/feedback/index.ts'),
   },
   {
     find: /^@sdkwork\/ui-pc-react\/components\/patterns\/app-shell$/,
-    replacement: resolveSdkworkUiDistPath('patterns-app-shell.js'),
+    replacement: resolveSdkworkUiSourcePath('components/patterns/app-shell/index.ts'),
   },
   {
     find: /^@sdkwork\/ui-pc-react\/components\/patterns\/desktop-shell$/,
-    replacement: resolveSdkworkUiDistPath('patterns-desktop-shell.js'),
+    replacement: resolveSdkworkUiSourcePath('components/patterns/desktop-shell/index.ts'),
   },
   {
     find: /^@sdkwork\/ui-pc-react$/,
-    replacement: resolveSdkworkUiDistPath('index.js'),
+    replacement: resolveSdkworkUiSourcePath('index.ts'),
   },
 ];
 
@@ -216,7 +229,7 @@ async function defineAdminViteConfig() {
       },
     },
     resolve: {
-      dedupe: ['react', 'react-dom'],
+      dedupe: ['react', 'react-dom', 'zustand'],
       alias: [
         ...sharedUiEntryAliases,
         ...readableRuntimeDependencyAliases,

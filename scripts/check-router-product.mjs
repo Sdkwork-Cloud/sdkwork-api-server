@@ -7,6 +7,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { withSupportedWindowsCmakeGenerator } from './run-tauri-cli.mjs';
+import { withManagedWorkspaceTargetDir, withManagedWorkspaceTempDir } from './workspace-target-dir.mjs';
 import {
   checkFrontendViteConfig,
   ensureFrontendDependenciesReady,
@@ -45,6 +46,27 @@ export function resolveRustRunner(platform = process.platform, env = process.env
   };
 }
 
+export function productCheckBaseEnv({
+  workspaceRoot = path.resolve(__dirname, '..'),
+  platform = process.platform,
+  env = process.env,
+} = {}) {
+  const managedEnv = withManagedWorkspaceTargetDir({
+    workspaceRoot,
+    env: withManagedWorkspaceTempDir({
+      workspaceRoot,
+      env: withSupportedWindowsCmakeGenerator(env, platform),
+      platform,
+    }),
+    platform,
+  });
+
+  return {
+    ...managedEnv,
+    CARGO_TARGET_DIR: managedEnv.CARGO_TARGET_DIR ?? path.join(workspaceRoot, 'target'),
+  };
+}
+
 export function createProductCheckPlan({
   workspaceRoot = path.resolve(__dirname, '..'),
   portalAppDir = path.join(workspaceRoot, 'apps', 'sdkwork-router-portal'),
@@ -54,8 +76,12 @@ export function createProductCheckPlan({
   env = process.env,
 } = {}) {
   const nodeCommand = process.execPath;
-  const baseEnv = withSupportedWindowsCmakeGenerator(env, platform);
-  const rustRunner = resolveRustRunner(platform, env);
+  const baseEnv = productCheckBaseEnv({
+    workspaceRoot,
+    platform,
+    env,
+  });
+  const rustRunner = resolveRustRunner(platform, baseEnv);
   const docsBuildProcess = pnpmProcessSpec(['--dir', 'docs', 'build'], {
     platform,
     execPath: nodeCommand,
@@ -214,7 +240,17 @@ async function runStep(step) {
 }
 
 async function main() {
-  const plan = createProductCheckPlan();
+  const workspaceRoot = path.resolve(__dirname, '..');
+  const baseEnv = productCheckBaseEnv({
+    workspaceRoot,
+    platform: process.platform,
+    env: process.env,
+  });
+  const plan = createProductCheckPlan({
+    workspaceRoot,
+    platform: process.platform,
+    env: baseEnv,
+  });
   for (const appRoot of [
     path.join(__dirname, '..', 'apps', 'sdkwork-router-portal'),
     path.join(__dirname, '..', 'apps', 'sdkwork-router-admin'),
@@ -227,12 +263,16 @@ async function main() {
         appRoot,
         command: 'build',
       }),
+      platform: process.platform,
+      env: baseEnv,
     });
   }
   ensureFrontendDependenciesReady({
     appRoot: path.join(__dirname, '..', 'docs'),
     requiredPackages: ['vitepress'],
     requiredBinCommands: ['vitepress'],
+    platform: process.platform,
+    env: baseEnv,
   });
 
   for (const step of plan) {

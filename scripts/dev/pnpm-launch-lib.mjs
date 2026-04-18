@@ -25,6 +25,42 @@ function withWindowsNodeOptions(env, platform) {
   };
 }
 
+function withWindowsNodeExecutableOnPath(env, platform, execPath = process.execPath) {
+  if (platform !== 'win32') {
+    return env;
+  }
+
+  const nodeExecutableDir = path.dirname(path.normalize(execPath));
+  const pathKeys = Object.keys(env).filter((key) => key.toLowerCase() === 'path');
+  const selectedPathKey = pathKeys[0] ?? 'PATH';
+  const rawPathValue = pathKeys
+    .map((key) => env[key])
+    .find((value) => typeof value === 'string' && value.length > 0) ?? '';
+  const pathEntries = String(rawPathValue)
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const normalizedNodeExecutableDir = nodeExecutableDir.toLowerCase();
+  const dedupedPathEntries = pathEntries.filter(
+    (entry, index, entries) => entries.findIndex(
+      (candidate) => candidate.toLowerCase() === entry.toLowerCase(),
+    ) === index,
+  );
+
+  if (!dedupedPathEntries.some((entry) => entry.toLowerCase() === normalizedNodeExecutableDir)) {
+    dedupedPathEntries.unshift(nodeExecutableDir);
+  }
+
+  const nextEnv = { ...env };
+  for (const key of pathKeys) {
+    if (key !== selectedPathKey) {
+      delete nextEnv[key];
+    }
+  }
+  nextEnv[selectedPathKey] = dedupedPathEntries.join(path.delimiter);
+  return nextEnv;
+}
+
 export function pnpmExecutable(platform = process.platform, execPath = process.execPath) {
   return platform === 'win32' ? execPath : 'pnpm';
 }
@@ -95,10 +131,15 @@ export function pnpmDisplayCommand(stepArgs = [], {
 export function pnpmSpawnOptions({
   platform = process.platform,
   env = process.env,
+  execPath = process.execPath,
   cwd,
   stdio = 'inherit',
 } = {}) {
-  const effectiveEnv = withWindowsNodeOptions(env, platform);
+  const effectiveEnv = withWindowsNodeExecutableOnPath(
+    withWindowsNodeOptions(env, platform),
+    platform,
+    execPath,
+  );
   const options = {
     env: effectiveEnv,
     shell: false,
@@ -396,6 +437,7 @@ export function ensureFrontendDependenciesReady({
       ...pnpmSpawnOptions({
         platform,
         env,
+        execPath,
       }),
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,

@@ -86,6 +86,20 @@ test('official packaging docs describe only the server and portal desktop produc
   assert.match(index, /\| apps\/sdkwork-router-portal \| browser or Tauri \| standalone developer self-service portal \|/);
 });
 
+test('repository landing docs keep the official product line and installed validation entrypoints aligned', () => {
+  const readme = read('README.md');
+  const zhReadme = read('README.zh-CN.md');
+
+  for (const content of [readme, zhReadme]) {
+    assert.match(content, /sdkwork-api-router-product-server/);
+    assert.match(content, /sdkwork-router-portal-desktop/);
+    assert.match(content, /current\/bin\/validate-config\.sh --home/);
+    assert.match(content, /current\\bin\\validate-config\.ps1 -Home/);
+    assert.doesNotMatch(content, /<install-root>\/bin\/validate-config\.sh/);
+    assert.doesNotMatch(content, /<install-root>\\bin\\validate-config\.ps1/);
+  }
+});
+
 test('localized product docs follow the same official packaging contract', () => {
   const zhIndex = read('docs/zh/index.md');
   const zhInstallation = read('docs/zh/getting-started/installation.md');

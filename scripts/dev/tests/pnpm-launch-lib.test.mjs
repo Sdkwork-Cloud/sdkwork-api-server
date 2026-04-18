@@ -94,19 +94,15 @@ test('pnpmSpawnOptions keeps Windows launches direct and hidden without opening 
   const options = pnpmSpawnOptions({
     platform: 'win32',
     env,
+    execPath: 'C:/Tools/node.exe',
     cwd: 'D:/workspace/sdkwork-api-router',
   });
 
-  assert.deepEqual(options, {
-    cwd: 'D:/workspace/sdkwork-api-router',
-    env: {
-      ...env,
-      NODE_OPTIONS: options.env.NODE_OPTIONS,
-    },
-    shell: false,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
+  assert.equal(options.cwd, 'D:/workspace/sdkwork-api-router');
+  assert.equal(options.shell, false);
+  assert.equal(options.stdio, 'inherit');
+  assert.equal(options.windowsHide, true);
+  assert.match(String(options.env.PATH ?? '').replaceAll('\\', '/'), /^C:\/Tools;C:\/pnpm$/);
   assert.match(options.env.NODE_OPTIONS, /vite-windows-realpath-preload\.mjs/);
   assert.match(options.env.NODE_OPTIONS, /--import=/);
 });
@@ -133,14 +129,29 @@ test('pnpmSpawnOptions preserves existing NODE_OPTIONS while adding the Vite pre
       NODE_OPTIONS: '--max-old-space-size=4096',
       PATH: 'C:/pnpm',
     },
+    execPath: 'C:/Tools/node.exe',
   });
 
+  assert.match(String(options.env.PATH ?? '').replaceAll('\\', '/'), /^C:\/Tools;C:\/pnpm$/);
   assert.match(options.env.NODE_OPTIONS, /--max-old-space-size=4096/);
   assert.match(options.env.NODE_OPTIONS, /vite-windows-realpath-preload\.mjs/);
   assert.equal(
     options.env.NODE_OPTIONS.match(/vite-windows-realpath-preload\.mjs/g)?.length,
     1,
   );
+});
+
+test('pnpmSpawnOptions prepends the Node executable directory to PATH on Windows', () => {
+  const options = pnpmSpawnOptions({
+    platform: 'win32',
+    env: {
+      PATH: 'C:/pnpm;C:/Windows/System32',
+    },
+    execPath: 'C:/Tools/node.exe',
+  });
+
+  const normalizedPath = String(options.env.PATH ?? '').replaceAll('\\', '/');
+  assert.match(normalizedPath, /^C:\/Tools;C:\/pnpm;C:\/Windows\/System32$/);
 });
 
 test('dev launchers use the shared pnpm helper for Windows-safe process spawning', () => {

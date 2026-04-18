@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import jiti from '../node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti.mjs';
+import jiti from 'jiti';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 
@@ -33,7 +33,7 @@ test('api key quick setup never falls back to an internal fake plaintext placeho
   assert.doesNotMatch(apiKeysPage, /api-key-not-visible-on-this-device/);
   assert.match(drawers, /selectedPlan\s*&&\s*selectedPlan\.available/);
   assert.match(drawers, /plan\.availabilityDetail/);
-  assert.doesNotMatch(drawers, /`\s*路\s*\$\{instance\.detail\}/);
+  assert.doesNotMatch(drawers, /`\s*璺痋s*\$\{instance\.detail\}/);
 
   assert.match(
     commons,
