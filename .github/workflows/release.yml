@@ -201,6 +201,7 @@ jobs:
       - name: Materialize release telemetry export
         shell: bash
         env:
+          SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH: docs/release/release-telemetry-export-latest.json
           SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: ${{ vars.SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON || '' }}
           SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_GATEWAY_PROMETHEUS_TEXT || '' }}
           SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT: ${{ vars.SDKWORK_RELEASE_TELEMETRY_ADMIN_PROMETHEUS_TEXT || '' }}

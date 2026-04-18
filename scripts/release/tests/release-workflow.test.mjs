@@ -51,6 +51,9 @@ export function buildExternalReleaseClonePlan() {
 export function auditExternalReleaseDependencyCoverage() {
   return ${JSON.stringify(coverage, null, 2)};
 }
+export function selectExternalReleaseDependencySpecsForMaterialization({ specs = [] } = {}) {
+  return specs.filter((spec) => spec.id === 'sdkwork-ui');
+}
 `,
   );
 
@@ -165,6 +168,10 @@ test('release workflow publishes only official server and portal desktop product
   assert.match(
     workflow,
     /Materialize release sync audit[\s\S]*?SDKWORK_RELEASE_SYNC_AUDIT_PATH:\s*docs\/release\/release-sync-audit-latest\.json[\s\S]*?node scripts\/release\/materialize-release-sync-audit\.mjs/,
+  );
+  assert.match(
+    workflow,
+    /Materialize release telemetry export[\s\S]*?SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH:\s*docs\/release\/release-telemetry-export-latest\.json[\s\S]*?node scripts\/release\/materialize-release-telemetry-export\.mjs/,
   );
   assert.doesNotMatch(workflow, /run-desktop-release-build\.mjs --app admin/);
   assert.doesNotMatch(workflow, /web-release:/);
@@ -645,5 +652,27 @@ jobs:
       repoRoot: fixtureRoot,
     }),
     /docs site/i,
+  );
+});
+
+test('release workflow contract helper rejects workflows that do not seed telemetry export from the committed governed artifact path', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: read('.github/workflows/release.yml').replace(
+      /^\s*SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH:\s*docs\/release\/release-telemetry-export-latest\.json\r?\n/m,
+      '',
+    ),
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /telemetry(?:-|\s)export/i,
   );
 });

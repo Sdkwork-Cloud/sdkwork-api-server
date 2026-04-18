@@ -71,6 +71,11 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
+    /governance-release:[\s\S]*?Materialize release telemetry export[\s\S]*?SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH:\s*docs\/release\/release-telemetry-export-latest\.json[\s\S]*?node scripts\/release\/materialize-release-telemetry-export\.mjs/,
+    'governance release job must seed the telemetry-export materializer from the committed governed artifact path unless an explicit control-plane handoff overrides it',
+  );
+  assert.match(
+    workflow,
     /governance-release:[\s\S]*?Materialize external release dependencies[\s\S]*?node scripts\/release\/materialize-external-deps\.mjs[\s\S]*?Materialize release window snapshot[\s\S]*?node scripts\/release\/materialize-release-window-snapshot\.mjs[\s\S]*?Materialize release sync audit[\s\S]*?node scripts\/release\/materialize-release-sync-audit\.mjs[\s\S]*?Materialize release telemetry export[\s\S]*?node scripts\/release\/materialize-release-telemetry-export\.mjs[\s\S]*?Materialize release telemetry snapshot[\s\S]*?node scripts\/release\/materialize-release-telemetry-snapshot\.mjs[\s\S]*?Materialize SLO governance evidence[\s\S]*?node scripts\/release\/materialize-slo-governance-evidence\.mjs[\s\S]*?Materialize release governance bundle[\s\S]*?node scripts\/release\/materialize-release-governance-bundle\.mjs[\s\S]*?Run release governance gate[\s\S]*?node scripts\/release\/run-release-governance-checks\.mjs --format json/,
     'governance release job must materialize governed evidence, assemble the governance bundle, and execute the governance gate',
   );
