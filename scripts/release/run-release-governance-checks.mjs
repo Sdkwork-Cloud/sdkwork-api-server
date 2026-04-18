@@ -91,6 +91,11 @@ const preflightExcludedPlanIds = new Set([
   'release-window-snapshot',
   'release-sync-audit',
 ]);
+const releaseGovernanceTestEnvPatterns = [
+  /^SDKWORK_RELEASE_/,
+  /^SDKWORK_SLO_GOVERNANCE_EVIDENCE_/,
+  /^SDKWORK_(API_ROUTER|CORE|UI|APPBASE|CRAW_CHAT_SDK)_GIT_REF$/,
+];
 
 function createSyntheticPrometheusHttpCounterSamples({
   service,
@@ -718,6 +723,28 @@ function summarizeReleaseGovernanceResults(results = []) {
   };
 }
 
+function isReleaseGovernanceTestPlan(plan) {
+  return Array.isArray(plan?.args) && plan.args.includes('--test');
+}
+
+function resolveReleaseGovernanceChildEnv({
+  plan,
+  env = process.env,
+} = {}) {
+  if (!isReleaseGovernanceTestPlan(plan)) {
+    return env;
+  }
+
+  const sanitizedEnv = { ...env };
+  for (const key of Object.keys(sanitizedEnv)) {
+    if (releaseGovernanceTestEnvPatterns.some((pattern) => pattern.test(key))) {
+      delete sanitizedEnv[key];
+    }
+  }
+
+  return sanitizedEnv;
+}
+
 async function runFallbackReleaseGovernanceCheck({
   plan,
   env = process.env,
@@ -1205,10 +1232,14 @@ export async function runReleaseGovernanceCheckPlan({
   const runner = resolveNodeRunner({
     nodeExecutable: plan.command,
   });
+  const childEnv = resolveReleaseGovernanceChildEnv({
+    plan,
+    env,
+  });
   const result = spawnSyncImpl(runner.command, plan.args, {
     cwd: rootDir,
     encoding: 'utf8',
-    env,
+    env: childEnv,
     shell: runner.shell,
     stdio: 'pipe',
   });

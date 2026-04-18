@@ -851,6 +851,117 @@ test('release governance runner aggregates passing tests and blocking live relea
   );
 });
 
+test('release governance runner strips governed release env from node test subprocesses while preserving live lanes', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-release-governance-checks.mjs'),
+    ).href,
+  );
+
+  const plan = module.listReleaseGovernanceCheckPlans({
+    nodeExecutable: 'node',
+  });
+  const selectedPlans = [
+    getPlanById(plan, 'release-window-snapshot-test'),
+    getPlanById(plan, 'release-window-snapshot'),
+  ];
+  const planByCommandLine = new Map(
+    selectedPlans.map((entry) => [[entry.command, ...entry.args].join('\u0000'), entry.id]),
+  );
+  const envByPlanId = new Map();
+  const inheritedEnv = {
+    ...process.env,
+    SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH: 'docs/release/release-window-snapshot-latest.json',
+    SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON: '{"snapshot":true}',
+    SDKWORK_RELEASE_SYNC_AUDIT_PATH: 'docs/release/release-sync-audit-latest.json',
+    SDKWORK_RELEASE_SYNC_AUDIT_JSON: '{"releasable":true}',
+    SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH: 'docs/release/release-telemetry-export-latest.json',
+    SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON: '{"export":true}',
+    SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH: 'docs/release/release-telemetry-snapshot-latest.json',
+    SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_JSON: '{"snapshot":true}',
+    SDKWORK_SLO_GOVERNANCE_EVIDENCE_PATH: 'docs/release/slo-governance-latest.json',
+    SDKWORK_SLO_GOVERNANCE_EVIDENCE_JSON: '{"ok":true}',
+    SDKWORK_API_ROUTER_GIT_REF: 'refs/tags/release-2026-04-18-7',
+    SDKWORK_CORE_GIT_REF: 'main',
+    SDKWORK_UI_GIT_REF: 'main',
+    SDKWORK_APPBASE_GIT_REF: 'main',
+    SDKWORK_CRAW_CHAT_SDK_GIT_REF: 'main',
+    UNRELATED_SENTINEL: 'keep-me',
+  };
+
+  const summary = await module.runReleaseGovernanceChecks({
+    plans: selectedPlans,
+    env: inheritedEnv,
+    spawnSyncImpl(command, args, options = {}) {
+      const planId = planByCommandLine.get([command, ...args].join('\u0000'));
+      assert.ok(planId, `unexpected plan invocation: ${command} ${args.join(' ')}`);
+      envByPlanId.set(planId, options.env);
+      return {
+        status: 0,
+        stdout: planId === 'release-window-snapshot'
+          ? '{"ok":true,"blocked":false,"snapshot":{"latestReleaseTag":"release-2026-04-18-7"}}'
+          : 'ok release window snapshot test',
+        stderr: '',
+      };
+    },
+  });
+
+  assert.equal(summary.ok, true);
+
+  const testEnv = envByPlanId.get('release-window-snapshot-test');
+  assert.ok(testEnv);
+  assert.equal(testEnv.UNRELATED_SENTINEL, 'keep-me');
+  assert.equal('SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_SYNC_AUDIT_PATH' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_SYNC_AUDIT_JSON' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH' in testEnv, false);
+  assert.equal('SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_JSON' in testEnv, false);
+  assert.equal('SDKWORK_SLO_GOVERNANCE_EVIDENCE_PATH' in testEnv, false);
+  assert.equal('SDKWORK_SLO_GOVERNANCE_EVIDENCE_JSON' in testEnv, false);
+  assert.equal('SDKWORK_API_ROUTER_GIT_REF' in testEnv, false);
+  assert.equal('SDKWORK_CORE_GIT_REF' in testEnv, false);
+  assert.equal('SDKWORK_UI_GIT_REF' in testEnv, false);
+  assert.equal('SDKWORK_APPBASE_GIT_REF' in testEnv, false);
+  assert.equal('SDKWORK_CRAW_CHAT_SDK_GIT_REF' in testEnv, false);
+
+  const liveEnv = envByPlanId.get('release-window-snapshot');
+  assert.ok(liveEnv);
+  assert.equal(liveEnv.UNRELATED_SENTINEL, 'keep-me');
+  assert.equal(
+    liveEnv.SDKWORK_RELEASE_WINDOW_SNAPSHOT_PATH,
+    'docs/release/release-window-snapshot-latest.json',
+  );
+  assert.equal(liveEnv.SDKWORK_RELEASE_WINDOW_SNAPSHOT_JSON, '{"snapshot":true}');
+  assert.equal(
+    liveEnv.SDKWORK_RELEASE_SYNC_AUDIT_PATH,
+    'docs/release/release-sync-audit-latest.json',
+  );
+  assert.equal(liveEnv.SDKWORK_RELEASE_SYNC_AUDIT_JSON, '{"releasable":true}');
+  assert.equal(
+    liveEnv.SDKWORK_RELEASE_TELEMETRY_EXPORT_PATH,
+    'docs/release/release-telemetry-export-latest.json',
+  );
+  assert.equal(liveEnv.SDKWORK_RELEASE_TELEMETRY_EXPORT_JSON, '{"export":true}');
+  assert.equal(
+    liveEnv.SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_PATH,
+    'docs/release/release-telemetry-snapshot-latest.json',
+  );
+  assert.equal(liveEnv.SDKWORK_RELEASE_TELEMETRY_SNAPSHOT_JSON, '{"snapshot":true}');
+  assert.equal(
+    liveEnv.SDKWORK_SLO_GOVERNANCE_EVIDENCE_PATH,
+    'docs/release/slo-governance-latest.json',
+  );
+  assert.equal(liveEnv.SDKWORK_SLO_GOVERNANCE_EVIDENCE_JSON, '{"ok":true}');
+  assert.equal(liveEnv.SDKWORK_API_ROUTER_GIT_REF, 'refs/tags/release-2026-04-18-7');
+  assert.equal(liveEnv.SDKWORK_CORE_GIT_REF, 'main');
+  assert.equal(liveEnv.SDKWORK_UI_GIT_REF, 'main');
+  assert.equal(liveEnv.SDKWORK_APPBASE_GIT_REF, 'main');
+  assert.equal(liveEnv.SDKWORK_CRAW_CHAT_SDK_GIT_REF, 'main');
+});
+
 test('release governance runner distinguishes blocked lanes from real failing lanes', async () => {
   const module = await import(
     pathToFileURL(

@@ -555,6 +555,14 @@ test('restore release governance latest materializer enables blocked-host govern
     });
 
     const summary = await governanceModule.runReleaseGovernanceChecks({
+      env: {
+        ...process.env,
+        SDKWORK_API_ROUTER_GIT_REF: '',
+        SDKWORK_CORE_GIT_REF: '',
+        SDKWORK_UI_GIT_REF: '',
+        SDKWORK_APPBASE_GIT_REF: '',
+        SDKWORK_CRAW_CHAT_SDK_GIT_REF: '',
+      },
       spawnSyncImpl() {
         return {
           status: 1,

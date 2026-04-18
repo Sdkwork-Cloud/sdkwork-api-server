@@ -531,6 +531,7 @@ function runGitCommand({
 }
 
 function auditRepositorySpec(spec, {
+  env = process.env,
   spawnSyncImpl = spawnSync,
 } = {}) {
   if (!existsSync(spec.targetDir)) {
@@ -567,7 +568,7 @@ function auditRepositorySpec(spec, {
     args: ['remote', 'get-url', 'origin'],
     spawnSyncImpl,
   });
-  const expectedRef = resolveReleaseSyncRepositoryRef({ spec });
+  const expectedRef = resolveReleaseSyncRepositoryRef({ spec, env });
   const localHeadResult = runGitCommand({
     cwd: spec.targetDir,
     args: ['rev-parse', 'HEAD'],
@@ -617,6 +618,7 @@ function auditRepositorySpec(spec, {
 
 function mergeGovernedReleaseSyncSummaryWithLiveReports(summary, {
   specs = [],
+  env = process.env,
   spawnSyncImpl = spawnSync,
 } = {}) {
   if (!Array.isArray(specs) || specs.length === 0) {
@@ -632,6 +634,7 @@ function mergeGovernedReleaseSyncSummaryWithLiveReports(summary, {
     refreshSpecs.map((spec) => [
       spec.id,
       auditRepositorySpec(spec, {
+        env,
         spawnSyncImpl,
       }),
     ]),
@@ -675,11 +678,13 @@ export function auditReleaseSyncRepositories({
   if (resolvedInput) {
     return mergeGovernedReleaseSyncSummaryWithLiveReports(resolvedInput.summary, {
       specs: resolvedSpecs,
+      env,
       spawnSyncImpl,
     });
   }
 
   const reports = resolvedSpecs.map((spec) => auditRepositorySpec(spec, {
+    env,
     spawnSyncImpl,
   }));
   return {

@@ -309,3 +309,97 @@ test('release sync audit materializer rejects blocked live git execution when no
     /command-exec-blocked/i,
   );
 });
+
+test('release sync audit materializer uses the provided env instead of inherited process env when resolving the repository ref', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'materialize-release-sync-audit.mjs'),
+    ).href,
+  );
+
+  const originalRepoRef = process.env.SDKWORK_API_ROUTER_GIT_REF;
+  process.env.SDKWORK_API_ROUTER_GIT_REF = 'refs/tags/release-env-leak';
+
+  try {
+    const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-release-sync-audit-env-'));
+    const outputPath = path.join(fixtureRoot, 'release-sync-audit-latest.json');
+
+    const result = module.materializeReleaseSyncAudit({
+      env: {},
+      generatedAt: '2026-04-18T09:00:00Z',
+      sourceKind: 'release-sync-audit-live-git',
+      outputPath,
+      specs: [
+        {
+          id: 'sdkwork-api-router',
+          targetDir: repoRoot,
+          expectedGitRoot: repoRoot,
+          expectedRemoteUrl: 'https://github.com/Sdkwork-Cloud/sdkwork-api-router.git',
+          envRefKey: 'SDKWORK_API_ROUTER_GIT_REF',
+          defaultRef: 'main',
+        },
+      ],
+      spawnSyncImpl(_command, args) {
+        const key = args.join('\u0000');
+        const responses = new Map([
+          [
+            'rev-parse\u0000--show-toplevel',
+            {
+              status: 0,
+              stdout: `${repoRoot}\n`,
+              stderr: '',
+            },
+          ],
+          [
+            'status\u0000--short\u0000--branch',
+            {
+              status: 0,
+              stdout: '## main...origin/main\n',
+              stderr: '',
+            },
+          ],
+          [
+            'remote\u0000get-url\u0000origin',
+            {
+              status: 0,
+              stdout: 'https://github.com/Sdkwork-Cloud/sdkwork-api-router.git\n',
+              stderr: '',
+            },
+          ],
+          [
+            'rev-parse\u0000HEAD',
+            {
+              status: 0,
+              stdout: 'env-clean-head\n',
+              stderr: '',
+            },
+          ],
+          [
+            'ls-remote\u0000origin\u0000main',
+            {
+              status: 0,
+              stdout: 'env-clean-head\trefs/heads/main\n',
+              stderr: '',
+            },
+          ],
+        ]);
+        const response = responses.get(key);
+        if (!response) {
+          throw new Error(`unexpected git command: ${args.join(' ')}`);
+        }
+        return response;
+      },
+    });
+
+    assert.equal(result.source, 'live-git');
+    const written = JSON.parse(readFileSync(outputPath, 'utf8'));
+    assert.equal(written.summary.reports[0].expectedRef, 'main');
+    assert.equal(written.summary.reports[0].remoteHead, 'env-clean-head');
+  } finally {
+    if (originalRepoRef === undefined) {
+      delete process.env.SDKWORK_API_ROUTER_GIT_REF;
+    } else {
+      process.env.SDKWORK_API_ROUTER_GIT_REF = originalRepoRef;
+    }
+  }
+});

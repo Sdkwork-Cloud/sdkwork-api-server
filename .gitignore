@@ -18,6 +18,7 @@ Thumbs.db
 **/.codex-logs/
 /artifacts/
 /.external/
+/sdkwork-ui/
 /bin/.sdkwork-target/
 /bin/.sdkwork-target-*/
 /bin/.sdkrt-*/
