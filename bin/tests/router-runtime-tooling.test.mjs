@@ -1055,6 +1055,7 @@ test('packageProductServerBundle falls back to repository cargo target roots whe
   const outputDir = path.join(fixtureRoot, 'release-output');
   const managedTargetRoot = path.join(fixtureRoot, 'managed', 'x86_64-pc-windows-msvc', 'release');
   const repositoryTargetRoot = path.join(fixtureRoot, 'target', 'x86_64-pc-windows-msvc', 'release');
+  const serviceBinaryNames = ['router-product-service-fixture'];
   const adminSiteDir = path.join(fixtureRoot, 'sites', 'admin', 'dist');
   const portalSiteDir = path.join(fixtureRoot, 'sites', 'portal', 'dist');
   const bootstrapDataDir = path.join(fixtureRoot, 'data');
@@ -1064,7 +1065,7 @@ test('packageProductServerBundle falls back to repository cargo target roots whe
     mkdirSync(managedTargetRoot, { recursive: true });
     writeFileSync(path.join(managedTargetRoot, 'desktop-only.txt'), 'desktop build residue\n', 'utf8');
     mkdirSync(repositoryTargetRoot, { recursive: true });
-    for (const binaryName of module.listNativeServiceBinaryNames()) {
+    for (const binaryName of serviceBinaryNames) {
       writeFileSync(
         path.join(repositoryTargetRoot, `${binaryName}.exe`),
         `${binaryName}\n`,
@@ -1087,6 +1088,7 @@ test('packageProductServerBundle falls back to repository cargo target roots whe
       targetTriple: 'x86_64-pc-windows-msvc',
       outputDir,
       resolveServiceRootCandidates: () => [managedTargetRoot, repositoryTargetRoot],
+      serviceBinaryNames,
       siteAssetRoots: {
         admin: adminSiteDir,
         portal: portalSiteDir,
@@ -1097,7 +1099,11 @@ test('packageProductServerBundle falls back to repository cargo target roots whe
       deploymentAssetRoots: {
         deploy: deploymentAssetDir,
       },
-      runTar: (archivePath) => {
+      runTar: (archivePath, stagingRoot, archiveBaseName) => {
+        assert.equal(
+          existsSync(path.join(stagingRoot, archiveBaseName, 'bin', 'router-product-service-fixture.exe')),
+          true,
+        );
         writeFileSync(archivePath, 'bundle archive\n', 'utf8');
       },
     });
@@ -1110,7 +1116,7 @@ test('packageProductServerBundle falls back to repository cargo target roots whe
     const manifest = JSON.parse(
       readFileSync(path.join(outputDir, 'native', 'windows', 'x64', 'bundles', result.manifestFileName), 'utf8'),
     );
-    assert.deepEqual(manifest.services, module.listNativeServiceBinaryNames());
+    assert.deepEqual(manifest.services, serviceBinaryNames);
   } finally {
     removeTempRuntimeHome(fixtureRoot);
   }

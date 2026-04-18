@@ -556,11 +556,13 @@ function copyServiceBinaries({
   targetDir,
   writeChecksums = false,
   resolveServiceRoot = resolveServiceReleaseRoot,
+  serviceReleaseRoots,
   serviceBinaryNames = SERVICE_BINARY_NAMES,
 }) {
   const serviceReleaseRoot = resolveServiceRoot({
     targetTriple,
     platform: platformId,
+    serviceReleaseRoots,
     serviceBinaryNames,
   });
   ensureDirectory(targetDir);
@@ -710,6 +712,7 @@ export function packageProductServerBundle({
   targetTriple,
   outputDir,
   resolveServiceRoot = resolveServiceReleaseRoot,
+  resolveServiceRootCandidates,
   serviceBinaryNames = SERVICE_BINARY_NAMES,
   siteAssetRoots = productServerSiteAssetRoots,
   bootstrapDataRoots = productServerBootstrapDataRoots,
@@ -747,6 +750,13 @@ export function packageProductServerBundle({
     archId,
   });
   const bundleOutputDir = path.join(outputDir, 'native', platformId, archId, 'bundles');
+  const serviceReleaseRoots = typeof resolveServiceRootCandidates === 'function'
+    ? resolveServiceRootCandidates({
+        targetTriple,
+        platform: platformId,
+        serviceBinaryNames,
+      })
+    : undefined;
   ensureDirectory(bundleOutputDir);
 
   const stagingRoot = createManagedStagingRoot(bundleOutputDir, '.sdkwork-api-router-native-server-');
@@ -758,6 +768,7 @@ export function packageProductServerBundle({
       targetTriple,
       targetDir: path.join(archiveRoot, 'bin'),
       resolveServiceRoot,
+      serviceReleaseRoots,
       serviceBinaryNames,
     });
 
