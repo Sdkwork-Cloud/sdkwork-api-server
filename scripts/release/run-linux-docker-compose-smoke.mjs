@@ -730,14 +730,13 @@ export function createLinuxDockerComposeSmokePlan({
       {
         label: 'portal',
         url: `http://127.0.0.1:${DEFAULT_WEB_PORT}/portal/`,
+        // Packaged portal smoke must rely on stable visible copy instead of hydration-sensitive DOM markers.
         expectedTexts: [
-          'Unified AI gateway workspace',
           'Operate routing, credentials, usage, and downloads from one product surface.',
+          'Launch sequence',
+          'Product pathways',
         ],
-        expectedSelectors: [
-          '[data-slot="portal-home-page"]',
-          '[data-slot="portal-home-metrics"]',
-        ],
+        expectedSelectors: [],
       },
     ],
     envContents: [

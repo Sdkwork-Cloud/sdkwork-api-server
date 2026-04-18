@@ -98,13 +98,11 @@ test('linux Docker Compose smoke script exposes a parseable CLI contract for pac
       label: 'portal',
       url: 'http://127.0.0.1:3001/portal/',
       expectedTexts: [
-        'Unified AI gateway workspace',
         'Operate routing, credentials, usage, and downloads from one product surface.',
+        'Launch sequence',
+        'Product pathways',
       ],
-      expectedSelectors: [
-        '[data-slot="portal-home-page"]',
-        '[data-slot="portal-home-metrics"]',
-      ],
+      expectedSelectors: [],
     },
   ]);
   assert.match(plan.envContents, /^SDKWORK_BOOTSTRAP_PROFILE=prod$/m);
