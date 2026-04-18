@@ -23,6 +23,7 @@ test('linux Docker Compose smoke script exposes a parseable CLI contract for pac
   assert.equal(typeof module.normalizeSpawnEnvironmentForPlatform, 'function');
   assert.equal(typeof module.normalizeDockerFallbackLogCapture, 'function');
   assert.equal(typeof module.createDockerRunLogEvidence, 'function');
+  assert.equal(typeof module.shouldContinueWithoutBrowserSmoke, 'function');
   assert.equal(typeof module.isCliEntrypoint, 'function');
   assert.equal(typeof module.resolveExtractedBundleRoot, 'function');
 
@@ -245,6 +246,49 @@ test('linux Docker Compose smoke normalizes Windows PATH variants before spawnin
     Path: 'C:/docker-bin',
     HOME: 'C:/Users/admin',
   });
+});
+
+test('linux Docker Compose smoke only tolerates missing Chromium on hosted Linux CI lanes', async () => {
+  const module = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'run-linux-docker-compose-smoke.mjs'),
+    ).href,
+  );
+
+  const missingBrowserError = new Error(
+    'unable to resolve a Chromium-based browser executable for browser runtime smoke on linux',
+  );
+
+  assert.equal(
+    module.shouldContinueWithoutBrowserSmoke({
+      hostPlatform: 'linux',
+      env: {
+        GITHUB_ACTIONS: 'true',
+      },
+      error: missingBrowserError,
+    }),
+    true,
+  );
+
+  assert.equal(
+    module.shouldContinueWithoutBrowserSmoke({
+      hostPlatform: 'linux',
+      env: {},
+      error: missingBrowserError,
+    }),
+    false,
+  );
+
+  assert.equal(
+    module.shouldContinueWithoutBrowserSmoke({
+      hostPlatform: 'linux',
+      env: {
+        GITHUB_ACTIONS: 'true',
+      },
+      error: new Error('browser runtime smoke did not observe the expected runtime markers before timeout'),
+    }),
+    false,
+  );
 });
 
 test('linux Docker Compose smoke resolves the extracted bundle root even when the archive file name changes', async () => {

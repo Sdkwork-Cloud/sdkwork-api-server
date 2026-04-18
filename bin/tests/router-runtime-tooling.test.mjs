@@ -1651,6 +1651,30 @@ test('applyInstallPlan materializes the versioned payload from the packaged serv
   }
 });
 
+test('createOfficialServerBundleExtractionPlan avoids -C absolute Windows staging paths for GNU tar', async () => {
+  const module = await loadModule();
+
+  assert.equal(typeof module.createOfficialServerBundleExtractionPlan, 'function');
+
+  const stagingRoot = 'C:/work/sdkwork-api-router/artifacts/release-smoke/windows-x64/releases/0.1.0/.sdkwork-install-bundle-abc123';
+  const extractionPlan = module.createOfficialServerBundleExtractionPlan({
+    bundlePath: 'C:/work/sdkwork-api-router/artifacts/release/native/windows/x64/bundles/sdkwork-api-router-product-server-windows-x64.tar.gz',
+    stagingRoot,
+    platform: 'win32',
+    tarFlavor: 'gnu',
+  });
+
+  assert.equal(extractionPlan.command, 'tar');
+  assert.equal(extractionPlan.cwd, stagingRoot);
+  assert.equal(extractionPlan.shell, true);
+  assert.deepEqual(extractionPlan.args, [
+    '--force-local',
+    '-xzf',
+    'C:/work/sdkwork-api-router/artifacts/release/native/windows/x64/bundles/sdkwork-api-router-product-server-windows-x64.tar.gz',
+  ]);
+  assert.equal(extractionPlan.args.includes('-C'), false);
+});
+
 test('renderRuntimeEnvTemplate defaults release runtime to writable local data and product server-mode ports', async () => {
   const module = await loadModule();
   const installRoot = '/opt/sdkwork-api-router';

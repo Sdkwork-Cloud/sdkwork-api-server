@@ -129,6 +129,18 @@ export function normalizeDockerFallbackLogCapture({
   };
 }
 
+export function shouldContinueWithoutBrowserSmoke({
+  hostPlatform = process.platform,
+  env = process.env,
+  error,
+} = {}) {
+  return hostPlatform === 'linux'
+    && String(env.GITHUB_ACTIONS ?? '').toLowerCase() === 'true'
+    && /unable to resolve a Chromium-based browser executable/i.test(
+      String(error instanceof Error ? error.message : error ?? ''),
+    );
+}
+
 export function createDockerRunLogEvidence({
   routerLogOutput = '',
   postgresLogOutput = '',
@@ -904,21 +916,70 @@ function queryTableCountViaDockerRun(plan, bundleRoot, env, table) {
   return count;
 }
 
-async function runBrowserSmokeTargets(plan) {
+async function runBrowserSmokeTargets(plan, {
+  env = process.env,
+  hostPlatform = process.platform,
+} = {}) {
   const browserSmokeResults = [];
+  const diagnostics = [];
+  let skipBrowserSmokeReason = '';
+
   for (const target of plan.browserSmokeTargets) {
-    // eslint-disable-next-line no-await-in-loop
-    const result = await runBrowserRuntimeSmoke({
-      url: target.url,
-      expectedSelectors: target.expectedSelectors,
-    });
-    browserSmokeResults.push({
-      label: target.label,
-      ...result,
-    });
+    if (skipBrowserSmokeReason) {
+      browserSmokeResults.push({
+        label: target.label,
+        url: target.url,
+        expectedTexts: target.expectedTexts ?? [],
+        expectedSelectors: target.expectedSelectors ?? [],
+        skipped: true,
+        reason: skipBrowserSmokeReason,
+      });
+      continue;
+    }
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await runBrowserRuntimeSmoke({
+        url: target.url,
+        expectedTexts: target.expectedTexts,
+        expectedSelectors: target.expectedSelectors,
+        env,
+        platform: hostPlatform,
+      });
+      browserSmokeResults.push({
+        label: target.label,
+        ...result,
+      });
+    } catch (error) {
+      if (!shouldContinueWithoutBrowserSmoke({
+        hostPlatform,
+        env,
+        error,
+      })) {
+        throw error;
+      }
+
+      skipBrowserSmokeReason = String(
+        error instanceof Error ? error.message : error ?? 'missing Chromium browser runtime',
+      );
+      diagnostics.push(
+        'browser runtime smoke skipped because hosted Linux CI did not provide a Chromium-based browser executable',
+      );
+      browserSmokeResults.push({
+        label: target.label,
+        url: target.url,
+        expectedTexts: target.expectedTexts ?? [],
+        expectedSelectors: target.expectedSelectors ?? [],
+        skipped: true,
+        reason: skipBrowserSmokeReason,
+      });
+    }
   }
 
-  return browserSmokeResults;
+  return {
+    browserSmokeResults,
+    diagnostics,
+  };
 }
 
 function collectDatabaseAssertions(plan, queryCount) {
@@ -971,14 +1032,18 @@ async function runLinuxDockerComposeSmokeViaCompose({
 
   await waitForResponses(plan.healthUrls, assertHealthyResponse, 'health checks');
   await waitForResponses(plan.siteUrls, assertSiteResponse, 'site checks');
+  const browserSmoke = await runBrowserSmokeTargets(plan, {
+    env,
+  });
 
   return {
     composeCwd,
-    browserSmokeResults: await runBrowserSmokeTargets(plan),
+    browserSmokeResults: browserSmoke.browserSmokeResults,
     databaseAssertions: collectDatabaseAssertions(
       plan,
       (table) => queryTableCount(plan, composeCwd, env, table),
     ),
+    diagnostics: browserSmoke.diagnostics,
     composePs: captureComposeOutput(
       buildDockerComposeArgs(plan, 'ps'),
       { cwd: composeCwd, env },
@@ -1063,6 +1128,9 @@ async function runLinuxDockerComposeSmokeViaDockerRun({
 
   await waitForResponses(plan.healthUrls, assertHealthyResponse, 'health checks');
   await waitForResponses(plan.siteUrls, assertSiteResponse, 'site checks');
+  const browserSmoke = await runBrowserSmokeTargets(plan, {
+    env,
+  });
   const logEvidence = createDockerRunLogEvidence({
     routerLogOutput: captureDockerOutput(
       ['logs', '--tail', '200', plan.fallbackResources.routerContainerName],
@@ -1076,7 +1144,7 @@ async function runLinuxDockerComposeSmokeViaDockerRun({
 
   return {
     composeCwd,
-    browserSmokeResults: await runBrowserSmokeTargets(plan),
+    browserSmokeResults: browserSmoke.browserSmokeResults,
     databaseAssertions: collectDatabaseAssertions(
       plan,
       (table) => queryTableCountViaDockerRun(plan, composeCwd, env, table),
@@ -1086,7 +1154,10 @@ async function runLinuxDockerComposeSmokeViaDockerRun({
       { cwd: composeCwd, env },
     ),
     logs: logEvidence.logs,
-    diagnostics: logEvidence.diagnostics,
+    diagnostics: [
+      ...logEvidence.diagnostics,
+      ...browserSmoke.diagnostics,
+    ],
   };
 }
 

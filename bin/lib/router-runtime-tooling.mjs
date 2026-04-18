@@ -294,21 +294,41 @@ function createManagedStagingRoot(stagingParent, prefix) {
   return mkdtempSync(path.join(stagingParent, prefix));
 }
 
+export function createOfficialServerBundleExtractionPlan({
+  bundlePath,
+  stagingRoot,
+  platform = process.platform,
+  tarFlavor = detectTarFlavorForExtraction(),
+} = {}) {
+  const runtimePlatform = normalizeRuntimePlatform(platform);
+  const args = [];
+  if (runtimePlatform === 'win32' && tarFlavor === 'gnu') {
+    args.push('--force-local');
+  }
+  args.push('-xzf', bundlePath);
+
+  return {
+    command: 'tar',
+    args,
+    cwd: stagingRoot,
+    shell: runtimePlatform === 'win32',
+    encoding: 'utf8',
+  };
+}
+
 function extractOfficialProductServerBundle(bundlePath, {
   stagingParent = path.dirname(bundlePath),
 } = {}) {
   const stagingRoot = createManagedStagingRoot(stagingParent, '.sdkwork-install-bundle-');
-  const tarFlavor = detectTarFlavorForExtraction();
-  const args = [];
-  if (process.platform === 'win32' && tarFlavor === 'gnu') {
-    args.push('--force-local');
-  }
-  args.push('-xzf', bundlePath, '-C', stagingRoot);
+  const extractionPlan = createOfficialServerBundleExtractionPlan({
+    bundlePath,
+    stagingRoot,
+  });
 
-  const result = spawnSync('tar', args, {
-    cwd: process.cwd(),
-    shell: process.platform === 'win32',
-    encoding: 'utf8',
+  const result = spawnSync(extractionPlan.command, extractionPlan.args, {
+    cwd: extractionPlan.cwd,
+    shell: extractionPlan.shell,
+    encoding: extractionPlan.encoding,
   });
   if (result.error || result.status !== 0) {
     const fragments = [];
