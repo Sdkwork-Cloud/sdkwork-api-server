@@ -100,6 +100,68 @@ function createReleaseSyncAuditArtifactPayload(head = 'abc123') {
   };
 }
 
+function createCurrentRepoReleaseSyncGitFallback({
+  localHead = 'fed456',
+  remoteHead = localHead,
+  statusText = '## main...origin/main\n',
+} = {}) {
+  let gitSpawnCount = 0;
+
+  return {
+    getCount() {
+      return gitSpawnCount;
+    },
+    fallbackSpawnSyncImpl(command, args, options = {}) {
+      gitSpawnCount += 1;
+      assert.equal(command, process.platform === 'win32' ? 'git.exe' : 'git');
+      assert.equal(options.cwd, repoRoot);
+
+      const key = args.join('\u0000');
+      if (key === 'rev-parse\u0000--show-toplevel') {
+        return {
+          status: 0,
+          stdout: `${repoRoot}\n`,
+          stderr: '',
+        };
+      }
+
+      if (key === 'status\u0000--short\u0000--branch') {
+        return {
+          status: 0,
+          stdout: statusText,
+          stderr: '',
+        };
+      }
+
+      if (key === 'remote\u0000get-url\u0000origin') {
+        return {
+          status: 0,
+          stdout: 'https://github.com/Sdkwork-Cloud/sdkwork-api-router.git\n',
+          stderr: '',
+        };
+      }
+
+      if (key === 'rev-parse\u0000HEAD') {
+        return {
+          status: 0,
+          stdout: `${localHead}\n`,
+          stderr: '',
+        };
+      }
+
+      if (key === 'ls-remote\u0000origin\u0000main') {
+        return {
+          status: 0,
+          stdout: `${remoteHead}\trefs/heads/main\n`,
+          stderr: '',
+        };
+      }
+
+      throw new Error(`unexpected live git replay: ${command} ${args.join(' ')}`);
+    },
+  };
+}
+
 function createTelemetrySnapshotPayload() {
   return {
     version: 1,
@@ -487,6 +549,10 @@ test('restore release governance latest materializer enables blocked-host govern
       artifactDir: artifactRoot,
       repoRoot,
     });
+    const liveGit = createCurrentRepoReleaseSyncGitFallback({
+      localHead: 'fed456',
+      remoteHead: 'fed456',
+    });
 
     const summary = await governanceModule.runReleaseGovernanceChecks({
       spawnSyncImpl() {
@@ -497,13 +563,12 @@ test('restore release governance latest materializer enables blocked-host govern
           error: new Error('spawnSync node EPERM'),
         };
       },
-      fallbackSpawnSyncImpl() {
-        throw new Error('live git replay should not run after latest governance artifacts are restored');
-      },
+      fallbackSpawnSyncImpl: liveGit.fallbackSpawnSyncImpl,
     });
 
     assert.equal(summary.ok, true);
     assert.equal(summary.blocked, false);
     assert.deepEqual(summary.blockedIds, []);
+    assert.equal(liveGit.getCount(), 5);
   });
 });
