@@ -11,6 +11,16 @@ function read(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
+function extractNamedStepBlock(containerText, stepName) {
+  const stepPattern = new RegExp(
+    String.raw`^\s+- name: ${stepName}\r?\n[\s\S]*?(?=^\s+- name:|\Z)`,
+    'im',
+  );
+  const match = containerText.match(stepPattern);
+  assert.ok(match, `missing ${stepName} step`);
+  return match[0];
+}
+
 test('repository exposes a pull-request product verification workflow with governed installs and strict mode', () => {
   const workflowPath = path.join(repoRoot, '.github', 'workflows', 'product-verification.yml');
 
@@ -71,6 +81,20 @@ test('repository exposes a pull-request product verification workflow with gover
   assert.match(
     workflow,
     /Run product verification gate[\s\S]*?env:[\s\S]*?SDKWORK_STRICT_FRONTEND_INSTALLS:\s*'1'[\s\S]*?run:\s*node scripts\/check-router-product\.mjs/,
+  );
+});
+
+test('product verification workflow defers pnpm version selection to the root packageManager field', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const pnpmSetupStep = extractNamedStepBlock(
+    read('.github/workflows/product-verification.yml'),
+    'Setup pnpm',
+  );
+
+  assert.equal(rootPackage.packageManager, 'pnpm@10.30.2');
+  assert.doesNotMatch(
+    pnpmSetupStep,
+    /^\s+version:/m,
   );
 });
 

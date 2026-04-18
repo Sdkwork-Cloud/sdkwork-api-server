@@ -21,6 +21,16 @@ function extractTopLevelJobBlock(workflow, jobName) {
   return match[0];
 }
 
+function extractNamedStepBlock(containerText, stepName) {
+  const stepPattern = new RegExp(
+    String.raw`^\s+- name: ${stepName}\r?\n[\s\S]*?(?=^\s+- name:|\Z)`,
+    'im',
+  );
+  const match = containerText.match(stepPattern);
+  assert.ok(match, `missing ${stepName} step`);
+  return match[0];
+}
+
 function writeModule(filePath, source) {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, source, 'utf8');
@@ -724,6 +734,29 @@ test('release workflow disables setup-node package-manager auto-cache in non-pnp
   assert.match(
     publishJob,
     /actions\/setup-node@v5[\s\S]*?node-version:\s*22[\s\S]*?package-manager-cache:\s*false/,
+  );
+});
+
+test('release workflow defers pnpm version selection to the root packageManager field', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const workflow = read('.github/workflows/release.yml');
+  const productVerificationPnpmStep = extractNamedStepBlock(
+    extractTopLevelJobBlock(workflow, 'product-verification'),
+    'Setup pnpm',
+  );
+  const nativeReleasePnpmStep = extractNamedStepBlock(
+    extractTopLevelJobBlock(workflow, 'native-release'),
+    'Setup pnpm',
+  );
+
+  assert.equal(rootPackage.packageManager, 'pnpm@10.30.2');
+  assert.doesNotMatch(
+    productVerificationPnpmStep,
+    /^\s+version:/m,
+  );
+  assert.doesNotMatch(
+    nativeReleasePnpmStep,
+    /^\s+version:/m,
   );
 });
 
