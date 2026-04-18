@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -44,20 +45,31 @@ function managedWindowsWorkspaceTargetLeaf(workspaceRoot) {
   return `${workspaceName}-${workspaceHash}`;
 }
 
-function defaultManagedWindowsWorkspaceRoot(workspaceRoot, directoryName) {
+function defaultManagedWindowsWorkspaceRoot(
+  workspaceRoot,
+  directoryName,
+  hostPlatform = process.platform,
+) {
   const resolvedWorkspaceRoot = path.resolve(workspaceRoot);
   const workspaceDriveRoot = path.parse(resolvedWorkspaceRoot).root;
-  if (workspaceDriveRoot) {
+
+  if (hostPlatform === 'win32' && workspaceDriveRoot) {
     return path.join(workspaceDriveRoot, directoryName);
   }
 
-  return '';
+  const hostTempRoot = os.tmpdir();
+  if (typeof hostTempRoot === 'string' && hostTempRoot.trim().length > 0) {
+    return path.join(hostTempRoot, directoryName);
+  }
+
+  return path.join(resolvedWorkspaceRoot, 'bin', `.${directoryName}`);
 }
 
 export function resolveWorkspaceTargetDir({
   workspaceRoot,
   env = process.env,
   platform = process.platform,
+  hostPlatform = process.platform,
 } = {}) {
   if (typeof workspaceRoot !== 'string' || workspaceRoot.trim().length === 0) {
     throw new Error('workspaceRoot is required.');
@@ -86,6 +98,7 @@ export function resolveWorkspaceTargetDir({
   const defaultManagedWindowsTargetRoot = defaultManagedWindowsWorkspaceRoot(
     workspaceRoot,
     'sdkwork-target',
+    hostPlatform,
   );
   if (defaultManagedWindowsTargetRoot.length > 0) {
     return path.join(
@@ -101,6 +114,7 @@ export function resolveWorkspaceTempDir({
   workspaceRoot,
   env = process.env,
   platform = process.platform,
+  hostPlatform = process.platform,
 } = {}) {
   if (typeof workspaceRoot !== 'string' || workspaceRoot.trim().length === 0) {
     throw new Error('workspaceRoot is required.');
@@ -122,6 +136,7 @@ export function resolveWorkspaceTempDir({
   const defaultManagedWindowsTempRoot = defaultManagedWindowsWorkspaceRoot(
     workspaceRoot,
     'sdkwork-temp',
+    hostPlatform,
   );
   if (defaultManagedWindowsTempRoot.length > 0) {
     return path.join(
@@ -137,6 +152,7 @@ export function withManagedWorkspaceTargetDir({
   workspaceRoot,
   env = process.env,
   platform = process.platform,
+  hostPlatform = process.platform,
 } = {}) {
   const nextEnv = { ...env };
   if (platform === 'win32' && String(nextEnv.CARGO_TARGET_DIR ?? '').trim().length === 0) {
@@ -144,6 +160,7 @@ export function withManagedWorkspaceTargetDir({
       workspaceRoot,
       env: nextEnv,
       platform,
+      hostPlatform,
     });
   }
 
@@ -154,6 +171,7 @@ export function withManagedWorkspaceTempDir({
   workspaceRoot,
   env = process.env,
   platform = process.platform,
+  hostPlatform = process.platform,
 } = {}) {
   const nextEnv = { ...env };
   if (platform === 'win32') {
@@ -161,6 +179,7 @@ export function withManagedWorkspaceTempDir({
       workspaceRoot,
       env: nextEnv,
       platform,
+      hostPlatform,
     });
     mkdirSync(tempDir, { recursive: true });
     nextEnv.TEMP = tempDir;
