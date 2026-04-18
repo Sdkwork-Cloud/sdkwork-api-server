@@ -28,7 +28,7 @@ export async function assertProductVerificationWorkflowContracts({
     'product verification workflow must watch the release workflow because release packaging contract changes are product-surface changes',
   );
   assert.match(workflow, /actions\/checkout@v5/);
-  assert.match(workflow, /pnpm\/action-setup@v4/);
+  assert.match(workflow, /pnpm\/action-setup@v5/);
   assert.match(workflow, /actions\/setup-node@v5/);
   assert.match(workflow, /dtolnay\/rust-toolchain@stable/);
   assert.match(workflow, /Swatinem\/rust-cache@v2/);

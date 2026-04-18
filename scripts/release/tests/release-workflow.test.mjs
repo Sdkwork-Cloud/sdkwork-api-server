@@ -162,6 +162,10 @@ test('release workflow publishes only official server and portal desktop product
   const workflow = read('.github/workflows/release.yml');
 
   assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'/);
+  assert.match(workflow, /pnpm\/action-setup@v5/);
+  assert.match(workflow, /actions\/upload-artifact@v6/);
+  assert.match(workflow, /actions\/download-artifact@v8/);
+  assert.match(workflow, /softprops\/action-gh-release@v3/);
   assert.match(workflow, /governance-release:/);
   assert.match(workflow, /native-release:/);
   assert.match(workflow, /publish:/);
@@ -292,7 +296,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: \${{ needs.prepare.outputs.git_ref }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
       - uses: actions/setup-node@v5
@@ -328,7 +332,7 @@ jobs:
       - name: Build portal desktop release
         run: node scripts/release/run-desktop-release-build.mjs --app portal --target \${{ matrix.target }}
       - name: Upload official release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-assets-native-\${{ matrix.platform }}-\${{ matrix.arch }}
           path: |
@@ -389,7 +393,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: \${{ needs.prepare.outputs.git_ref }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
       - uses: actions/setup-node@v5
@@ -443,7 +447,7 @@ jobs:
       - name: Materialize release governance bundle
         run: node scripts/release/materialize-release-governance-bundle.mjs
       - name: Upload release governance bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-bundle
           path: artifacts/release-governance-bundle/**/*
@@ -463,7 +467,7 @@ jobs:
       - name: Package web release assets
         run: node scripts/release/package-release-assets.mjs web --release-tag \${{ needs.prepare.outputs.release_tag }} --output-dir artifacts/release
       - name: Upload web release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-assets-web
           path: artifacts/release/**/*
@@ -522,7 +526,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: \${{ needs.prepare.outputs.git_ref }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
       - uses: actions/setup-node@v5
@@ -574,7 +578,7 @@ jobs:
       - name: Materialize release governance bundle
         run: node scripts/release/materialize-release-governance-bundle.mjs
       - name: Upload release governance bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-bundle
           path: artifacts/release-governance-bundle/**/*
@@ -594,7 +598,7 @@ jobs:
       - name: Build portal desktop release
         run: node scripts/release/run-desktop-release-build.mjs --app portal --target \${{ matrix.target }}
       - name: Upload official release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-assets-native-\${{ matrix.platform }}-\${{ matrix.arch }}
           path: |
@@ -670,7 +674,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: \${{ needs.prepare.outputs.git_ref }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
       - uses: actions/setup-node@v5

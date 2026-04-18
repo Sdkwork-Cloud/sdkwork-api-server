@@ -92,7 +92,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -176,7 +176,7 @@ jobs:
         run: node scripts/release/materialize-release-window-snapshot.mjs
 
       - name: Upload release window snapshot governance artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-window-snapshot
           path: docs/release/release-window-snapshot-latest.json
@@ -195,7 +195,7 @@ jobs:
         run: node scripts/release/materialize-release-sync-audit.mjs
 
       - name: Upload release sync audit governance artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-sync-audit
           path: docs/release/release-sync-audit-latest.json
@@ -217,7 +217,7 @@ jobs:
         run: node scripts/release/materialize-release-telemetry-export.mjs
 
       - name: Upload release telemetry export governance artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-telemetry-export
           path: docs/release/release-telemetry-export-latest.json
@@ -230,7 +230,7 @@ jobs:
         run: node scripts/release/materialize-release-telemetry-snapshot.mjs
 
       - name: Upload release telemetry snapshot governance artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-telemetry-snapshot
           path: docs/release/release-telemetry-snapshot-latest.json
@@ -243,7 +243,7 @@ jobs:
         run: node scripts/release/materialize-slo-governance-evidence.mjs
 
       - name: Upload SLO governance evidence artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-slo-evidence
           path: docs/release/slo-governance-latest.json
@@ -254,7 +254,7 @@ jobs:
         run: node scripts/release/materialize-release-governance-bundle.mjs
 
       - name: Upload release governance bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-bundle
           path: artifacts/release-governance-bundle/**/*
@@ -327,7 +327,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -401,7 +401,7 @@ jobs:
 
       - name: Upload Windows installed runtime smoke evidence
         if: ${{ always() && matrix.platform == 'windows' && hashFiles(format('artifacts/release-governance/windows-installed-runtime-smoke-{0}-{1}.json', matrix.platform, matrix.arch)) != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/release-governance/windows-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
@@ -420,7 +420,7 @@ jobs:
 
       - name: Upload Unix installed runtime smoke evidence
         if: ${{ always() && matrix.platform != 'windows' && hashFiles(format('artifacts/release-governance/unix-installed-runtime-smoke-{0}-{1}.json', matrix.platform, matrix.arch)) != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/release-governance/unix-installed-runtime-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
@@ -439,7 +439,7 @@ jobs:
 
       - name: Upload Linux Docker Compose smoke evidence
         if: ${{ always() && matrix.platform == 'linux' && hashFiles(format('artifacts/release-governance/docker-compose-smoke-{0}-{1}.json', matrix.platform, matrix.arch)) != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/release-governance/docker-compose-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
@@ -458,7 +458,7 @@ jobs:
 
       - name: Upload Linux Helm render smoke evidence
         if: ${{ always() && matrix.platform == 'linux' && hashFiles(format('artifacts/release-governance/helm-render-smoke-{0}-{1}.json', matrix.platform, matrix.arch)) != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-governance-helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/release-governance/helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
@@ -471,7 +471,7 @@ jobs:
           subject-path: artifacts/release-governance/helm-render-smoke-${{ matrix.platform }}-${{ matrix.arch }}.json
 
       - name: Upload official release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-assets-native-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -512,7 +512,7 @@ jobs:
           package-manager-cache: false
 
       - name: Download packaged release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-assets-native-*
           path: artifacts/release
@@ -528,7 +528,7 @@ jobs:
           subject-path: artifacts/release/release-catalog.json
 
       - name: Publish release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
           name: SDKWork API Router ${{ needs.prepare.outputs.release_tag }}

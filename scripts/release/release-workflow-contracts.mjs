@@ -55,7 +55,7 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /product-verification:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?ref:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?pnpm\/action-setup@v4[\s\S]*?actions\/setup-node@v5[\s\S]*?node-version:\s*22[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?Swatinem\/rust-cache@v2[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?Run release product verification[\s\S]*?SDKWORK_STRICT_FRONTEND_INSTALLS:\s*'1'[\s\S]*?node scripts\/check-router-product\.mjs/,
+    /product-verification:[\s\S]*?runs-on:\s*ubuntu-latest[\s\S]*?actions\/checkout@v5[\s\S]*?ref:\s*\$\{\{\s*needs\.prepare\.outputs\.git_ref\s*\}\}[\s\S]*?pnpm\/action-setup@v5[\s\S]*?actions\/setup-node@v5[\s\S]*?node-version:\s*22[\s\S]*?dtolnay\/rust-toolchain@stable[\s\S]*?Swatinem\/rust-cache@v2[\s\S]*?taiki-e\/install-action@cargo-audit[\s\S]*?Install product verification workspace dependencies[\s\S]*?pnpm --dir apps\/sdkwork-router-admin install --frozen-lockfile[\s\S]*?pnpm --dir apps\/sdkwork-router-portal install --frozen-lockfile[\s\S]*?Run release product verification[\s\S]*?SDKWORK_STRICT_FRONTEND_INSTALLS:\s*'1'[\s\S]*?node scripts\/check-router-product\.mjs/,
     'release workflow must execute product verification with frozen installs and strict frontend install mode before any assets are built',
   );
   assert.doesNotMatch(
@@ -173,7 +173,7 @@ export async function assertReleaseWorkflowContracts({
   );
   assert.match(
     workflow,
-    /publish:[\s\S]*?Download packaged release assets[\s\S]*?pattern:\s*release-assets-native-\*[\s\S]*?Publish release assets[\s\S]*?softprops\/action-gh-release@v2[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.tar\.gz[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.tar\.gz\.sha256\.txt[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.manifest\.json[\s\S]*?artifacts\/release\/\*\*\/desktop\/portal\/sdkwork-router-portal-desktop-\*[\s\S]*?artifacts\/release\/release-catalog\.json/,
+    /publish:[\s\S]*?Download packaged release assets[\s\S]*?actions\/download-artifact@v8[\s\S]*?pattern:\s*release-assets-native-\*[\s\S]*?Publish release assets[\s\S]*?softprops\/action-gh-release@v3[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.tar\.gz[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.tar\.gz\.sha256\.txt[\s\S]*?artifacts\/release\/\*\*\/sdkwork-api-router-product-server-\*\.manifest\.json[\s\S]*?artifacts\/release\/\*\*\/desktop\/portal\/sdkwork-router-portal-desktop-\*[\s\S]*?artifacts\/release\/release-catalog\.json/,
     'publish job must attach the explicit official server and portal desktop asset globs plus the unified release catalog',
   );
   assert.doesNotMatch(
