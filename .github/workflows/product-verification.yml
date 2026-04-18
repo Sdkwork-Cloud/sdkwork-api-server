@@ -47,6 +47,9 @@ on:
       - 'vendor/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   product-verification:
     runs-on: ubuntu-latest

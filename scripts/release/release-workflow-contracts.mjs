@@ -31,6 +31,11 @@ export async function assertReleaseWorkflowContracts({
   assert.match(workflow, /permissions:\s*[\s\S]*id-token:\s*write/);
   assert.match(workflow, /permissions:\s*[\s\S]*attestations:\s*write/);
   assert.match(workflow, /permissions:\s*[\s\S]*artifact-metadata:\s*write/);
+  assert.match(
+    workflow,
+    /permissions:\s*[\s\S]*artifact-metadata:\s*write[\s\S]*?env:\s*[\s\S]*?FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'[\s\S]*?jobs:/,
+    'release workflow must opt GitHub JavaScript actions into the Node 24 runtime to avoid Node 20 deprecation drift on hosted runners',
+  );
 
   assert.match(
     workflow,

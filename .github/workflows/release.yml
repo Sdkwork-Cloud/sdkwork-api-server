@@ -21,6 +21,9 @@ permissions:
   attestations: write
   artifact-metadata: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   prepare:
     runs-on: ubuntu-latest

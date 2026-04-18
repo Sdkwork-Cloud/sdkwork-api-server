@@ -36,6 +36,17 @@ function writeModule(filePath, source) {
   writeFileSync(filePath, source, 'utf8');
 }
 
+function withNode24JavaScriptActionsEnv(workflowText) {
+  if (/FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'/.test(workflowText)) {
+    return workflowText;
+  }
+
+  return workflowText.replace(
+    /artifact-metadata:\s*write\r?\n/,
+    `artifact-metadata: write\n\nenv:\n  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'\n`,
+  );
+}
+
 function writeReleaseWorkflowContractFixture({
   workflowText,
   coverage = {
@@ -43,6 +54,7 @@ function writeReleaseWorkflowContractFixture({
     uncoveredReferences: [],
     externalDependencyIds: ['sdkwork-ui'],
   },
+  includeNode24JavaScriptActionsEnv = true,
 } = {}) {
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-release-workflow-'));
   mkdirSync(path.join(fixtureRoot, '.github', 'workflows'), { recursive: true });
@@ -50,7 +62,7 @@ function writeReleaseWorkflowContractFixture({
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'release.yml'),
-    workflowText,
+    includeNode24JavaScriptActionsEnv ? withNode24JavaScriptActionsEnv(workflowText) : workflowText,
     'utf8',
   );
 
@@ -149,6 +161,7 @@ test('release workflow publishes only official server and portal desktop product
 
   const workflow = read('.github/workflows/release.yml');
 
+  assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'/);
   assert.match(workflow, /governance-release:/);
   assert.match(workflow, /native-release:/);
   assert.match(workflow, /publish:/);
@@ -757,6 +770,29 @@ test('release workflow defers pnpm version selection to the root packageManager 
   assert.doesNotMatch(
     nativeReleasePnpmStep,
     /^\s+version:/m,
+  );
+});
+
+test('release workflow contract helper rejects workflows that do not opt JavaScript actions into Node 24', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'release', 'release-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const fixtureRoot = writeReleaseWorkflowContractFixture({
+    workflowText: read('.github/workflows/release.yml').replace(
+      /^env:\r?\n\s+FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'\r?\n\r?\n/m,
+      '',
+    ),
+    includeNode24JavaScriptActionsEnv: false,
+  });
+
+  await assert.rejects(
+    contracts.assertReleaseWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /node 24|javascript actions/i,
   );
 });
 

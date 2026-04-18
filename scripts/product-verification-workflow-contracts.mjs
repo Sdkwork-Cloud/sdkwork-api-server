@@ -19,6 +19,11 @@ export async function assertProductVerificationWorkflowContracts({
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(
     workflow,
+    /workflow_dispatch:\s*[\s\S]*?env:\s*[\s\S]*?FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'[\s\S]*?jobs:/,
+    'product verification workflow must opt GitHub JavaScript actions into the Node 24 runtime to avoid Node 20 deprecation drift on hosted runners',
+  );
+  assert.match(
+    workflow,
     /\.github\/workflows\/release\.yml/,
     'product verification workflow must watch the release workflow because release packaging contract changes are product-surface changes',
   );

@@ -21,6 +21,17 @@ function extractNamedStepBlock(containerText, stepName) {
   return match[0];
 }
 
+function withNode24JavaScriptActionsEnv(workflowText) {
+  if (/FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'/.test(workflowText)) {
+    return workflowText;
+  }
+
+  return workflowText.replace(
+    /\r?\njobs:\r?\n/,
+    `\n\nenv:\n  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'\n\njobs:\n`,
+  );
+}
+
 test('repository exposes a pull-request product verification workflow with governed installs and strict mode', () => {
   const workflowPath = path.join(repoRoot, '.github', 'workflows', 'product-verification.yml');
 
@@ -30,6 +41,7 @@ test('repository exposes a pull-request product verification workflow with gover
 
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'/);
   assert.match(workflow, /\.github\/workflows\/release\.yml/);
   assert.match(workflow, /actions\/checkout@v5/);
   assert.match(workflow, /pnpm\/action-setup@v4/);
@@ -98,6 +110,33 @@ test('product verification workflow defers pnpm version selection to the root pa
   );
 });
 
+test('product verification workflow contract helper rejects workflows that do not opt JavaScript actions into Node 24', async () => {
+  const contracts = await import(
+    pathToFileURL(
+      path.join(repoRoot, 'scripts', 'product-verification-workflow-contracts.mjs'),
+    ).href,
+  );
+
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'sdkwork-product-verification-workflow-'));
+  mkdirSync(path.join(fixtureRoot, '.github', 'workflows'), { recursive: true });
+
+  writeFileSync(
+    path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
+    read('.github/workflows/product-verification.yml').replace(
+      /^env:\r?\n\s+FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*'true'\r?\n\r?\n/m,
+      '',
+    ),
+    'utf8',
+  );
+
+  await assert.rejects(
+    contracts.assertProductVerificationWorkflowContracts({
+      repoRoot: fixtureRoot,
+    }),
+    /node 24|javascript actions/i,
+  );
+});
+
 test('product verification workflow contract helper rejects workflows without strict frontend install mode', async () => {
   const contracts = await import(
     pathToFileURL(
@@ -110,7 +149,7 @@ test('product verification workflow contract helper rejects workflows without st
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
-    `
+    withNode24JavaScriptActionsEnv(`
 name: product-verification
 
 on:
@@ -181,7 +220,7 @@ jobs:
 
       - name: Run product verification gate
         run: node scripts/check-router-product.mjs
-`,
+`),
     'utf8',
   );
 
@@ -205,7 +244,7 @@ test('product verification workflow contract helper rejects workflows that do no
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
-    `
+    withNode24JavaScriptActionsEnv(`
 name: product-verification
 
 on:
@@ -277,7 +316,7 @@ jobs:
         env:
           SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
         run: node scripts/check-router-product.mjs
-`,
+`),
     'utf8',
   );
 
@@ -301,7 +340,7 @@ test('product verification workflow contract helper rejects workflows that do no
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
-    `
+    withNode24JavaScriptActionsEnv(`
 name: product-verification
 
 on:
@@ -370,7 +409,7 @@ jobs:
         env:
           SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
         run: node scripts/check-router-product.mjs
-`,
+`),
     'utf8',
   );
 
@@ -394,7 +433,7 @@ test('product verification workflow contract helper rejects workflows that do no
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
-    `
+    withNode24JavaScriptActionsEnv(`
 name: product-verification
 
 on:
@@ -464,7 +503,7 @@ jobs:
         env:
           SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
         run: node scripts/check-router-product.mjs
-`,
+`),
     'utf8',
   );
 
@@ -488,7 +527,7 @@ test('product verification workflow contract helper rejects workflows that do no
 
   writeFileSync(
     path.join(fixtureRoot, '.github', 'workflows', 'product-verification.yml'),
-    `
+    withNode24JavaScriptActionsEnv(`
 name: product-verification
 
 on:
@@ -569,7 +608,7 @@ jobs:
         env:
           SDKWORK_STRICT_FRONTEND_INSTALLS: '1'
         run: node scripts/check-router-product.mjs
-`,
+`),
     'utf8',
   );
 
